@@ -67,10 +67,10 @@ public class AuthService {
         // 5. 로그인 성공 처리
         userMapper.updateLastLogin(request.getUserId());
 
-        // 6. JWT 토큰 생성
+        // 6. JWT 토큰 생성 (사용자 이름 포함)
         Authentication authentication = createAuthentication(user);
-        String accessToken = jwtTokenProvider.createAccessToken(authentication);
-        String refreshToken = jwtTokenProvider.createRefreshToken(authentication);
+        String accessToken = jwtTokenProvider.createAccessToken(authentication, user.getPerson());
+        String refreshToken = jwtTokenProvider.createRefreshToken(authentication, user.getPerson());
 
         log.info("로그인 성공: userId={}", user.getUserId());
 
@@ -154,10 +154,10 @@ public class AuthService {
             throw new BusinessException(ErrorCode.ACCOUNT_DISABLED);
         }
 
-        // 5. 새 토큰 발급
+        // 5. 새 토큰 발급 (사용자 이름 포함)
         Authentication authentication = createAuthentication(user);
-        String newAccessToken = jwtTokenProvider.createAccessToken(authentication);
-        String newRefreshToken = jwtTokenProvider.createRefreshToken(authentication);
+        String newAccessToken = jwtTokenProvider.createAccessToken(authentication, user.getPerson());
+        String newRefreshToken = jwtTokenProvider.createRefreshToken(authentication, user.getPerson());
 
         return LoginResponse.builder()
                 .accessToken(newAccessToken)

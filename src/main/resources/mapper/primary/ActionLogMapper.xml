@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.ActionLogMapper">
+
+    <resultMap id="actionLogResultMap" type="kr.wisead.domain.admin.entity.ActionLog">
+        <id property="seq" column="SEQ"/>
+        <result property="menuName" column="MENU_NAME"/>
+        <result property="actionType" column="ACTION_TYPE"/>
+        <result property="actionReason" column="ACTION_REASON"/>
+        <result property="menuUrl" column="MENU_URL"/>
+        <result property="code" column="CODE"/>
+        <result property="referer" column="REFERER"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="userName" column="USER_NAME"/>
+        <result property="ip" column="IP"/>
+        <result property="regDate" column="REG_DATE"/>
+    </resultMap>
+
+    <sql id="selectLogColumns">
+        SEQ,
+        MENU_NAME,
+        ACTION_TYPE,
+        ACTION_REASON,
+        MENU_URL,
+        CODE,
+        REFERER,
+        USER_ID,
+        USER_NAME,
+        IP,
+        REG_DATE
+    </sql>
+
+    <sql id="whereCondition">
+        <where>
+            1=1
+            <if test="startDate != null and startDate != ''">
+                AND DATE_FORMAT(REG_DATE, '%Y-%m-%d') &gt;= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND DATE_FORMAT(REG_DATE, '%Y-%m-%d') &lt;= #{endDate}
+            </if>
+            <if test="actionType != null and actionType != ''">
+                AND ACTION_TYPE = #{actionType}
+            </if>
+            <if test="searchKeyword != null and searchKeyword != ''">
+                <choose>
+                    <when test="searchField == 'logId'">
+                        AND USER_ID LIKE CONCAT('%', #{searchKeyword}, '%')
+                    </when>
+                    <when test="searchField == 'logName'">
+                        AND USER_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
+                    </when>
+                    <when test="searchField == 'logMenu'">
+                        AND MENU_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
+                    </when>
+                    <otherwise>
+                        AND (
+                            USER_ID LIKE CONCAT('%', #{searchKeyword}, '%')
+                            OR USER_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
+                            OR MENU_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
+                        )
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+    </sql>
+
+    <!-- 액션 로그 목록 조회 -->
+    <select id="selectList" parameterType="kr.wisead.domain.admin.dto.ActionLogSearchRequest" resultMap="actionLogResultMap">
+        SELECT
+            <include refid="selectLogColumns"/>
+        FROM TB_ACTION_LOG
+        <include refid="whereCondition"/>
+        ORDER BY REG_DATE DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <!-- 액션 로그 총 건수 -->
+    <select id="selectCount" parameterType="kr.wisead.domain.admin.dto.ActionLogSearchRequest" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_ACTION_LOG
+        <include refid="whereCondition"/>
+    </select>
+
+    <!-- 액션 로그 상세 조회 -->
+    <select id="selectById" resultMap="actionLogResultMap">
+        SELECT
+            <include refid="selectLogColumns"/>
+        FROM TB_ACTION_LOG
+        WHERE SEQ = #{seq}
+    </select>
+
+    <!-- 액션 로그 등록 -->
+    <insert id="insert" parameterType="kr.wisead.domain.admin.entity.ActionLog" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO TB_ACTION_LOG (
+            MENU_NAME,
+            ACTION_TYPE,
+            MENU_URL,
+            CODE,
+            REFERER,
+            USER_ID,
+            USER_NAME,
+            IP,
+            REG_DATE
+        ) VALUES (
+            #{menuName},
+            #{actionType},
+            #{menuUrl},
+            #{code},
+            #{referer},
+            #{userId},
+            #{userName},
+            #{ip},
+            NOW()
+        )
+    </insert>
+
+    <!-- 다운로드 로그 등록 (사유 포함) -->
+    <insert id="insertDownloadLog" parameterType="kr.wisead.domain.admin.entity.ActionLog" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO TB_ACTION_LOG (
+            MENU_NAME,
+            ACTION_TYPE,
+            ACTION_REASON,
+            MENU_URL,
+            CODE,
+            REFERER,
+            USER_ID,
+            USER_NAME,
+            IP,
+            REG_DATE
+        ) VALUES (
+            #{menuName},
+            #{actionType},
+            #{actionReason},
+            #{menuUrl},
+            #{code},
+            #{referer},
+            #{userId},
+            #{userName},
+            #{ip},
+            NOW()
+        )
+    </insert>
+
+</mapper>

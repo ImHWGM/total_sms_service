@@ -23,6 +23,7 @@ public class UserResponse {
     private String phone;
     private String email;
     private Integer userLevel;
+    private String userLevelName;
     private String status;
     private String useYn;
     private LocalDateTime lastLogin;

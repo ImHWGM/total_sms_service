@@ -33,7 +33,8 @@ public enum ErrorCode {
 
     // Member (M)
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "M001", "회원을 찾을 수 없습니다."),
-    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "M002", "이미 등록된 이메일입니다."),
+    DUPLICATE_USER_ID(HttpStatus.CONFLICT, "M002", "이미 사용 중인 아이디입니다."),
+    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "M003", "이미 등록된 이메일입니다."),
     DUPLICATE_PHONE(HttpStatus.CONFLICT, "M003", "이미 등록된 전화번호입니다."),
     INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "M004", "비밀번호가 일치하지 않습니다."),
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "M005", "비밀번호 확인이 일치하지 않습니다."),

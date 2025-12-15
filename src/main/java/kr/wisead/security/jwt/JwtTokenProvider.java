@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 public class JwtTokenProvider {
 
     private static final String AUTHORITIES_KEY = "auth";
+    private static final String USER_NAME_KEY = "userName";
 
     @Value("${jwt.secret:default-secret-key-for-development-only-must-be-changed-in-production-at-least-256-bits}")
     private String secret;
@@ -50,20 +51,34 @@ public class JwtTokenProvider {
      * Access Token 생성
      */
     public String createAccessToken(Authentication authentication) {
-        return createToken(authentication, accessTokenValidity);
+        return createToken(authentication, null, accessTokenValidity);
+    }
+
+    /**
+     * Access Token 생성 (사용자 이름 포함)
+     */
+    public String createAccessToken(Authentication authentication, String userName) {
+        return createToken(authentication, userName, accessTokenValidity);
     }
 
     /**
      * Refresh Token 생성
      */
     public String createRefreshToken(Authentication authentication) {
-        return createToken(authentication, refreshTokenValidity);
+        return createToken(authentication, null, refreshTokenValidity);
+    }
+
+    /**
+     * Refresh Token 생성 (사용자 이름 포함)
+     */
+    public String createRefreshToken(Authentication authentication, String userName) {
+        return createToken(authentication, userName, refreshTokenValidity);
     }
 
     /**
      * 토큰 생성
      */
-    private String createToken(Authentication authentication, long validity) {
+    private String createToken(Authentication authentication, String userName, long validity) {
         String authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.joining(","));
@@ -71,9 +86,15 @@ public class JwtTokenProvider {
         long now = System.currentTimeMillis();
         Date expiration = new Date(now + validity);
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(authentication.getName())
-                .claim(AUTHORITIES_KEY, authorities)
+                .claim(AUTHORITIES_KEY, authorities);
+
+        if (userName != null) {
+            builder.claim(USER_NAME_KEY, userName);
+        }
+
+        return builder
                 .issuedAt(new Date(now))
                 .expiration(expiration)
                 .signWith(key)
@@ -110,6 +131,20 @@ public class JwtTokenProvider {
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
+    }
+
+    /**
+     * 토큰에서 사용자 이름 추출
+     */
+    public String getUserName(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        Object userName = claims.get(USER_NAME_KEY);
+        return userName != null ? userName.toString() : null;
     }
 
     /**

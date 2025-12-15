@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.SurveyQuestionMapper">
+
+    <!-- 이벤트의 문항 목록 조회 -->
+    <select id="selectByEventSeq" resultType="kr.wisead.domain.survey.entity.SurveyQuestion">
+        SELECT
+            QUESTION_SEQ as questionSeq,
+            EVENT_SEQ as eventSeq,
+            QUESTION_TYPE as questionType,
+            QUESTION_TYPE_DETAIL as questionTypeDetail,
+            QUESTION as question,
+            QUESTION_IMG as questionImg,
+            ORD as `order`,
+            REG_DATE as regDate,
+            REG_ID as regId
+        FROM TB_SURVEY_QUESTION
+        WHERE EVENT_SEQ = #{eventSeq}
+        ORDER BY ORD ASC
+    </select>
+
+    <!-- 문항 상세 조회 -->
+    <select id="selectByQuestionSeq" resultType="kr.wisead.domain.survey.entity.SurveyQuestion">
+        SELECT
+            QUESTION_SEQ as questionSeq,
+            EVENT_SEQ as eventSeq,
+            QUESTION_TYPE as questionType,
+            QUESTION_TYPE_DETAIL as questionTypeDetail,
+            QUESTION as question,
+            QUESTION_IMG as questionImg,
+            ORD as `order`,
+            REG_DATE as regDate,
+            REG_ID as regId
+        FROM TB_SURVEY_QUESTION
+        WHERE QUESTION_SEQ = #{questionSeq}
+    </select>
+
+    <!-- 이벤트의 문항 개수 -->
+    <select id="countByEventSeq" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_SURVEY_QUESTION
+        WHERE EVENT_SEQ = #{eventSeq}
+    </select>
+
+    <!-- 문항 등록 -->
+    <insert id="insert" parameterType="kr.wisead.domain.survey.entity.SurveyQuestion"
+            useGeneratedKeys="true" keyProperty="questionSeq" keyColumn="QUESTION_SEQ">
+        INSERT INTO TB_SURVEY_QUESTION (
+            EVENT_SEQ, QUESTION_TYPE, QUESTION_TYPE_DETAIL,
+            QUESTION, QUESTION_IMG, ORD, REG_DATE, REG_ID
+        ) VALUES (
+            #{eventSeq}, #{questionType}, #{questionTypeDetail},
+            #{question}, #{questionImg}, #{order}, NOW(), #{regId}
+        )
+    </insert>
+
+    <!-- 문항 이미지 수정 -->
+    <update id="updateQuestionImg">
+        UPDATE TB_SURVEY_QUESTION
+        SET QUESTION_IMG = #{questionImg}
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND QUESTION_SEQ = #{questionSeq}
+    </update>
+
+    <!-- 이벤트의 문항 전체 삭제 -->
+    <delete id="deleteByEventSeq">
+        DELETE FROM TB_SURVEY_QUESTION
+        WHERE EVENT_SEQ = #{eventSeq}
+    </delete>
+
+</mapper>

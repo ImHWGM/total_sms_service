@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.SurveyAnswerMapper">
+
+    <!-- 이벤트의 답변 수 -->
+    <select id="countByEventSeq" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_SURVEY_ANSWER
+        WHERE EVENT_SEQ = #{eventSeq}
+    </select>
+
+    <!-- 문항별 응답자 수 -->
+    <select id="countByQuestionSeq" resultType="int">
+        SELECT COUNT(DISTINCT USER_SEQ)
+        FROM TB_SURVEY_ANSWER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND QUESTION_SEQ = #{questionSeq}
+    </select>
+
+    <!-- 항목별 선택 수 -->
+    <select id="countByItemSeq" resultType="int">
+        SELECT COUNT(DISTINCT USER_SEQ)
+        FROM TB_SURVEY_ANSWER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND QUESTION_SEQ = #{questionSeq}
+        AND ITEM_SEQ = #{itemSeq}
+    </select>
+
+    <!-- 복수선택 항목값별 선택 수 -->
+    <select id="countByItemValueMCM" resultType="int">
+        SELECT COUNT(DISTINCT USER_SEQ)
+        FROM TB_SURVEY_ANSWER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND QUESTION_SEQ = #{questionSeq}
+        AND QUESTION_TYPE = 'MCM'
+        AND (
+            ANSWER = #{itemValue}
+            OR ANSWER LIKE CONCAT(#{itemValue}, ',%')
+            OR ANSWER LIKE CONCAT('%,', #{itemValue}, ',%')
+            OR ANSWER LIKE CONCAT('%,', #{itemValue})
+        )
+    </select>
+
+    <!-- 사용자의 답변 목록 조회 -->
+    <select id="selectByUserSeq" resultType="kr.wisead.domain.survey.entity.SurveyAnswer">
+        SELECT
+            ANSWER_SEQ as answerSeq,
+            EVENT_SEQ as eventSeq,
+            QUESTION_SEQ as questionSeq,
+            USER_SEQ as userSeq,
+            ITEM_SEQ as itemSeq,
+            QUESTION_TYPE as questionType,
+            QUESTION_TYPE_DETAIL as questionTypeDetail,
+            ANSWER as answer,
+            FILE_PATH as filePath,
+            REG_DATE as regDate,
+            REG_ID as regId
+        FROM TB_SURVEY_ANSWER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND USER_SEQ = #{userSeq}
+        ORDER BY QUESTION_SEQ
+    </select>
+
+    <!-- 답변 등록 -->
+    <insert id="insert" parameterType="kr.wisead.domain.survey.entity.SurveyAnswer"
+            useGeneratedKeys="true" keyProperty="answerSeq" keyColumn="ANSWER_SEQ">
+        INSERT INTO TB_SURVEY_ANSWER (
+            EVENT_SEQ, QUESTION_SEQ, USER_SEQ, ITEM_SEQ,
+            QUESTION_TYPE, QUESTION_TYPE_DETAIL, ANSWER, FILE_PATH,
+            REG_DATE, REG_ID
+        ) VALUES (
+            #{eventSeq}, #{questionSeq}, #{userSeq}, #{itemSeq},
+            #{questionType}, #{questionTypeDetail}, #{answer}, #{filePath},
+            NOW(), #{regId}
+        )
+    </insert>
+
+    <!-- 답변 존재 여부 확인 -->
+    <select id="checkAnswerExists" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_SURVEY_ANSWER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND USER_SEQ = #{userSeq}
+        AND QUESTION_SEQ = #{questionSeq}
+    </select>
+
+    <!-- 사용자의 모든 답변 삭제 -->
+    <delete id="deleteByUserSeq">
+        DELETE FROM TB_SURVEY_ANSWER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND USER_SEQ = #{userSeq}
+    </delete>
+
+</mapper>

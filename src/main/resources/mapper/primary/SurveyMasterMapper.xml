@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.SurveyMasterMapper">
+
+    <sql id="selectEventColumns">
+        M.EVENT_SEQ as eventSeq,
+        M.MANAGER_SEQ as managerSeq,
+        M.EVENT_CODE as eventCode,
+        M.EVENT_NAME as eventName,
+        M.EVENT_EMPHASIS_YN as eventEmphasisYn,
+        M.EVENT_DESC_IMG as eventDescImg,
+        M.EVENT_DESC as eventDesc,
+        M.EVENT_TYPE as eventType,
+        M.START_DATE as startDate,
+        M.END_DATE as endDate,
+        M.STATUS as status,
+        M.PRIVACY_POLICY_YN as privacyPolicyYn,
+        M.PRIVACY_POLICY_TTL as privacyPolicyTtl,
+        M.PRIVACY_POLICY_DESC as privacyPolicyDesc,
+        M.AUTH as auth,
+        M.AUTH_KEY_DESC as authKeyDesc,
+        M.QR_CODE as qrCode,
+        M.QR_CODE_IMG_PATH as qrCodeImgPath,
+        M.QR_CODE_VISITS as qrCodeVisits,
+        M.AUTH_CODE_URL as authCodeUrl,
+        M.END_MESSAGE as endMessage,
+        M.EVENT_END_IMG as eventEndImg,
+        M.REG_DATE as regDate,
+        M.REG_ID as regId,
+        M.UPT_DATE as uptDate,
+        M.UPT_ID as uptId
+    </sql>
+
+    <sql id="selectWithCounts">
+        <include refid="selectEventColumns"/>,
+        (SELECT COUNT(*) FROM TB_SURVEY_USER U WHERE U.EVENT_SEQ = M.EVENT_SEQ AND U.DEL_YN = 'N') as totSurveyUser,
+        (SELECT COUNT(*) FROM TB_SURVEY_USER U WHERE U.EVENT_SEQ = M.EVENT_SEQ AND U.SUBMISSION_DATE IS NOT NULL AND U.DEL_YN = 'N') as resSurveyUser
+    </sql>
+
+    <sql id="whereCondition">
+        <where>
+            1=1
+            <if test="userLevel != null and userLevel lt 50">
+                AND M.REG_ID = #{regId}
+            </if>
+            <if test="eventType != null and eventType != ''">
+                AND M.EVENT_TYPE = #{eventType}
+            </if>
+            <if test="surveyStatus != null and surveyStatus != ''">
+                AND M.STATUS = #{surveyStatus}
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND DATE(M.START_DATE) >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND DATE(M.END_DATE) &lt;= #{endDate}
+            </if>
+            <if test="searchKeyword != null and searchKeyword != ''">
+                AND M.EVENT_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
+            </if>
+        </where>
+    </sql>
+
+    <sql id="orderBy">
+        ORDER BY
+        <choose>
+            <when test="sortField == 'startDate'">
+                M.START_DATE <if test="sortOrder == 'asc'">ASC</if><if test="sortOrder == 'desc'">DESC</if>
+            </when>
+            <when test="sortField == 'endDate'">
+                M.END_DATE <if test="sortOrder == 'asc'">ASC</if><if test="sortOrder == 'desc'">DESC</if>
+            </when>
+            <when test="sortField == 'participants'">
+                (SELECT COUNT(*) FROM TB_SURVEY_USER U WHERE U.EVENT_SEQ = M.EVENT_SEQ AND U.SUBMISSION_DATE IS NOT NULL)
+                <if test="sortOrder == 'asc'">ASC</if><if test="sortOrder == 'desc'">DESC</if>
+            </when>
+            <otherwise>
+                M.REG_DATE DESC
+            </otherwise>
+        </choose>
+    </sql>
+
+    <!-- 이벤트 목록 조회 -->
+    <select id="selectList" parameterType="kr.wisead.domain.survey.dto.EventSearchRequest"
+            resultType="kr.wisead.domain.survey.entity.SurveyMaster">
+        SELECT
+            <include refid="selectWithCounts"/>
+        FROM TB_SURVEY_MASTER M
+        <include refid="whereCondition"/>
+        <include refid="orderBy"/>
+        LIMIT #{rowStart}, #{rowSize}
+    </select>
+
+    <!-- 이벤트 총 개수 -->
+    <select id="selectCount" parameterType="kr.wisead.domain.survey.dto.EventSearchRequest" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_SURVEY_MASTER M
+        <include refid="whereCondition"/>
+    </select>
+
+    <!-- 이벤트 상세 조회 -->
+    <select id="selectByEventSeq" resultType="kr.wisead.domain.survey.entity.SurveyMaster">
+        SELECT
+            <include refid="selectWithCounts"/>
+        FROM TB_SURVEY_MASTER M
+        WHERE M.EVENT_SEQ = #{eventSeq}
+    </select>
+
+    <!-- 이벤트 코드로 조회 -->
+    <select id="selectByEventCode" resultType="kr.wisead.domain.survey.entity.SurveyMaster">
+        SELECT
+            <include refid="selectEventColumns"/>
+        FROM TB_SURVEY_MASTER M
+        WHERE BINARY M.EVENT_CODE = #{eventCode}
+    </select>
+
+    <!-- QR코드 URL로 조회 -->
+    <select id="selectByAuthCodeUrl" resultType="kr.wisead.domain.survey.entity.SurveyMaster">
+        SELECT
+            <include refid="selectEventColumns"/>
+        FROM TB_SURVEY_MASTER M
+        WHERE BINARY M.AUTH_CODE_URL = #{authCodeUrl}
+    </select>
+
+    <!-- 이벤트 등록 -->
+    <insert id="insert" parameterType="kr.wisead.domain.survey.entity.SurveyMaster"
+            useGeneratedKeys="true" keyProperty="eventSeq" keyColumn="EVENT_SEQ">
+        INSERT INTO TB_SURVEY_MASTER (
+            MANAGER_SEQ, EVENT_CODE, EVENT_NAME, EVENT_EMPHASIS_YN,
+            EVENT_DESC_IMG, EVENT_DESC, EVENT_TYPE, START_DATE, END_DATE,
+            STATUS, PRIVACY_POLICY_YN, PRIVACY_POLICY_TTL, PRIVACY_POLICY_DESC,
+            AUTH, QR_CODE, QR_CODE_IMG_PATH, AUTH_CODE_URL,
+            END_MESSAGE, EVENT_END_IMG, QR_CODE_VISITS, REG_DATE, REG_ID
+        ) VALUES (
+            #{managerSeq}, #{eventCode}, #{eventName}, #{eventEmphasisYn},
+            #{eventDescImg}, #{eventDesc}, #{eventType}, #{startDate}, #{endDate},
+            #{status}, #{privacyPolicyYn}, #{privacyPolicyTtl}, #{privacyPolicyDesc},
+            #{auth}, #{qrCode}, #{qrCodeImgPath}, #{authCodeUrl},
+            #{endMessage}, #{eventEndImg}, IFNULL(#{qrCodeVisits}, 0), NOW(), #{regId}
+        )
+    </insert>
+
+    <!-- 이벤트 수정 -->
+    <update id="update" parameterType="kr.wisead.domain.survey.entity.SurveyMaster">
+        UPDATE TB_SURVEY_MASTER
+        SET
+            EVENT_NAME = #{eventName},
+            EVENT_EMPHASIS_YN = #{eventEmphasisYn},
+            EVENT_TYPE = #{eventType},
+            EVENT_DESC = #{eventDesc},
+            START_DATE = #{startDate},
+            END_DATE = #{endDate},
+            STATUS = #{status},
+            PRIVACY_POLICY_YN = #{privacyPolicyYn},
+            <if test="privacyPolicyYn == 'Y'">
+                PRIVACY_POLICY_TTL = #{privacyPolicyTtl},
+                PRIVACY_POLICY_DESC = #{privacyPolicyDesc},
+            </if>
+            AUTH = #{auth},
+            QR_CODE = #{qrCode},
+            <if test="qrCode == 'Y' and qrCodeImgPath != null">
+                QR_CODE_IMG_PATH = #{qrCodeImgPath},
+                AUTH_CODE_URL = #{authCodeUrl},
+            </if>
+            <if test="eventDescImg != null">
+                EVENT_DESC_IMG = #{eventDescImg},
+            </if>
+            <if test="endMessage != null">
+                END_MESSAGE = #{endMessage},
+            </if>
+            <if test="eventEndImg != null">
+                EVENT_END_IMG = #{eventEndImg},
+            </if>
+            UPT_ID = #{uptId},
+            UPT_DATE = NOW()
+        WHERE EVENT_SEQ = #{eventSeq}
+    </update>
+
+    <!-- 상태 변경 -->
+    <update id="updateStatus">
+        UPDATE TB_SURVEY_MASTER
+        SET STATUS = #{status}, UPT_DATE = NOW()
+        WHERE EVENT_SEQ = #{eventSeq}
+    </update>
+
+    <!-- 설명 이미지 수정 -->
+    <update id="updateDescImg">
+        UPDATE TB_SURVEY_MASTER
+        SET EVENT_DESC_IMG = #{eventDescImg}
+        WHERE EVENT_SEQ = #{eventSeq}
+    </update>
+
+    <!-- 종료 이미지 수정 -->
+    <update id="updateEndImg">
+        UPDATE TB_SURVEY_MASTER
+        SET EVENT_END_IMG = #{eventEndImg}
+        WHERE EVENT_SEQ = #{eventSeq}
+    </update>
+
+    <!-- QR코드 방문 수 증가 -->
+    <update id="incrementQrCodeVisits">
+        UPDATE TB_SURVEY_MASTER
+        SET QR_CODE_VISITS = QR_CODE_VISITS + 1
+        WHERE BINARY AUTH_CODE_URL = #{authCodeUrl}
+    </update>
+
+    <!-- 만료된 이벤트 상태 업데이트 -->
+    <update id="updateExpiredEventsStatus">
+        UPDATE TB_SURVEY_MASTER
+        SET STATUS = 'F'
+        WHERE STATUS != 'F'
+        AND END_DATE &lt; NOW()
+    </update>
+
+    <!-- 이벤트명 검색 -->
+    <select id="searchEventNames" resultType="string">
+        SELECT DISTINCT EVENT_NAME
+        FROM TB_SURVEY_MASTER
+        WHERE 1=1
+        <if test="userLevel != null and userLevel lt 50">
+            AND REG_ID = #{regId}
+        </if>
+        <if test="searchKeyword != null and searchKeyword != ''">
+            AND EVENT_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
+        </if>
+        ORDER BY EVENT_NAME
+        LIMIT 10
+    </select>
+
+    <!-- 범용인증키 설명 조회 -->
+    <select id="selectAuthKeyDesc" resultType="string">
+        SELECT AUTH_KEY_DESC
+        FROM TB_SURVEY_MASTER
+        WHERE EVENT_SEQ = #{eventSeq}
+    </select>
+
+    <!-- 범용인증키 설명 수정 -->
+    <update id="updateAuthKeyDesc">
+        UPDATE TB_SURVEY_MASTER
+        SET AUTH_KEY_DESC = #{authKeyDesc}
+        WHERE EVENT_SEQ = #{eventSeq}
+    </update>
+
+</mapper>

@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.SurveyUserMapper">
+
+    <sql id="selectColumns">
+        U.SEQ as seq,
+        U.EVENT_SEQ as eventSeq,
+        U.USER_KEY as userKey,
+        U.USER_NAME as userName,
+        U.JUMIN_NUM as juminNum,
+        U.USER_PHONE as userPhone,
+        U.RESEND_USER_PHONE as resendUserPhone,
+        U.USER_EMAIL as userEmail,
+        U.ADDRESS as address,
+        U.ADDRESS2 as address2,
+        U.DEL_YN as delYn,
+        U.DEPOSIT_DATE as depositDate,
+        U.SHIPMENT_DATE as shipmentDate,
+        U.SUBMISSION_DATE as submissionDate,
+        U.LAST_CON_DATE as lastConDate,
+        U.SURVEY_START_TIME as surveyStartTime,
+        U.SURVEY_AUTH_TIME as surveyAuthTime,
+        U.REG_ID as regId,
+        U.REG_DATE as regDate,
+        U.UPT_ID as uptId,
+        U.UPT_DATE as uptDate
+    </sql>
+
+    <!-- 이벤트의 참여자 목록 조회 -->
+    <select id="selectByEventSeq" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM TB_SURVEY_USER U
+        WHERE U.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+        ORDER BY U.REG_DATE DESC
+    </select>
+
+    <!-- 설문 완료자 목록 조회 -->
+    <select id="selectCompletedByEventSeq" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM TB_SURVEY_USER U
+        WHERE U.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+        AND U.SUBMISSION_DATE IS NOT NULL
+        ORDER BY U.SUBMISSION_DATE ASC
+    </select>
+
+    <!-- 미참여/접속자 목록 조회 -->
+    <select id="selectAbsenteesAndLurkers" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM TB_SURVEY_USER U
+        WHERE U.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+        AND U.SUBMISSION_DATE IS NULL
+        ORDER BY (U.SURVEY_START_TIME IS NULL), U.SURVEY_START_TIME
+    </select>
+
+    <!-- 시퀀스로 조회 -->
+    <select id="selectBySeq" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM TB_SURVEY_USER U
+        WHERE U.SEQ = #{userSeq}
+        AND U.DEL_YN = 'N'
+    </select>
+
+    <!-- 사용자 키로 조회 -->
+    <select id="selectByUserKey" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            <include refid="selectColumns"/>,
+            M.EVENT_CODE as eventCode,
+            M.EVENT_TYPE as eventType,
+            M.EVENT_NAME as eventName,
+            M.AUTH as auth
+        FROM TB_SURVEY_USER U
+        INNER JOIN TB_SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+        WHERE BINARY U.USER_KEY = #{userKey}
+        AND U.DEL_YN = 'N'
+        LIMIT 1
+    </select>
+
+    <!-- 이벤트 + 사용자키로 조회 -->
+    <select id="selectByEventSeqAndUserKey" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM TB_SURVEY_USER U
+        WHERE U.EVENT_SEQ = #{eventSeq}
+        AND BINARY U.USER_KEY = #{userKey}
+        AND U.DEL_YN = 'N'
+    </select>
+
+    <!-- 재발송 전화번호로 조회 -->
+    <select id="selectByResendUserPhone" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM TB_SURVEY_USER U
+        WHERE U.EVENT_SEQ = #{eventSeq}
+        AND U.RESEND_USER_PHONE = #{resendUserPhone}
+        AND U.DEL_YN = 'N'
+    </select>
+
+    <!-- 전체 대상자 수 -->
+    <select id="countByEventSeq" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_SURVEY_USER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND DEL_YN = 'N'
+    </select>
+
+    <!-- 설문 완료자 수 -->
+    <select id="countCompletedByEventSeq" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_SURVEY_USER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND DEL_YN = 'N'
+        AND SUBMISSION_DATE IS NOT NULL
+    </select>
+
+    <!-- 미참여자 수 -->
+    <select id="countAbsenteesByEventSeq" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_SURVEY_USER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND DEL_YN = 'N'
+        AND SUBMISSION_DATE IS NULL
+    </select>
+
+    <!-- 접속자 수 -->
+    <select id="countLurkersByEventSeq" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_SURVEY_USER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND DEL_YN = 'N'
+        AND SURVEY_START_TIME IS NOT NULL
+        AND SUBMISSION_DATE IS NULL
+    </select>
+
+    <!-- 참여자 등록 -->
+    <insert id="insert" parameterType="kr.wisead.domain.survey.entity.SurveyUser"
+            useGeneratedKeys="true" keyProperty="seq" keyColumn="SEQ">
+        INSERT INTO TB_SURVEY_USER (
+            EVENT_SEQ, USER_KEY, USER_PHONE, DEL_YN, REG_ID, REG_DATE
+        ) VALUES (
+            #{eventSeq}, #{userKey}, #{userPhone}, 'N', #{regId}, NOW()
+        )
+    </insert>
+
+    <!-- 설문 제출 -->
+    <update id="updateSubmission" parameterType="kr.wisead.domain.survey.entity.SurveyUser">
+        UPDATE TB_SURVEY_USER
+        <set>
+            <if test="userName != null and userName != ''">
+                USER_NAME = #{userName},
+            </if>
+            <if test="juminNum != null and juminNum != ''">
+                JUMIN_NUM = #{juminNum},
+            </if>
+            <if test="userPhone != null and userPhone != ''">
+                USER_PHONE = #{userPhone},
+            </if>
+            <if test="userEmail != null and userEmail != ''">
+                USER_EMAIL = #{userEmail},
+            </if>
+            <if test="address != null and address != ''">
+                ADDRESS = #{address},
+                ADDRESS2 = #{address2},
+            </if>
+            UPT_ID = #{uptId},
+            UPT_DATE = NOW(),
+            SUBMISSION_DATE = NOW()
+        </set>
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND BINARY USER_KEY = #{userKey}
+    </update>
+
+    <!-- 설문 접속 시간 기록 -->
+    <update id="updateStartTime">
+        UPDATE TB_SURVEY_USER
+        SET SURVEY_START_TIME = NOW()
+        WHERE BINARY USER_KEY = #{userKey}
+    </update>
+
+    <!-- 설문 인증 시간 기록 -->
+    <update id="updateAuthTime">
+        UPDATE TB_SURVEY_USER
+        SET SURVEY_AUTH_TIME = NOW()
+        WHERE BINARY USER_KEY = #{userKey}
+    </update>
+
+    <!-- 참여자 삭제 -->
+    <delete id="delete">
+        DELETE FROM TB_SURVEY_USER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND USER_KEY = #{userKey}
+    </delete>
+
+    <!-- 범용인증 상태 확인 -->
+    <select id="checkGeneralAuthStatus" resultType="map">
+        SELECT
+            CASE
+                WHEN MAP.GENERAL_AUTH_CODE IS NULL THEN 'NOT_FOUND'
+                WHEN U.SUBMISSION_DATE IS NOT NULL THEN 'ALREADY_ANSWERED'
+                WHEN U.SUBMISSION_DATE IS NULL AND U.SURVEY_AUTH_TIME IS NOT NULL
+                     AND U.SURVEY_AUTH_TIME >= DATE_SUB(NOW(), INTERVAL 1 MINUTE) THEN 'TIME_RESTRICTED'
+                WHEN U.SUBMISSION_DATE IS NULL AND (U.SURVEY_AUTH_TIME IS NULL
+                     OR U.SURVEY_AUTH_TIME &lt; DATE_SUB(NOW(), INTERVAL 1 MINUTE)) THEN 'VALID'
+                ELSE 'NOT_FOUND'
+            END as authStatus,
+            M.EVENT_SEQ as eventSeq,
+            M.EVENT_CODE as eventCode,
+            M.EVENT_TYPE as eventType,
+            MAP.GENERAL_AUTH_CODE as generalAuthCode,
+            MAP.USER_KEY as userKey,
+            U.SUBMISSION_DATE as submissionDate,
+            U.SURVEY_AUTH_TIME as surveyAuthTime,
+            NOW() as currentTime
+        FROM TB_SURVEY_MASTER M
+        INNER JOIN TB_AUTH_USER_MAPPING MAP ON M.EVENT_SEQ = MAP.EVENT_SEQ
+            AND MAP.GENERAL_AUTH_CODE = #{generalAuthCode}
+        LEFT JOIN TB_SURVEY_USER U ON (MAP.EVENT_SEQ = U.EVENT_SEQ AND MAP.USER_KEY = U.USER_KEY)
+        WHERE M.AUTH_CODE_URL = #{authCodeUrl}
+        LIMIT 1
+    </select>
+
+    <!-- 범용인증으로 사용자 정보 조회 -->
+    <select id="selectByGeneralAuthCode" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            U.SEQ as seq,
+            U.EVENT_SEQ as eventSeq,
+            U.USER_KEY as userKey,
+            M.EVENT_CODE as eventCode,
+            M.EVENT_TYPE as eventType,
+            M.AUTH as auth,
+            MAP.GENERAL_AUTH_CODE as generalAuthCode
+        FROM TB_SURVEY_MASTER M
+        INNER JOIN TB_AUTH_USER_MAPPING MAP ON M.EVENT_SEQ = MAP.EVENT_SEQ
+        LEFT JOIN TB_SURVEY_USER U ON MAP.USER_KEY = U.USER_KEY AND MAP.EVENT_SEQ = U.EVENT_SEQ
+        WHERE MAP.GENERAL_AUTH_CODE = #{generalAuthCode}
+        AND M.AUTH_CODE_URL = #{authCodeUrl}
+        AND (U.SUBMISSION_DATE IS NULL)
+        AND (U.SURVEY_AUTH_TIME IS NULL OR U.SURVEY_AUTH_TIME &lt; DATE_SUB(NOW(), INTERVAL 1 MINUTE))
+        ORDER BY MAP.REG_DATE ASC
+        LIMIT 1
+    </select>
+
+</mapper>

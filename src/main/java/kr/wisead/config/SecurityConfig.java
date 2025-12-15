@@ -44,6 +44,7 @@ public class SecurityConfig {
             // 인증 관련
             "/api/auth/**",
             "/api/public/**",
+            "/api/users/find-id",
 
             // Swagger/API 문서
             "/swagger-ui/**",

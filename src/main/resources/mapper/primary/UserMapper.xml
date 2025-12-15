@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.UserMapper">
+
+    <!-- User ResultMap -->
+    <resultMap id="UserResultMap" type="kr.wisead.domain.user.entity.User">
+        <id property="seq" column="SEQ"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="userPass" column="USER_PASS"/>
+        <result property="corpName" column="CORP_NAME"/>
+        <result property="corpAddr" column="CORP_ADDR"/>
+        <result property="bizNum" column="BIZ_NUM"/>
+        <result property="bizTel" column="BIZ_TEL"/>
+        <result property="person" column="PERSON"/>
+        <result property="phone" column="PHONE"/>
+        <result property="email" column="EMAIL"/>
+        <result property="userLevel" column="USER_LEVEL"/>
+        <result property="useYn" column="USE_YN"/>
+        <result property="allowIpYn" column="ALLOW_IP_YN"/>
+        <result property="allowIp" column="ALLOW_IP"/>
+        <result property="lastLogin" column="LAST_LOGIN"/>
+        <result property="loginFailureCnt" column="LOGIN_FAILURE_CNT"/>
+        <result property="regDate" column="REG_DATE"/>
+        <result property="regId" column="REG_ID"/>
+        <result property="uptDate" column="UPT_DATE"/>
+        <result property="uptId" column="UPT_ID"/>
+        <result property="status" column="STATUS"/>
+        <result property="subtractUnitPrice" column="SUBTRACT_UNIT_PRICE"/>
+        <result property="emailCode" column="EMAIL_CODE"/>
+        <result property="codeValidate" column="CODE_VALIDATE"/>
+        <result property="callback" column="CALLBACK"/>
+        <result property="bizPdfLoc" column="BIZ_PDF_LOC"/>
+        <result property="storeCode" column="STORE_CODE"/>
+        <result property="blockedSeq" column="BLOCKED_SEQ"/>
+    </resultMap>
+
+    <!-- 기본 컬럼 -->
+    <sql id="userColumns">
+        SEQ, USER_ID, USER_PASS, CORP_NAME, CORP_ADDR, BIZ_NUM, BIZ_TEL,
+        PERSON, PHONE, EMAIL, USER_LEVEL, USE_YN, ALLOW_IP_YN, ALLOW_IP,
+        LAST_LOGIN, LOGIN_FAILURE_CNT, REG_DATE, REG_ID, UPT_DATE, UPT_ID,
+        STATUS, SUBTRACT_UNIT_PRICE, EMAIL_CODE, CODE_VALIDATE, CALLBACK,
+        BIZ_PDF_LOC, STORE_CODE, BLOCKED_SEQ
+    </sql>
+
+    <!-- 회원 조회 (by SEQ) -->
+    <select id="findBySeq" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM user
+        WHERE SEQ = #{seq}
+    </select>
+
+    <!-- 회원 조회 (by USER_ID) -->
+    <select id="findByUserId" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM user
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <!-- 회원 조회 (by EMAIL) -->
+    <select id="findByEmail" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM user
+        WHERE EMAIL = #{email}
+    </select>
+
+    <!-- 아이디 중복 확인 -->
+    <select id="existsByUserId" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM user WHERE USER_ID = #{userId})
+    </select>
+
+    <!-- 이메일 중복 확인 -->
+    <select id="existsByEmail" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM user WHERE EMAIL = #{email})
+    </select>
+
+    <!-- 회원가입 -->
+    <insert id="insert" parameterType="kr.wisead.domain.user.entity.User" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO user (
+            USER_ID, USER_PASS, CORP_NAME, CORP_ADDR, BIZ_NUM, BIZ_TEL,
+            PERSON, PHONE, EMAIL, USER_LEVEL, USE_YN, STATUS,
+            SUBTRACT_UNIT_PRICE, REG_DATE, REG_ID
+        ) VALUES (
+            #{userId}, #{userPass}, #{corpName}, #{corpAddr}, #{bizNum}, #{bizTel},
+            #{person}, #{phone}, #{email}, #{userLevel}, #{useYn}, #{status},
+            #{subtractUnitPrice}, NOW(), #{regId}
+        )
+    </insert>
+
+    <!-- 회원정보 수정 -->
+    <update id="update" parameterType="kr.wisead.domain.user.entity.User">
+        UPDATE user
+        SET
+            CORP_NAME = #{corpName},
+            CORP_ADDR = #{corpAddr},
+            BIZ_NUM = #{bizNum},
+            BIZ_TEL = #{bizTel},
+            PERSON = #{person},
+            PHONE = #{phone},
+            EMAIL = #{email},
+            CALLBACK = #{callback},
+            UPT_DATE = NOW(),
+            UPT_ID = #{uptId}
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- 로그인 성공 시 최근 로그인 시간 업데이트 -->
+    <update id="updateLastLogin">
+        UPDATE user
+        SET LAST_LOGIN = NOW(),
+            LOGIN_FAILURE_CNT = 0
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 로그인 실패 횟수 증가 -->
+    <update id="increaseLoginFailureCnt">
+        UPDATE user
+        SET LOGIN_FAILURE_CNT = IFNULL(LOGIN_FAILURE_CNT, 0) + 1
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 로그인 실패 횟수 초기화 -->
+    <update id="resetLoginFailureCnt">
+        UPDATE user
+        SET LOGIN_FAILURE_CNT = 0
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 비밀번호 변경 -->
+    <update id="updatePassword">
+        UPDATE user
+        SET USER_PASS = #{userPass},
+            UPT_DATE = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 이메일 인증 코드 저장 -->
+    <update id="updateEmailCode">
+        UPDATE user
+        SET EMAIL_CODE = #{emailCode},
+            CODE_VALIDATE = #{codeValidate}
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 회원 상태 변경 -->
+    <update id="updateStatus">
+        UPDATE user
+        SET STATUS = #{status},
+            UPT_DATE = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 회원 목록 조회 (페이징) -->
+    <select id="findAll" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM user
+        ORDER BY SEQ DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 회원 수 조회 -->
+    <select id="count" resultType="long">
+        SELECT COUNT(*) FROM user
+    </select>
+
+    <!-- 아이디 찾기 -->
+    <select id="findByEmailAndPerson" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM user
+        WHERE EMAIL = #{email}
+          AND PERSON = #{person}
+    </select>
+
+</mapper>

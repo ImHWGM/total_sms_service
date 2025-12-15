@@ -16,7 +16,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 예약 메시지 Controller
@@ -136,7 +139,10 @@ public class ScheduledMessageController {
         Integer userLevel = adminService.getUserLevel(userId);
         String queryUserId = determineQueryUserId(userId, userLevel);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+
+        // 중복 그룹 삭제 방지용 Map
+        Map<String, ScheduledMessageResponse> groupMap = new HashMap<>();
 
         for (Integer mSeq : mSeqs) {
             ScheduledMessageResponse message = scheduledMessageService.getMessageById(mSeq, queryUserId);
@@ -149,7 +155,13 @@ public class ScheduledMessageController {
                 throw new BusinessException(ErrorCode.INVALID_INPUT, "전송 10분 이내인 메시지는 삭제할 수 없습니다.");
             }
 
-            // 예약 취소
+            // 그룹 키 생성 (msgType + requestTime)
+            String key = message.getMsgType() + "_" + message.getRequestTime().toString();
+            groupMap.put(key, message);
+        }
+
+        // 그룹별로 예약 취소
+        for (ScheduledMessageResponse message : groupMap.values()) {
             scheduledMessageService.cancelMessageGroup(
                     message.getUserId(),  // 실제 메시지 소유자
                     message.getMsgType(),

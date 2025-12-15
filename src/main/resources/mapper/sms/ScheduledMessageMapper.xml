@@ -3,164 +3,339 @@
 <mapper namespace="kr.wisead.mapper.sms.ScheduledMessageMapper">
 
     <resultMap id="scheduledMessageResultMap" type="kr.wisead.domain.schedule.entity.ScheduledMessage">
-        <id property="mSeq" column="MSEQ"/>
-        <result property="msgType" column="MSG_TYPE"/>
-        <result property="dstAddr" column="DSTADDR"/>
-        <result property="callBack" column="CALLBACK"/>
-        <result property="stat" column="STAT"/>
-        <result property="subject" column="SUBJECT"/>
-        <result property="text" column="TEXT"/>
-        <result property="insertTime" column="INSERT_TIME"/>
-        <result property="requestTime" column="REQUEST_TIME"/>
-        <result property="senderCode" column="SENDER_CODE"/>
-        <result property="extCol0" column="EXT_COL0"/>
-        <result property="extCol1" column="EXT_COL1"/>
-        <result property="extCol2" column="EXT_COL2"/>
-        <result property="extCol3" column="EXT_COL3"/>
-        <result property="messageCount" column="MESSAGE_COUNT"/>
-        <result property="fileCnt" column="FILECNT"/>
-        <result property="fileLoc1" column="FILELOC1"/>
-        <result property="fileLoc2" column="FILELOC2"/>
-        <result property="fileLoc3" column="FILELOC3"/>
-        <result property="fileLoc4" column="FILELOC4"/>
-        <result property="fileLoc5" column="FILELOC5"/>
+        <id property="mSeq" column="mSeq"/>
+        <result property="msgType" column="msgType"/>
+        <result property="dstAddr" column="dstAddr"/>
+        <result property="callBack" column="callBack"/>
+        <result property="stat" column="stat"/>
+        <result property="subject" column="subject"/>
+        <result property="text" column="text"/>
+        <result property="insertTime" column="insertTime"/>
+        <result property="requestTime" column="requestTime"/>
+        <result property="senderCode" column="senderCode"/>
+        <result property="extCol0" column="extCol0"/>
+        <result property="extCol1" column="extCol1"/>
+        <result property="extCol2" column="extCol2"/>
+        <result property="extCol3" column="extCol3"/>
+        <result property="messageCount" column="messageCount"/>
+        <result property="fileCnt" column="fileCnt"/>
+        <result property="fileLoc1" column="fileLoc1"/>
+        <result property="fileLoc2" column="fileLoc2"/>
+        <result property="fileLoc3" column="fileLoc3"/>
+        <result property="fileLoc4" column="fileLoc4"/>
+        <result property="fileLoc5" column="fileLoc5"/>
     </resultMap>
 
-    <sql id="whereCondition">
-        <where>
-            STAT = '0'
-            AND REQUEST_TIME > NOW()
-            <if test="userId != null and userId != '' and userId != 'ALL'">
+    <!-- 예약 메시지 목록 조회 (Window Function으로 그룹핑) -->
+    <select id="selectScheduledMessages" resultMap="scheduledMessageResultMap">
+        WITH grouped_data AS (
+            SELECT
+                MSEQ,
+                MSG_TYPE,
+                DSTADDR,
+                CALLBACK,
+                STAT,
+                SUBJECT,
+                TEXT,
+                INSERT_TIME,
+                REQUEST_TIME,
+                SENDER_CODE,
+                EXT_COL0,
+                EXT_COL1,
+                EXT_COL2,
+                EXT_COL3,
+                ROW_NUMBER() OVER (PARTITION BY
+                    CASE
+                        WHEN EXT_COL0 IS NULL THEN EXT_COL1
+                        ELSE CONCAT(EXT_COL0, '_',
+                            DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
+                            LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0'),
+                            '_', REQUEST_TIME)
+                    END,
+                    MSG_TYPE ORDER BY MSEQ) as rn,
+                COUNT(*) OVER (PARTITION BY
+                    CASE
+                        WHEN EXT_COL0 IS NULL THEN EXT_COL1
+                        ELSE CONCAT(EXT_COL0, '_',
+                            DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
+                            LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0'),
+                            '_', REQUEST_TIME)
+                    END,
+                    MSG_TYPE) as message_count
+            FROM msg_queue
+            <where>
                 <choose>
-                    <when test="userId.contains(',')">
-                        AND EXT_COL3 IN
-                        <foreach item="id" collection="userId.split(',')" open="(" separator="," close=")">
-                            #{id}
+                    <when test="userId == 'ALL'">
+                        1=1
+                    </when>
+                    <when test="userId != null and userId != '' and userId.indexOf(',') != -1">
+                        EXT_COL3 IN
+                        <foreach collection="userId.split(',')" item="accountId" open="(" close=")" separator=",">
+                            #{accountId}
                         </foreach>
                     </when>
+                    <when test="userId != null and userId != ''">
+                        EXT_COL3 = #{userId}
+                    </when>
                     <otherwise>
-                        AND EXT_COL3 = #{userId}
+                        1=0
                     </otherwise>
                 </choose>
-            </if>
-            <if test="msgType != null and msgType != ''">
-                AND MSG_TYPE = #{msgType}
-            </if>
-            <if test="searchText != null and searchText != ''">
-                AND (
-                    DSTADDR LIKE CONCAT('%', #{searchText}, '%')
-                    OR CALLBACK LIKE CONCAT('%', #{searchText}, '%')
-                    OR SUBJECT LIKE CONCAT('%', #{searchText}, '%')
-                    OR TEXT LIKE CONCAT('%', #{searchText}, '%')
-                )
-            </if>
-        </where>
-    </sql>
-
-    <!-- 예약 메시지 목록 조회 (그룹핑) -->
-    <select id="selectScheduledMessages" resultMap="scheduledMessageResultMap">
+                AND REQUEST_TIME > current_timestamp
+                <if test="msgType != null and msgType != ''">
+                    AND MSG_TYPE = #{msgType}
+                </if>
+                <if test="searchText != null and searchText != ''">
+                    AND TEXT LIKE CONCAT('%', #{searchText}, '%')
+                </if>
+            </where>
+        )
         SELECT
-            MIN(MSEQ) as MSEQ,
-            MSG_TYPE,
-            MIN(DSTADDR) as DSTADDR,
-            CALLBACK,
-            STAT,
-            SUBJECT,
-            TEXT,
-            INSERT_TIME,
-            REQUEST_TIME,
-            EXT_COL2,
-            EXT_COL3,
-            COUNT(*) as MESSAGE_COUNT,
-            MAX(FILECNT) as FILECNT
-        FROM msg_queue
-        <include refid="whereCondition"/>
-        GROUP BY MSG_TYPE, CALLBACK, SUBJECT, TEXT, INSERT_TIME, REQUEST_TIME, EXT_COL2, EXT_COL3, STAT
-        ORDER BY REQUEST_TIME ASC
-        LIMIT #{offset}, #{limit}
+            MSEQ as mSeq,
+            MSG_TYPE as msgType,
+            DSTADDR as dstAddr,
+            CALLBACK as callBack,
+            STAT as stat,
+            SUBJECT as subject,
+            TEXT as text,
+            INSERT_TIME as insertTime,
+            REQUEST_TIME as requestTime,
+            SENDER_CODE as senderCode,
+            EXT_COL0 as extCol0,
+            EXT_COL1 as extCol1,
+            EXT_COL2 as extCol2,
+            EXT_COL3 as extCol3,
+            message_count as messageCount
+        FROM grouped_data
+        WHERE rn = 1
+        ORDER BY INSERT_TIME DESC, EXT_COL1 DESC
+        <if test="offset != null and limit != null">
+            LIMIT #{offset}, #{limit}
+        </if>
     </select>
 
     <!-- 예약 메시지 총 건수 (그룹핑) -->
     <select id="countScheduledMessages" resultType="int">
-        SELECT COUNT(*)
-        FROM (
-            SELECT 1
+        WITH grouped_data AS (
+            SELECT
+                MSEQ,
+                MSG_TYPE,
+                EXT_COL0,
+                EXT_COL1,
+                INSERT_TIME,
+                REQUEST_TIME,
+                ROW_NUMBER() OVER (PARTITION BY
+                    CASE
+                        WHEN EXT_COL0 IS NULL THEN EXT_COL1
+                        ELSE CONCAT(EXT_COL0, '_',
+                            DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
+                            LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0'),
+                            '_', REQUEST_TIME)
+                    END,
+                    MSG_TYPE ORDER BY MSEQ) as rn
             FROM msg_queue
-            <include refid="whereCondition"/>
-            GROUP BY MSG_TYPE, CALLBACK, SUBJECT, TEXT, INSERT_TIME, REQUEST_TIME, EXT_COL2, EXT_COL3, STAT
-        ) t
+            <where>
+                <choose>
+                    <when test="userId == 'ALL'">
+                        1=1
+                    </when>
+                    <when test="userId != null and userId != '' and userId.indexOf(',') != -1">
+                        EXT_COL3 IN
+                        <foreach collection="userId.split(',')" item="accountId" open="(" close=")" separator=",">
+                            #{accountId}
+                        </foreach>
+                    </when>
+                    <when test="userId != null and userId != ''">
+                        EXT_COL3 = #{userId}
+                    </when>
+                    <otherwise>
+                        1=0
+                    </otherwise>
+                </choose>
+                AND REQUEST_TIME > current_timestamp
+                <if test="msgType != null and msgType != ''">
+                    AND MSG_TYPE = #{msgType}
+                </if>
+                <if test="searchText != null and searchText != ''">
+                    AND TEXT LIKE CONCAT('%', #{searchText}, '%')
+                </if>
+            </where>
+        )
+        SELECT COUNT(*) FROM grouped_data WHERE rn = 1
     </select>
 
     <!-- 예약 메시지 상세 조회 -->
     <select id="selectMessageById" resultMap="scheduledMessageResultMap">
         SELECT
-            MSEQ,
-            MSG_TYPE,
-            DSTADDR,
-            CALLBACK,
-            STAT,
-            SUBJECT,
-            TEXT,
-            INSERT_TIME,
-            REQUEST_TIME,
-            SENDER_CODE,
-            EXT_COL0,
-            EXT_COL1,
-            EXT_COL2,
-            EXT_COL3,
-            FILECNT,
-            FILELOC1,
-            FILELOC2,
-            FILELOC3,
-            FILELOC4,
-            FILELOC5
+            MSEQ as mSeq,
+            MSG_TYPE as msgType,
+            DSTADDR as dstAddr,
+            CALLBACK as callBack,
+            STAT as stat,
+            SUBJECT as subject,
+            TEXT as text,
+            FILECNT as fileCnt,
+            FILELOC1 as fileLoc1,
+            FILELOC2 as fileLoc2,
+            FILELOC3 as fileLoc3,
+            FILELOC4 as fileLoc4,
+            FILELOC5 as fileLoc5,
+            INSERT_TIME as insertTime,
+            REQUEST_TIME as requestTime,
+            SENDER_CODE as senderCode,
+            EXT_COL0 as extCol0,
+            EXT_COL1 as extCol1,
+            EXT_COL2 as extCol2,
+            EXT_COL3 as extCol3
         FROM msg_queue
-        WHERE MSEQ = #{mSeq}
-        <if test="userId != null and userId != '' and userId != 'ALL'">
+        <where>
+            MSEQ = #{mSeq}
             <choose>
-                <when test="userId.contains(',')">
+                <when test="userId == 'ALL'">
+                    <!-- 모든 데이터 조회 -->
+                </when>
+                <when test="userId != null and userId != '' and userId.indexOf(',') != -1">
                     AND EXT_COL3 IN
-                    <foreach item="id" collection="userId.split(',')" open="(" separator="," close=")">
-                        #{id}
+                    <foreach collection="userId.split(',')" item="accountId" open="(" close=")" separator=",">
+                        #{accountId}
                     </foreach>
                 </when>
-                <otherwise>
+                <when test="userId != null and userId != ''">
                     AND EXT_COL3 = #{userId}
+                </when>
+                <otherwise>
+                    AND 1=0
                 </otherwise>
             </choose>
-        </if>
+        </where>
     </select>
 
     <!-- 그룹 예약 시간 변경 -->
     <update id="updateGroupRequestTime">
         UPDATE msg_queue
         SET REQUEST_TIME = #{newRequestTime}
-        WHERE EXT_COL3 = #{userId}
-        AND MSG_TYPE = #{msgType}
-        AND INSERT_TIME = #{insertTime}
-        AND STAT = '0'
-        AND REQUEST_TIME > NOW()
+        WHERE
+            EXT_COL3 = #{userId}
+            AND MSG_TYPE = #{msgType}
+            AND (
+                (EXT_COL0 IS NULL AND EXT_COL1 = (
+                    SELECT EXT_COL1 FROM msg_queue m2
+                    WHERE m2.EXT_COL3 = #{userId}
+                    AND m2.MSG_TYPE = #{msgType}
+                    AND m2.INSERT_TIME = #{insertTime}
+                    AND m2.EXT_COL0 IS NULL
+                    LIMIT 1
+                ))
+                OR
+                (EXT_COL0 IS NOT NULL AND EXT_COL0 = (
+                    SELECT EXT_COL0 FROM msg_queue m2
+                    WHERE m2.EXT_COL3 = #{userId}
+                    AND m2.MSG_TYPE = #{msgType}
+                    AND m2.INSERT_TIME = #{insertTime}
+                    AND m2.EXT_COL0 IS NOT NULL
+                    LIMIT 1
+                ) AND CONCAT(DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
+                    LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0')) =
+                    CONCAT(DATE_FORMAT(#{insertTime}, '%Y%m%d%H'),
+                    LPAD(FLOOR(MINUTE(#{insertTime})/2)*2, 2, '0'))
+                    AND REQUEST_TIME = (
+                    SELECT REQUEST_TIME FROM msg_queue m3
+                    WHERE m3.EXT_COL3 = #{userId}
+                    AND m3.MSG_TYPE = #{msgType}
+                    AND m3.INSERT_TIME = #{insertTime}
+                    AND m3.EXT_COL0 IS NOT NULL
+                    LIMIT 1
+                ))
+            )
     </update>
 
     <!-- 그룹 예약 메시지 삭제 -->
     <delete id="deleteScheduledMessageGroup">
         DELETE FROM msg_queue
-        WHERE EXT_COL3 = #{userId}
-        AND MSG_TYPE = #{msgType}
-        AND INSERT_TIME = #{insertTime}
-        AND STAT = '0'
-        AND REQUEST_TIME > NOW()
+        WHERE
+            EXT_COL3 = #{userId}
+            AND MSG_TYPE = #{msgType}
+            AND (
+                (EXT_COL0 IS NULL AND EXT_COL1 = (
+                    SELECT EXT_COL1 FROM (
+                        SELECT EXT_COL1 FROM msg_queue m2
+                        WHERE m2.EXT_COL3 = #{userId}
+                        AND m2.MSG_TYPE = #{msgType}
+                        AND m2.INSERT_TIME = #{insertTime}
+                        AND m2.EXT_COL0 IS NULL
+                        LIMIT 1
+                    ) AS temp
+                ))
+                OR
+                (EXT_COL0 IS NOT NULL AND EXT_COL0 = (
+                    SELECT EXT_COL0 FROM (
+                        SELECT EXT_COL0 FROM msg_queue m2
+                        WHERE m2.EXT_COL3 = #{userId}
+                        AND m2.MSG_TYPE = #{msgType}
+                        AND m2.INSERT_TIME = #{insertTime}
+                        AND m2.EXT_COL0 IS NOT NULL
+                        LIMIT 1
+                    ) AS temp2
+                ) AND CONCAT(DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
+                    LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0')) =
+                    CONCAT(DATE_FORMAT(#{insertTime}, '%Y%m%d%H'),
+                    LPAD(FLOOR(MINUTE(#{insertTime})/2)*2, 2, '0'))
+                    AND REQUEST_TIME = (
+                    SELECT REQUEST_TIME FROM (
+                        SELECT REQUEST_TIME FROM msg_queue m3
+                        WHERE m3.EXT_COL3 = #{userId}
+                        AND m3.MSG_TYPE = #{msgType}
+                        AND m3.INSERT_TIME = #{insertTime}
+                        AND m3.EXT_COL0 IS NOT NULL
+                        LIMIT 1
+                    ) AS temp3
+                ))
+            )
     </delete>
 
     <!-- 삭제 대상 메시지 건수 조회 -->
     <select id="countMessagesForCancellation" resultType="int">
         SELECT COUNT(*)
         FROM msg_queue
-        WHERE EXT_COL3 = #{userId}
-        AND MSG_TYPE = #{msgType}
-        AND INSERT_TIME = #{insertTime}
-        AND STAT = '0'
-        AND REQUEST_TIME > NOW()
+        WHERE
+            EXT_COL3 = #{userId}
+            AND MSG_TYPE = #{msgType}
+            AND (
+                (EXT_COL0 IS NULL AND EXT_COL1 = (
+                    SELECT EXT_COL1 FROM (
+                        SELECT EXT_COL1 FROM msg_queue m2
+                        WHERE m2.EXT_COL3 = #{userId}
+                        AND m2.MSG_TYPE = #{msgType}
+                        AND m2.INSERT_TIME = #{insertTime}
+                        AND m2.EXT_COL0 IS NULL
+                        LIMIT 1
+                    ) AS temp
+                ))
+                OR
+                (EXT_COL0 IS NOT NULL AND EXT_COL0 = (
+                    SELECT EXT_COL0 FROM (
+                        SELECT EXT_COL0 FROM msg_queue m2
+                        WHERE m2.EXT_COL3 = #{userId}
+                        AND m2.MSG_TYPE = #{msgType}
+                        AND m2.INSERT_TIME = #{insertTime}
+                        AND m2.EXT_COL0 IS NOT NULL
+                        LIMIT 1
+                    ) AS temp2
+                ) AND CONCAT(DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
+                    LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0')) =
+                    CONCAT(DATE_FORMAT(#{insertTime}, '%Y%m%d%H'),
+                    LPAD(FLOOR(MINUTE(#{insertTime})/2)*2, 2, '0'))
+                    AND REQUEST_TIME = (
+                    SELECT REQUEST_TIME FROM (
+                        SELECT REQUEST_TIME FROM msg_queue m3
+                        WHERE m3.EXT_COL3 = #{userId}
+                        AND m3.MSG_TYPE = #{msgType}
+                        AND m3.INSERT_TIME = #{insertTime}
+                        AND m3.EXT_COL0 IS NOT NULL
+                        LIMIT 1
+                    ) AS temp3
+                ))
+            )
     </select>
 
 </mapper>

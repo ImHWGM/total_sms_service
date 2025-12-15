@@ -1,0 +1,67 @@
+package kr.wisead.mapper.primary;
+
+import kr.wisead.domain.message.entity.MessageTemplate;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * 메시지 템플릿 Mapper (Primary DB - wise_ad)
+ */
+@Mapper
+public interface MessageTemplateMapper {
+
+    /**
+     * 템플릿 조회 (by SEQ)
+     */
+    Optional<MessageTemplate> findBySeq(@Param("templateSeq") Long templateSeq);
+
+    /**
+     * 사용자별 템플릿 목록 조회
+     */
+    List<MessageTemplate> findByUserSeq(@Param("userSeq") Long userSeq);
+
+    /**
+     * 사용자별 템플릿 목록 조회 (페이징)
+     */
+    List<MessageTemplate> findByUserSeqWithPaging(@Param("userSeq") Long userSeq,
+                                                   @Param("offset") int offset,
+                                                   @Param("limit") int limit);
+
+    /**
+     * 사용자별 템플릿 개수 조회
+     */
+    long countByUserSeq(@Param("userSeq") Long userSeq);
+
+    /**
+     * 사용자별 최대 순서 조회
+     */
+    Integer findMaxOrderByUserSeq(@Param("userSeq") Long userSeq);
+
+    /**
+     * 템플릿 등록
+     */
+    int insert(MessageTemplate template);
+
+    /**
+     * 템플릿 수정
+     */
+    int update(MessageTemplate template);
+
+    /**
+     * 템플릿 삭제
+     */
+    int delete(@Param("templateSeq") Long templateSeq);
+
+    /**
+     * 사용자별 템플릿 전체 삭제
+     */
+    int deleteByUserSeq(@Param("userSeq") Long userSeq);
+
+    /**
+     * 템플릿 순서 변경
+     */
+    int updateOrder(@Param("templateSeq") Long templateSeq, @Param("templateOrder") Integer templateOrder);
+}

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.sms.MsgResultMapper">
+
+    <!-- 결과 매핑 -->
+    <resultMap id="MsgResultMap" type="kr.wisead.domain.message.entity.MsgResult">
+        <id property="mseq" column="MSEQ"/>
+        <result property="msgType" column="MSG_TYPE"/>
+        <result property="dstaddr" column="DSTADDR"/>
+        <result property="callback" column="CALLBACK"/>
+        <result property="stat" column="STAT"/>
+        <result property="subject" column="SUBJECT"/>
+        <result property="text" column="TEXT"/>
+        <result property="filecnt" column="FILECNT"/>
+        <result property="fileloc1" column="FILELOC1"/>
+        <result property="filesize1" column="FILESIZE1"/>
+        <result property="fileloc2" column="FILELOC2"/>
+        <result property="filesize2" column="FILESIZE2"/>
+        <result property="fileloc3" column="FILELOC3"/>
+        <result property="filesize3" column="FILESIZE3"/>
+        <result property="requestTime" column="REQUEST_TIME"/>
+        <result property="sendTime" column="SEND_TIME"/>
+        <result property="reportTime" column="REPORT_TIME"/>
+        <result property="telecom" column="TELECOM"/>
+        <result property="result" column="RESULT"/>
+        <result property="extCol0" column="EXT_COL0"/>
+        <result property="extCol1" column="EXT_COL1"/>
+        <result property="extCol2" column="EXT_COL2"/>
+        <result property="extCol3" column="EXT_COL3"/>
+    </resultMap>
+
+    <!-- 공통 컬럼 -->
+    <sql id="selectColumns">
+        MSEQ, MSG_TYPE, DSTADDR, CALLBACK, STAT, SUBJECT, TEXT,
+        FILECNT, FILELOC1, FILESIZE1, FILELOC2, FILESIZE2, FILELOC3, FILESIZE3,
+        REQUEST_TIME, SEND_TIME, REPORT_TIME, TELECOM, RESULT,
+        EXT_COL0, EXT_COL1, EXT_COL2, EXT_COL3
+    </sql>
+
+    <!-- 권한별 EXT_COL3 조건 -->
+    <sql id="extCol3Condition">
+        <choose>
+            <when test="regId == 'ALL'">
+                1=1
+            </when>
+            <when test="regId != null and regId != '' and regId.indexOf(',') != -1">
+                EXT_COL3 IN
+                <foreach collection="regId.split(',')" item="accountId" open="(" close=")" separator=",">
+                    #{accountId}
+                </foreach>
+            </when>
+            <when test="regId != null and regId != ''">
+                EXT_COL3 = #{regId}
+            </when>
+            <otherwise>
+                1=0
+            </otherwise>
+        </choose>
+    </sql>
+
+    <!-- 검색 조건 -->
+    <sql id="searchCondition">
+        <if test="keyword != null and keyword != ''">
+            <choose>
+                <when test="type == 'A'">
+                    AND MSG_TYPE LIKE CONCAT('%', #{keyword}, '%')
+                </when>
+                <when test="type == 'B'">
+                    AND DSTADDR = #{keyword}
+                </when>
+                <when test="type == 'C'">
+                    AND CALLBACK LIKE CONCAT('%', #{keyword}, '%')
+                </when>
+                <when test="type == 'D'">
+                    AND RESULT LIKE CONCAT('%', #{keyword}, '%')
+                </when>
+                <when test="type == 'E'">
+                    AND SUBJECT LIKE CONCAT('%', #{keyword}, '%')
+                </when>
+                <when test="type == 'F'">
+                    AND TEXT LIKE CONCAT('%', #{keyword}, '%')
+                </when>
+                <when test="type == 'G'">
+                    AND STAT = #{keyword}
+                </when>
+                <when test="type == 'H'">
+                    AND EXT_COL3 = #{keyword}
+                </when>
+            </choose>
+        </if>
+        <if test="sendFailure == '1'">
+            AND RESULT != '0'
+        </if>
+    </sql>
+
+    <!-- 발송 이력 조회 (msg_queue + msg_result_YYYYMM UNION) -->
+    <select id="selectSendHistory" resultMap="MsgResultMap">
+        SELECT * FROM (
+            SELECT <include refid="selectColumns"/>
+            FROM msg_queue
+            WHERE <include refid="extCol3Condition"/>
+            AND REQUEST_TIME BETWEEN #{srhDateStart} AND #{srhDateEnd}
+            <include refid="searchCondition"/>
+            <if test="tables != null and tables.size() > 0">
+                UNION ALL
+                <foreach collection="tables" item="table" separator="UNION ALL">
+                    SELECT <include refid="selectColumns"/>
+                    FROM ${table}
+                    WHERE <include refid="extCol3Condition"/>
+                    AND REQUEST_TIME BETWEEN #{srhDateStart} AND #{srhDateEnd}
+                    <include refid="searchCondition"/>
+                </foreach>
+            </if>
+        ) AS combined
+        ORDER BY REQUEST_TIME DESC
+        LIMIT #{skip}, #{amount}
+    </select>
+
+    <!-- 발송 이력 총 건수 조회 -->
+    <select id="countSendHistory" resultType="int">
+        SELECT SUM(cnt) AS totalCount FROM (
+            SELECT COUNT(*) AS cnt
+            FROM msg_queue
+            WHERE <include refid="extCol3Condition"/>
+            AND REQUEST_TIME BETWEEN #{srhDateStart} AND #{srhDateEnd}
+            <include refid="searchCondition"/>
+            <if test="tables != null and tables.size() > 0">
+                UNION ALL
+                <foreach collection="tables" item="table" separator="UNION ALL">
+                    SELECT COUNT(*) AS cnt
+                    FROM ${table}
+                    WHERE <include refid="extCol3Condition"/>
+                    AND REQUEST_TIME BETWEEN #{srhDateStart} AND #{srhDateEnd}
+                    <include refid="searchCondition"/>
+                </foreach>
+            </if>
+        ) AS totalTable
+    </select>
+
+    <!-- 특정 테이블에서 단건 조회 -->
+    <select id="findByMseq" resultMap="MsgResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM ${tableName}
+        WHERE MSEQ = #{mseq}
+    </select>
+
+</mapper>

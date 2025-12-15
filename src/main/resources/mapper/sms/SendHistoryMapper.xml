@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.sms.SendHistoryMapper">
+
+    <resultMap id="sendHistoryResultMap" type="kr.wisead.domain.history.entity.SendHistory">
+        <id property="msgKey" column="MSG_KEY"/>
+        <result property="msgType" column="MSG_TYPE"/>
+        <result property="dstAddr" column="DST_ADDR"/>
+        <result property="callBack" column="CALLBACK"/>
+        <result property="subject" column="SUBJECT"/>
+        <result property="text" column="TEXT"/>
+        <result property="stat" column="STAT"/>
+        <result property="result" column="RESULT"/>
+        <result property="fileCnt" column="FILE_CNT"/>
+        <result property="requestTime" column="REQUEST_TIME"/>
+        <result property="sendTime" column="SEND_TIME"/>
+        <result property="reportTime" column="REPORT_TIME"/>
+        <result property="telecom" column="TELECOM"/>
+        <result property="extCol2" column="EXT_COL2"/>
+        <result property="extCol3" column="EXT_COL3"/>
+    </resultMap>
+
+    <resultMap id="blockedSenderResultMap" type="kr.wisead.domain.history.entity.BlockedSender">
+        <result property="ani" column="ANI"/>
+        <result property="dtmf1" column="DTMF1"/>
+        <result property="menuName" column="MENU_NAME"/>
+        <result property="tTime" column="T_TIME"/>
+    </resultMap>
+
+    <sql id="selectColumns">
+        MSG_KEY,
+        MSG_TYPE,
+        DST_ADDR,
+        CALLBACK,
+        SUBJECT,
+        TEXT,
+        STAT,
+        RESULT,
+        FILE_CNT,
+        REQUEST_TIME,
+        SEND_TIME,
+        REPORT_TIME,
+        TELECOM,
+        EXT_COL2,
+        EXT_COL3
+    </sql>
+
+    <sql id="whereCondition">
+        <where>
+            1=1
+            <if test="params.startDate != null and params.startDate != ''">
+                AND REQUEST_TIME &gt;= #{params.startDate}
+            </if>
+            <if test="params.endDate != null and params.endDate != ''">
+                AND REQUEST_TIME &lt;= #{params.endDate}
+            </if>
+            <if test="params.sendFailure == 'Y'">
+                AND STAT = 3
+            </if>
+            <if test="params.userId != null and params.userId != '' and params.userId != 'ALL'">
+                <choose>
+                    <when test="params.userId.contains(',')">
+                        AND EXT_COL3 IN
+                        <foreach item="id" collection="params.userId.split(',')" open="(" separator="," close=")">
+                            #{id}
+                        </foreach>
+                    </when>
+                    <otherwise>
+                        AND EXT_COL3 = #{params.userId}
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="params.keyword != null and params.keyword != ''">
+                <choose>
+                    <when test="params.type == 'dstAddr'">
+                        AND DST_ADDR LIKE CONCAT('%', #{params.keyword}, '%')
+                    </when>
+                    <when test="params.type == 'callBack'">
+                        AND CALLBACK LIKE CONCAT('%', #{params.keyword}, '%')
+                    </when>
+                    <when test="params.type == 'subject'">
+                        AND SUBJECT LIKE CONCAT('%', #{params.keyword}, '%')
+                    </when>
+                    <when test="params.type == 'text'">
+                        AND TEXT LIKE CONCAT('%', #{params.keyword}, '%')
+                    </when>
+                    <otherwise>
+                        AND (
+                            DST_ADDR LIKE CONCAT('%', #{params.keyword}, '%')
+                            OR CALLBACK LIKE CONCAT('%', #{params.keyword}, '%')
+                            OR SUBJECT LIKE CONCAT('%', #{params.keyword}, '%')
+                        )
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+    </sql>
+
+    <!-- 발송 이력 목록 조회 (동적 테이블명) -->
+    <select id="selectList" resultMap="sendHistoryResultMap">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM ${tableName}
+        <include refid="whereCondition"/>
+        ORDER BY REQUEST_TIME DESC
+        LIMIT #{params.offset}, #{params.size}
+    </select>
+
+    <!-- 발송 이력 총 건수 -->
+    <select id="selectCount" resultType="int">
+        SELECT COUNT(*)
+        FROM ${tableName}
+        <include refid="whereCondition"/>
+    </select>
+
+    <!-- 발송 이력 전체 조회 (다운로드용) -->
+    <select id="selectAllForDownload" resultMap="sendHistoryResultMap">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM ${tableName}
+        <include refid="whereCondition"/>
+        ORDER BY REQUEST_TIME DESC
+    </select>
+
+    <!-- 수신거부 목록 조회 -->
+    <select id="selectBlockedSenders" resultMap="blockedSenderResultMap">
+        SELECT
+            ANI,
+            DTMF1,
+            MENU_NAME,
+            T_TIME
+        FROM blocked_senders
+        WHERE DTMF1 = #{storeCode}
+        ORDER BY T_TIME DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 수신거부 총 건수 -->
+    <select id="selectBlockedSenderCount" resultType="int">
+        SELECT COUNT(*)
+        FROM blocked_senders
+        WHERE DTMF1 = #{storeCode}
+    </select>
+
+    <!-- 수신거부 전체 조회 (다운로드용) -->
+    <select id="selectAllBlockedSenders" resultMap="blockedSenderResultMap">
+        SELECT
+            ANI,
+            DTMF1,
+            MENU_NAME,
+            T_TIME
+        FROM blocked_senders
+        WHERE DTMF1 = #{storeCode}
+        ORDER BY T_TIME DESC
+    </select>
+
+    <!-- 수신거부 삭제 -->
+    <delete id="deleteBlockedSender">
+        DELETE FROM blocked_senders
+        WHERE ANI = #{ani}
+        AND DTMF1 = #{dtmf1}
+    </delete>
+
+    <!-- 수신거부 키워드 검색 -->
+    <select id="searchBlockedSenders" resultMap="blockedSenderResultMap">
+        SELECT
+            ANI,
+            DTMF1,
+            MENU_NAME,
+            T_TIME
+        FROM blocked_senders
+        WHERE DTMF1 = #{storeCode}
+        <if test="keyword != null and keyword != ''">
+            AND ANI LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        ORDER BY T_TIME DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+</mapper>

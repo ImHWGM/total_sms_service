@@ -49,6 +49,17 @@ public class ActionLogService {
     }
 
     /**
+     * 액션 로그 전체 조회 (엑셀 다운로드용)
+     */
+    @Transactional(readOnly = true)
+    public List<ActionLogResponse> getLogsForExcel(ActionLogSearchRequest request) {
+        List<ActionLog> logs = actionLogMapper.selectAllForDownload(request);
+        return logs.stream()
+                .map(ActionLogResponse::from)
+                .toList();
+    }
+
+    /**
      * 액션 로그 기록
      */
     @Transactional

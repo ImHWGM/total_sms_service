@@ -36,10 +36,14 @@ public class FileDownloadController {
     @Value("${upload.dir.businessRegistration:./uploads/bizreg}")
     private String bizRegPath;
 
+    @Value("${upload.dir:./uploads}")
+    private String uploadDir;
+
     private Path mmsFileStorageLocation;
     private Path surveyFileStorageLocation;
     private Path templateFileStorageLocation;
     private Path bizRegFileStorageLocation;
+    private Path qrFileStorageLocation;
 
     @PostConstruct
     public void init() {
@@ -48,11 +52,13 @@ public class FileDownloadController {
             surveyFileStorageLocation = Paths.get(surveyImgFilePath).toAbsolutePath().normalize();
             templateFileStorageLocation = Paths.get(templateImgPath).toAbsolutePath().normalize();
             bizRegFileStorageLocation = Paths.get(bizRegPath).toAbsolutePath().normalize();
+            qrFileStorageLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
 
             createDirectoryIfNotExists(mmsFileStorageLocation);
             createDirectoryIfNotExists(surveyFileStorageLocation);
             createDirectoryIfNotExists(templateFileStorageLocation);
             createDirectoryIfNotExists(bizRegFileStorageLocation);
+            createDirectoryIfNotExists(qrFileStorageLocation.resolve("qrcode"));
         } catch (Exception ex) {
             throw new RuntimeException("업로드 디렉토리를 생성할 수 없습니다.", ex);
         }
@@ -120,6 +126,35 @@ public class FileDownloadController {
                 .contentType(MediaType.parseMediaType(contentType))
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + encodedFileName + "\"")
+                .body(resource);
+    }
+
+    /**
+     * QR 코드 이미지 서빙
+     * 설문조사 QR 코드 이미지 제공
+     */
+    @GetMapping("/qrcode/{fileName:.+}")
+    public ResponseEntity<Resource> serveQrCodeFile(
+            @PathVariable String fileName) throws Exception {
+        Path filePath = qrFileStorageLocation.resolve(Paths.get("qrcode", fileName)).normalize();
+        Resource resource = new UrlResource(filePath.toUri());
+
+        if (!resource.exists()) {
+            throw new RuntimeException("파일을 찾을 수 없습니다: " + fileName);
+        }
+
+        String contentType = Files.probeContentType(filePath);
+        if (contentType == null) {
+            contentType = "image/png";
+        }
+
+        String encodedFileName = URLEncoder.encode(resource.getFilename(), StandardCharsets.UTF_8)
+                .replace("+", "%20");
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"" + encodedFileName + "\"")
                 .body(resource);
     }
 

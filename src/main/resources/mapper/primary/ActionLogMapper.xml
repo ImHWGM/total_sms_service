@@ -90,6 +90,15 @@
         WHERE SEQ = #{seq}
     </select>
 
+    <!-- 액션 로그 전체 조회 (엑셀 다운로드용) -->
+    <select id="selectAllForDownload" parameterType="kr.wisead.domain.admin.dto.ActionLogSearchRequest" resultMap="actionLogResultMap">
+        SELECT
+            <include refid="selectLogColumns"/>
+        FROM TB_ACTION_LOG
+        <include refid="whereCondition"/>
+        ORDER BY REG_DATE DESC
+    </select>
+
     <!-- 액션 로그 등록 -->
     <insert id="insert" parameterType="kr.wisead.domain.admin.entity.ActionLog" useGeneratedKeys="true" keyProperty="seq">
         INSERT INTO TB_ACTION_LOG (

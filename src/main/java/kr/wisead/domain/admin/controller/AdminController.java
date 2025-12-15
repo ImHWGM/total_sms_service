@@ -8,12 +8,26 @@ import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.admin.dto.*;
 import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
+import kr.wisead.domain.excel.service.ExcelService;
 import kr.wisead.domain.user.dto.UserResponse;
 import kr.wisead.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * 관리자 Controller
@@ -26,6 +40,7 @@ public class AdminController {
 
     private final AdminService adminService;
     private final ActionLogService actionLogService;
+    private final ExcelService excelService;
     private final JwtTokenProvider jwtTokenProvider;
 
     /**
@@ -81,6 +96,85 @@ public class AdminController {
     public ApiResponse<ActionLogResponse> getActionLog(@PathVariable Long seq) {
         ActionLogResponse response = actionLogService.getLog(seq);
         return ApiResponse.success(response);
+    }
+
+    /**
+     * 액션 로그 엑셀 다운로드
+     * GET /api/admin/logs/download
+     */
+    @GetMapping("/logs/download")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> downloadActionLogsExcel(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String searchField,
+            @RequestParam(required = false) String searchKeyword,
+            @RequestParam(required = false) String actionType,
+            @RequestHeader("Authorization") String token,
+            HttpServletRequest httpRequest) {
+
+        String accessToken = token.replace("Bearer ", "");
+        String userId = jwtTokenProvider.getUserId(accessToken);
+        String userName = jwtTokenProvider.getUserName(accessToken);
+
+        // 다운로드 로그 기록
+        actionLogService.logDownloadAction(userId, userName, "로그관리 엑셀다운로드", "D", "업무용", httpRequest);
+
+        ActionLogSearchRequest request = ActionLogSearchRequest.builder()
+                .startDate(startDate)
+                .endDate(endDate)
+                .searchField(searchField)
+                .searchKeyword(searchKeyword)
+                .actionType(actionType)
+                .page(1)
+                .size(Integer.MAX_VALUE)
+                .build();
+
+        List<ActionLogResponse> logs = actionLogService.getLogsForExcel(request);
+
+        try (SXSSFWorkbook workbook = excelService.createWorkbook()) {
+            Sheet sheet = excelService.createSheet(workbook, "로그관리");
+
+            CellStyle headerStyle = excelService.createHeaderStyle(workbook, 11, true, 192, 192, 192);
+
+            List<String> headers = Arrays.asList(
+                    "NO", "아이디", "이름", "메뉴명", "메뉴URL", "Referer", "코드", "IP", "등록일시"
+            );
+            excelService.createHeaderRow(sheet, 0, headers, headerStyle);
+
+            int rowNum = 1;
+            int totalCount = logs.size();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+            for (ActionLogResponse logItem : logs) {
+                excelService.createDataRow(sheet, rowNum++, Arrays.asList(
+                        totalCount--,
+                        logItem.getUserId(),
+                        logItem.getUserName(),
+                        logItem.getMenuName(),
+                        logItem.getMenuUrl(),
+                        logItem.getReferer(),
+                        logItem.getCode(),
+                        logItem.getIp(),
+                        logItem.getRegDate() != null ? logItem.getRegDate().format(formatter) : ""
+                ), null);
+            }
+
+            byte[] content = excelService.toByteArray(workbook);
+
+            String fileName = "로그관리_" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".xlsx";
+            String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8)
+                    .replace("+", "%20");
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFileName + "\"")
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(content);
+
+        } catch (Exception e) {
+            log.error("액션 로그 엑셀 다운로드 실패", e);
+            throw new RuntimeException("엑셀 파일 생성에 실패했습니다.");
+        }
     }
 
     /**

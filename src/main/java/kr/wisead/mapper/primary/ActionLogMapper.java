@@ -29,6 +29,11 @@ public interface ActionLogMapper {
     ActionLog selectById(@Param("seq") Long seq);
 
     /**
+     * 액션 로그 전체 조회 (엑셀 다운로드용)
+     */
+    List<ActionLog> selectAllForDownload(ActionLogSearchRequest request);
+
+    /**
      * 액션 로그 등록
      */
     int insert(ActionLog actionLog);

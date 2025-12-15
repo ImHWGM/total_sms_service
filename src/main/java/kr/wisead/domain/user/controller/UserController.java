@@ -1,6 +1,5 @@
 package kr.wisead.domain.user.controller;
 
-import jakarta.validation.constraints.NotBlank;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.user.dto.UserResponse;

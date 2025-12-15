@@ -1,6 +1,5 @@
 package kr.wisead.mapper.sms;
 
-import kr.wisead.domain.history.entity.BlockedSender;
 import kr.wisead.domain.history.entity.SendHistory;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -10,6 +9,7 @@ import java.util.Map;
 
 /**
  * 발송 이력 Mapper (SMS DB)
+ * - msg_result_YYYYMM 테이블 조회
  */
 @Mapper
 public interface SendHistoryMapper {
@@ -33,32 +33,8 @@ public interface SendHistoryMapper {
                                             @Param("params") Map<String, Object> params);
 
     /**
-     * 수신거부 목록 조회
+     * 전화번호로 최근 발송자 ID 조회 (월별 테이블)
+     * ARS 자동등록형에서 사용
      */
-    List<BlockedSender> selectBlockedSenders(@Param("storeCode") String storeCode,
-                                              @Param("offset") int offset,
-                                              @Param("limit") int limit);
-
-    /**
-     * 수신거부 총 건수
-     */
-    int selectBlockedSenderCount(@Param("storeCode") String storeCode);
-
-    /**
-     * 수신거부 전체 조회 (엑셀 다운로드용)
-     */
-    List<BlockedSender> selectAllBlockedSenders(@Param("storeCode") String storeCode);
-
-    /**
-     * 수신거부 삭제
-     */
-    int deleteBlockedSender(@Param("ani") String ani, @Param("dtmf1") String dtmf1);
-
-    /**
-     * 수신거부 키워드 검색
-     */
-    List<BlockedSender> searchBlockedSenders(@Param("storeCode") String storeCode,
-                                              @Param("keyword") String keyword,
-                                              @Param("offset") int offset,
-                                              @Param("limit") int limit);
+    String selectUserIdByAni(@Param("ani") String ani, @Param("tableName") String tableName);
 }

@@ -8,7 +8,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 예약 메시지 Entity (sc_tran 테이블)
+ * 예약 메시지 Entity (msg_queue 테이블)
+ * REQUEST_TIME이 미래인 경우 예약 메시지로 대기
  */
 @Data
 @NoArgsConstructor

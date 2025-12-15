@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.BlockedSenderMapper">
+
+    <resultMap id="blockedSenderResultMap" type="kr.wisead.domain.ars.entity.BlockedSender">
+        <result property="tTime" column="T_TIME"/>
+        <result property="ani" column="ANI"/>
+        <result property="dtmf1" column="DTMF_1"/>
+        <result property="menuName" column="MENU_NAME"/>
+    </resultMap>
+
+    <!-- 수신거부 등록 -->
+    <insert id="insertBlockedSender" parameterType="kr.wisead.domain.ars.entity.BlockedSender">
+        INSERT INTO blocked_senders (
+            T_TIME,
+            ANI,
+            DTMF_1,
+            MENU_NAME
+        ) VALUES (
+            #{tTime},
+            #{ani},
+            #{dtmf1},
+            #{menuName}
+        )
+    </insert>
+
+    <!-- 수신거부 중복 확인 -->
+    <select id="countBlockedSender" resultType="int">
+        SELECT COUNT(*)
+        FROM blocked_senders
+        WHERE ANI = #{ani}
+        AND DTMF_1 = #{dtmf1}
+    </select>
+
+    <!-- 수신거부 목록 조회 (상점코드별) -->
+    <select id="selectBlockedSendersByStoreCode" resultMap="blockedSenderResultMap">
+        SELECT
+            T_TIME,
+            ANI,
+            DTMF_1,
+            MENU_NAME
+        FROM blocked_senders
+        WHERE DTMF_1 = #{dtmf1}
+        ORDER BY T_TIME DESC
+    </select>
+
+    <!-- 수신거부 목록 조회 (페이징) -->
+    <select id="selectBlockedSendersWithPaging" resultMap="blockedSenderResultMap">
+        SELECT
+            T_TIME,
+            ANI,
+            DTMF_1,
+            MENU_NAME
+        FROM blocked_senders
+        WHERE DTMF_1 = #{dtmf1}
+        ORDER BY T_TIME DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 수신거부 총 건수 -->
+    <select id="countBlockedSendersByStoreCode" resultType="int">
+        SELECT COUNT(*)
+        FROM blocked_senders
+        WHERE DTMF_1 = #{dtmf1}
+    </select>
+
+    <!-- 수신거부 삭제 (단건) -->
+    <delete id="deleteBlockedSender">
+        DELETE FROM blocked_senders
+        WHERE ANI = #{ani}
+        AND DTMF_1 = #{dtmf1}
+    </delete>
+
+    <!-- 수신거부 삭제 (일괄) -->
+    <delete id="deleteBlockedSenders">
+        DELETE FROM blocked_senders
+        WHERE
+        <foreach collection="list" item="item" separator=" OR ">
+            (ANI = #{item.ani} AND DTMF_1 = #{item.dtmf1})
+        </foreach>
+    </delete>
+
+    <!-- 상점코드로 회사명 조회 -->
+    <select id="selectCorpNameByStoreCode" resultType="String">
+        SELECT CORP_NAME
+        FROM tb_manager
+        WHERE STORE_CODE = #{storeCode}
+    </select>
+
+    <!-- 수신거부 번호 확인 -->
+    <select id="isBlockedNumber" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM blocked_senders
+        WHERE ANI = #{ani}
+        AND DTMF_1 = #{dtmf1}
+    </select>
+
+    <!-- 수신거부 번호 목록 확인 (일괄 발송 시) -->
+    <select id="selectBlockedNumbers" resultType="String">
+        SELECT ANI
+        FROM blocked_senders
+        WHERE DTMF_1 = #{dtmf1}
+        AND ANI IN
+        <foreach collection="aniList" item="ani" open="(" separator="," close=")">
+            #{ani}
+        </foreach>
+    </select>
+
+</mapper>

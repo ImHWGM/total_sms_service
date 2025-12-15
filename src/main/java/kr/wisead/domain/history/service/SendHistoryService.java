@@ -1,10 +1,10 @@
 package kr.wisead.domain.history.service;
 
 import kr.wisead.common.response.PageResponse;
-import kr.wisead.domain.history.dto.BlockedSenderResponse;
+import kr.wisead.domain.ars.dto.BlockedSenderResponse;
+import kr.wisead.domain.ars.service.ArsService;
 import kr.wisead.domain.history.dto.SendHistoryResponse;
 import kr.wisead.domain.history.dto.SendHistorySearchRequest;
-import kr.wisead.domain.history.entity.BlockedSender;
 import kr.wisead.domain.history.entity.SendHistory;
 import kr.wisead.mapper.sms.SendHistoryMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +25,7 @@ import java.util.*;
 public class SendHistoryService {
 
     private final SendHistoryMapper sendHistoryMapper;
+    private final ArsService arsService;
 
     /**
      * 발송 이력 목록 조회 (여러 월 테이블 조회)
@@ -120,59 +121,19 @@ public class SendHistoryService {
     }
 
     /**
-     * 수신거부 목록 조회
+     * 수신거부 목록 조회 (ArsService 위임)
      */
     @Transactional(readOnly = true)
-    public PageResponse<BlockedSenderResponse> getBlockedSenders(String storeCode, String keyword,
-                                                                   int page, int size) {
-        int offset = (page - 1) * size;
-        List<BlockedSender> blockedSenders;
-        int totalCount;
-
-        if (keyword != null && !keyword.isEmpty()) {
-            blockedSenders = sendHistoryMapper.searchBlockedSenders(storeCode, keyword, offset, size);
-            totalCount = blockedSenders.size(); // 검색 시 전체 건수 재조회 필요
-        } else {
-            blockedSenders = sendHistoryMapper.selectBlockedSenders(storeCode, offset, size);
-            totalCount = sendHistoryMapper.selectBlockedSenderCount(storeCode);
-        }
-
-        List<BlockedSenderResponse> responses = blockedSenders.stream()
-                .map(BlockedSenderResponse::from)
-                .toList();
-
-        return PageResponse.of(responses, page, size, totalCount);
+    public PageResponse<BlockedSenderResponse> getBlockedSenders(String storeCode, int page, int size) {
+        return arsService.getBlockedSenders(storeCode, page, size);
     }
 
     /**
-     * 수신거부 전체 조회 (엑셀 다운로드용)
-     */
-    @Transactional(readOnly = true)
-    public List<BlockedSenderResponse> getBlockedSendersForDownload(String storeCode) {
-        List<BlockedSender> blockedSenders = sendHistoryMapper.selectAllBlockedSenders(storeCode);
-
-        return blockedSenders.stream()
-                .map(BlockedSenderResponse::from)
-                .toList();
-    }
-
-    /**
-     * 수신거부 삭제
+     * 수신거부 삭제 (ArsService 위임)
      */
     @Transactional
     public int deleteBlockedSenders(List<Map<String, String>> keyList) {
-        int deleteCount = 0;
-
-        for (Map<String, String> key : keyList) {
-            try {
-                deleteCount += sendHistoryMapper.deleteBlockedSender(key.get("ani"), key.get("dtmf1"));
-            } catch (Exception e) {
-                log.error("수신거부 삭제 중 오류: ani={}, dtmf1={}", key.get("ani"), key.get("dtmf1"), e);
-            }
-        }
-
-        log.info("수신거부 삭제 완료: {}건", deleteCount);
-        return deleteCount;
+        return arsService.deleteBlockedSenders(keyList);
     }
 
     /**

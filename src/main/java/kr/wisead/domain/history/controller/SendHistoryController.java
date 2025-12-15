@@ -6,8 +6,7 @@ import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
-import kr.wisead.domain.excel.service.ExcelService;
-import kr.wisead.domain.history.dto.BlockedSenderResponse;
+import kr.wisead.domain.ars.dto.BlockedSenderResponse;
 import kr.wisead.domain.history.dto.SendHistoryResponse;
 import kr.wisead.domain.history.dto.SendHistorySearchRequest;
 import kr.wisead.domain.history.service.SendHistoryService;
@@ -175,7 +174,6 @@ public class SendHistoryController {
      */
     @GetMapping("/optout")
     public ApiResponse<PageResponse<BlockedSenderResponse>> getOptOutList(
-            @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestHeader("Authorization") String token) {
@@ -184,7 +182,7 @@ public class SendHistoryController {
         // TODO: storeCode 조회 로직 필요 (사용자별 스토어 코드)
         String storeCode = userId; // 임시로 userId 사용
 
-        PageResponse<BlockedSenderResponse> response = sendHistoryService.getBlockedSenders(storeCode, keyword, page, size);
+        PageResponse<BlockedSenderResponse> response = sendHistoryService.getBlockedSenders(storeCode, page, size);
         return ApiResponse.success(response);
     }
 
@@ -228,7 +226,9 @@ public class SendHistoryController {
         // 다운로드 로그 기록
         actionLogService.logDownloadAction(userId, userName, "수신거부 내역 다운로드", "D", "업무용", request);
 
-        List<BlockedSenderResponse> blockedList = sendHistoryService.getBlockedSendersForDownload(storeCode);
+        // 전체 조회 (페이징 없이)
+        PageResponse<BlockedSenderResponse> pageResponse = sendHistoryService.getBlockedSenders(storeCode, 1, Integer.MAX_VALUE);
+        List<BlockedSenderResponse> blockedList = pageResponse.getContent();
 
         // 엑셀 생성
         Workbook wb = new SXSSFWorkbook();

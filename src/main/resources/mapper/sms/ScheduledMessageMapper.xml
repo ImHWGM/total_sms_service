@@ -3,9 +3,9 @@
 <mapper namespace="kr.wisead.mapper.sms.ScheduledMessageMapper">
 
     <resultMap id="scheduledMessageResultMap" type="kr.wisead.domain.schedule.entity.ScheduledMessage">
-        <id property="mSeq" column="M_SEQ"/>
+        <id property="mSeq" column="MSEQ"/>
         <result property="msgType" column="MSG_TYPE"/>
-        <result property="dstAddr" column="DST_ADDR"/>
+        <result property="dstAddr" column="DSTADDR"/>
         <result property="callBack" column="CALLBACK"/>
         <result property="stat" column="STAT"/>
         <result property="subject" column="SUBJECT"/>
@@ -18,17 +18,17 @@
         <result property="extCol2" column="EXT_COL2"/>
         <result property="extCol3" column="EXT_COL3"/>
         <result property="messageCount" column="MESSAGE_COUNT"/>
-        <result property="fileCnt" column="FILE_CNT"/>
-        <result property="fileLoc1" column="FILE_LOC1"/>
-        <result property="fileLoc2" column="FILE_LOC2"/>
-        <result property="fileLoc3" column="FILE_LOC3"/>
-        <result property="fileLoc4" column="FILE_LOC4"/>
-        <result property="fileLoc5" column="FILE_LOC5"/>
+        <result property="fileCnt" column="FILECNT"/>
+        <result property="fileLoc1" column="FILELOC1"/>
+        <result property="fileLoc2" column="FILELOC2"/>
+        <result property="fileLoc3" column="FILELOC3"/>
+        <result property="fileLoc4" column="FILELOC4"/>
+        <result property="fileLoc5" column="FILELOC5"/>
     </resultMap>
 
     <sql id="whereCondition">
         <where>
-            STAT = 0
+            STAT = '0'
             AND REQUEST_TIME > NOW()
             <if test="userId != null and userId != '' and userId != 'ALL'">
                 <choose>
@@ -48,7 +48,7 @@
             </if>
             <if test="searchText != null and searchText != ''">
                 AND (
-                    DST_ADDR LIKE CONCAT('%', #{searchText}, '%')
+                    DSTADDR LIKE CONCAT('%', #{searchText}, '%')
                     OR CALLBACK LIKE CONCAT('%', #{searchText}, '%')
                     OR SUBJECT LIKE CONCAT('%', #{searchText}, '%')
                     OR TEXT LIKE CONCAT('%', #{searchText}, '%')
@@ -60,9 +60,9 @@
     <!-- 예약 메시지 목록 조회 (그룹핑) -->
     <select id="selectScheduledMessages" resultMap="scheduledMessageResultMap">
         SELECT
-            MIN(M_SEQ) as M_SEQ,
+            MIN(MSEQ) as MSEQ,
             MSG_TYPE,
-            MIN(DST_ADDR) as DST_ADDR,
+            MIN(DSTADDR) as DSTADDR,
             CALLBACK,
             STAT,
             SUBJECT,
@@ -72,8 +72,8 @@
             EXT_COL2,
             EXT_COL3,
             COUNT(*) as MESSAGE_COUNT,
-            MAX(FILE_CNT) as FILE_CNT
-        FROM sc_tran
+            MAX(FILECNT) as FILECNT
+        FROM msg_queue
         <include refid="whereCondition"/>
         GROUP BY MSG_TYPE, CALLBACK, SUBJECT, TEXT, INSERT_TIME, REQUEST_TIME, EXT_COL2, EXT_COL3, STAT
         ORDER BY REQUEST_TIME ASC
@@ -85,7 +85,7 @@
         SELECT COUNT(*)
         FROM (
             SELECT 1
-            FROM sc_tran
+            FROM msg_queue
             <include refid="whereCondition"/>
             GROUP BY MSG_TYPE, CALLBACK, SUBJECT, TEXT, INSERT_TIME, REQUEST_TIME, EXT_COL2, EXT_COL3, STAT
         ) t
@@ -94,9 +94,9 @@
     <!-- 예약 메시지 상세 조회 -->
     <select id="selectMessageById" resultMap="scheduledMessageResultMap">
         SELECT
-            M_SEQ,
+            MSEQ,
             MSG_TYPE,
-            DST_ADDR,
+            DSTADDR,
             CALLBACK,
             STAT,
             SUBJECT,
@@ -108,14 +108,14 @@
             EXT_COL1,
             EXT_COL2,
             EXT_COL3,
-            FILE_CNT,
-            FILE_LOC1,
-            FILE_LOC2,
-            FILE_LOC3,
-            FILE_LOC4,
-            FILE_LOC5
-        FROM sc_tran
-        WHERE M_SEQ = #{mSeq}
+            FILECNT,
+            FILELOC1,
+            FILELOC2,
+            FILELOC3,
+            FILELOC4,
+            FILELOC5
+        FROM msg_queue
+        WHERE MSEQ = #{mSeq}
         <if test="userId != null and userId != '' and userId != 'ALL'">
             <choose>
                 <when test="userId.contains(',')">
@@ -133,31 +133,34 @@
 
     <!-- 그룹 예약 시간 변경 -->
     <update id="updateGroupRequestTime">
-        UPDATE sc_tran
+        UPDATE msg_queue
         SET REQUEST_TIME = #{newRequestTime}
         WHERE EXT_COL3 = #{userId}
         AND MSG_TYPE = #{msgType}
         AND INSERT_TIME = #{insertTime}
-        AND STAT = 0
+        AND STAT = '0'
+        AND REQUEST_TIME > NOW()
     </update>
 
     <!-- 그룹 예약 메시지 삭제 -->
     <delete id="deleteScheduledMessageGroup">
-        DELETE FROM sc_tran
+        DELETE FROM msg_queue
         WHERE EXT_COL3 = #{userId}
         AND MSG_TYPE = #{msgType}
         AND INSERT_TIME = #{insertTime}
-        AND STAT = 0
+        AND STAT = '0'
+        AND REQUEST_TIME > NOW()
     </delete>
 
     <!-- 삭제 대상 메시지 건수 조회 -->
     <select id="countMessagesForCancellation" resultType="int">
         SELECT COUNT(*)
-        FROM sc_tran
+        FROM msg_queue
         WHERE EXT_COL3 = #{userId}
         AND MSG_TYPE = #{msgType}
         AND INSERT_TIME = #{insertTime}
-        AND STAT = 0
+        AND STAT = '0'
+        AND REQUEST_TIME > NOW()
     </select>
 
 </mapper>

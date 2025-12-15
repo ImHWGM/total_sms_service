@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.CustomerCompanyMapper">
+
+    <!-- 고객사 선택 등록 -->
+    <insert id="insertCustomerCompany" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO TB_CUST_COMP (
+            USER_ID,
+            SELECTED_USER_ID,
+            CUST_COMP_NAME,
+            UPT_DATE,
+            UPT_ID,
+            CHKED_YN
+        ) VALUES (
+            #{userId},
+            #{selectedUserId},
+            #{custCompName},
+            NOW(),
+            #{uptId},
+            'Y'
+        )
+    </insert>
+
+    <!-- 고객사 일괄 등록 -->
+    <insert id="insertCustomerCompanyBatch">
+        INSERT INTO TB_CUST_COMP (
+            USER_ID,
+            CUST_COMP_NAME,
+            UPT_DATE,
+            UPT_ID,
+            CHKED_YN
+        ) VALUES
+        <foreach item="custCompName" collection="custCompNames" separator=",">
+            (
+                #{userId},
+                #{custCompName},
+                NOW(),
+                #{uptId},
+                'Y'
+            )
+        </foreach>
+    </insert>
+
+    <!-- 고객사 목록 조회 (TB_MANAGER 기반) -->
+    <select id="selectCompanyList" resultType="kr.wisead.domain.company.dto.CustomerCompanyResponse">
+        SELECT
+            SEQ AS seq,
+            USER_ID AS userId,
+            PERSON AS person,
+            CORP_NAME AS corpName,
+            BIZ_NUM AS bizNum
+        FROM TB_MANAGER
+        WHERE 1=1
+        <choose>
+            <when test="type == 'seqOpt'">
+                AND SEQ LIKE CONCAT('%', #{keyword}, '%')
+            </when>
+            <when test="type == 'custCompNameOpt'">
+                AND CORP_NAME LIKE CONCAT('%', #{keyword}, '%')
+            </when>
+            <when test="type == 'custCompBizCodeOpt'">
+                AND BIZ_NUM LIKE CONCAT('%', #{keyword}, '%')
+            </when>
+        </choose>
+        ORDER BY SEQ DESC
+        LIMIT #{skip}, #{amount}
+    </select>
+
+    <!-- 고객사 목록 총 개수 -->
+    <select id="selectCompanyListCount" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_MANAGER
+        WHERE 1=1
+        <choose>
+            <when test="type == 'seqOpt'">
+                AND SEQ LIKE CONCAT('%', #{keyword}, '%')
+            </when>
+            <when test="type == 'custCompNameOpt'">
+                AND CORP_NAME LIKE CONCAT('%', #{keyword}, '%')
+            </when>
+            <when test="type == 'custCompBizCodeOpt'">
+                AND BIZ_NUM LIKE CONCAT('%', #{keyword}, '%')
+            </when>
+        </choose>
+    </select>
+
+    <!-- 사용자의 선택된 고객사 목록 조회 -->
+    <select id="selectSelectedCompanies" resultType="kr.wisead.domain.company.entity.CustomerCompany">
+        SELECT
+            SEQ AS seq,
+            USER_ID AS userId,
+            SELECTED_USER_ID AS selectedUserId,
+            CUST_COMP_NAME AS custCompName,
+            UPT_DATE AS uptDate,
+            UPT_ID AS uptId,
+            CHKED_YN AS chkedYn
+        FROM TB_CUST_COMP
+        WHERE USER_ID = #{userId}
+          AND CHKED_YN = 'Y'
+    </select>
+
+    <!-- 고객사 선택 여부 확인 -->
+    <select id="selectCompanyExists" resultType="string">
+        SELECT SELECTED_USER_ID
+        FROM TB_CUST_COMP
+        WHERE USER_ID = #{userId}
+          AND SELECTED_USER_ID = #{selectedUserId}
+          AND CUST_COMP_NAME = #{custCompName}
+    </select>
+
+    <!-- 고객사 선택 상태 수정 -->
+    <update id="updateCompanyChecked">
+        UPDATE TB_CUST_COMP
+        SET UPT_DATE = NOW(),
+            UPT_ID = #{uptId},
+            CHKED_YN = #{chkedYn}
+        WHERE USER_ID = #{userId}
+          AND SELECTED_USER_ID = #{selectedUserId}
+          AND CUST_COMP_NAME = #{custCompName}
+    </update>
+
+    <!-- 고객사명 일괄 수정 -->
+    <update id="updateCompanyName">
+        UPDATE TB_CUST_COMP
+        SET CUST_COMP_NAME = #{newName}
+        WHERE CUST_COMP_NAME = #{oldName}
+    </update>
+
+    <!-- 담당자명 조회 -->
+    <select id="selectPersonByUserId" resultType="string">
+        SELECT PERSON
+        FROM TB_MANAGER
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <!-- 회사명 조회 -->
+    <select id="selectCorpNameByUserId" resultType="string">
+        SELECT CORP_NAME
+        FROM TB_MANAGER
+        WHERE USER_ID = #{userId}
+    </select>
+
+</mapper>

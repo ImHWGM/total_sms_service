@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.PaymentMapper">
+
+    <!-- 결제 정보 등록 -->
+    <insert id="insertPayment" useGeneratedKeys="true" keyProperty="kgSeq">
+        INSERT INTO TB_KG_PAYMENT (
+            SVC_ID,
+            MOBIL_ID,
+            TRADE_ID,
+            PRDT_NM,
+            PRDT_PRICE,
+            RESULT_CD,
+            SIGN_DATE,
+            USER_ID,
+            USER_NAME,
+            PAYER_EMAIL,
+            INTEREST,
+            CARD_NUM,
+            CARD_CODE,
+            CARD_NAME,
+            APPR_NO,
+            OWN_DIV_CD,
+            REG_DATE
+        ) VALUES (
+            #{svcId},
+            #{mobilId},
+            #{tradeId},
+            #{prdtNm},
+            #{prdtPrice},
+            #{resultCd},
+            #{signDate},
+            #{userId},
+            #{userName},
+            #{payerEmail},
+            #{interest},
+            #{cardNum},
+            #{cardCode},
+            #{cardName},
+            #{apprNo},
+            #{ownDivCd},
+            NOW()
+        )
+    </insert>
+
+    <!-- 거래 ID로 결제 정보 존재 여부 확인 -->
+    <select id="existsByTradeId" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM TB_KG_PAYMENT WHERE TRADE_ID = #{tradeId}
+        )
+    </select>
+
+    <!-- 거래 ID로 결제 정보 조회 -->
+    <select id="selectByTradeId" resultType="kr.wisead.domain.payment.entity.Payment">
+        SELECT
+            KG_SEQ AS kgSeq,
+            SVC_ID AS svcId,
+            MOBIL_ID AS mobilId,
+            TRADE_ID AS tradeId,
+            PRDT_NM AS prdtNm,
+            PRDT_PRICE AS prdtPrice,
+            RESULT_CD AS resultCd,
+            SIGN_DATE AS signDate,
+            USER_ID AS userId,
+            USER_NAME AS userName,
+            PAYER_EMAIL AS payerEmail,
+            INTEREST AS interest,
+            CARD_NUM AS cardNum,
+            CARD_CODE AS cardCode,
+            CARD_NAME AS cardName,
+            APPR_NO AS apprNo,
+            OWN_DIV_CD AS ownDivCd,
+            REG_DATE AS regDate
+        FROM TB_KG_PAYMENT
+        WHERE TRADE_ID = #{tradeId}
+    </select>
+
+    <!-- 사용자 결제 내역 조회 -->
+    <select id="selectPaymentHistory" resultType="kr.wisead.domain.payment.entity.Payment">
+        SELECT
+            KG_SEQ AS kgSeq,
+            SVC_ID AS svcId,
+            TRADE_ID AS tradeId,
+            PRDT_NM AS prdtNm,
+            PRDT_PRICE AS prdtPrice,
+            RESULT_CD AS resultCd,
+            SIGN_DATE AS signDate,
+            USER_ID AS userId,
+            USER_NAME AS userName,
+            CARD_NAME AS cardName,
+            APPR_NO AS apprNo,
+            REG_DATE AS regDate
+        FROM TB_KG_PAYMENT
+        WHERE USER_ID = #{userId}
+        ORDER BY KG_SEQ DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 사용자 결제 내역 총 개수 -->
+    <select id="selectPaymentHistoryCount" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_KG_PAYMENT
+        WHERE USER_ID = #{userId}
+    </select>
+
+</mapper>

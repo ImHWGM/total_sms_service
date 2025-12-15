@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.BalanceMapper">
+
+    <!-- 잔액 내역 등록 -->
+    <insert id="insertBalance" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO TB_BALANCE (
+            USER_ID,
+            BALANCE,
+            TOTAL_BALANCE,
+            OPERATION,
+            COMMENT,
+            SUBTRACT_UNIT_PRICE,
+            SMS_PRICE,
+            LMS_PRICE,
+            MMS_PRICE,
+            REFUND,
+            REG_DATE,
+            REG_ID
+        ) VALUES (
+            #{userId},
+            #{balance},
+            #{totalBalance},
+            #{operation},
+            #{comment},
+            #{subtractUnitPrice},
+            #{smsPrice},
+            #{lmsPrice},
+            #{mmsPrice},
+            #{refund},
+            NOW(),
+            #{regId}
+        )
+    </insert>
+
+    <!-- 최신 잔액 조회 -->
+    <select id="selectLatestBalance" resultType="kr.wisead.domain.payment.entity.Balance">
+        SELECT
+            SEQ AS seq,
+            USER_ID AS userId,
+            BALANCE AS balance,
+            TOTAL_BALANCE AS totalBalance,
+            OPERATION AS operation,
+            COMMENT AS comment,
+            SUBTRACT_UNIT_PRICE AS subtractUnitPrice,
+            SMS_PRICE AS smsPrice,
+            LMS_PRICE AS lmsPrice,
+            MMS_PRICE AS mmsPrice,
+            REFUND AS refund,
+            REG_DATE AS regDate,
+            REG_ID AS regId
+        FROM TB_BALANCE
+        WHERE USER_ID = #{userId}
+        ORDER BY SEQ DESC
+        LIMIT 1
+    </select>
+
+    <!-- 잔액 내역 목록 조회 -->
+    <select id="selectBalanceHistory" resultType="kr.wisead.domain.payment.entity.Balance">
+        SELECT
+            SEQ AS seq,
+            USER_ID AS userId,
+            BALANCE AS balance,
+            TOTAL_BALANCE AS totalBalance,
+            OPERATION AS operation,
+            COMMENT AS comment,
+            SUBTRACT_UNIT_PRICE AS subtractUnitPrice,
+            SMS_PRICE AS smsPrice,
+            LMS_PRICE AS lmsPrice,
+            MMS_PRICE AS mmsPrice,
+            REFUND AS refund,
+            REG_DATE AS regDate,
+            REG_ID AS regId
+        FROM TB_BALANCE
+        WHERE USER_ID = #{userId}
+        ORDER BY SEQ DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 잔액 내역 총 개수 -->
+    <select id="selectBalanceHistoryCount" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_BALANCE
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <!-- 충전 내역 조회 -->
+    <select id="selectChargeHistory" resultType="kr.wisead.domain.payment.entity.Balance">
+        SELECT
+            SEQ AS seq,
+            USER_ID AS userId,
+            BALANCE AS balance,
+            TOTAL_BALANCE AS totalBalance,
+            OPERATION AS operation,
+            COMMENT AS comment,
+            REG_DATE AS regDate
+        FROM TB_BALANCE
+        WHERE USER_ID = #{userId}
+          AND OPERATION = 'P'
+        <if test="startDate != null and startDate != ''">
+            AND DATE(REG_DATE) >= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND DATE(REG_DATE) <![CDATA[<=]]> #{endDate}
+        </if>
+        ORDER BY SEQ DESC
+    </select>
+
+</mapper>

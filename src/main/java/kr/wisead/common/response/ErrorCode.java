@@ -58,7 +58,9 @@ public enum ErrorCode {
     FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "F001", "파일을 찾을 수 없습니다."),
     FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F002", "파일 업로드에 실패했습니다."),
     INVALID_FILE_TYPE(HttpStatus.BAD_REQUEST, "F003", "허용되지 않은 파일 형식입니다."),
-    FILE_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "F004", "파일 크기가 초과되었습니다.");
+    FILE_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "F004", "파일 크기가 초과되었습니다."),
+    FILE_READ_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F005", "파일 읽기에 실패했습니다."),
+    FILE_WRITE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F006", "파일 쓰기에 실패했습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;

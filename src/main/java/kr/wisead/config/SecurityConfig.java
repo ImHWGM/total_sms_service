@@ -46,6 +46,12 @@ public class SecurityConfig {
             "/api/public/**",
             "/api/users/find-id",
 
+            // 문의 등록 (비로그인 허용)
+            "/api/inquiry",
+
+            // 파일 다운로드
+            "/files/**",
+
             // Swagger/API 문서
             "/swagger-ui/**",
             "/swagger-ui.html",

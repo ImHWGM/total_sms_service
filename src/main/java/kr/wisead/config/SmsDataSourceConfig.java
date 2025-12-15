@@ -38,10 +38,17 @@ public class SmsDataSourceConfig {
             @Qualifier("smsDataSource") DataSource dataSource) throws Exception {
         SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
         factoryBean.setDataSource(dataSource);
-        factoryBean.setMapperLocations(
-            new PathMatchingResourcePatternResolver()
-                .getResources("classpath:mapper/sms/**/*.xml")
-        );
+
+        // mapper XML 파일이 없어도 에러 안나도록 처리
+        try {
+            PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+            org.springframework.core.io.Resource[] resources = resolver.getResources("classpath:mapper/sms/**/*.xml");
+            if (resources.length > 0) {
+                factoryBean.setMapperLocations(resources);
+            }
+        } catch (java.io.FileNotFoundException e) {
+            // mapper 폴더가 없거나 비어있으면 무시
+        }
 
         // MyBatis 설정
         org.apache.ibatis.session.Configuration configuration = new org.apache.ibatis.session.Configuration();

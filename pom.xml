@@ -14,7 +14,7 @@
     <groupId>kr</groupId>
     <artifactId>wisead</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <packaging>war</packaging>
+    <packaging>jar</packaging>
     <name>WiseAd</name>
     <description>WiseAd</description>
 
@@ -70,13 +70,6 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Tomcat (provided for WAR) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-tomcat</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -89,11 +82,15 @@
             <groupId>com.kcp</groupId>
             <artifactId>ctcli</artifactId>
             <version>1.0.7</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/CtCli-1.0.7.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>com.kgmobilians</groupId>
             <artifactId>kgmobilians</artifactId>
             <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/kgMobilians.jar</systemPath>
         </dependency>
     </dependencies>
 
@@ -139,6 +136,8 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <!-- system scope 라이브러리를 JAR에 포함 -->
+                    <includeSystemScope>true</includeSystemScope>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>

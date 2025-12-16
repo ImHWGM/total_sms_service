@@ -340,13 +340,85 @@ Before signing up or finding ID, you typically verify the email address.
     }
     ```
 
-### Get Opt-out List
+### Get Opt-out List (Legacy)
 *   **Method**: `GET`
 *   **URL**: `{{baseUrl}}/api/history/optout?page=1&size=10`
 
 ---
 
-## 11. Privacy Consent (`/api/privacy-consent`)
+## 11. Blocked Numbers Management (`/api/blocked-numbers`)
+
+| Method | Endpoint   | Description                  |
+| :----- | :--------- | :--------------------------- |
+| `GET`  | `/`        | 수신거부 목록 조회 (페이징) |
+| `GET`  | `/all`     | 수신거부 목록 전체 조회      |
+| `GET`  | `/count`   | 수신거부 건수 조회           |
+| `POST` | `/`        | 수신거부 등록 (단건)         |
+| `POST` | `/batch`   | 수신거부 등록 (일괄)         |
+| `DELETE`| `/`       | 수신거부 삭제 (단건)         |
+| `DELETE`| `/batch`  | 수신거부 삭제 (일괄)         |
+| `GET`  | `/check`   | 수신거부 여부 확인           |
+| `POST` | `/filter`  | 차단된 번호 필터링           |
+| `POST` | `/available`| 발송 가능 번호 조회          |
+
+### Get Blocked Numbers
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/blocked-numbers?storeCode=STORE001&page=1&size=20`
+
+### Register Blocked Number (Single)
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/blocked-numbers`
+*   **Body**:
+    ```json
+    {
+        "phoneNumber": "010-1234-5678",
+        "storeCode": "STORE001",
+        "menuName": "080-1234-5678"
+    }
+    ```
+
+### Register Blocked Numbers (Batch)
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/blocked-numbers/batch`
+*   **Body**:
+    ```json
+    {
+        "phoneNumbers": ["010-1111-2222", "010-3333-4444"],
+        "storeCode": "STORE001",
+        "menuName": "080-1234-5678"
+    }
+    ```
+
+### Delete Blocked Number (Single)
+*   **Method**: `DELETE`
+*   **URL**: `{{baseUrl}}/api/blocked-numbers?phoneNumber=010-1234-5678&storeCode=STORE001`
+
+### Delete Blocked Numbers (Batch - Plain)
+*   **Method**: `DELETE`
+*   **URL**: `{{baseUrl}}/api/blocked-numbers/batch-plain`
+*   **Body**:
+    ```json
+    {
+        "phoneNumbers": ["010-1111-2222", "010-3333-4444"],
+        "storeCode": "STORE001"
+    }
+    ```
+
+### Filter/Check Available Numbers
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/blocked-numbers/available`
+*   **Body**:
+    ```json
+    {
+        "phoneNumbers": ["010-1111-2222", "010-3333-4444"],
+        "storeCode": "STORE001"
+    }
+    ```
+    *   **Response**: Returns list of numbers *NOT* blocked.
+
+---
+
+## 12. Privacy Consent (`/api/privacy-consent`)
 
 ### Preview Consent Form
 *   **Method**: `POST`
@@ -365,7 +437,7 @@ Before signing up or finding ID, you typically verify the email address.
 
 ---
 
-## 12. File Upload (`/api/file`)
+## 13. File Upload (`/api/file`)
 
 ### Upload MMS Image
 *   **Method**: `POST`
@@ -382,7 +454,7 @@ Before signing up or finding ID, you typically verify the email address.
 
 ---
 
-## 13. Inquiry (`/api/inquiry`)
+## 14. Inquiry (`/api/inquiry`)
 
 ### Submit Inquiry
 *   **Method**: `POST`
@@ -401,7 +473,7 @@ Before signing up or finding ID, you typically verify the email address.
 
 ---
 
-## 14. Statistics (`/api/statistics`)
+## 15. Statistics (`/api/statistics`)
 
 ### Get Daily Stats
 *   **Method**: `GET`

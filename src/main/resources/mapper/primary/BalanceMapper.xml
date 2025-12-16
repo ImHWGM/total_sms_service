@@ -106,4 +106,167 @@
         ORDER BY SEQ DESC
     </select>
 
+    <!-- 일별 과금 통계 조회 -->
+    <select id="selectDailyBillingStats" resultType="java.util.Map">
+        SELECT
+            DATE(REG_DATE) AS statDate,
+            OPERATION AS operation,
+            COUNT(*) AS transactionCount,
+            SUM(BALANCE) AS totalAmount
+        FROM BALANCE
+        WHERE 1=1
+        <if test="userId != null and userId != ''">
+            AND USER_ID = #{userId}
+        </if>
+        <if test="startDate != null and startDate != ''">
+            AND DATE(REG_DATE) >= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND DATE(REG_DATE) <![CDATA[<=]]> #{endDate}
+        </if>
+        GROUP BY DATE(REG_DATE), OPERATION
+        ORDER BY DATE(REG_DATE) DESC, OPERATION
+    </select>
+
+    <!-- 월별 과금 통계 조회 -->
+    <select id="selectMonthlyBillingStats" resultType="java.util.Map">
+        SELECT
+            DATE_FORMAT(REG_DATE, '%Y-%m') AS statMonth,
+            OPERATION AS operation,
+            COUNT(*) AS transactionCount,
+            SUM(BALANCE) AS totalAmount
+        FROM BALANCE
+        WHERE 1=1
+        <if test="userId != null and userId != ''">
+            AND USER_ID = #{userId}
+        </if>
+        <if test="startDate != null and startDate != ''">
+            AND DATE(REG_DATE) >= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND DATE(REG_DATE) <![CDATA[<=]]> #{endDate}
+        </if>
+        GROUP BY DATE_FORMAT(REG_DATE, '%Y-%m'), OPERATION
+        ORDER BY statMonth DESC, OPERATION
+    </select>
+
+    <!-- 서비스 타입별 과금 통계 (comment 기반) -->
+    <select id="selectBillingStatsByServiceType" resultType="java.util.Map">
+        SELECT
+            CASE
+                WHEN COMMENT LIKE '%SMS%' THEN 'SMS'
+                WHEN COMMENT LIKE '%LMS%' THEN 'LMS'
+                WHEN COMMENT LIKE '%MMS%' THEN 'MMS'
+                WHEN COMMENT LIKE '%카카오%' OR COMMENT LIKE '%알림톡%' OR COMMENT LIKE '%친구톡%' THEN 'KAKAO'
+                WHEN COMMENT LIKE '%설문%' OR COMMENT LIKE '%survey%' THEN 'SURVEY'
+                WHEN COMMENT LIKE '%QR%' THEN 'QR'
+                WHEN COMMENT LIKE '%충전%' OR OPERATION = 'P' THEN 'CHARGE'
+                WHEN COMMENT LIKE '%환불%' OR OPERATION = 'R' THEN 'REFUND'
+                ELSE 'ETC'
+            END AS serviceType,
+            COUNT(*) AS transactionCount,
+            SUM(BALANCE) AS totalAmount
+        FROM BALANCE
+        WHERE 1=1
+        <if test="userId != null and userId != ''">
+            AND USER_ID = #{userId}
+        </if>
+        <if test="startDate != null and startDate != ''">
+            AND DATE(REG_DATE) >= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND DATE(REG_DATE) <![CDATA[<=]]> #{endDate}
+        </if>
+        GROUP BY serviceType
+        ORDER BY totalAmount DESC
+    </select>
+
+    <!-- 사용자별 과금 통계 -->
+    <select id="selectBillingStatsByUser" resultType="java.util.Map">
+        SELECT
+            USER_ID AS userId,
+            OPERATION AS operation,
+            COUNT(*) AS transactionCount,
+            SUM(BALANCE) AS totalAmount
+        FROM BALANCE
+        WHERE 1=1
+        <if test="userIds != null and userIds.size() > 0">
+            AND USER_ID IN
+            <foreach collection="userIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        <if test="startDate != null and startDate != ''">
+            AND DATE(REG_DATE) >= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND DATE(REG_DATE) <![CDATA[<=]]> #{endDate}
+        </if>
+        GROUP BY USER_ID, OPERATION
+        ORDER BY USER_ID, OPERATION
+    </select>
+
+    <!-- 기간별 총계 조회 -->
+    <select id="selectBillingSummary" resultType="java.util.Map">
+        SELECT
+            COALESCE(SUM(CASE WHEN OPERATION = 'P' THEN BALANCE ELSE 0 END), 0) AS totalCharge,
+            COALESCE(SUM(CASE WHEN OPERATION = 'M' THEN BALANCE ELSE 0 END), 0) AS totalDeduct,
+            COALESCE(SUM(CASE WHEN OPERATION = 'R' THEN BALANCE ELSE 0 END), 0) AS totalRefund,
+            COUNT(CASE WHEN OPERATION = 'P' THEN 1 END) AS chargeCount,
+            COUNT(CASE WHEN OPERATION = 'M' THEN 1 END) AS deductCount,
+            COUNT(CASE WHEN OPERATION = 'R' THEN 1 END) AS refundCount
+        FROM BALANCE
+        WHERE 1=1
+        <if test="userId != null and userId != ''">
+            AND USER_ID = #{userId}
+        </if>
+        <if test="startDate != null and startDate != ''">
+            AND DATE(REG_DATE) >= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND DATE(REG_DATE) <![CDATA[<=]]> #{endDate}
+        </if>
+    </select>
+
+    <!-- 최근 거래 내역 조회 (전체 사용자) -->
+    <select id="selectRecentTransactions" resultType="kr.wisead.domain.payment.entity.Balance">
+        SELECT
+            SEQ AS seq,
+            USER_ID AS userId,
+            BALANCE AS balance,
+            TOTAL_BALANCE AS totalBalance,
+            OPERATION AS operation,
+            COMMENT AS comment,
+            REG_DATE AS regDate,
+            REG_ID AS regId
+        FROM BALANCE
+        WHERE 1=1
+        <if test="operation != null and operation != ''">
+            AND OPERATION = #{operation}
+        </if>
+        ORDER BY SEQ DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 사용자별 현재 잔액 목록 조회 -->
+    <select id="selectCurrentBalanceByUsers" resultType="java.util.Map">
+        SELECT
+            b.USER_ID AS userId,
+            b.TOTAL_BALANCE AS currentBalance,
+            b.REG_DATE AS lastTransactionDate
+        FROM BALANCE b
+        INNER JOIN (
+            SELECT USER_ID, MAX(SEQ) AS maxSeq
+            FROM BALANCE
+            <if test="userIds != null and userIds.size() > 0">
+                WHERE USER_ID IN
+                <foreach collection="userIds" item="id" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
+            GROUP BY USER_ID
+        ) latest ON b.USER_ID = latest.USER_ID AND b.SEQ = latest.maxSeq
+        ORDER BY b.TOTAL_BALANCE DESC
+    </select>
+
 </mapper>

@@ -2,6 +2,7 @@ package kr.wisead.domain.statistics.controller;
 
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.domain.statistics.dto.*;
+import kr.wisead.domain.statistics.service.PeriodStatisticsService;
 import kr.wisead.domain.statistics.service.StatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import java.util.List;
 public class StatisticsController {
 
     private final StatisticsService statisticsService;
+    private final PeriodStatisticsService periodStatisticsService;
 
     /**
      * 일별 통계 조회
@@ -129,6 +131,135 @@ public class StatisticsController {
                 .build();
 
         List<DailyStatsResponse> stats = statisticsService.getDailyStats(request);
+        return ApiResponse.success(stats);
+    }
+
+    // ==================== 기간별 상세 통계 (PeriodStatisticsService) ====================
+
+    /**
+     * 기간별 일별 통계 조회 (루프 방식 - 대기/진행중 포함)
+     * GET /api/statistics/period/daily?startDate=2025-01-01&endDate=2025-01-31
+     */
+    @GetMapping("/period/daily")
+    public ApiResponse<List<DailyStatsResponse>> getPeriodDailyStats(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam String startDate,
+            @RequestParam String endDate,
+            @RequestParam(required = false) String msgType,
+            @RequestParam(required = false) String serviceType) {
+
+        Integer userSeq = userDetails != null ? Integer.parseInt(userDetails.getUsername()) : null;
+
+        StatsSearchRequest request = StatsSearchRequest.builder()
+                .userId(userSeq)
+                .startDate(startDate)
+                .endDate(endDate)
+                .msgType(msgType)
+                .serviceType(serviceType)
+                .build();
+
+        List<DailyStatsResponse> stats = periodStatisticsService.getDailyStatsByLoop(request);
+        return ApiResponse.success(stats);
+    }
+
+    /**
+     * 기간별 일별 통계 조회 (관리자용 - 전체/특정 사용자)
+     * GET /api/statistics/period/daily/admin?startDate=2025-01-01&endDate=2025-01-31&userId=xxx
+     */
+    @GetMapping("/period/daily/admin")
+    public ApiResponse<List<DailyStatsResponse>> getPeriodDailyStatsAdmin(
+            @RequestParam String startDate,
+            @RequestParam String endDate,
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) List<Integer> userIds,
+            @RequestParam(required = false) String msgType,
+            @RequestParam(required = false) String serviceType) {
+
+        StatsSearchRequest request = StatsSearchRequest.builder()
+                .userId(userId)
+                .userIds(userIds)
+                .startDate(startDate)
+                .endDate(endDate)
+                .msgType(msgType)
+                .serviceType(serviceType)
+                .build();
+
+        List<DailyStatsResponse> stats = periodStatisticsService.getDailyStatsByLoop(request);
+        return ApiResponse.success(stats);
+    }
+
+    /**
+     * 특정 일자 상세 통계 조회
+     * GET /api/statistics/period/day/2025-01-15
+     */
+    @GetMapping("/period/day/{date}")
+    public ApiResponse<DailyStatsResponse> getDayStats(
+            @PathVariable String date,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(required = false) String msgType,
+            @RequestParam(required = false) String serviceType) {
+
+        Integer userSeq = userDetails != null ? Integer.parseInt(userDetails.getUsername()) : null;
+
+        StatsSearchRequest request = StatsSearchRequest.builder()
+                .userId(userSeq)
+                .msgType(msgType)
+                .serviceType(serviceType)
+                .build();
+
+        DailyStatsResponse stats = periodStatisticsService.getDayStats(date, request);
+        return ApiResponse.success(stats);
+    }
+
+    /**
+     * 기간 합계 통계 조회
+     * GET /api/statistics/period/total?startDate=2025-01-01&endDate=2025-01-31
+     */
+    @GetMapping("/period/total")
+    public ApiResponse<DailyStatsResponse> getPeriodTotalStats(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam String startDate,
+            @RequestParam String endDate,
+            @RequestParam(required = false) String msgType,
+            @RequestParam(required = false) String serviceType) {
+
+        Integer userSeq = userDetails != null ? Integer.parseInt(userDetails.getUsername()) : null;
+
+        StatsSearchRequest request = StatsSearchRequest.builder()
+                .userId(userSeq)
+                .startDate(startDate)
+                .endDate(endDate)
+                .msgType(msgType)
+                .serviceType(serviceType)
+                .build();
+
+        DailyStatsResponse stats = periodStatisticsService.getPeriodTotalStats(request);
+        return ApiResponse.success(stats);
+    }
+
+    /**
+     * 기간 합계 통계 조회 (관리자용)
+     * GET /api/statistics/period/total/admin?startDate=2025-01-01&endDate=2025-01-31
+     */
+    @GetMapping("/period/total/admin")
+    public ApiResponse<DailyStatsResponse> getPeriodTotalStatsAdmin(
+            @RequestParam String startDate,
+            @RequestParam String endDate,
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) List<Integer> userIds,
+            @RequestParam(required = false) String msgType,
+            @RequestParam(required = false) String serviceType) {
+
+        StatsSearchRequest request = StatsSearchRequest.builder()
+                .userId(userId)
+                .userIds(userIds)
+                .startDate(startDate)
+                .endDate(endDate)
+                .msgType(msgType)
+                .serviceType(serviceType)
+                .build();
+
+        DailyStatsResponse stats = periodStatisticsService.getPeriodTotalStats(request);
         return ApiResponse.success(stats);
     }
 }

@@ -1,29 +1,32 @@
 # Postman API Testing Guide
 
-This document provides the details needed to test the WiseAd API using Postman.
+This document provides a comprehensive guide to testing the WiseAd API using Postman.
 
 ## Global Configuration
-*   **Base URL**: `http://localhost:8100` (twisead-api.epopkon.com 예정)
+*   **Base URL**: `http://localhost:8080` (Set this as a variable `{{baseUrl}}` in Postman)
 *   **Headers**:
-    *   `Content-Type`: `application/json`
-    *   `Authorization`: `Bearer {{accessToken}}` (Add this to the collection's Authorization tab or individual requests after login)
+    *   `Content-Type`: `application/json` (Unless specified otherwise, e.g., for file uploads)
+    *   `Authorization`: `Bearer {{accessToken}}` (Required for most endpoints after login)
 
 ---
 
-## 1. Authentication (`/api/auth`)
+## 1. Authentication & User (`/api/auth`, `/api/users`, `/api/email`)
 
-### Login
+### 1.1 Email Verification (Pre-Signup/Find ID)
+Before signing up or finding ID, you typically verify the email address.
+
+**Step 1: Send Verification Code**
 *   **Method**: `POST`
-*   **URL**: `{{baseUrl}}/api/auth/login`
-*   **Body**:
-    ```json
-    {
-        "userId": "admin",
-        "userPass": "password123!"
-    }
-    ```
+*   **URL**: `{{baseUrl}}/api/email/verification?email=test@example.com`
+*   **Body**: (Empty or None)
 
-### Sign Up
+**Step 2: Verify Code**
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/email/verification/verify?email=test@example.com&code=12345678`
+*   **Body**: (Empty or None)
+*   **Response**: `true` if valid.
+
+### 1.2 Sign Up
 *   **Method**: `POST`
 *   **URL**: `{{baseUrl}}/api/auth/signup`
 *   **Body**:
@@ -38,13 +41,25 @@ This document provides the details needed to test the WiseAd API using Postman.
         "bizTel": "02-1234-5678",
         "person": "John Doe",
         "phone": "010-1234-5678",
-        "email": "john@example.com",
+        "email": "test@example.com",
         "hintQuestion": "Q01",
         "hintAnswer": "Answer"
     }
     ```
 
-### Refresh Token
+### 1.3 Login
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/auth/login`
+*   **Body**:
+    ```json
+    {
+        "userId": "newuser",
+        "userPass": "Password123!"
+    }
+    ```
+    *   **Note**: Copy `accessToken` from the response to your Postman environment variables.
+
+### 1.4 Refresh Token
 *   **Method**: `POST`
 *   **URL**: `{{baseUrl}}/api/auth/refresh`
 *   **Body**:
@@ -53,6 +68,21 @@ This document provides the details needed to test the WiseAd API using Postman.
         "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
     }
     ```
+
+### 1.5 Find ID
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/users/find-id`
+*   **Body**:
+    ```json
+    {
+        "email": "test@example.com",
+        "person": "John Doe"
+    }
+    ```
+
+### 1.6 Check Duplicates
+*   **Check User ID**: `GET {{baseUrl}}/api/auth/check-userid?userId=testuser`
+*   **Check Email**: `GET {{baseUrl}}/api/auth/check-email?email=test@example.com`
 
 ---
 
@@ -70,19 +100,24 @@ This document provides the details needed to test the WiseAd API using Postman.
             "010-1111-2222",
             "010-3333-4444"
         ],
-        "subject": "Message Subject",
+        "subject": "Message Subject (LMS/MMS)",
         "text": "This is a test message.",
         "sendType": "1",
         "requestTime": null, 
-        "delDuplicateNum": true
+        "delDuplicateNum": true,
+        "fileCnt": 0
     }
     ```
     *   `msgType`: "S" (SMS), "L" (LMS), "M" (MMS)
-    *   `requestTime`: Format `2025-12-25T10:00:00` for scheduled sending
+    *   `requestTime`: Use `2025-12-25T10:00:00` for scheduled sending.
+
+### Get Send History
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/message/send/history?startDate=2025-01-01T00:00:00&endDate=2025-01-31T23:59:59&page=1&size=20`
 
 ---
 
-## 3. Event & Survey (`/api/event`, `/api/survey`)
+## 3. Event & Survey Management (`/api/event`, `/api/survey`)
 
 ### Create Event (Survey)
 *   **Method**: `POST`
@@ -90,26 +125,26 @@ This document provides the details needed to test the WiseAd API using Postman.
 *   **Body**:
     ```json
     {
-        "eventName": "Customer Satisfaction Survey",
+        "eventName": "Customer Survey 2025",
         "eventEmphasisYn": "Y",
-        "eventDesc": "Please fill out this survey.",
+        "eventDesc": "Description here",
         "eventType": "SURVEY",
         "startDate": "20250101",
         "endDate": "20251231",
         "status": "P",
         "privacyPolicyYn": "Y",
         "privacyPolicyTtl": "Privacy Policy",
-        "privacyPolicyDesc": "We collect...",
+        "privacyPolicyDesc": "Details...",
         "auth": "NONE",
         "qrCode": "Y",
         "questions": [
             {
                 "questionType": "CHOICE",
-                "questionTitle": "How satisfied are you?",
+                "questionTitle": "Satisfaction Level",
                 "order": 1,
                 "items": [
-                    { "itemTitle": "Very Satisfied", "order": 1 },
-                    { "itemTitle": "Satisfied", "order": 2 }
+                    { "itemTitle": "High", "order": 1 },
+                    { "itemTitle": "Low", "order": 2 }
                 ]
             }
         ]
@@ -122,7 +157,7 @@ This document provides the details needed to test the WiseAd API using Postman.
 *   **Body**:
     ```json
     {
-        "userKey": "USER_UNIQUE_KEY",
+        "userKey": "USER_UNIQUE_KEY_FROM_DB",
         "userName": "Jane Doe",
         "userPhone": "010-9876-5432",
         "answers": [
@@ -130,31 +165,73 @@ This document provides the details needed to test the WiseAd API using Postman.
                 "questionSeq": 1,
                 "questionType": "CHOICE",
                 "itemSeq": 101,
-                "answer": "Very Satisfied"
-            },
-            {
-                "questionSeq": 2,
-                "questionType": "TEXT",
-                "answer": "Great service!"
+                "answer": "High"
             }
         ]
     }
     ```
 
-### Add Auth Key (General Auth)
+---
+
+## 4. Survey User Management (`/api/survey/users`)
+
+### Add Participant (Single)
 *   **Method**: `POST`
-*   **URL**: `{{baseUrl}}/api/event/{eventSeq}/auth-keys`
+*   **URL**: `{{baseUrl}}/api/survey/users`
 *   **Body**:
     ```json
     {
-        "authCode": "AUTH1234",
-        "authKeyDesc": "VIP Customer Key"
+        "eventSeq": 1,
+        "userName": "Tester01",
+        "userPhone": "010-1234-1234",
+        "userEmail": "test@test.com",
+        "address": "Seoul",
+        "address2": "Gangnam"
     }
     ```
 
+### Add Participants (Batch)
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/survey/users/batch?eventSeq=1`
+*   **Body**:
+    ```json
+    [
+        {
+            "eventSeq": 1,
+            "userName": "User A",
+            "userPhone": "010-1111-1111"
+        },
+        {
+            "eventSeq": 1,
+            "userName": "User B",
+            "userPhone": "010-2222-2222"
+        }
+    ]
+    ```
+
+### Get Participants List
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/survey/users?eventSeq=1`
+
+### Update Payment Info
+*   **Method**: `PATCH`
+*   **URL**: `{{baseUrl}}/api/survey/users/{userSeq}/payment-info?depositDate=2025-01-15`
+
 ---
 
-## 4. Message Templates (`/api/message/template`)
+## 5. Survey Answers & Statistics (`/api/survey/answers`)
+
+### Get Answer Statistics (Question Level)
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/survey/answers/statistics/question?eventSeq=1&questionSeq=1`
+
+### Get All Answers by Event
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/survey/answers?eventSeq=1`
+
+---
+
+## 6. Message Templates (`/api/message/template`)
 
 ### Create Template
 *   **Method**: `POST`
@@ -164,80 +241,148 @@ This document provides the details needed to test the WiseAd API using Postman.
     {
         "sendingForm": "I",
         "msgType": "L",
-        "subject": "Promotion Template",
-        "text": "Hello, this is a promotion message.",
-        "imagePath": "/uploads/template/img01.jpg"
+        "subject": "Promo",
+        "text": "Hello, check this out.",
+        "imagePath": "/uploads/template/sample.jpg"
     }
     ```
 
 ---
 
-## 5. Scheduled Messages (`/api/scheduled-messages`)
-
-### Reschedule Message
-*   **Method**: `PUT`
-*   **URL**: `{{baseUrl}}/api/scheduled-messages/{mSeq}/reschedule`
-*   **Body**:
-    ```json
-    {
-        "newScheduleTime": "2025-12-30T15:00:00"
-    }
-    ```
-
----
-
-## 6. Admin (`/api/admin`)
+## 7. Admin & Logs (`/api/admin`)
 
 ### Create Admin Account
 *   **Method**: `POST`
 *   **URL**: `{{baseUrl}}/api/admin/account`
-*   **Headers**: `Authorization: Bearer {{adminToken}}`
 *   **Body**:
     ```json
     {
-        "userId": "manager1",
-        "userPass": "Manager123!",
-        "userPassChk": "Manager123!",
-        "corpName": "Sub Corp",
-        "person": "Manager Kim",
-        "phone": "010-5555-6666",
+        "userId": "subadmin",
+        "userPass": "Pass123!",
+        "userPassChk": "Pass123!",
+        "corpName": "Sub Company",
+        "person": "Manager Lee",
+        "phone": "010-5555-5555",
         "userLevel": 50,
-        "email": "manager@example.com"
+        "email": "lee@sub.com"
     }
     ```
 
-### Log Phone Masking
-*   **Method**: `POST`
-*   **URL**: `{{baseUrl}}/api/admin/logs/phone-masking`
-*   **Body**:
-    ```json
-    {
-        "action": "UNMASK",
-        "reason": "Customer verification",
-        "pageNumber": "1"
-    }
-    ```
+### Search Action Logs
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/admin/logs?startDate=2025-01-01&endDate=2025-01-31&actionType=LOGIN`
 
 ---
 
-## 7. Payment (`/api/payment`)
+## 8. Payment & Balance (`/api/payment`)
 
-### Charge Balance (Admin)
+### Charge Balance
 *   **Method**: `POST`
 *   **URL**: `{{baseUrl}}/api/payment/charge`
 *   **Body**:
     ```json
     {
+        "userId": "targetUser",
+        "amount": 100000,
+        "comment": "Wire Transfer",
+        "tradeId": "TR_20250101_001"
+    }
+    ```
+
+### Get Balance History
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/payment/balance/history?page=1&size=10`
+
+---
+
+## 9. Customer Company (`/api/company`)
+
+### Search Companies
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/company/list`
+*   **Body**:
+    ```json
+    {
+        "type": "custCompNameOpt",
+        "keyword": "Samsung",
+        "pageNum": 1,
+        "amount": 20
+    }
+    ```
+
+### Toggle Selection
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/company/toggle`
+*   **Body**:
+    ```json
+    {
         "userId": "user1",
-        "amount": 50000,
-        "comment": "Bonus charge",
-        "tradeId": "TID_123456789"
+        "custCompName": "Partner A",
+        "chkedYn": "Y"
     }
     ```
 
 ---
 
-## 8. Inquiry (`/api/inquiry`)
+## 10. ARS & Opt-out (`/ars`, `/api/history`)
+
+### ARS Auto Reject (Simulated)
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/ars/auto-reject`
+*   **Headers**: No Auth required (or specific system auth)
+*   **Body**:
+    ```json
+    {
+        "tId": "T123456",
+        "tTime": "20250101120000",
+        "menuName": "0801234567",
+        "ani": "01012345678"
+    }
+    ```
+
+### Get Opt-out List
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/history/optout?page=1&size=10`
+
+---
+
+## 11. Privacy Consent (`/api/privacy-consent`)
+
+### Preview Consent Form
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/privacy-consent/preview`
+*   **Body**:
+    ```json
+    {
+        "title": "Privacy Agreement",
+        "content": "<h1>Agreement</h1><p>We collect your data...</p>"
+    }
+    ```
+
+### Download PDF
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/privacy-consent/download/user/{userSeq}/event/{eventSeq}`
+
+---
+
+## 12. File Upload (`/api/file`)
+
+### Upload MMS Image
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/file/mms`
+*   **Headers**: Remove `Content-Type` (let Postman set `multipart/form-data`)
+*   **Body**:
+    *   Key: `file` (Type: File) -> Select image file
+
+### Upload Template Image
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/file/template`
+*   **Body**:
+    *   Key: `file` (Type: File) -> Select image file
+
+---
+
+## 13. Inquiry (`/api/inquiry`)
 
 ### Submit Inquiry
 *   **Method**: `POST`
@@ -245,67 +390,23 @@ This document provides the details needed to test the WiseAd API using Postman.
 *   **Body**:
     ```json
     {
-        "companyName": "My Company",
-        "applicantName": "Tester",
-        "email": "tester@example.com",
-        "contact": "010-1111-2222",
+        "companyName": "Tech Corp",
+        "applicantName": "Developer",
+        "email": "dev@tech.com",
+        "contact": "010-0000-0000",
         "inquiryType": 1,
-        "content": "I have a question about the API."
-    }
-    ```
-
-### Answer Inquiry (Admin)
-*   **Method**: `POST`
-*   **URL**: `{{baseUrl}}/api/inquiry/{inquiryId}/answer`
-*   **Body**:
-    ```json
-    {
-        "answer": "Here is the answer to your question.",
-        "sendEmail": true
+        "content": "API usage question."
     }
     ```
 
 ---
 
-## 9. Company Management (`/api/company`)
+## 14. Statistics (`/api/statistics`)
 
-### Toggle Company Selection
-*   **Method**: `POST`
-*   **URL**: `{{baseUrl}}/api/company/toggle`
-*   **Body**:
-    ```json
-    {
-        "userId": "user1",
-        "custCompName": "Target Company",
-        "chkedYn": "Y"
-    }
-    ```
+### Get Daily Stats
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/statistics/daily?startDate=2025-01-01&endDate=2025-01-07&serviceType=SMS`
 
----
-
-## 10. Front Auth (`/api/front/auth`)
-
-### Validate Phone
-*   **Method**: `POST`
-*   **URL**: `{{baseUrl}}/api/front/auth/validate/phone`
-*   **Body**:
-    ```json
-    {
-        "phone": "010-1234-5678",
-        "eventCode": "EVENT_001"
-    }
-    ```
-
-### KCP Auth Result
-*   **Method**: `POST`
-*   **URL**: `{{baseUrl}}/api/front/auth/kcp/result`
-*   **Body**:
-    ```json
-    {
-        "siteCd": "S1234",
-        "ordrIdxx": "ORDER_001",
-        "certNo": "CERT_123",
-        "encCertData2": "ENCRYPTED_DATA...",
-        "eventCode": "EVENT_001"
-    }
-    ```
+### Get Usage Summary
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/statistics/usage-summary?startDate=2025-01-01&endDate=2025-01-31`

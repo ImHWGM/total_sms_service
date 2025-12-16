@@ -69,7 +69,7 @@
     <select id="selectList" parameterType="kr.wisead.domain.admin.dto.ActionLogSearchRequest" resultMap="actionLogResultMap">
         SELECT
             <include refid="selectLogColumns"/>
-        FROM TB_ACTION_LOG
+        FROM ACTION_LOG
         <include refid="whereCondition"/>
         ORDER BY REG_DATE DESC
         LIMIT #{offset}, #{size}
@@ -78,7 +78,7 @@
     <!-- 액션 로그 총 건수 -->
     <select id="selectCount" parameterType="kr.wisead.domain.admin.dto.ActionLogSearchRequest" resultType="int">
         SELECT COUNT(*)
-        FROM TB_ACTION_LOG
+        FROM ACTION_LOG
         <include refid="whereCondition"/>
     </select>
 
@@ -86,7 +86,7 @@
     <select id="selectById" resultMap="actionLogResultMap">
         SELECT
             <include refid="selectLogColumns"/>
-        FROM TB_ACTION_LOG
+        FROM ACTION_LOG
         WHERE SEQ = #{seq}
     </select>
 
@@ -94,14 +94,14 @@
     <select id="selectAllForDownload" parameterType="kr.wisead.domain.admin.dto.ActionLogSearchRequest" resultMap="actionLogResultMap">
         SELECT
             <include refid="selectLogColumns"/>
-        FROM TB_ACTION_LOG
+        FROM ACTION_LOG
         <include refid="whereCondition"/>
         ORDER BY REG_DATE DESC
     </select>
 
     <!-- 액션 로그 등록 -->
     <insert id="insert" parameterType="kr.wisead.domain.admin.entity.ActionLog" useGeneratedKeys="true" keyProperty="seq">
-        INSERT INTO TB_ACTION_LOG (
+        INSERT INTO ACTION_LOG (
             MENU_NAME,
             ACTION_TYPE,
             MENU_URL,
@@ -126,7 +126,7 @@
 
     <!-- 다운로드 로그 등록 (사유 포함) -->
     <insert id="insertDownloadLog" parameterType="kr.wisead.domain.admin.entity.ActionLog" useGeneratedKeys="true" keyProperty="seq">
-        INSERT INTO TB_ACTION_LOG (
+        INSERT INTO ACTION_LOG (
             MENU_NAME,
             ACTION_TYPE,
             ACTION_REASON,

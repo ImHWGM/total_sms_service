@@ -4,7 +4,7 @@
 
     <!-- 잔액 내역 등록 -->
     <insert id="insertBalance" useGeneratedKeys="true" keyProperty="seq">
-        INSERT INTO TB_BALANCE (
+        INSERT INTO BALANCE (
             USER_ID,
             BALANCE,
             TOTAL_BALANCE,
@@ -49,7 +49,7 @@
             REFUND AS refund,
             REG_DATE AS regDate,
             REG_ID AS regId
-        FROM TB_BALANCE
+        FROM BALANCE
         WHERE USER_ID = #{userId}
         ORDER BY SEQ DESC
         LIMIT 1
@@ -71,7 +71,7 @@
             REFUND AS refund,
             REG_DATE AS regDate,
             REG_ID AS regId
-        FROM TB_BALANCE
+        FROM BALANCE
         WHERE USER_ID = #{userId}
         ORDER BY SEQ DESC
         LIMIT #{offset}, #{limit}
@@ -80,7 +80,7 @@
     <!-- 잔액 내역 총 개수 -->
     <select id="selectBalanceHistoryCount" resultType="int">
         SELECT COUNT(*)
-        FROM TB_BALANCE
+        FROM BALANCE
         WHERE USER_ID = #{userId}
     </select>
 
@@ -94,7 +94,7 @@
             OPERATION AS operation,
             COMMENT AS comment,
             REG_DATE AS regDate
-        FROM TB_BALANCE
+        FROM BALANCE
         WHERE USER_ID = #{userId}
           AND OPERATION = 'P'
         <if test="startDate != null and startDate != ''">

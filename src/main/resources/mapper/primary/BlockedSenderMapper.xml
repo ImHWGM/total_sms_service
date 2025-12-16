@@ -83,7 +83,7 @@
     <!-- 상점코드로 회사명 조회 -->
     <select id="selectCorpNameByStoreCode" resultType="String">
         SELECT CORP_NAME
-        FROM tb_manager
+        FROM user
         WHERE STORE_CODE = #{storeCode}
     </select>
 

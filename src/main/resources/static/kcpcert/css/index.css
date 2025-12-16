@@ -24,7 +24,7 @@ img { border: 0px; margin: 0px; padding: 0px;}   	/* img border 0  */
 
 /*���̺�*/
 .tbtop {background-color: #0f75ac;background-repeat: repeat;}
-.tbleft {background-repeat: no-repeat;background-image: url(../img/tb_left.gif);height: 27px;color: #003b7e;width: 139px;padding:3 0 0 25;}
+.tbleft {background-repeat: no-repeat;background-image: url(../img/left.gif);height: 27px;color: #003b7e;width: 139px;padding:3 0 0 25;}
 .tbline {background-color: #bbcbdb;background-repeat: repeat;}
 .tbline2 {background-color: #a3ccf3;background-repeat: repeat;}
 .padding12{padding-left: 12px;}

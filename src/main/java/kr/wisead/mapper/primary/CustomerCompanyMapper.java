@@ -27,7 +27,7 @@ public interface CustomerCompanyMapper {
                                     @Param("custCompNames") List<String> custCompNames);
 
     /**
-     * 고객사 목록 조회 (TB_MANAGER 기반)
+     * 고객사 목록 조회 (USER 기반)
      */
     List<CustomerCompanyResponse> selectCompanyList(CustomerCompanySearchRequest request);
 
@@ -65,7 +65,7 @@ public interface CustomerCompanyMapper {
     String selectPersonByUserId(@Param("userId") String userId);
 
     /**
-     * 회사명 조회 (TB_MANAGER)
+     * 회사명 조회 (USER)
      */
     String selectCorpNameByUserId(@Param("userId") String userId);
 }

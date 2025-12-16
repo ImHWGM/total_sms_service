@@ -5,7 +5,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 /**
- * 범용인증 사용자 매핑 Entity (TB_AUTH_USER_MAPPING)
+ * 범용인증 사용자 매핑 Entity (AUTH_USER_MAPPING)
  */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

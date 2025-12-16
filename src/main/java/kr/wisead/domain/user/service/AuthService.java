@@ -2,10 +2,13 @@ package kr.wisead.domain.user.service;
 
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.domain.payment.entity.Balance;
+import kr.wisead.domain.payment.service.StandardRateService;
 import kr.wisead.domain.user.dto.LoginRequest;
 import kr.wisead.domain.user.dto.LoginResponse;
 import kr.wisead.domain.user.dto.SignUpRequest;
 import kr.wisead.domain.user.entity.User;
+import kr.wisead.mapper.primary.BalanceMapper;
 import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +33,8 @@ import java.util.List;
 public class AuthService {
 
     private final UserMapper userMapper;
+    private final BalanceMapper balanceMapper;
+    private final StandardRateService standardRateService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -124,13 +129,33 @@ public class AuthService {
                 .userLevel(1) // 일반 회원
                 .useYn("Y")
                 .status("미승인") // 가입 후 관리자 승인 필요
-                .subtractUnitPrice(BigDecimal.valueOf(100.0))
                 .regId(request.getUserId())
                 .build();
 
         userMapper.insert(user);
 
-        log.info("회원가입 완료: userId={}", request.getUserId());
+        // 5. 잔액 정보 초기화 (standard_rate 테이블 기준, VAT 포함)
+        Balance balance = Balance.builder()
+                .userId(request.getUserId())
+                .balance(BigDecimal.ZERO)
+                .totalBalance(BigDecimal.ZERO)
+                .operation("P") // 최초 등록
+                .comment("회원가입 초기 설정")
+                .subtractUnitPrice(standardRateService.getStandardRateWithVat("survey"))   // 설문 단가
+                .smsPrice(standardRateService.getStandardRateWithVat("msg_sms"))           // SMS 단가
+                .lmsPrice(standardRateService.getStandardRateWithVat("msg_lms"))           // LMS 단가
+                .mmsPrice(standardRateService.getStandardRateWithVat("msg_mms"))           // MMS 단가
+                .regId(request.getUserId())
+                .build();
+
+        balanceMapper.insertBalance(balance);
+
+        log.info("회원가입 완료: userId={}, 설문단가={}, SMS단가={}, LMS단가={}, MMS단가={}",
+                request.getUserId(),
+                balance.getSubtractUnitPrice(),
+                balance.getSmsPrice(),
+                balance.getLmsPrice(),
+                balance.getMmsPrice());
     }
 
     /**

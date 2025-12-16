@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 /**
  * 고객사 Entity
- * TB_CUST_COMP 테이블 매핑
+ * CUST_COMP 테이블 매핑
  */
 @Data
 @NoArgsConstructor

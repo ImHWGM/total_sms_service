@@ -4,7 +4,7 @@
 
     <!-- 결제 정보 등록 -->
     <insert id="insertPayment" useGeneratedKeys="true" keyProperty="kgSeq">
-        INSERT INTO TB_KG_PAYMENT (
+        INSERT INTO KG_PAYMENT (
             SVC_ID,
             MOBIL_ID,
             TRADE_ID,
@@ -46,7 +46,7 @@
     <!-- 거래 ID로 결제 정보 존재 여부 확인 -->
     <select id="existsByTradeId" resultType="boolean">
         SELECT EXISTS(
-            SELECT 1 FROM TB_KG_PAYMENT WHERE TRADE_ID = #{tradeId}
+            SELECT 1 FROM KG_PAYMENT WHERE TRADE_ID = #{tradeId}
         )
     </select>
 
@@ -71,7 +71,7 @@
             APPR_NO AS apprNo,
             OWN_DIV_CD AS ownDivCd,
             REG_DATE AS regDate
-        FROM TB_KG_PAYMENT
+        FROM KG_PAYMENT
         WHERE TRADE_ID = #{tradeId}
     </select>
 
@@ -90,7 +90,7 @@
             CARD_NAME AS cardName,
             APPR_NO AS apprNo,
             REG_DATE AS regDate
-        FROM TB_KG_PAYMENT
+        FROM KG_PAYMENT
         WHERE USER_ID = #{userId}
         ORDER BY KG_SEQ DESC
         LIMIT #{offset}, #{limit}
@@ -99,7 +99,7 @@
     <!-- 사용자 결제 내역 총 개수 -->
     <select id="selectPaymentHistoryCount" resultType="int">
         SELECT COUNT(*)
-        FROM TB_KG_PAYMENT
+        FROM KG_PAYMENT
         WHERE USER_ID = #{userId}
     </select>
 

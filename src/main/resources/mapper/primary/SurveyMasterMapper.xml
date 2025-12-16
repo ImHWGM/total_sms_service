@@ -4,7 +4,7 @@
 
     <sql id="selectEventColumns">
         M.EVENT_SEQ as eventSeq,
-        M.MANAGER_SEQ as managerSeq,
+        M.MANAGER_SEQ as userSeq,
         M.EVENT_CODE as eventCode,
         M.EVENT_NAME as eventName,
         M.EVENT_EMPHASIS_YN as eventEmphasisYn,
@@ -33,8 +33,8 @@
 
     <sql id="selectWithCounts">
         <include refid="selectEventColumns"/>,
-        (SELECT COUNT(*) FROM TB_SURVEY_USER U WHERE U.EVENT_SEQ = M.EVENT_SEQ AND U.DEL_YN = 'N') as totSurveyUser,
-        (SELECT COUNT(*) FROM TB_SURVEY_USER U WHERE U.EVENT_SEQ = M.EVENT_SEQ AND U.SUBMISSION_DATE IS NOT NULL AND U.DEL_YN = 'N') as resSurveyUser
+        (SELECT COUNT(*) FROM SURVEY_USER U WHERE U.EVENT_SEQ = M.EVENT_SEQ AND U.DEL_YN = 'N') as totSurveyUser,
+        (SELECT COUNT(*) FROM SURVEY_USER U WHERE U.EVENT_SEQ = M.EVENT_SEQ AND U.SUBMISSION_DATE IS NOT NULL AND U.DEL_YN = 'N') as resSurveyUser
     </sql>
 
     <sql id="whereCondition">
@@ -71,7 +71,7 @@
                 M.END_DATE <if test="sortOrder == 'asc'">ASC</if><if test="sortOrder == 'desc'">DESC</if>
             </when>
             <when test="sortField == 'participants'">
-                (SELECT COUNT(*) FROM TB_SURVEY_USER U WHERE U.EVENT_SEQ = M.EVENT_SEQ AND U.SUBMISSION_DATE IS NOT NULL)
+                (SELECT COUNT(*) FROM SURVEY_USER U WHERE U.EVENT_SEQ = M.EVENT_SEQ AND U.SUBMISSION_DATE IS NOT NULL)
                 <if test="sortOrder == 'asc'">ASC</if><if test="sortOrder == 'desc'">DESC</if>
             </when>
             <otherwise>
@@ -85,7 +85,7 @@
             resultType="kr.wisead.domain.survey.entity.SurveyMaster">
         SELECT
             <include refid="selectWithCounts"/>
-        FROM TB_SURVEY_MASTER M
+        FROM SURVEY_MASTER M
         <include refid="whereCondition"/>
         <include refid="orderBy"/>
         LIMIT #{rowStart}, #{rowSize}
@@ -94,7 +94,7 @@
     <!-- 이벤트 총 개수 -->
     <select id="selectCount" parameterType="kr.wisead.domain.survey.dto.EventSearchRequest" resultType="int">
         SELECT COUNT(*)
-        FROM TB_SURVEY_MASTER M
+        FROM SURVEY_MASTER M
         <include refid="whereCondition"/>
     </select>
 
@@ -102,7 +102,7 @@
     <select id="selectByEventSeq" resultType="kr.wisead.domain.survey.entity.SurveyMaster">
         SELECT
             <include refid="selectWithCounts"/>
-        FROM TB_SURVEY_MASTER M
+        FROM SURVEY_MASTER M
         WHERE M.EVENT_SEQ = #{eventSeq}
     </select>
 
@@ -110,7 +110,7 @@
     <select id="selectByEventCode" resultType="kr.wisead.domain.survey.entity.SurveyMaster">
         SELECT
             <include refid="selectEventColumns"/>
-        FROM TB_SURVEY_MASTER M
+        FROM SURVEY_MASTER M
         WHERE BINARY M.EVENT_CODE = #{eventCode}
     </select>
 
@@ -118,21 +118,21 @@
     <select id="selectByAuthCodeUrl" resultType="kr.wisead.domain.survey.entity.SurveyMaster">
         SELECT
             <include refid="selectEventColumns"/>
-        FROM TB_SURVEY_MASTER M
+        FROM SURVEY_MASTER M
         WHERE BINARY M.AUTH_CODE_URL = #{authCodeUrl}
     </select>
 
     <!-- 이벤트 등록 -->
     <insert id="insert" parameterType="kr.wisead.domain.survey.entity.SurveyMaster"
             useGeneratedKeys="true" keyProperty="eventSeq" keyColumn="EVENT_SEQ">
-        INSERT INTO TB_SURVEY_MASTER (
+        INSERT INTO SURVEY_MASTER (
             MANAGER_SEQ, EVENT_CODE, EVENT_NAME, EVENT_EMPHASIS_YN,
             EVENT_DESC_IMG, EVENT_DESC, EVENT_TYPE, START_DATE, END_DATE,
             STATUS, PRIVACY_POLICY_YN, PRIVACY_POLICY_TTL, PRIVACY_POLICY_DESC,
             AUTH, QR_CODE, QR_CODE_IMG_PATH, AUTH_CODE_URL,
             END_MESSAGE, EVENT_END_IMG, QR_CODE_VISITS, REG_DATE, REG_ID
         ) VALUES (
-            #{managerSeq}, #{eventCode}, #{eventName}, #{eventEmphasisYn},
+            #{userSeq}, #{eventCode}, #{eventName}, #{eventEmphasisYn},
             #{eventDescImg}, #{eventDesc}, #{eventType}, #{startDate}, #{endDate},
             #{status}, #{privacyPolicyYn}, #{privacyPolicyTtl}, #{privacyPolicyDesc},
             #{auth}, #{qrCode}, #{qrCodeImgPath}, #{authCodeUrl},
@@ -142,7 +142,7 @@
 
     <!-- 이벤트 수정 -->
     <update id="update" parameterType="kr.wisead.domain.survey.entity.SurveyMaster">
-        UPDATE TB_SURVEY_MASTER
+        UPDATE SURVEY_MASTER
         SET
             EVENT_NAME = #{eventName},
             EVENT_EMPHASIS_YN = #{eventEmphasisYn},
@@ -178,35 +178,35 @@
 
     <!-- 상태 변경 -->
     <update id="updateStatus">
-        UPDATE TB_SURVEY_MASTER
+        UPDATE SURVEY_MASTER
         SET STATUS = #{status}, UPT_DATE = NOW()
         WHERE EVENT_SEQ = #{eventSeq}
     </update>
 
     <!-- 설명 이미지 수정 -->
     <update id="updateDescImg">
-        UPDATE TB_SURVEY_MASTER
+        UPDATE SURVEY_MASTER
         SET EVENT_DESC_IMG = #{eventDescImg}
         WHERE EVENT_SEQ = #{eventSeq}
     </update>
 
     <!-- 종료 이미지 수정 -->
     <update id="updateEndImg">
-        UPDATE TB_SURVEY_MASTER
+        UPDATE SURVEY_MASTER
         SET EVENT_END_IMG = #{eventEndImg}
         WHERE EVENT_SEQ = #{eventSeq}
     </update>
 
     <!-- QR코드 방문 수 증가 -->
     <update id="incrementQrCodeVisits">
-        UPDATE TB_SURVEY_MASTER
+        UPDATE SURVEY_MASTER
         SET QR_CODE_VISITS = QR_CODE_VISITS + 1
         WHERE BINARY AUTH_CODE_URL = #{authCodeUrl}
     </update>
 
     <!-- 만료된 이벤트 상태 업데이트 -->
     <update id="updateExpiredEventsStatus">
-        UPDATE TB_SURVEY_MASTER
+        UPDATE SURVEY_MASTER
         SET STATUS = 'F'
         WHERE STATUS != 'F'
         AND END_DATE &lt; NOW()
@@ -215,7 +215,7 @@
     <!-- 이벤트명 검색 -->
     <select id="searchEventNames" resultType="string">
         SELECT DISTINCT EVENT_NAME
-        FROM TB_SURVEY_MASTER
+        FROM SURVEY_MASTER
         WHERE 1=1
         <if test="userLevel != null and userLevel lt 50">
             AND REG_ID = #{regId}
@@ -230,13 +230,13 @@
     <!-- 범용인증키 설명 조회 -->
     <select id="selectAuthKeyDesc" resultType="string">
         SELECT AUTH_KEY_DESC
-        FROM TB_SURVEY_MASTER
+        FROM SURVEY_MASTER
         WHERE EVENT_SEQ = #{eventSeq}
     </select>
 
     <!-- 범용인증키 설명 수정 -->
     <update id="updateAuthKeyDesc">
-        UPDATE TB_SURVEY_MASTER
+        UPDATE SURVEY_MASTER
         SET AUTH_KEY_DESC = #{authKeyDesc}
         WHERE EVENT_SEQ = #{eventSeq}
     </update>

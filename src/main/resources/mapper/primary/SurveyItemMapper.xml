@@ -15,7 +15,7 @@
             JUMP_QUESTION as jumpQuestion,
             REG_DATE as regDate,
             REG_ID as regId
-        FROM TB_SURVEY_ITEM
+        FROM SURVEY_ITEM
         WHERE EVENT_SEQ = #{eventSeq}
         ORDER BY QUESTION_SEQ, `ORDER`
     </select>
@@ -33,7 +33,7 @@
             JUMP_QUESTION as jumpQuestion,
             REG_DATE as regDate,
             REG_ID as regId
-        FROM TB_SURVEY_ITEM
+        FROM SURVEY_ITEM
         WHERE EVENT_SEQ = #{eventSeq}
         AND QUESTION_SEQ = #{questionSeq}
         ORDER BY `ORDER`
@@ -42,7 +42,7 @@
     <!-- 항목 등록 -->
     <insert id="insert" parameterType="kr.wisead.domain.survey.entity.SurveyItem"
             useGeneratedKeys="true" keyProperty="itemSeq" keyColumn="ITEM_SEQ">
-        INSERT INTO TB_SURVEY_ITEM (
+        INSERT INTO SURVEY_ITEM (
             EVENT_SEQ, QUESTION_SEQ, ITEM, ITEM_VALUE,
             ITEM_IMG, `ORDER`, JUMP_QUESTION, REG_DATE, REG_ID
         ) VALUES (
@@ -53,7 +53,7 @@
 
     <!-- 항목 이미지 수정 -->
     <update id="updateItemImg">
-        UPDATE TB_SURVEY_ITEM
+        UPDATE SURVEY_ITEM
         SET ITEM_IMG = #{itemImg}
         WHERE EVENT_SEQ = #{eventSeq}
         AND QUESTION_SEQ = #{questionSeq}
@@ -62,7 +62,7 @@
 
     <!-- 이벤트의 항목 전체 삭제 -->
     <delete id="deleteByEventSeq">
-        DELETE FROM TB_SURVEY_ITEM
+        DELETE FROM SURVEY_ITEM
         WHERE EVENT_SEQ = #{eventSeq}
     </delete>
 

@@ -107,4 +107,27 @@ public interface SurveyUserMapper {
      */
     Optional<SurveyUser> selectByGeneralAuthCode(@Param("authCodeUrl") String authCodeUrl,
                                                   @Param("generalAuthCode") String generalAuthCode);
+
+    /**
+     * 이벤트코드 + 재발송 전화번호로 조회
+     */
+    Optional<SurveyUser> selectByEventCodeAndResendPhone(@Param("eventCode") String eventCode,
+                                                          @Param("resendUserPhone") String resendUserPhone);
+
+    /**
+     * 재발송 전화번호 존재 여부 확인
+     */
+    boolean existsByEventCodeAndResendPhone(@Param("eventCode") String eventCode,
+                                             @Param("resendUserPhone") String resendUserPhone);
+
+    /**
+     * QR코드 authCodeUrl + 재발송 전화번호로 조회
+     */
+    Optional<SurveyUser> selectByAuthCodeUrlAndResendPhone(@Param("authCodeUrl") String authCodeUrl,
+                                                            @Param("resendUserPhone") String resendUserPhone);
+
+    /**
+     * QR 사용자 등록 (인증 없이 QR 접근 시)
+     */
+    int insertQrUser(SurveyUser user);
 }

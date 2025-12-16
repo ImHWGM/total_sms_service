@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 /**
  * 결제 정보 Entity (KG모빌리언스)
- * TB_KG_PAYMENT 테이블 매핑
+ * KG_PAYMENT 테이블 매핑
  */
 @Data
 @NoArgsConstructor

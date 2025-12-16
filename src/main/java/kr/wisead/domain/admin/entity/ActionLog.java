@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 액션 로그 Entity (TB_ACTION_LOG)
+ * 액션 로그 Entity (ACTION_LOG)
  */
 @Data
 @NoArgsConstructor

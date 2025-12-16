@@ -5,7 +5,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 /**
- * 설문 답변 Entity (TB_SURVEY_ANSWER)
+ * 설문 답변 Entity (SURVEY_ANSWER)
  */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

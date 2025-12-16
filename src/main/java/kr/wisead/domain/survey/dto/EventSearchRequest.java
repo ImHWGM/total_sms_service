@@ -13,7 +13,7 @@ import lombok.Builder.Default;
 @Builder
 public class EventSearchRequest {
 
-    private Integer managerSeq;             // 관리자 시퀀스
+    private Integer userSeq;             // 관리자 시퀀스
     private String regId;                   // 등록자 ID
     private Integer userLevel;              // 사용자 레벨
 

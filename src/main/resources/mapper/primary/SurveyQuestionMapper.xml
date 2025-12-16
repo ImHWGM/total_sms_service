@@ -14,7 +14,7 @@
             ORD as `order`,
             REG_DATE as regDate,
             REG_ID as regId
-        FROM TB_SURVEY_QUESTION
+        FROM SURVEY_QUESTION
         WHERE EVENT_SEQ = #{eventSeq}
         ORDER BY ORD ASC
     </select>
@@ -31,21 +31,21 @@
             ORD as `order`,
             REG_DATE as regDate,
             REG_ID as regId
-        FROM TB_SURVEY_QUESTION
+        FROM SURVEY_QUESTION
         WHERE QUESTION_SEQ = #{questionSeq}
     </select>
 
     <!-- 이벤트의 문항 개수 -->
     <select id="countByEventSeq" resultType="int">
         SELECT COUNT(*)
-        FROM TB_SURVEY_QUESTION
+        FROM SURVEY_QUESTION
         WHERE EVENT_SEQ = #{eventSeq}
     </select>
 
     <!-- 문항 등록 -->
     <insert id="insert" parameterType="kr.wisead.domain.survey.entity.SurveyQuestion"
             useGeneratedKeys="true" keyProperty="questionSeq" keyColumn="QUESTION_SEQ">
-        INSERT INTO TB_SURVEY_QUESTION (
+        INSERT INTO SURVEY_QUESTION (
             EVENT_SEQ, QUESTION_TYPE, QUESTION_TYPE_DETAIL,
             QUESTION, QUESTION_IMG, ORD, REG_DATE, REG_ID
         ) VALUES (
@@ -56,7 +56,7 @@
 
     <!-- 문항 이미지 수정 -->
     <update id="updateQuestionImg">
-        UPDATE TB_SURVEY_QUESTION
+        UPDATE SURVEY_QUESTION
         SET QUESTION_IMG = #{questionImg}
         WHERE EVENT_SEQ = #{eventSeq}
         AND QUESTION_SEQ = #{questionSeq}
@@ -64,7 +64,7 @@
 
     <!-- 이벤트의 문항 전체 삭제 -->
     <delete id="deleteByEventSeq">
-        DELETE FROM TB_SURVEY_QUESTION
+        DELETE FROM SURVEY_QUESTION
         WHERE EVENT_SEQ = #{eventSeq}
     </delete>
 

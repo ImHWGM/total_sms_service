@@ -64,7 +64,6 @@ public class AdminService {
                 .allowIpYn("Y")
                 .status("승인")  // 관리자 계정은 자동 승인
                 .regId(creatorId)
-                .subtractUnitPrice(BigDecimal.ZERO)
                 .loginFailureCnt(0)
                 .build();
 

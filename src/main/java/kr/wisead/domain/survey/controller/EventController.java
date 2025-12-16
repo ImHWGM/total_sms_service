@@ -74,9 +74,9 @@ public class EventController {
     public ApiResponse<EventResponse> create(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody EventRequest request) {
-        Integer managerSeq = Integer.parseInt(userDetails.getUsername());
+        Integer userSeq = Integer.parseInt(userDetails.getUsername());
         String regId = userDetails.getUsername();
-        EventResponse response = eventService.createEvent(managerSeq, request, regId);
+        EventResponse response = eventService.createEvent(userSeq, request, regId);
         return ApiResponse.success(response);
     }
 

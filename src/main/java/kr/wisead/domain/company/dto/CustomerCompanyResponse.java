@@ -22,7 +22,7 @@ public class CustomerCompanyResponse {
     private String selectedUserId;
     private String custCompName;
     private String person;                  // 담당자명
-    private String corpName;                // 회사명 (TB_MANAGER)
+    private String corpName;                // 회사명 (USER)
     private String bizNum;                  // 사업자번호
     private LocalDateTime uptDate;
     private String chkedYn;

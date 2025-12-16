@@ -46,6 +46,10 @@ public class SecurityConfig {
             "/api/public/**",
             "/api/users/find-id",
 
+            // 설문 참여 (비로그인 허용)
+            "/api/survey/**",
+            "/api/front/**",
+
             // 문의 등록 (비로그인 허용)
             "/api/inquiry",
 

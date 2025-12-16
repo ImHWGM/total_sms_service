@@ -81,12 +81,12 @@ public class EventService {
      * 이벤트 생성
      */
     @Transactional
-    public EventResponse createEvent(Integer managerSeq, EventRequest request, String regId) {
+    public EventResponse createEvent(Integer userSeq, EventRequest request, String regId) {
         // 이벤트 코드 생성
         String eventCode = generateEventCode();
 
         SurveyMaster event = SurveyMaster.builder()
-                .managerSeq(managerSeq)
+                .userSeq(userSeq)
                 .eventCode(eventCode)
                 .eventName(request.getEventName())
                 .eventEmphasisYn(request.getEventEmphasisYn())
@@ -355,5 +355,13 @@ public class EventService {
      */
     private String generateEventCode() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
+    }
+
+    /**
+     * 만료된 이벤트 상태 업데이트 (배치용)
+     */
+    @Transactional
+    public int updateExpiredEventsStatus() {
+        return surveyMasterMapper.updateExpiredEventsStatus();
     }
 }

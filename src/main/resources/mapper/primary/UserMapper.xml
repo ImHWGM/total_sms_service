@@ -25,7 +25,6 @@
         <result property="uptDate" column="UPT_DATE"/>
         <result property="uptId" column="UPT_ID"/>
         <result property="status" column="STATUS"/>
-        <result property="subtractUnitPrice" column="SUBTRACT_UNIT_PRICE"/>
         <result property="emailCode" column="EMAIL_CODE"/>
         <result property="codeValidate" column="CODE_VALIDATE"/>
         <result property="callback" column="CALLBACK"/>
@@ -39,7 +38,7 @@
         SEQ, USER_ID, USER_PASS, CORP_NAME, CORP_ADDR, BIZ_NUM, BIZ_TEL,
         PERSON, PHONE, EMAIL, USER_LEVEL, USE_YN, ALLOW_IP_YN, ALLOW_IP,
         LAST_LOGIN, LOGIN_FAILURE_CNT, REG_DATE, REG_ID, UPT_DATE, UPT_ID,
-        STATUS, SUBTRACT_UNIT_PRICE, EMAIL_CODE, CODE_VALIDATE, CALLBACK,
+        STATUS, EMAIL_CODE, CODE_VALIDATE, CALLBACK,
         BIZ_PDF_LOC, STORE_CODE, BLOCKED_SEQ
     </sql>
 
@@ -79,11 +78,11 @@
         INSERT INTO user (
             USER_ID, USER_PASS, CORP_NAME, CORP_ADDR, BIZ_NUM, BIZ_TEL,
             PERSON, PHONE, EMAIL, USER_LEVEL, USE_YN, STATUS,
-            SUBTRACT_UNIT_PRICE, REG_DATE, REG_ID
+            REG_DATE, REG_ID
         ) VALUES (
             #{userId}, #{userPass}, #{corpName}, #{corpAddr}, #{bizNum}, #{bizTel},
             #{person}, #{phone}, #{email}, #{userLevel}, #{useYn}, #{status},
-            #{subtractUnitPrice}, NOW(), #{regId}
+            NOW(), #{regId}
         )
     </insert>
 

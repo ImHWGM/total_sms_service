@@ -11,14 +11,14 @@
             a.REG_DATE as regDate,
             CASE
                 WHEN EXISTS (
-                    SELECT 1 FROM TB_SURVEY_ANSWER ans
+                    SELECT 1 FROM SURVEY_ANSWER ans
                     WHERE ans.EVENT_SEQ = a.EVENT_SEQ
                     AND ans.USER_SEQ = a.SEQ
                 ) THEN 'Y'
                 ELSE 'N'
             END as hasAnswer
-        FROM TB_SURVEY_USER a
-        LEFT JOIN TB_AUTH_USER_MAPPING b ON a.EVENT_SEQ = b.EVENT_SEQ AND a.USER_KEY = b.USER_KEY
+        FROM SURVEY_USER a
+        LEFT JOIN AUTH_USER_MAPPING b ON a.EVENT_SEQ = b.EVENT_SEQ AND a.USER_KEY = b.USER_KEY
         WHERE a.EVENT_SEQ = #{eventSeq}
         AND b.GENERAL_AUTH_CODE IS NOT NULL
         ORDER BY a.SEQ DESC
@@ -28,8 +28,8 @@
     <!-- 이벤트의 인증키 개수 -->
     <select id="countByEventSeq" resultType="int">
         SELECT COUNT(*)
-        FROM TB_SURVEY_USER a
-        INNER JOIN TB_AUTH_USER_MAPPING b ON a.EVENT_SEQ = b.EVENT_SEQ AND a.USER_KEY = b.USER_KEY
+        FROM SURVEY_USER a
+        INNER JOIN AUTH_USER_MAPPING b ON a.EVENT_SEQ = b.EVENT_SEQ AND a.USER_KEY = b.USER_KEY
         WHERE a.EVENT_SEQ = #{eventSeq}
         AND b.GENERAL_AUTH_CODE IS NOT NULL
     </select>
@@ -37,18 +37,18 @@
     <!-- 인증코드 중복 확인 -->
     <select id="checkDuplicateAuthCode" resultType="int">
         SELECT COUNT(*)
-        FROM TB_AUTH_USER_MAPPING
+        FROM AUTH_USER_MAPPING
         WHERE EVENT_SEQ = #{eventSeq}
         AND GENERAL_AUTH_CODE = #{authCode}
     </select>
 
     <!-- 인증 매핑 등록 -->
     <insert id="insert" parameterType="kr.wisead.domain.survey.entity.AuthUserMapping">
-        INSERT INTO TB_AUTH_USER_MAPPING (
+        INSERT INTO AUTH_USER_MAPPING (
             EVENT_SEQ, USER_SEQ, USER_KEY, GENERAL_AUTH_CODE, REG_ID, REG_DATE
         ) VALUES (
             #{eventSeq},
-            (SELECT SEQ FROM TB_SURVEY_USER WHERE EVENT_SEQ = #{eventSeq} AND USER_KEY = #{userKey}),
+            (SELECT SEQ FROM SURVEY_USER WHERE EVENT_SEQ = #{eventSeq} AND USER_KEY = #{userKey}),
             #{userKey},
             #{generalAuthCode},
             #{regId},
@@ -58,7 +58,7 @@
 
     <!-- 인증 매핑 삭제 -->
     <delete id="delete">
-        DELETE FROM TB_AUTH_USER_MAPPING
+        DELETE FROM AUTH_USER_MAPPING
         WHERE EVENT_SEQ = #{eventSeq}
         AND USER_KEY = #{userKey}
     </delete>
@@ -66,8 +66,8 @@
     <!-- 사용자가 답변이 있는지 확인 -->
     <select id="checkHasAnswer" resultType="int">
         SELECT COUNT(*)
-        FROM TB_SURVEY_ANSWER a
-        INNER JOIN TB_SURVEY_USER u ON a.EVENT_SEQ = u.EVENT_SEQ AND a.USER_SEQ = u.SEQ
+        FROM SURVEY_ANSWER a
+        INNER JOIN SURVEY_USER u ON a.EVENT_SEQ = u.EVENT_SEQ AND a.USER_SEQ = u.SEQ
         WHERE u.EVENT_SEQ = #{eventSeq}
         AND u.USER_KEY = #{userKey}
     </select>

@@ -33,6 +33,7 @@ public class SurveyUserResponse {
     // 조회용
     private String eventName;               // 이벤트 명
     private String eventCode;               // 이벤트 코드
+    private String eventType;               // 이벤트 타입 (P:개인정보, S:설문조사)
     private String generalAuthCode;         // 범용인증코드
 
     /**
@@ -65,6 +66,7 @@ public class SurveyUserResponse {
                 .status(status)
                 .eventName(entity.getEventName())
                 .eventCode(entity.getEventCode())
+                .eventType(entity.getEventType())
                 .generalAuthCode(entity.getGeneralAuthCode())
                 .build();
     }

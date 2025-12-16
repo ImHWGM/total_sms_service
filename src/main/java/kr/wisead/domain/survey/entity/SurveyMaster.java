@@ -5,7 +5,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 /**
- * 설문 마스터 Entity (TB_SURVEY_MASTER)
+ * 설문 마스터 Entity (SURVEY_MASTER)
  */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 public class SurveyMaster {
 
     private Integer eventSeq;               // 이벤트 시퀀스
-    private Integer managerSeq;             // 회원 시퀀스
+    private Integer userSeq;             // 회원 시퀀스
     private String eventCode;               // 이벤트 코드
     private String eventName;               // 이벤트 명(타이틀)
     private String eventEmphasisYn;         // 이벤트 명 강조 사용여부
@@ -47,11 +47,11 @@ public class SurveyMaster {
     /**
      * 이벤트 생성
      */
-    public static SurveyMaster create(Integer managerSeq, String eventCode, String eventName,
+    public static SurveyMaster create(Integer userSeq, String eventCode, String eventName,
                                        String eventType, String startDate, String endDate,
                                        String auth, String regId) {
         return SurveyMaster.builder()
-                .managerSeq(managerSeq)
+                .userSeq(userSeq)
                 .eventCode(eventCode)
                 .eventName(eventName)
                 .eventType(eventType)

@@ -6,7 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * 설문 참여자 Entity (TB_SURVEY_USER)
+ * 설문 참여자 Entity (SURVEY_USER)
  */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

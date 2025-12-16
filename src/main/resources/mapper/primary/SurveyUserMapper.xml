@@ -30,7 +30,7 @@
     <select id="selectByEventSeq" resultType="kr.wisead.domain.survey.entity.SurveyUser">
         SELECT
             <include refid="selectColumns"/>
-        FROM TB_SURVEY_USER U
+        FROM SURVEY_USER U
         WHERE U.EVENT_SEQ = #{eventSeq}
         AND U.DEL_YN = 'N'
         ORDER BY U.REG_DATE DESC
@@ -40,7 +40,7 @@
     <select id="selectCompletedByEventSeq" resultType="kr.wisead.domain.survey.entity.SurveyUser">
         SELECT
             <include refid="selectColumns"/>
-        FROM TB_SURVEY_USER U
+        FROM SURVEY_USER U
         WHERE U.EVENT_SEQ = #{eventSeq}
         AND U.DEL_YN = 'N'
         AND U.SUBMISSION_DATE IS NOT NULL
@@ -51,7 +51,7 @@
     <select id="selectAbsenteesAndLurkers" resultType="kr.wisead.domain.survey.entity.SurveyUser">
         SELECT
             <include refid="selectColumns"/>
-        FROM TB_SURVEY_USER U
+        FROM SURVEY_USER U
         WHERE U.EVENT_SEQ = #{eventSeq}
         AND U.DEL_YN = 'N'
         AND U.SUBMISSION_DATE IS NULL
@@ -62,7 +62,7 @@
     <select id="selectBySeq" resultType="kr.wisead.domain.survey.entity.SurveyUser">
         SELECT
             <include refid="selectColumns"/>
-        FROM TB_SURVEY_USER U
+        FROM SURVEY_USER U
         WHERE U.SEQ = #{userSeq}
         AND U.DEL_YN = 'N'
     </select>
@@ -75,8 +75,8 @@
             M.EVENT_TYPE as eventType,
             M.EVENT_NAME as eventName,
             M.AUTH as auth
-        FROM TB_SURVEY_USER U
-        INNER JOIN TB_SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+        FROM SURVEY_USER U
+        INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
         WHERE BINARY U.USER_KEY = #{userKey}
         AND U.DEL_YN = 'N'
         LIMIT 1
@@ -86,7 +86,7 @@
     <select id="selectByEventSeqAndUserKey" resultType="kr.wisead.domain.survey.entity.SurveyUser">
         SELECT
             <include refid="selectColumns"/>
-        FROM TB_SURVEY_USER U
+        FROM SURVEY_USER U
         WHERE U.EVENT_SEQ = #{eventSeq}
         AND BINARY U.USER_KEY = #{userKey}
         AND U.DEL_YN = 'N'
@@ -96,7 +96,7 @@
     <select id="selectByResendUserPhone" resultType="kr.wisead.domain.survey.entity.SurveyUser">
         SELECT
             <include refid="selectColumns"/>
-        FROM TB_SURVEY_USER U
+        FROM SURVEY_USER U
         WHERE U.EVENT_SEQ = #{eventSeq}
         AND U.RESEND_USER_PHONE = #{resendUserPhone}
         AND U.DEL_YN = 'N'
@@ -105,7 +105,7 @@
     <!-- 전체 대상자 수 -->
     <select id="countByEventSeq" resultType="int">
         SELECT COUNT(*)
-        FROM TB_SURVEY_USER
+        FROM SURVEY_USER
         WHERE EVENT_SEQ = #{eventSeq}
         AND DEL_YN = 'N'
     </select>
@@ -113,7 +113,7 @@
     <!-- 설문 완료자 수 -->
     <select id="countCompletedByEventSeq" resultType="int">
         SELECT COUNT(*)
-        FROM TB_SURVEY_USER
+        FROM SURVEY_USER
         WHERE EVENT_SEQ = #{eventSeq}
         AND DEL_YN = 'N'
         AND SUBMISSION_DATE IS NOT NULL
@@ -122,7 +122,7 @@
     <!-- 미참여자 수 -->
     <select id="countAbsenteesByEventSeq" resultType="int">
         SELECT COUNT(*)
-        FROM TB_SURVEY_USER
+        FROM SURVEY_USER
         WHERE EVENT_SEQ = #{eventSeq}
         AND DEL_YN = 'N'
         AND SUBMISSION_DATE IS NULL
@@ -131,7 +131,7 @@
     <!-- 접속자 수 -->
     <select id="countLurkersByEventSeq" resultType="int">
         SELECT COUNT(*)
-        FROM TB_SURVEY_USER
+        FROM SURVEY_USER
         WHERE EVENT_SEQ = #{eventSeq}
         AND DEL_YN = 'N'
         AND SURVEY_START_TIME IS NOT NULL
@@ -141,7 +141,7 @@
     <!-- 참여자 등록 -->
     <insert id="insert" parameterType="kr.wisead.domain.survey.entity.SurveyUser"
             useGeneratedKeys="true" keyProperty="seq" keyColumn="SEQ">
-        INSERT INTO TB_SURVEY_USER (
+        INSERT INTO SURVEY_USER (
             EVENT_SEQ, USER_KEY, USER_PHONE, DEL_YN, REG_ID, REG_DATE
         ) VALUES (
             #{eventSeq}, #{userKey}, #{userPhone}, 'N', #{regId}, NOW()
@@ -150,7 +150,7 @@
 
     <!-- 설문 제출 -->
     <update id="updateSubmission" parameterType="kr.wisead.domain.survey.entity.SurveyUser">
-        UPDATE TB_SURVEY_USER
+        UPDATE SURVEY_USER
         <set>
             <if test="userName != null and userName != ''">
                 USER_NAME = #{userName},
@@ -178,21 +178,21 @@
 
     <!-- 설문 접속 시간 기록 -->
     <update id="updateStartTime">
-        UPDATE TB_SURVEY_USER
+        UPDATE SURVEY_USER
         SET SURVEY_START_TIME = NOW()
         WHERE BINARY USER_KEY = #{userKey}
     </update>
 
     <!-- 설문 인증 시간 기록 -->
     <update id="updateAuthTime">
-        UPDATE TB_SURVEY_USER
+        UPDATE SURVEY_USER
         SET SURVEY_AUTH_TIME = NOW()
         WHERE BINARY USER_KEY = #{userKey}
     </update>
 
     <!-- 참여자 삭제 -->
     <delete id="delete">
-        DELETE FROM TB_SURVEY_USER
+        DELETE FROM SURVEY_USER
         WHERE EVENT_SEQ = #{eventSeq}
         AND USER_KEY = #{userKey}
     </delete>
@@ -217,10 +217,10 @@
             U.SUBMISSION_DATE as submissionDate,
             U.SURVEY_AUTH_TIME as surveyAuthTime,
             NOW() as currentTime
-        FROM TB_SURVEY_MASTER M
-        INNER JOIN TB_AUTH_USER_MAPPING MAP ON M.EVENT_SEQ = MAP.EVENT_SEQ
+        FROM SURVEY_MASTER M
+        INNER JOIN AUTH_USER_MAPPING MAP ON M.EVENT_SEQ = MAP.EVENT_SEQ
             AND MAP.GENERAL_AUTH_CODE = #{generalAuthCode}
-        LEFT JOIN TB_SURVEY_USER U ON (MAP.EVENT_SEQ = U.EVENT_SEQ AND MAP.USER_KEY = U.USER_KEY)
+        LEFT JOIN SURVEY_USER U ON (MAP.EVENT_SEQ = U.EVENT_SEQ AND MAP.USER_KEY = U.USER_KEY)
         WHERE M.AUTH_CODE_URL = #{authCodeUrl}
         LIMIT 1
     </select>
@@ -235,9 +235,9 @@
             M.EVENT_TYPE as eventType,
             M.AUTH as auth,
             MAP.GENERAL_AUTH_CODE as generalAuthCode
-        FROM TB_SURVEY_MASTER M
-        INNER JOIN TB_AUTH_USER_MAPPING MAP ON M.EVENT_SEQ = MAP.EVENT_SEQ
-        LEFT JOIN TB_SURVEY_USER U ON MAP.USER_KEY = U.USER_KEY AND MAP.EVENT_SEQ = U.EVENT_SEQ
+        FROM SURVEY_MASTER M
+        INNER JOIN AUTH_USER_MAPPING MAP ON M.EVENT_SEQ = MAP.EVENT_SEQ
+        LEFT JOIN SURVEY_USER U ON MAP.USER_KEY = U.USER_KEY AND MAP.EVENT_SEQ = U.EVENT_SEQ
         WHERE MAP.GENERAL_AUTH_CODE = #{generalAuthCode}
         AND M.AUTH_CODE_URL = #{authCodeUrl}
         AND (U.SUBMISSION_DATE IS NULL)
@@ -245,5 +245,59 @@
         ORDER BY MAP.REG_DATE ASC
         LIMIT 1
     </select>
+
+    <!-- 이벤트코드 + 재발송 전화번호로 조회 -->
+    <select id="selectByEventCodeAndResendPhone" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            <include refid="selectColumns"/>,
+            M.EVENT_CODE as eventCode,
+            M.EVENT_TYPE as eventType,
+            M.EVENT_NAME as eventName,
+            M.AUTH as auth
+        FROM SURVEY_USER U
+        INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+        WHERE M.EVENT_CODE = #{eventCode}
+        AND U.RESEND_USER_PHONE = #{resendUserPhone}
+        AND U.DEL_YN = 'N'
+        LIMIT 1
+    </select>
+
+    <!-- 재발송 전화번호 존재 여부 확인 -->
+    <select id="existsByEventCodeAndResendPhone" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM SURVEY_USER U
+            INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+            WHERE M.EVENT_CODE = #{eventCode}
+            AND U.RESEND_USER_PHONE = #{resendUserPhone}
+            AND U.DEL_YN = 'N'
+        )
+    </select>
+
+    <!-- QR코드 authCodeUrl + 재발송 전화번호로 조회 -->
+    <select id="selectByAuthCodeUrlAndResendPhone" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            <include refid="selectColumns"/>,
+            M.EVENT_CODE as eventCode,
+            M.EVENT_TYPE as eventType,
+            M.EVENT_NAME as eventName,
+            M.AUTH as auth
+        FROM SURVEY_USER U
+        INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+        WHERE M.AUTH_CODE_URL = #{authCodeUrl}
+        AND U.RESEND_USER_PHONE = #{resendUserPhone}
+        AND U.DEL_YN = 'N'
+        LIMIT 1
+    </select>
+
+    <!-- QR 사용자 등록 -->
+    <insert id="insertQrUser" parameterType="kr.wisead.domain.survey.entity.SurveyUser"
+            useGeneratedKeys="true" keyProperty="seq" keyColumn="SEQ">
+        INSERT INTO SURVEY_USER (
+            EVENT_SEQ, USER_KEY, DEL_YN, REG_ID, REG_DATE
+        ) VALUES (
+            #{eventSeq}, #{userKey}, 'N', #{regId}, NOW()
+        )
+    </insert>
 
 </mapper>

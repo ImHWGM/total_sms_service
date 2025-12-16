@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -36,7 +35,6 @@ public class User {
     private LocalDateTime uptDate;
     private String uptId;
     private String status;
-    private BigDecimal subtractUnitPrice;
     private String emailCode;
     private LocalDateTime codeValidate;
     private String callback;
@@ -50,7 +48,7 @@ public class User {
                 Integer userLevel, String useYn, String allowIpYn, String allowIp,
                 LocalDateTime lastLogin, Integer loginFailureCnt, LocalDateTime regDate,
                 String regId, LocalDateTime uptDate, String uptId, String status,
-                BigDecimal subtractUnitPrice, String emailCode, LocalDateTime codeValidate,
+                String emailCode, LocalDateTime codeValidate,
                 String callback, String bizPdfLoc, String storeCode, Integer blockedSeq) {
         this.seq = seq;
         this.userId = userId;
@@ -73,7 +71,6 @@ public class User {
         this.uptDate = uptDate;
         this.uptId = uptId;
         this.status = status;
-        this.subtractUnitPrice = subtractUnitPrice;
         this.emailCode = emailCode;
         this.codeValidate = codeValidate;
         this.callback = callback;

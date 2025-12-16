@@ -28,7 +28,7 @@ public class ScheduledMessage {
     private LocalDateTime requestTime;  // 예약발송일시
     private String senderCode;      // 발송코드
     private Integer extCol0;        // EVENT_SEQ
-    private String extCol1;         // TB_SURVEY_USER_SEQ or YYYYMMdd-HHmmssSSS
+    private String extCol1;         // SURVEY_USER_SEQ or YYYYMMdd-HHmmssSSS
     private String extCol2;         // 발송타입 (직접등록, 대량발송)
     private String extCol3;         // 등록 아이디
     private Integer messageCount;   // 그룹별 메시지 건수 (조회용)

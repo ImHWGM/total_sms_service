@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 /**
  * 잔액 Entity
- * TB_BALANCE 테이블 매핑
+ * BALANCE 테이블 매핑
  */
 @Data
 @NoArgsConstructor

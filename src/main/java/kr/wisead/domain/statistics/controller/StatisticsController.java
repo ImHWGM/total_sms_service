@@ -4,6 +4,7 @@ import kr.wisead.common.response.ApiResponse;
 import kr.wisead.domain.statistics.dto.*;
 import kr.wisead.domain.statistics.service.PeriodStatisticsService;
 import kr.wisead.domain.statistics.service.StatisticsService;
+import kr.wisead.domain.statistics.service.UserStatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,6 +24,7 @@ public class StatisticsController {
 
     private final StatisticsService statisticsService;
     private final PeriodStatisticsService periodStatisticsService;
+    private final UserStatisticsService userStatisticsService;
 
     /**
      * 일별 통계 조회
@@ -260,6 +262,97 @@ public class StatisticsController {
                 .build();
 
         DailyStatsResponse stats = periodStatisticsService.getPeriodTotalStats(request);
+        return ApiResponse.success(stats);
+    }
+
+    // ==================== 사용자별 통계 (UserStatisticsService) ====================
+
+    /**
+     * 사용자별 통계 조회 (서비스 타입별)
+     * GET /api/statistics/user-stats?startDate=2025-01-01&endDate=2025-01-31&serviceType=M
+     * serviceType: M(일반메시지), S(설문), Q(QR)
+     */
+    @GetMapping("/user-stats")
+    public ApiResponse<List<?>> getUserStatsByServiceType(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false, defaultValue = "M") String serviceType,
+            @RequestParam(required = false) List<Integer> userIds) {
+
+        StatsSearchRequest request = StatsSearchRequest.builder()
+                .userIds(userIds)
+                .startDate(startDate)
+                .endDate(endDate)
+                .serviceType(serviceType)
+                .build();
+
+        List<?> stats = userStatisticsService.findUserStats(request);
+        return ApiResponse.success(stats);
+    }
+
+    /**
+     * 사용자별 메시지 통계 조회 (SMS/LMS/MMS)
+     * GET /api/statistics/user-stats/msg?startDate=2025-01-01&endDate=2025-01-31
+     */
+    @GetMapping("/user-stats/msg")
+    public ApiResponse<List<UserMsgStatsResponse>> getUserMsgStats(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) List<Integer> userIds) {
+
+        StatsSearchRequest request = StatsSearchRequest.builder()
+                .userId(userId)
+                .userIds(userIds)
+                .startDate(startDate)
+                .endDate(endDate)
+                .build();
+
+        List<UserMsgStatsResponse> stats = userStatisticsService.findMsgStats(request);
+        return ApiResponse.success(stats);
+    }
+
+    /**
+     * 사용자별 설문 통계 조회
+     * GET /api/statistics/user-stats/survey?startDate=2025-01-01&endDate=2025-01-31
+     */
+    @GetMapping("/user-stats/survey")
+    public ApiResponse<List<UserSurveyStatsResponse>> getUserSurveyStats(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) List<Integer> userIds) {
+
+        StatsSearchRequest request = StatsSearchRequest.builder()
+                .userId(userId)
+                .userIds(userIds)
+                .startDate(startDate)
+                .endDate(endDate)
+                .build();
+
+        List<UserSurveyStatsResponse> stats = userStatisticsService.findSurveyStats(request);
+        return ApiResponse.success(stats);
+    }
+
+    /**
+     * 사용자별 QR 통계 조회
+     * GET /api/statistics/user-stats/qr?startDate=2025-01-01&endDate=2025-01-31
+     */
+    @GetMapping("/user-stats/qr")
+    public ApiResponse<List<UserQrStatsResponse>> getUserQrStats(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) List<Integer> userIds) {
+
+        StatsSearchRequest request = StatsSearchRequest.builder()
+                .userId(userId)
+                .userIds(userIds)
+                .startDate(startDate)
+                .endDate(endDate)
+                .build();
+
+        List<UserQrStatsResponse> stats = userStatisticsService.findQrStats(request);
         return ApiResponse.success(stats);
     }
 }

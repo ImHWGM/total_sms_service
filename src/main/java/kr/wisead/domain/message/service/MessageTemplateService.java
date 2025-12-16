@@ -30,14 +30,21 @@ public class MessageTemplateService {
      */
     @Transactional
     public MessageTemplateResponse create(Long userSeq, MessageTemplateRequest request) {
-        // 다음 순서 번호 조회
-        Integer maxOrder = messageTemplateMapper.findMaxOrderByUserSeq(userSeq);
+        String sendingForm = request.getSendingForm();
+
+        // 다음 순서 번호 조회 (발송 형태별로 분리)
+        Integer maxOrder;
+        if (sendingForm != null && !sendingForm.isEmpty()) {
+            maxOrder = messageTemplateMapper.findMaxOrderByUserSeqAndSendingForm(userSeq, sendingForm);
+        } else {
+            maxOrder = messageTemplateMapper.findMaxOrderByUserSeq(userSeq);
+        }
         int nextOrder = (maxOrder == null ? 0 : maxOrder) + 1;
 
         MessageTemplate template = MessageTemplate.builder()
                 .userSeq(userSeq)
                 .templateOrder(nextOrder)
-                .sendingForm(request.getSendingForm())
+                .sendingForm(sendingForm)
                 .msgType(request.getMsgType())
                 .subject(request.getSubject())
                 .text(request.getText())
@@ -45,7 +52,8 @@ public class MessageTemplateService {
                 .build();
 
         messageTemplateMapper.insert(template);
-        log.info("템플릿 생성 완료 - userSeq: {}, templateSeq: {}", userSeq, template.getTemplateSeq());
+        log.info("템플릿 생성 완료 - userSeq: {}, templateSeq: {}, sendingForm: {}",
+                userSeq, template.getTemplateSeq(), sendingForm);
 
         return MessageTemplateResponse.from(template);
     }
@@ -56,6 +64,18 @@ public class MessageTemplateService {
     @Transactional(readOnly = true)
     public List<MessageTemplateResponse> getList(Long userSeq) {
         return messageTemplateMapper.findByUserSeq(userSeq).stream()
+                .map(MessageTemplateResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 템플릿 목록 조회 (발송 형태별)
+     * @param userSeq 사용자 SEQ
+     * @param sendingForm 발송 형태 (s: 설문용, d: 직접발송용)
+     */
+    @Transactional(readOnly = true)
+    public List<MessageTemplateResponse> getListBySendingForm(Long userSeq, String sendingForm) {
+        return messageTemplateMapper.findByUserSeqAndSendingForm(userSeq, sendingForm).stream()
                 .map(MessageTemplateResponse::from)
                 .collect(Collectors.toList());
     }
@@ -138,5 +158,20 @@ public class MessageTemplateService {
         messageTemplateMapper.findByUserSeq(userSeq).forEach(t ->
                 messageTemplateMapper.updateOrder(t.getTemplateSeq(), order.getAndIncrement())
         );
+    }
+
+    /**
+     * 템플릿 순서 변경 (발송 형태별)
+     * @param userSeq 사용자 SEQ
+     * @param templateSeqList 순서대로 정렬된 템플릿 SEQ 목록
+     * @param sendingForm 발송 형태 (s: 설문용, d: 직접발송용)
+     */
+    @Transactional
+    public void reorderBySendingForm(Long userSeq, List<Long> templateSeqList, String sendingForm) {
+        AtomicInteger order = new AtomicInteger(1);
+        templateSeqList.forEach(seq ->
+                messageTemplateMapper.updateOrder(seq, order.getAndIncrement())
+        );
+        log.info("템플릿 순서 변경 완료 - userSeq: {}, sendingForm: {}", userSeq, sendingForm);
     }
 }

@@ -136,6 +136,23 @@ public class FileDownloadController {
     @GetMapping("/qrcode/{fileName:.+}")
     public ResponseEntity<Resource> serveQrCodeFile(
             @PathVariable String fileName) throws Exception {
+        return serveQrImage(fileName);
+    }
+
+    /**
+     * QR 코드 이미지 서빙 (하위 호환성)
+     * 이전 프로젝트에서 사용하던 경로: /survey/qvey/qrcode/{fileName}
+     */
+    @GetMapping("/survey/qvey/qrcode/{fileName:.+}")
+    public ResponseEntity<Resource> serveQrCodeFileLegacy(
+            @PathVariable String fileName) throws Exception {
+        return serveQrImage(fileName);
+    }
+
+    /**
+     * QR 코드 이미지 서빙 공통 로직
+     */
+    private ResponseEntity<Resource> serveQrImage(String fileName) throws Exception {
         Path filePath = qrFileStorageLocation.resolve(Paths.get("qrcode", fileName)).normalize();
         Resource resource = new UrlResource(filePath.toUri());
 

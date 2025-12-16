@@ -24,6 +24,14 @@ public interface MessageTemplateMapper {
     List<MessageTemplate> findByUserSeq(@Param("userSeq") Long userSeq);
 
     /**
+     * 사용자별 템플릿 목록 조회 (발송 형태별)
+     * @param userSeq 사용자 SEQ
+     * @param sendingForm 발송 형태 (s: 설문용, d: 직접발송용)
+     */
+    List<MessageTemplate> findByUserSeqAndSendingForm(@Param("userSeq") Long userSeq,
+                                                       @Param("sendingForm") String sendingForm);
+
+    /**
      * 사용자별 템플릿 목록 조회 (페이징)
      */
     List<MessageTemplate> findByUserSeqWithPaging(@Param("userSeq") Long userSeq,
@@ -39,6 +47,12 @@ public interface MessageTemplateMapper {
      * 사용자별 최대 순서 조회
      */
     Integer findMaxOrderByUserSeq(@Param("userSeq") Long userSeq);
+
+    /**
+     * 사용자별 발송형태별 최대 순서 조회
+     */
+    Integer findMaxOrderByUserSeqAndSendingForm(@Param("userSeq") Long userSeq,
+                                                  @Param("sendingForm") String sendingForm);
 
     /**
      * 템플릿 등록

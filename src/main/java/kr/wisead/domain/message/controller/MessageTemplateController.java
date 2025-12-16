@@ -2,6 +2,7 @@ package kr.wisead.domain.message.controller;
 
 import jakarta.validation.Valid;
 import kr.wisead.common.response.ApiResponse;
+import kr.wisead.domain.file.service.FileStorageService;
 import kr.wisead.domain.message.dto.MessageTemplateRequest;
 import kr.wisead.domain.message.dto.MessageTemplateResponse;
 import kr.wisead.domain.message.service.MessageTemplateService;
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -23,6 +25,7 @@ import java.util.List;
 public class MessageTemplateController {
 
     private final MessageTemplateService messageTemplateService;
+    private final FileStorageService fileStorageService;
 
     /**
      * 템플릿 생성
@@ -37,13 +40,74 @@ public class MessageTemplateController {
     }
 
     /**
+     * MMS 템플릿 생성 (이미지 포함)
+     */
+    @PostMapping("/with-image")
+    public ApiResponse<MessageTemplateResponse> createWithImage(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam("msgType") String msgType,
+            @RequestParam(value = "subject", required = false) String subject,
+            @RequestParam("text") String text,
+            @RequestParam(value = "sendingForm", required = false, defaultValue = "d") String sendingForm,
+            @RequestParam(value = "image", required = false) MultipartFile image) {
+
+        Long userSeq = getUserSeq(userDetails);
+        String imagePath = null;
+
+        // MMS이고 이미지가 있을 때만 처리
+        if ("MMS".equals(msgType) && image != null && !image.isEmpty()) {
+            imagePath = fileStorageService.storeTemplateImage(image, userSeq.intValue());
+        }
+
+        MessageTemplateRequest request = MessageTemplateRequest.builder()
+                .msgType(msgType)
+                .subject(subject)
+                .text(text)
+                .sendingForm(sendingForm)
+                .imagePath(imagePath)
+                .build();
+
+        MessageTemplateResponse response = messageTemplateService.create(userSeq, request);
+        return ApiResponse.success(response);
+    }
+
+    /**
      * 템플릿 목록 조회
+     * @param type 발송 형태 (s: 설문용, d: 직접발송용) - 없으면 전체 조회
      */
     @GetMapping
     public ApiResponse<List<MessageTemplateResponse>> getList(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(required = false) String type) {
+        Long userSeq = getUserSeq(userDetails);
+        List<MessageTemplateResponse> list;
+        if (type != null && !type.isEmpty()) {
+            list = messageTemplateService.getListBySendingForm(userSeq, type);
+        } else {
+            list = messageTemplateService.getList(userSeq);
+        }
+        return ApiResponse.success(list);
+    }
+
+    /**
+     * 설문용 템플릿 목록 조회
+     */
+    @GetMapping("/survey")
+    public ApiResponse<List<MessageTemplateResponse>> getSurveyList(
             @AuthenticationPrincipal UserDetails userDetails) {
         Long userSeq = getUserSeq(userDetails);
-        List<MessageTemplateResponse> list = messageTemplateService.getList(userSeq);
+        List<MessageTemplateResponse> list = messageTemplateService.getListBySendingForm(userSeq, "s");
+        return ApiResponse.success(list);
+    }
+
+    /**
+     * 직접발송용 템플릿 목록 조회
+     */
+    @GetMapping("/direct")
+    public ApiResponse<List<MessageTemplateResponse>> getDirectList(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userSeq = getUserSeq(userDetails);
+        List<MessageTemplateResponse> list = messageTemplateService.getListBySendingForm(userSeq, "d");
         return ApiResponse.success(list);
     }
 
@@ -91,6 +155,30 @@ public class MessageTemplateController {
             @RequestBody List<Long> templateSeqList) {
         Long userSeq = getUserSeq(userDetails);
         messageTemplateService.reorder(userSeq, templateSeqList);
+        return ApiResponse.success(null);
+    }
+
+    /**
+     * 설문용 템플릿 순서 변경
+     */
+    @PutMapping("/survey/reorder")
+    public ApiResponse<Void> reorderSurvey(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody List<Long> templateSeqList) {
+        Long userSeq = getUserSeq(userDetails);
+        messageTemplateService.reorderBySendingForm(userSeq, templateSeqList, "s");
+        return ApiResponse.success(null);
+    }
+
+    /**
+     * 직접발송용 템플릿 순서 변경
+     */
+    @PutMapping("/direct/reorder")
+    public ApiResponse<Void> reorderDirect(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody List<Long> templateSeqList) {
+        Long userSeq = getUserSeq(userDetails);
+        messageTemplateService.reorderBySendingForm(userSeq, templateSeqList, "d");
         return ApiResponse.success(null);
     }
 

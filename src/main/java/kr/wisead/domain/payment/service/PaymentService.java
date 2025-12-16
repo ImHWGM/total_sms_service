@@ -6,6 +6,7 @@ import kr.wisead.domain.payment.entity.Payment;
 import kr.wisead.mapper.primary.PaymentMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import mup.mcash.module.common.McashCipher.McashCipher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,23 +68,87 @@ public class PaymentService {
 
     /**
      * 결제 검증
+     * KG모빌리언스 결제 결과의 필수 파라미터 및 위변조 검증
      */
     public boolean validatePayment(Map<String, String> paymentResult) {
         // 필수 파라미터 확인
-        if (!paymentResult.containsKey("Resultcd") ||
-                !paymentResult.containsKey("Tradeid") ||
-                !paymentResult.containsKey("Prdtprice")) {
-            log.error("필수 파라미터가 누락되었습니다.");
-            return false;
+        String[] requiredParams = {"Resultcd", "Mobilid", "Svcid", "Tradeid", "Prdtprice", "Signdate", "chkValue"};
+        for (String param : requiredParams) {
+            if (!paymentResult.containsKey(param) || paymentResult.get(param) == null) {
+                log.error("필수 파라미터가 누락되었습니다: {}", param);
+                return false;
+            }
         }
 
+        // 결과 코드 확인
         String resultCd = paymentResult.get("Resultcd");
         if (!"0000".equals(resultCd)) {
             log.error("결제가 실패했습니다. 결과코드: {}", resultCd);
             return false;
         }
 
+        // 결제 금액 유효성 검증
+        try {
+            String prdtPrice = paymentResult.get("Prdtprice");
+            BigDecimal amount = new BigDecimal(prdtPrice);
+            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+                log.error("결제 금액이 유효하지 않습니다: {}", prdtPrice);
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            log.error("결제 금액 파싱 실패: {}", paymentResult.get("Prdtprice"));
+            return false;
+        }
+
+        // 위변조 검증 (chkValue 검증)
+        if (!validateCheckValue(paymentResult)) {
+            log.error("결제 정보가 위변조 되었습니다.");
+            return false;
+        }
+
         return true;
+    }
+
+    /**
+     * 결제 위변조 검증
+     * KG모빌리언스 McashCipher를 사용한 chkValue 검증
+     */
+    private boolean validateCheckValue(Map<String, String> paymentResult) {
+        try {
+            String mobilId = paymentResult.get("Mobilid");
+            String svcId = paymentResult.get("Svcid");
+            String tradeId = paymentResult.get("Tradeid");
+            String signDate = paymentResult.get("Signdate");
+            String prdtPrice = paymentResult.get("Prdtprice");
+            String chkValue = paymentResult.get("chkValue");
+
+            if (chkValue == null || chkValue.isEmpty()) {
+                log.warn("chkValue가 비어있습니다.");
+                return false;
+            }
+
+            // 체크값 원본 문자열 생성 (KG모빌리언스 규격)
+            String cpChkValue = "Mobilid=" + mobilId +
+                    "&Mrchid=null" +
+                    "&Svcid=" + svcId +
+                    "&Tradeid=" + tradeId +
+                    "&Signdate=" + signDate +
+                    "&Prdtprice=" + prdtPrice;
+
+            // McashCipher를 사용한 암호화 검증
+            String encChkValue = McashCipher.encodeString(cpChkValue, tradeId);
+
+            if (!encChkValue.equals(chkValue)) {
+                log.error("결제 정보 위변조 감지 - 기대값: {}, 수신값: {}", encChkValue, chkValue);
+                return false;
+            }
+
+            log.info("결제 위변조 검증 통과 - tradeId: {}, signDate: {}", tradeId, signDate);
+            return true;
+        } catch (Exception e) {
+            log.error("결제 검증 중 오류 발생: {}", e.getMessage(), e);
+            return false;
+        }
     }
 
     /**

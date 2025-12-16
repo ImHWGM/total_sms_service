@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.sms.UserStatisticsMapper">
+
+    <!-- 사용자별 메시지 통계 조회 (일반 메시지) -->
+    <select id="selectMsgStats" resultType="kr.wisead.domain.statistics.dto.UserMsgStatsResponse">
+        SELECT
+            t.userId,
+            SUM(CASE WHEN t.msgType = 'S' THEN 1 ELSE 0 END) AS smsTotal,
+            SUM(CASE WHEN t.msgType = 'S' AND t.isSucc = 1 THEN 1 ELSE 0 END) AS smsSucc,
+            SUM(CASE WHEN t.msgType = 'L' THEN 1 ELSE 0 END) AS lmsTotal,
+            SUM(CASE WHEN t.msgType = 'L' AND t.isSucc = 1 THEN 1 ELSE 0 END) AS lmsSucc,
+            SUM(CASE WHEN t.msgType = 'M' THEN 1 ELSE 0 END) AS mmsTotal,
+            SUM(CASE WHEN t.msgType = 'M' AND t.isSucc = 1 THEN 1 ELSE 0 END) AS mmsSucc
+        FROM (
+            <foreach collection="tables" item="tbl" separator=" UNION ALL ">
+                SELECT
+                    <choose>
+                        <when test="tbl == 'msg_queue'">
+                            ext_col3 AS userId,
+                            msg_type AS msgType,
+                            0 AS isSucc
+                        </when>
+                        <otherwise>
+                            user_id AS userId,
+                            msg_type AS msgType,
+                            CASE WHEN rslt_val = '0' OR rslt_val = '1000' THEN 1 ELSE 0 END AS isSucc
+                        </otherwise>
+                    </choose>
+                FROM ${tbl}
+                WHERE (ext_col0 IS NULL OR ext_col0 = '')
+                <if test="startDate != null and startDate != ''">
+                    <choose>
+                        <when test="tbl == 'msg_queue'">
+                            AND request_time <![CDATA[>=]]> #{startDate}
+                        </when>
+                        <otherwise>
+                            AND rslt_date <![CDATA[>=]]> #{startDate}
+                        </otherwise>
+                    </choose>
+                </if>
+                <if test="endDate != null and endDate != ''">
+                    <choose>
+                        <when test="tbl == 'msg_queue'">
+                            AND request_time <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+                        </when>
+                        <otherwise>
+                            AND rslt_date <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+                        </otherwise>
+                    </choose>
+                </if>
+                <if test="userId != null and userId != ''">
+                    <choose>
+                        <when test="tbl == 'msg_queue'">
+                            AND ext_col3 = #{userId}
+                        </when>
+                        <otherwise>
+                            AND user_id = #{userId}
+                        </otherwise>
+                    </choose>
+                </if>
+                <if test="userIds != null and userIds.size() > 0">
+                    <choose>
+                        <when test="tbl == 'msg_queue'">
+                            AND ext_col3 IN
+                        </when>
+                        <otherwise>
+                            AND user_id IN
+                        </otherwise>
+                    </choose>
+                    <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+                        #{uid}
+                    </foreach>
+                </if>
+            </foreach>
+        ) t
+        GROUP BY t.userId
+        ORDER BY t.userId
+    </select>
+
+    <!-- 사용자별 설문 통계 조회 -->
+    <select id="selectSurveyStats" resultType="kr.wisead.domain.statistics.dto.UserSurveyStatsResponse">
+        SELECT
+            t.userId,
+            COUNT(*) AS surveyTotal,
+            SUM(t.isSucc) AS surveySucc
+        FROM (
+            <foreach collection="tables" item="tbl" separator=" UNION ALL ">
+                SELECT
+                    <choose>
+                        <when test="tbl == 'msg_queue'">
+                            ext_col3 AS userId,
+                            0 AS isSucc
+                        </when>
+                        <otherwise>
+                            user_id AS userId,
+                            CASE WHEN rslt_val = '0' OR rslt_val = '1000' THEN 1 ELSE 0 END AS isSucc
+                        </otherwise>
+                    </choose>
+                FROM ${tbl}
+                WHERE ext_col0 IS NOT NULL AND ext_col0 != ''
+                <if test="startDate != null and startDate != ''">
+                    <choose>
+                        <when test="tbl == 'msg_queue'">
+                            AND request_time <![CDATA[>=]]> #{startDate}
+                        </when>
+                        <otherwise>
+                            AND rslt_date <![CDATA[>=]]> #{startDate}
+                        </otherwise>
+                    </choose>
+                </if>
+                <if test="endDate != null and endDate != ''">
+                    <choose>
+                        <when test="tbl == 'msg_queue'">
+                            AND request_time <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+                        </when>
+                        <otherwise>
+                            AND rslt_date <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+                        </otherwise>
+                    </choose>
+                </if>
+                <if test="userId != null and userId != ''">
+                    <choose>
+                        <when test="tbl == 'msg_queue'">
+                            AND ext_col3 = #{userId}
+                        </when>
+                        <otherwise>
+                            AND user_id = #{userId}
+                        </otherwise>
+                    </choose>
+                </if>
+                <if test="userIds != null and userIds.size() > 0">
+                    <choose>
+                        <when test="tbl == 'msg_queue'">
+                            AND ext_col3 IN
+                        </when>
+                        <otherwise>
+                            AND user_id IN
+                        </otherwise>
+                    </choose>
+                    <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+                        #{uid}
+                    </foreach>
+                </if>
+            </foreach>
+        ) t
+        GROUP BY t.userId
+        ORDER BY t.userId
+    </select>
+
+</mapper>

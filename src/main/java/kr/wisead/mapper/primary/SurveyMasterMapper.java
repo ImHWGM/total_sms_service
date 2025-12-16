@@ -98,4 +98,14 @@ public interface SurveyMasterMapper {
      * 범용인증키 설명 수정
      */
     int updateAuthKeyDesc(@Param("eventSeq") Integer eventSeq, @Param("authKeyDesc") String authKeyDesc);
+
+    /**
+     * 사용자별 QR 통계 조회
+     */
+    List<kr.wisead.domain.statistics.dto.UserQrStatsResponse> selectQrStatsByUser(
+            @Param("startDate") String startDate,
+            @Param("endDate") String endDate,
+            @Param("userSeq") Long userSeq,
+            @Param("userSeqs") java.util.List<Long> userSeqs
+    );
 }

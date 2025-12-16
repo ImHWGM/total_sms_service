@@ -144,4 +144,25 @@
         WHERE MSEQ = #{mseq}
     </select>
 
+    <!-- 이벤트와 사용자 시퀀스로 이전 발송 내용 조회 (재발송용) -->
+    <select id="selectPreviousSend" resultMap="MsgResultMap">
+        SELECT * FROM (
+            SELECT <include refid="selectColumns"/>
+            FROM msg_queue
+            WHERE EXT_COL0 = #{eventSeq}
+              AND EXT_COL1 = #{userSeq}
+            <if test="tables != null and tables.size() > 0">
+                UNION ALL
+                <foreach collection="tables" item="table" separator="UNION ALL">
+                    SELECT <include refid="selectColumns"/>
+                    FROM ${table}
+                    WHERE EXT_COL0 = #{eventSeq}
+                      AND EXT_COL1 = #{userSeq}
+                </foreach>
+            </if>
+        ) AS combined
+        ORDER BY REQUEST_TIME ASC
+        LIMIT 1
+    </select>
+
 </mapper>

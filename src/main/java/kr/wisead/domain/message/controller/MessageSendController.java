@@ -104,4 +104,44 @@ public class MessageSendController {
         int deleted = messageSendService.cancelScheduledBatch(userKey);
         return ApiResponse.success(deleted);
     }
+
+    /**
+     * 설문 문자 재발송 (단건)
+     * POST /api/message/send/resend
+     */
+    @PostMapping("/resend")
+    public ApiResponse<Integer> resendSurveyMessage(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody ResendRequest request) {
+        String regId = userDetails.getUsername();
+        int mseq = messageSendService.resendSurveyMessage(
+                request.getUserSeq(),
+                request.getSubject(),
+                request.getText(),
+                request.getCallback(),
+                request.isUseOriginalContent(),
+                regId
+        );
+        return ApiResponse.success(mseq);
+    }
+
+    /**
+     * 설문 문자 재발송 (다건)
+     * POST /api/message/send/resend/batch
+     */
+    @PostMapping("/resend/batch")
+    public ApiResponse<ResendResponse> resendSurveyMessageBatch(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody ResendRequest request) {
+        String regId = userDetails.getUsername();
+        ResendResponse response = messageSendService.resendSurveyMessageBatch(
+                request.getUserSeqList(),
+                request.getSubject(),
+                request.getText(),
+                request.getCallback(),
+                request.isUseOriginalContent(),
+                regId
+        );
+        return ApiResponse.success(response);
+    }
 }

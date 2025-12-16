@@ -473,12 +473,58 @@ Before signing up or finding ID, you typically verify the email address.
 
 ---
 
-## 15. Statistics (`/api/statistics`)
+## 15. Statistics (`/api/statistics`, `/api/billing/statistics`)
 
-### Get Daily Stats
+### 15.1 General Statistics
+
+#### Get Daily Stats
 *   **Method**: `GET`
 *   **URL**: `{{baseUrl}}/api/statistics/daily?startDate=2025-01-01&endDate=2025-01-07&serviceType=SMS`
 
-### Get Usage Summary
+#### Get Usage Summary
 *   **Method**: `GET`
 *   **URL**: `{{baseUrl}}/api/statistics/usage-summary?startDate=2025-01-01&endDate=2025-01-31`
+
+#### Get Period Daily Stats (Loop/Detailed)
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/statistics/period/daily?startDate=2025-01-01&endDate=2025-01-07`
+
+#### Get User Stats by Service Type (M/S/Q)
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/statistics/user-stats?startDate=2025-01-01&endDate=2025-01-31&serviceType=M`
+    *   `serviceType`: M (Message), S (Survey), Q (QR)
+
+### 15.2 Billing Statistics
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/billing/statistics/daily` | 일별 과금 통계 조회 |
+| `GET` | `/api/billing/statistics/monthly` | 월별 과금 통계 조회 |
+| `GET` | `/api/billing/statistics/service-type` | 서비스 타입별 과금 통계 조회 |
+| `POST` | `/api/billing/statistics/users` | 사용자별 과금 통계 조회 |
+| `GET` | `/api/billing/statistics/summary` | 과금 총계 조회 |
+| `GET` | `/api/billing/statistics/current-month` | 현재 월 과금 요약 (대시보드) |
+| `GET` | `/api/billing/statistics/previous-month` | 전월 과금 요약 |
+| `GET` | `/api/billing/statistics/my` | 내 과금 요약 |
+| `GET` | `/api/billing/statistics/trend/daily` | 일별 과금 추이 (최근 30일) |
+| `GET` | `/api/billing/statistics/trend/monthly` | 월별 과금 추이 (최근 12개월) |
+
+#### Get Daily Billing Stats
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/billing/statistics/daily?startDate=2025-01-01&endDate=2025-01-31`
+
+#### Get Monthly Billing Stats
+*   **Method**: `GET`
+*   **URL**: `{{baseUrl}}/api/billing/statistics/monthly?startDate=2025-01-01&endDate=2025-12-31`
+
+#### Get User Billing Stats (POST)
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/billing/statistics/users`
+*   **Body**:
+    ```json
+    {
+        "startDate": "2025-01-01",
+        "endDate": "2025-01-31",
+        "userIds": ["user1", "user2"]
+    }
+    ```

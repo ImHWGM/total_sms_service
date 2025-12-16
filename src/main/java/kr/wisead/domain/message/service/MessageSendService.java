@@ -3,13 +3,17 @@ package kr.wisead.domain.message.service;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.message.dto.*;
 import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.message.entity.MsgResult;
+import kr.wisead.domain.survey.entity.SurveyUser;
+import kr.wisead.mapper.primary.SurveyUserMapper;
 import kr.wisead.mapper.sms.MsgQueueMapper;
 import kr.wisead.mapper.sms.MsgResultMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +32,10 @@ public class MessageSendService {
 
     private final MsgQueueMapper msgQueueMapper;
     private final MsgResultMapper msgResultMapper;
+    private final SurveyUserMapper surveyUserMapper;
+
+    @Value("${wisead.front.url:https://wisead.kr}")
+    private String wiseadFrontUrl;
 
     /**
      * 일반 문자 발송 (SMS/LMS/MMS)
@@ -208,5 +216,135 @@ public class MessageSendService {
      */
     private String normalizePhoneNumber(String phone) {
         return phone != null ? phone.replaceAll("-", "") : null;
+    }
+
+    /**
+     * 설문 문자 재발송 (단건)
+     *
+     * @param userSeq 사용자 시퀀스
+     * @param subject 제목 (useOriginal=false일 때 사용)
+     * @param text 내용 (useOriginal=false일 때 사용, #유저키# 치환됨)
+     * @param callback 발신번호
+     * @param useOriginal true: 이전 발송 내용 그대로, false: 새 내용으로 발송
+     * @param regId 등록자 ID
+     * @return mseq
+     */
+    @Transactional("smsTransactionManager")
+    public int resendSurveyMessage(Integer userSeq, String subject, String text,
+                                    String callback, boolean useOriginal, String regId) {
+        // SURVEY_USER에서 사용자 정보 조회
+        SurveyUser surveyUser = surveyUserMapper.selectBySeq(userSeq)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "설문 참여자 정보를 찾을 수 없습니다."));
+
+        Integer eventSeq = surveyUser.getEventSeq();
+        String userKey = surveyUser.getUserKey();
+        String encryptedPhone = surveyUser.getResendUserPhone();
+
+        if (encryptedPhone == null || encryptedPhone.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "수신번호가 존재하지 않습니다.");
+        }
+
+        // 수신번호 복호화
+        String dstaddr;
+        try {
+            dstaddr = CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedPhone));
+        } catch (Exception e) {
+            log.error("수신번호 복호화 실패 - userSeq: {}", userSeq, e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "수신번호 복호화 실패");
+        }
+
+        String finalSubject;
+        String finalText;
+        String finalCallback;
+
+        if (useOriginal) {
+            // 이전 발송 내용 조회 (msg_result_yyyyMM 테이블에서)
+            List<String> tables = getResultTableNames(eventSeq);
+            MsgResult previous = msgResultMapper.selectPreviousSend(tables, eventSeq, userSeq);
+
+            if (previous == null) {
+                throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이전 발송 내역을 찾을 수 없습니다.");
+            }
+
+            finalSubject = previous.getSubject();
+            finalText = previous.getText();
+            finalCallback = callback != null ? callback : previous.getCallback();
+            log.info("이전 발송 내용으로 재발송 - userSeq: {}, subject: {}", userSeq, finalSubject);
+        } else {
+            // 새 내용으로 발송 (userKey 치환)
+            if (userKey == null || userKey.isEmpty()) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT, "userKey가 존재하지 않습니다.");
+            }
+
+            finalSubject = subject;
+            finalText = text.replace("#유저키#", userKey);
+            finalCallback = callback;
+            log.info("새 내용으로 재발송 - userSeq: {}, userKey: {}", userSeq, userKey);
+        }
+
+        // MSG_QUEUE에 등록
+        MsgQueue msgQueue = MsgQueue.createForSurvey(
+                "L", // LMS로 발송
+                normalizePhoneNumber(dstaddr),
+                finalCallback,
+                finalSubject,
+                finalText,
+                eventSeq,
+                userSeq,
+                "1", // 즉시 발송
+                regId
+        );
+
+        msgQueueMapper.insertLms(msgQueue);
+        log.info("설문 재발송 완료 - userSeq: {}, mseq: {}", userSeq, msgQueue.getMseq());
+
+        return msgQueue.getMseq();
+    }
+
+    /**
+     * 설문 문자 재발송 (다건)
+     */
+    @Transactional("smsTransactionManager")
+    public ResendResponse resendSurveyMessageBatch(List<Integer> userSeqList, String subject,
+                                                    String text, String callback,
+                                                    boolean useOriginal, String regId) {
+        int successCount = 0;
+        int failCount = 0;
+        List<String> failedUserSeqs = new ArrayList<>();
+
+        for (Integer userSeq : userSeqList) {
+            try {
+                resendSurveyMessage(userSeq, subject, text, callback, useOriginal, regId);
+                successCount++;
+            } catch (Exception e) {
+                failCount++;
+                log.warn("다건 재발송 중 실패 - userSeq: {}, error: {}", userSeq, e.getMessage());
+                failedUserSeqs.add(String.valueOf(userSeq));
+            }
+        }
+
+        log.info("다건 재발송 완료 - 성공: {}/{}", successCount, userSeqList.size());
+
+        if (failCount == 0) {
+            return ResendResponse.success(successCount);
+        } else {
+            return ResendResponse.partial(successCount, failCount, failedUserSeqs);
+        }
+    }
+
+    /**
+     * 이벤트 시퀀스 기반으로 조회할 msg_result 테이블명 목록 생성
+     * 현재 월부터 1개월 전까지
+     */
+    private List<String> getResultTableNames(Integer eventSeq) {
+        List<String> tables = new ArrayList<>();
+        java.time.LocalDate now = java.time.LocalDate.now();
+
+        // 현재 월
+        tables.add("msg_result_" + now.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM")));
+        // 1개월 전
+        tables.add("msg_result_" + now.minusMonths(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM")));
+
+        return tables;
     }
 }

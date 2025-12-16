@@ -16,6 +16,7 @@ import java.util.List;
 @Builder
 public class CustomerCompanyRequest {
 
+    private Integer seq;                    // 시퀀스 (수정 시 사용)
     private String userId;                  // 사용자 ID
     private String selectedUserId;          // 선택된 사용자 ID
     private String custCompName;            // 고객사명

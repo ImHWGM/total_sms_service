@@ -140,4 +140,30 @@
         WHERE USER_ID = #{userId}
     </select>
 
+    <!-- 고객사 정보 수정 -->
+    <update id="updateCustomerCompany">
+        UPDATE CUST_COMP
+        SET
+            <if test="custCompName != null">
+                CUST_COMP_NAME = #{custCompName},
+            </if>
+            UPT_DATE = NOW(),
+            UPT_ID = #{uptId}
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- 고객사 시퀀스로 조회 -->
+    <select id="selectBySeq" resultType="kr.wisead.domain.company.entity.CustomerCompany">
+        SELECT
+            SEQ AS seq,
+            USER_ID AS userId,
+            SELECTED_USER_ID AS selectedUserId,
+            CUST_COMP_NAME AS custCompName,
+            UPT_DATE AS uptDate,
+            UPT_ID AS uptId,
+            CHKED_YN AS chkedYn
+        FROM CUST_COMP
+        WHERE SEQ = #{seq}
+    </select>
+
 </mapper>

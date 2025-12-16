@@ -123,4 +123,31 @@ public class CustomerCompanyService {
     public String getCorpNameByUserId(String userId) {
         return customerCompanyMapper.selectCorpNameByUserId(userId);
     }
+
+    /**
+     * 고객사 정보 수정
+     */
+    @Transactional
+    public boolean updateCompany(CustomerCompanyRequest request, String operatorId) {
+        if (request.getSeq() == null) {
+            log.error("고객사 시퀀스가 없습니다.");
+            return false;
+        }
+
+        CustomerCompany company = CustomerCompany.builder()
+                .seq(request.getSeq())
+                .custCompName(request.getCustCompName())
+                .uptId(operatorId)
+                .build();
+
+        int result = customerCompanyMapper.updateCustomerCompany(company);
+        return result > 0;
+    }
+
+    /**
+     * 고객사 시퀀스로 조회
+     */
+    public CustomerCompany getCompanyBySeq(Integer seq) {
+        return customerCompanyMapper.selectBySeq(seq);
+    }
 }

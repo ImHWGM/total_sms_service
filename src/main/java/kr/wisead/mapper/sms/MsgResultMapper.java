@@ -52,4 +52,13 @@ public interface MsgResultMapper {
      * 특정 테이블에서 단건 조회
      */
     MsgResult findByMseq(@Param("tableName") String tableName, @Param("mseq") Integer mseq);
+
+    /**
+     * 이벤트와 사용자 시퀀스로 이전 발송 내용 조회 (재발송용)
+     * msg_queue + msg_result_yyyyMM 테이블에서 최신 발송 정보 조회
+     * EXT_COL0 = eventSeq, EXT_COL1 = userSeq
+     */
+    MsgResult selectPreviousSend(@Param("tables") List<String> tables,
+                                  @Param("eventSeq") Integer eventSeq,
+                                  @Param("userSeq") Integer userSeq);
 }

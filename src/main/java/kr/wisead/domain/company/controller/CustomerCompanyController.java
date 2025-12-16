@@ -105,4 +105,29 @@ public class CustomerCompanyController {
         String corpName = customerCompanyService.getCorpNameByUserId(userId);
         return ApiResponse.<String>success(corpName, "회사명 조회 성공");
     }
+
+    /**
+     * 고객사 정보 수정
+     * PUT /api/company/{seq}
+     */
+    @PutMapping("/{seq}")
+    public ApiResponse<Boolean> updateCompany(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Integer seq,
+            @RequestBody CustomerCompanyRequest request) {
+        String operatorId = userDetails.getUsername();
+        request.setSeq(seq);
+        boolean result = customerCompanyService.updateCompany(request, operatorId);
+        return ApiResponse.success(result);
+    }
+
+    /**
+     * 고객사 상세 조회
+     * GET /api/company/{seq}
+     */
+    @GetMapping("/{seq}")
+    public ApiResponse<CustomerCompany> getCompanyBySeq(@PathVariable Integer seq) {
+        CustomerCompany company = customerCompanyService.getCompanyBySeq(seq);
+        return ApiResponse.success(company);
+    }
 }

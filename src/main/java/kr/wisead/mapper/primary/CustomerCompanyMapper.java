@@ -68,4 +68,14 @@ public interface CustomerCompanyMapper {
      * 회사명 조회 (USER)
      */
     String selectCorpNameByUserId(@Param("userId") String userId);
+
+    /**
+     * 고객사 정보 수정
+     */
+    int updateCustomerCompany(CustomerCompany company);
+
+    /**
+     * 고객사 시퀀스로 조회
+     */
+    CustomerCompany selectBySeq(@Param("seq") Integer seq);
 }

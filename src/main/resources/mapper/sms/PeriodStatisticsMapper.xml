@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.sms.PeriodStatisticsMapper">
+
+    <!-- 일별 통계 조회 (msg_result_YYYYMM 테이블) -->
+    <select id="countOneDayStats" resultType="kr.wisead.domain.statistics.dto.DailyStatsResponse">
+        SELECT
+            #{date} AS dtStats,
+            COUNT(*) AS inCnt,
+            IFNULL(SUM(CASE WHEN rslt_val = '0' OR rslt_val = '1000' THEN 1 ELSE 0 END), 0) AS succCnt,
+            IFNULL(SUM(CASE WHEN rslt_val IN ('9999', '-1') THEN 1 ELSE 0 END), 0) AS errorCnt,
+            IFNULL(SUM(CASE WHEN rslt_val NOT IN ('0', '1000', '9999', '-1', '') AND rslt_val IS NOT NULL THEN 1 ELSE 0 END), 0) AS failCnt,
+            0 AS ingCnt,
+            0 AS waitCnt
+        FROM ${tableName}
+        <where>
+            DATE(rslt_date) = #{date}
+            <if test="userId != null and userId != ''">
+                AND user_id = #{userId}
+            </if>
+            <if test="userIds != null and userIds.size() > 0">
+                AND user_id IN
+                <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+                    #{uid}
+                </foreach>
+            </if>
+            <if test="msgType != null and msgType != ''">
+                AND msg_type = #{msgType}
+            </if>
+            <if test="serviceType != null and serviceType != ''">
+                <choose>
+                    <when test="serviceType == 'M'">
+                        AND (ext_col0 IS NULL OR ext_col0 = '')
+                    </when>
+                    <otherwise>
+                        AND ext_col0 IS NOT NULL AND ext_col0 != ''
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+    </select>
+
+    <!-- 대기 건수 조회 (msg_queue 테이블 - 예약 발송) -->
+    <select id="countWaitStats" resultType="int">
+        SELECT COUNT(*)
+        FROM msg_queue
+        <where>
+            stat = '0'
+            AND DATE(request_time) = #{date}
+            AND request_time > NOW()
+            <if test="userId != null and userId != ''">
+                AND ext_col3 = #{userId}
+            </if>
+            <if test="userIds != null and userIds.size() > 0">
+                AND ext_col3 IN
+                <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+                    #{uid}
+                </foreach>
+            </if>
+            <if test="msgType != null and msgType != ''">
+                AND msg_type = #{msgType}
+            </if>
+            <if test="serviceType != null and serviceType != ''">
+                <choose>
+                    <when test="serviceType == 'M'">
+                        AND (ext_col0 IS NULL OR ext_col0 = '')
+                    </when>
+                    <otherwise>
+                        AND ext_col0 IS NOT NULL AND ext_col0 != ''
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+    </select>
+
+    <!-- 진행중 건수 조회 (msg_queue 테이블 - 발송 진행중) -->
+    <select id="countInProgressStats" resultType="int">
+        SELECT COUNT(*)
+        FROM msg_queue
+        <where>
+            stat IN ('1', '2')
+            AND DATE(request_time) = #{date}
+            AND request_time <![CDATA[<=]]> NOW()
+            <if test="userId != null and userId != ''">
+                AND ext_col3 = #{userId}
+            </if>
+            <if test="userIds != null and userIds.size() > 0">
+                AND ext_col3 IN
+                <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+                    #{uid}
+                </foreach>
+            </if>
+            <if test="msgType != null and msgType != ''">
+                AND msg_type = #{msgType}
+            </if>
+            <if test="serviceType != null and serviceType != ''">
+                <choose>
+                    <when test="serviceType == 'M'">
+                        AND (ext_col0 IS NULL OR ext_col0 = '')
+                    </when>
+                    <otherwise>
+                        AND ext_col0 IS NOT NULL AND ext_col0 != ''
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+    </select>
+
+</mapper>

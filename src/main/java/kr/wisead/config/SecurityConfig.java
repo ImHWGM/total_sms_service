@@ -45,6 +45,7 @@ public class SecurityConfig {
             "/api/auth/**",
             "/api/public/**",
             "/api/users/find-id",
+            "/api/email/verification/**",  // 이메일 인증 (회원가입, 로그인 시 사용)
 
             // 설문 참여 (비로그인 허용)
             "/api/survey/**",

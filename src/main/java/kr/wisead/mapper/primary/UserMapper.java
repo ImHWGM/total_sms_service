@@ -94,4 +94,19 @@ public interface UserMapper {
      * 아이디 찾기 (이메일, 담당자명으로)
      */
     Optional<User> findByEmailAndPerson(@Param("email") String email, @Param("person") String person);
+
+    /**
+     * 계정 잠금 해제 (로그인 실패 횟수 초기화 + 상태 변경)
+     */
+    int unlockAccount(@Param("userId") String userId);
+
+    /**
+     * 비밀번호 만료일 연장 (UPT_DATE 현재 시간으로 갱신)
+     */
+    int extendPasswordExpiry(@Param("userId") String userId);
+
+    /**
+     * 비밀번호 초기화 (관리자용)
+     */
+    int resetPassword(@Param("userId") String userId, @Param("userPass") String userPass);
 }

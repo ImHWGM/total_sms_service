@@ -127,4 +127,63 @@ public class UserService {
                "보류".equals(status) ||
                "탈퇴".equals(status);
     }
+
+    /**
+     * 계정 잠금 해제 (관리자)
+     */
+    @Transactional
+    public int unlockAccount(String userId) {
+        if (!userMapper.existsByUserId(userId)) {
+            throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+        }
+
+        int result = userMapper.unlockAccount(userId);
+        log.info("계정 잠금 해제: userId={}", userId);
+        return result;
+    }
+
+    /**
+     * 비밀번호 만료일 연장 (180일)
+     */
+    @Transactional
+    public int extendPasswordExpiry(String userId) {
+        if (!userMapper.existsByUserId(userId)) {
+            throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+        }
+
+        int result = userMapper.extendPasswordExpiry(userId);
+        log.info("비밀번호 만료일 연장: userId={}", userId);
+        return result;
+    }
+
+    /**
+     * 비밀번호 초기화 (관리자용)
+     * @param userId 대상 사용자 ID
+     * @param newPassword 새 비밀번호
+     */
+    @Transactional
+    public int resetPassword(String userId, String newPassword) {
+        if (!userMapper.existsByUserId(userId)) {
+            throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+        }
+
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        int result = userMapper.resetPassword(userId, encodedPassword);
+        log.info("비밀번호 초기화 완료: userId={}", userId);
+        return result;
+    }
+
+    /**
+     * 만료된 비밀번호 변경
+     */
+    @Transactional
+    public void changeExpiredPassword(String userId, String newPassword) {
+        if (!userMapper.existsByUserId(userId)) {
+            throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+        }
+
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        userMapper.updatePassword(userId, encodedPassword);
+        log.info("만료된 비밀번호 변경 완료: userId={}", userId);
+    }
 }

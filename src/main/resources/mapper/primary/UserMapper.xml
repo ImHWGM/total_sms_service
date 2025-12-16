@@ -170,4 +170,29 @@
           AND PERSON = #{person}
     </select>
 
+    <!-- 계정 잠금 해제 -->
+    <update id="unlockAccount">
+        UPDATE user
+        SET LOGIN_FAILURE_CNT = 0,
+            STATUS = '승인',
+            UPT_DATE = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 비밀번호 만료일 연장 (UPT_DATE 갱신으로 180일 연장) -->
+    <update id="extendPasswordExpiry">
+        UPDATE user
+        SET UPT_DATE = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 비밀번호 초기화 (관리자용) -->
+    <update id="resetPassword">
+        UPDATE user
+        SET USER_PASS = #{userPass},
+            LOGIN_FAILURE_CNT = 0,
+            UPT_DATE = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
 </mapper>

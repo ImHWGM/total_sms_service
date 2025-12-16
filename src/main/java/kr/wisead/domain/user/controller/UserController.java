@@ -89,4 +89,52 @@ public class UserController {
         String maskedUserId = userService.findUserId(email, person);
         return ApiResponse.success(Map.of("userId", maskedUserId));
     }
+
+    /**
+     * 비밀번호 초기화 (관리자용)
+     * PUT /api/users/{userId}/password/reset
+     */
+    @PutMapping("/{userId}/password/reset")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> resetPassword(
+            @PathVariable String userId,
+            @RequestBody Map<String, String> request) {
+        String newPassword = request.get("newPassword");
+        userService.resetPassword(userId, newPassword);
+        return ApiResponse.success("비밀번호가 초기화되었습니다.");
+    }
+
+    /**
+     * 계정 잠금 해제 (관리자용)
+     * PUT /api/users/{userId}/unlock
+     */
+    @PutMapping("/{userId}/unlock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> unlockAccount(@PathVariable String userId) {
+        userService.unlockAccount(userId);
+        return ApiResponse.success("계정 잠금이 해제되었습니다.");
+    }
+
+    /**
+     * 비밀번호 만료일 연장 (본인용)
+     * PUT /api/users/me/password/extend
+     */
+    @PutMapping("/me/password/extend")
+    public ApiResponse<Void> extendPasswordExpiry(@AuthenticationPrincipal UserDetails userDetails) {
+        userService.extendPasswordExpiry(userDetails.getUsername());
+        return ApiResponse.success("비밀번호 만료일이 180일 연장되었습니다.");
+    }
+
+    /**
+     * 만료된 비밀번호 변경 (본인용)
+     * PUT /api/users/me/password/expired
+     */
+    @PutMapping("/me/password/expired")
+    public ApiResponse<Void> changeExpiredPassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody Map<String, String> request) {
+        String newPassword = request.get("newPassword");
+        userService.changeExpiredPassword(userDetails.getUsername(), newPassword);
+        return ApiResponse.success("비밀번호가 변경되었습니다.");
+    }
 }

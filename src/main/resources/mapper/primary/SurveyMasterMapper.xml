@@ -204,6 +204,20 @@
         WHERE BINARY AUTH_CODE_URL = #{authCodeUrl}
     </update>
 
+    <!-- QR코드 방문 수 조회 -->
+    <select id="selectQrCodeVisits" resultType="java.lang.Long">
+        SELECT IFNULL(QR_CODE_VISITS, 0)
+        FROM SURVEY_MASTER
+        WHERE BINARY AUTH_CODE_URL = #{authCodeUrl}
+    </select>
+
+    <!-- QR코드 방문 수 롤백 (과금 실패 시) -->
+    <update id="rollbackQrCodeVisits">
+        UPDATE SURVEY_MASTER
+        SET QR_CODE_VISITS = GREATEST(QR_CODE_VISITS - 1, 0)
+        WHERE BINARY AUTH_CODE_URL = #{authCodeUrl}
+    </update>
+
     <!-- 만료된 이벤트 상태 업데이트 -->
     <update id="updateExpiredEventsStatus">
         UPDATE SURVEY_MASTER

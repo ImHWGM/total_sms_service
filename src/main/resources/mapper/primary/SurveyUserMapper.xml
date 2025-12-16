@@ -300,4 +300,195 @@
         )
     </insert>
 
+    <!-- 설문 참여자 목록 조회 (엑셀 다운로드용, 이벤트/고객사 정보 포함) -->
+    <select id="selectForExcelDownload" resultType="map">
+        SELECT
+            U.SEQ as seq,
+            C.CORP_NAME as corpName,
+            M.EVENT_NAME as eventName,
+            M.EVENT_TYPE as eventType,
+            U.USER_KEY as userKey,
+            U.USER_NAME as userName,
+            U.USER_PHONE as userPhone,
+            U.RESEND_USER_PHONE as resendUserPhone,
+            U.JUMIN_NUM as juminNum,
+            U.ADDRESS as address,
+            U.ADDRESS2 as address2,
+            U.DEPOSIT_DATE as depositDate,
+            U.SHIPMENT_DATE as shipmentDate,
+            U.SURVEY_START_TIME as surveyStartTime,
+            U.SUBMISSION_DATE as submissionDate,
+            U.REG_DATE as regDate
+        FROM SURVEY_USER U
+        INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+        LEFT JOIN CUSTOMER_COMPANY C ON M.MANAGER_SEQ = C.SEQ
+        <where>
+            U.DEL_YN = 'N'
+            <if test="eventSeq != null">
+                AND U.EVENT_SEQ = #{eventSeq}
+            </if>
+            <if test="eventType != null and eventType != ''">
+                AND M.EVENT_TYPE = #{eventType}
+            </if>
+            <if test="userLevel != null and userLevel lt 50">
+                AND M.REG_ID = #{regId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                <choose>
+                    <when test="searchType == 'phone'">
+                        AND U.RESEND_USER_PHONE = #{keyword}
+                    </when>
+                    <when test="searchType == 'name'">
+                        AND U.USER_NAME LIKE CONCAT('%', #{keyword}, '%')
+                    </when>
+                    <otherwise>
+                        AND (M.EVENT_NAME LIKE CONCAT('%', #{keyword}, '%')
+                            OR C.CORP_NAME LIKE CONCAT('%', #{keyword}, '%'))
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="submissionStatus != null and submissionStatus != '' and submissionStatus != 'all'">
+                <choose>
+                    <when test="submissionStatus == 'completed'">
+                        AND U.SUBMISSION_DATE IS NOT NULL
+                    </when>
+                    <when test="submissionStatus == 'pending'">
+                        AND U.SUBMISSION_DATE IS NULL
+                    </when>
+                </choose>
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND DATE(U.REG_DATE) >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND DATE(U.REG_DATE) &lt;= #{endDate}
+            </if>
+        </where>
+        ORDER BY U.SEQ DESC
+        <if test="limit != null and limit > 0">
+            LIMIT #{limit}
+        </if>
+    </select>
+
+    <!-- 설문 참여자 수 조회 (검색 조건 포함) -->
+    <select id="countForExcelDownload" resultType="int">
+        SELECT COUNT(*)
+        FROM SURVEY_USER U
+        INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+        LEFT JOIN CUSTOMER_COMPANY C ON M.MANAGER_SEQ = C.SEQ
+        <where>
+            U.DEL_YN = 'N'
+            <if test="eventSeq != null">
+                AND U.EVENT_SEQ = #{eventSeq}
+            </if>
+            <if test="eventType != null and eventType != ''">
+                AND M.EVENT_TYPE = #{eventType}
+            </if>
+            <if test="userLevel != null and userLevel lt 50">
+                AND M.REG_ID = #{regId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                <choose>
+                    <when test="searchType == 'phone'">
+                        AND U.RESEND_USER_PHONE = #{keyword}
+                    </when>
+                    <when test="searchType == 'name'">
+                        AND U.USER_NAME LIKE CONCAT('%', #{keyword}, '%')
+                    </when>
+                    <otherwise>
+                        AND (M.EVENT_NAME LIKE CONCAT('%', #{keyword}, '%')
+                            OR C.CORP_NAME LIKE CONCAT('%', #{keyword}, '%'))
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="submissionStatus != null and submissionStatus != '' and submissionStatus != 'all'">
+                <choose>
+                    <when test="submissionStatus == 'completed'">
+                        AND U.SUBMISSION_DATE IS NOT NULL
+                    </when>
+                    <when test="submissionStatus == 'pending'">
+                        AND U.SUBMISSION_DATE IS NULL
+                    </when>
+                </choose>
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND DATE(U.REG_DATE) >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND DATE(U.REG_DATE) &lt;= #{endDate}
+            </if>
+        </where>
+    </select>
+
+    <!-- 사용자 정보 수정 -->
+    <update id="update" parameterType="kr.wisead.domain.survey.entity.SurveyUser">
+        UPDATE SURVEY_USER
+        <set>
+            <if test="userName != null">USER_NAME = #{userName},</if>
+            <if test="userPhone != null">USER_PHONE = #{userPhone},</if>
+            <if test="resendUserPhone != null">RESEND_USER_PHONE = #{resendUserPhone},</if>
+            <if test="userEmail != null">USER_EMAIL = #{userEmail},</if>
+            <if test="address != null">ADDRESS = #{address},</if>
+            <if test="address2 != null">ADDRESS2 = #{address2},</if>
+            <if test="depositDate != null">DEPOSIT_DATE = #{depositDate},</if>
+            <if test="shipmentDate != null">SHIPMENT_DATE = #{shipmentDate},</if>
+            UPT_ID = #{uptId},
+            UPT_DATE = NOW()
+        </set>
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- 재발송 전화번호 수정 -->
+    <update id="updateResendPhone">
+        UPDATE SURVEY_USER
+        SET RESEND_USER_PHONE = #{resendUserPhone},
+            UPT_ID = #{uptId},
+            UPT_DATE = NOW()
+        WHERE SEQ = #{userSeq}
+    </update>
+
+    <!-- 소프트 삭제 -->
+    <update id="softDelete">
+        UPDATE SURVEY_USER
+        SET DEL_YN = 'Y',
+            UPT_ID = #{uptId},
+            UPT_DATE = NOW()
+        WHERE SEQ = #{userSeq}
+    </update>
+
+    <!-- 이벤트의 모든 사용자 삭제 -->
+    <delete id="deleteByEventSeq">
+        DELETE FROM SURVEY_USER
+        WHERE EVENT_SEQ = #{eventSeq}
+    </delete>
+
+    <!-- 이벤트의 모든 사용자 소프트 삭제 -->
+    <update id="softDeleteByEventSeq">
+        UPDATE SURVEY_USER
+        SET DEL_YN = 'Y',
+            UPT_ID = #{uptId},
+            UPT_DATE = NOW()
+        WHERE EVENT_SEQ = #{eventSeq}
+    </update>
+
+    <!-- 일괄 등록 -->
+    <insert id="insertBatch" parameterType="list">
+        INSERT INTO SURVEY_USER (
+            EVENT_SEQ, USER_KEY, USER_PHONE, RESEND_USER_PHONE, DEL_YN, REG_ID, REG_DATE
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.eventSeq}, #{item.userKey}, #{item.userPhone}, #{item.resendUserPhone}, 'N', #{item.regId}, NOW())
+        </foreach>
+    </insert>
+
+    <!-- 입금일자/출고일자 수정 -->
+    <update id="updatePaymentInfo">
+        UPDATE SURVEY_USER
+        SET DEPOSIT_DATE = #{depositDate},
+            SHIPMENT_DATE = #{shipmentDate},
+            UPT_ID = #{uptId},
+            UPT_DATE = NOW()
+        WHERE SEQ = #{userSeq}
+    </update>
+
 </mapper>

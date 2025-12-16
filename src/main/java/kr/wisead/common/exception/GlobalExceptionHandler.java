@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -143,6 +144,25 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNoHandlerFoundException(NoHandlerFoundException e) {
         log.warn("No Handler Found Exception: {} {}", e.getHttpMethod(), e.getRequestURL());
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ErrorCode.RESOURCE_NOT_FOUND));
+    }
+
+    /**
+     * 정적 리소스 Not Found 예외 처리 (favicon.ico 등)
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFoundException(NoResourceFoundException e) {
+        String resourcePath = e.getResourcePath();
+
+        // favicon.ico 요청은 DEBUG 레벨로 처리 (브라우저 자동 요청)
+        if (resourcePath != null && resourcePath.contains("favicon")) {
+            log.debug("Favicon request ignored: {}", resourcePath);
+        } else {
+            log.warn("No Resource Found: {}", resourcePath);
+        }
 
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)

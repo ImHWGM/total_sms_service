@@ -136,6 +136,25 @@ public class ActionLogService {
     }
 
     /**
+     * 다운로드 로그 기록 (간편 버전 - HttpServletRequest 없이)
+     */
+    @Transactional
+    public void logDownload(String userId, String menuName, String reason) {
+        ActionLog actionLog = ActionLog.builder()
+                .menuName(menuName)
+                .actionType("R")
+                .actionReason(reason)
+                .menuUrl("/api/excel")
+                .code("200")
+                .userId(userId)
+                .userName(userId)
+                .build();
+
+        actionLogMapper.insertDownloadLog(actionLog);
+        log.info("다운로드 로그 기록: userId={}, menuName={}, reason={}", userId, menuName, reason);
+    }
+
+    /**
      * 에러 로그 기록
      */
     @Transactional

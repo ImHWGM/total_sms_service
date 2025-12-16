@@ -91,4 +91,57 @@
         AND USER_SEQ = #{userSeq}
     </delete>
 
+    <!-- 이벤트의 전체 답변 목록 조회 -->
+    <select id="selectByEventSeq" resultType="kr.wisead.domain.survey.entity.SurveyAnswer">
+        SELECT
+            ANSWER_SEQ as answerSeq,
+            EVENT_SEQ as eventSeq,
+            QUESTION_SEQ as questionSeq,
+            USER_SEQ as userSeq,
+            ITEM_SEQ as itemSeq,
+            QUESTION_TYPE as questionType,
+            QUESTION_TYPE_DETAIL as questionTypeDetail,
+            ANSWER as answer,
+            FILE_PATH as filePath,
+            REG_DATE as regDate,
+            REG_ID as regId
+        FROM SURVEY_ANSWER
+        WHERE EVENT_SEQ = #{eventSeq}
+        ORDER BY USER_SEQ, QUESTION_SEQ
+    </select>
+
+    <!-- 문항별 답변 목록 조회 -->
+    <select id="selectByQuestionSeq" resultType="kr.wisead.domain.survey.entity.SurveyAnswer">
+        SELECT
+            ANSWER_SEQ as answerSeq,
+            EVENT_SEQ as eventSeq,
+            QUESTION_SEQ as questionSeq,
+            USER_SEQ as userSeq,
+            ITEM_SEQ as itemSeq,
+            QUESTION_TYPE as questionType,
+            QUESTION_TYPE_DETAIL as questionTypeDetail,
+            ANSWER as answer,
+            FILE_PATH as filePath,
+            REG_DATE as regDate,
+            REG_ID as regId
+        FROM SURVEY_ANSWER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND QUESTION_SEQ = #{questionSeq}
+        ORDER BY USER_SEQ
+    </select>
+
+    <!-- 답변 일괄 등록 -->
+    <insert id="insertBatch" parameterType="list">
+        INSERT INTO SURVEY_ANSWER (
+            EVENT_SEQ, QUESTION_SEQ, USER_SEQ, ITEM_SEQ,
+            QUESTION_TYPE, QUESTION_TYPE_DETAIL, ANSWER, FILE_PATH,
+            REG_DATE, REG_ID
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.eventSeq}, #{item.questionSeq}, #{item.userSeq}, #{item.itemSeq},
+             #{item.questionType}, #{item.questionTypeDetail}, #{item.answer}, #{item.filePath},
+             NOW(), #{item.regId})
+        </foreach>
+    </insert>
+
 </mapper>

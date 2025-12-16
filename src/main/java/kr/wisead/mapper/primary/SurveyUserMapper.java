@@ -130,4 +130,54 @@ public interface SurveyUserMapper {
      * QR 사용자 등록 (인증 없이 QR 접근 시)
      */
     int insertQrUser(SurveyUser user);
+
+    /**
+     * 설문 참여자 목록 조회 (엑셀 다운로드용)
+     */
+    List<Map<String, Object>> selectForExcelDownload(Map<String, Object> params);
+
+    /**
+     * 설문 참여자 수 조회 (검색 조건 포함)
+     */
+    int countForExcelDownload(Map<String, Object> params);
+
+    /**
+     * 사용자 정보 수정
+     */
+    int update(SurveyUser user);
+
+    /**
+     * 재발송 전화번호 수정
+     */
+    int updateResendPhone(@Param("userSeq") Integer userSeq,
+                          @Param("resendUserPhone") String resendUserPhone,
+                          @Param("uptId") String uptId);
+
+    /**
+     * 소프트 삭제
+     */
+    int softDelete(@Param("userSeq") Integer userSeq, @Param("uptId") String uptId);
+
+    /**
+     * 이벤트의 모든 사용자 삭제
+     */
+    int deleteByEventSeq(@Param("eventSeq") Integer eventSeq);
+
+    /**
+     * 이벤트의 모든 사용자 소프트 삭제
+     */
+    int softDeleteByEventSeq(@Param("eventSeq") Integer eventSeq, @Param("uptId") String uptId);
+
+    /**
+     * 일괄 등록
+     */
+    int insertBatch(List<SurveyUser> users);
+
+    /**
+     * 입금일자/출고일자 수정
+     */
+    int updatePaymentInfo(@Param("userSeq") Integer userSeq,
+                          @Param("depositDate") java.time.LocalDate depositDate,
+                          @Param("shipmentDate") java.time.LocalDate shipmentDate,
+                          @Param("uptId") String uptId);
 }

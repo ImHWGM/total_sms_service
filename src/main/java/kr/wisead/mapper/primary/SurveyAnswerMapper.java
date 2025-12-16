@@ -60,4 +60,20 @@ public interface SurveyAnswerMapper {
      */
     int deleteByUserSeq(@Param("eventSeq") Integer eventSeq,
                         @Param("userSeq") Integer userSeq);
+
+    /**
+     * 이벤트의 전체 답변 목록 조회
+     */
+    List<SurveyAnswer> selectByEventSeq(@Param("eventSeq") Integer eventSeq);
+
+    /**
+     * 문항별 답변 목록 조회
+     */
+    List<SurveyAnswer> selectByQuestionSeq(@Param("eventSeq") Integer eventSeq,
+                                            @Param("questionSeq") Integer questionSeq);
+
+    /**
+     * 답변 일괄 등록
+     */
+    int insertBatch(List<SurveyAnswer> answers);
 }

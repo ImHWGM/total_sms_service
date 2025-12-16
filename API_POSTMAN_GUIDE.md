@@ -86,9 +86,9 @@ Before signing up or finding ID, you typically verify the email address.
 
 ---
 
-## 2. Message Sending (`/api/message/send`)
+## 2. Message Sending (`/api/message/send`, `/api/multi`)
 
-### Send SMS/LMS/MMS
+### 2.1 Send SMS/LMS/MMS (Legacy)
 *   **Method**: `POST`
 *   **URL**: `{{baseUrl}}/api/message/send`
 *   **Body**:
@@ -111,7 +111,50 @@ Before signing up or finding ID, you typically verify the email address.
     *   `msgType`: "S" (SMS), "L" (LMS), "M" (MMS)
     *   `requestTime`: Use `2025-12-25T10:00:00` for scheduled sending.
 
-### Get Send History
+### 2.2 Send Multi Message (New - SMS/LMS/MMS with Variable Replacement)
+**Option A: Direct JSON (No Files)**
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/multi/send`
+*   **Body**:
+    ```json
+    {
+        "messageType": "SMS",
+        "callback": "02-1234-5678",
+        "subject": "Subject for LMS",
+        "text": "Hello [VAR1], your code is [VAR2].",
+        "reqType": "direct",
+        "delDuplicateNum": "N",
+        "receivers": [
+            {
+                "phone": "010-1111-2222",
+                "repChar01": "John",
+                "repChar02": "12345"
+            },
+            {
+                "phone": "010-3333-4444",
+                "repChar01": "Jane",
+                "repChar02": "67890"
+            }
+        ]
+    }
+    ```
+    *   `messageType`: "SMS", "LMS", "MMS"
+    *   `reqType`: "direct" (Immediate), "reserve" (Scheduled)
+    *   `reqDate`: "2025-12-31 23:59:59" (Required if `reqType` is "reserve")
+
+**Option B: With MMS Files (Multipart)**
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/api/multi/send/mms`
+*   **Header**: `Content-Type: multipart/form-data`
+*   **Body (form-data)**:
+    *   `messageType`: "MMS"
+    *   `callback`: "02-1234-5678"
+    *   `subject`: "Image Message"
+    *   `text`: "Check this image."
+    *   `receivers`: `[{"phone":"010-1111-2222", "repChar01":"User"}]` (JSON String)
+    *   `mmsFiles`: (File upload - Select 1~3 images)
+
+### 2.3 Get Send History
 *   **Method**: `GET`
 *   **URL**: `{{baseUrl}}/api/message/send/history?startDate=2025-01-01T00:00:00&endDate=2025-01-31T23:59:59&page=1&size=20`
 

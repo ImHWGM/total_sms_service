@@ -144,4 +144,34 @@ public class MessageSendController {
         );
         return ApiResponse.success(response);
     }
+
+    /**
+     * 중복 번호 재발송 (이전 내용 재발송)
+     * POST /api/message/send/resend/duplicate
+     *
+     * 설문 발송 시 중복으로 실패한 번호들에게 이전 발송 내용을 그대로 재발송
+     */
+    @PostMapping("/resend/duplicate")
+    public ApiResponse<ResendResponse> resendToDuplicates(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody ResendRequest request) {
+        String regId = userDetails.getUsername();
+        ResendResponse response = messageSendService.resendToDuplicates(request, regId);
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * 중복 번호에 새 내용 발송
+     * POST /api/message/send/duplicate/new
+     *
+     * 설문 발송 시 중복으로 실패한 번호들에게 새로운 내용으로 발송
+     */
+    @PostMapping("/duplicate/new")
+    public ApiResponse<ResendResponse> sendNewToDuplicates(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody ResendRequest request) {
+        String regId = userDetails.getUsername();
+        ResendResponse response = messageSendService.sendNewToDuplicates(request, regId);
+        return ApiResponse.success(response);
+    }
 }

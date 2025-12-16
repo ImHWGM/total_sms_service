@@ -7,7 +7,9 @@ import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.message.dto.*;
 import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.message.entity.MsgResult;
+import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
+import kr.wisead.mapper.primary.SurveyMasterMapper;
 import kr.wisead.mapper.primary.SurveyUserMapper;
 import kr.wisead.mapper.sms.MsgQueueMapper;
 import kr.wisead.mapper.sms.MsgResultMapper;
@@ -33,9 +35,10 @@ public class MessageSendService {
     private final MsgQueueMapper msgQueueMapper;
     private final MsgResultMapper msgResultMapper;
     private final SurveyUserMapper surveyUserMapper;
+    private final SurveyMasterMapper surveyMasterMapper;
 
-    @Value("${wisead.front.url:https://wisead.kr}")
-    private String wiseadFrontUrl;
+    @Value("${wisead.url:https://wisead.kr}")
+    private String wiseadUrl;
 
     /**
      * 일반 문자 발송 (SMS/LMS/MMS)
@@ -271,15 +274,22 @@ public class MessageSendService {
             finalCallback = callback != null ? callback : previous.getCallback();
             log.info("이전 발송 내용으로 재발송 - userSeq: {}, subject: {}", userSeq, finalSubject);
         } else {
-            // 새 내용으로 발송 (userKey 치환)
+            // 새 내용으로 발송 (설문 링크 생성)
             if (userKey == null || userKey.isEmpty()) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT, "userKey가 존재하지 않습니다.");
             }
 
+            // 이벤트 코드 조회
+            SurveyMaster event = surveyMasterMapper.selectByEventSeq(eventSeq)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트 정보를 찾을 수 없습니다."));
+
+            // 설문 링크 생성: https://wisead.kr/auth/{eventCode}/{userKey}
+            String surveyLink = generateSurveyLink(event.getEventCode(), userKey);
+
             finalSubject = subject;
-            finalText = text.replace("#유저키#", userKey);
+            finalText = text.replace("#유저키#", surveyLink);
             finalCallback = callback;
-            log.info("새 내용으로 재발송 - userSeq: {}, userKey: {}", userSeq, userKey);
+            log.info("새 내용으로 재발송 - userSeq: {}, userKey: {}, link: {}", userSeq, userKey, surveyLink);
         }
 
         // MSG_QUEUE에 등록
@@ -330,6 +340,122 @@ public class MessageSendService {
         } else {
             return ResendResponse.partial(successCount, failCount, failedUserSeqs);
         }
+    }
+
+    /**
+     * 중복 번호 재발송 (설문)
+     * 설문 발송 시 중복으로 실패한 번호들에게 재발송
+     *
+     * @param request 재발송 요청 (중복 수신자 목록 포함)
+     * @param regId 등록자 ID
+     * @return 재발송 결과
+     */
+    @Transactional("smsTransactionManager")
+    public ResendResponse resendToDuplicates(ResendRequest request, String regId) {
+        log.info("중복 번호 재발송 시작 - eventSeq: {}, regId: {}", request.getEventSeq(), regId);
+
+        List<ResendRequest.DuplicateReceiver> receivers = request.getDuplicateReceivers();
+        if (receivers == null || receivers.isEmpty()) {
+            log.warn("중복 수신자 목록이 비어있음");
+            return ResendResponse.fail("재발송할 수신자가 없습니다.");
+        }
+
+        // 이벤트 코드 조회
+        String eventCode = request.getEventCode();
+        if (eventCode == null || eventCode.isEmpty()) {
+            eventCode = surveyMasterMapper.selectByEventSeq(request.getEventSeq())
+                    .map(SurveyMaster::getEventCode)
+                    .orElse(null);
+        }
+
+        if (eventCode == null || eventCode.isEmpty()) {
+            log.error("이벤트 코드를 찾을 수 없음 - eventSeq: {}", request.getEventSeq());
+            return ResendResponse.fail("이벤트 정보를 찾을 수 없습니다.");
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+        List<String> failedList = new ArrayList<>();
+
+        for (ResendRequest.DuplicateReceiver receiver : receivers) {
+            try {
+                String phone = normalizePhoneNumber(receiver.getPhone());
+                String text = request.getText();
+
+                // 대치문자 처리
+                if (receiver.getRepChar01() != null && !receiver.getRepChar01().isEmpty()) {
+                    text = text.replace("#대치문자1#", receiver.getRepChar01());
+                }
+                if (receiver.getRepChar02() != null && !receiver.getRepChar02().isEmpty()) {
+                    text = text.replace("#대치문자2#", receiver.getRepChar02());
+                }
+                if (receiver.getRepChar03() != null && !receiver.getRepChar03().isEmpty()) {
+                    text = text.replace("#대치문자3#", receiver.getRepChar03());
+                }
+
+                // 설문 링크 생성: https://wisead.kr/auth/{eventCode}/{userKey}
+                String surveyLink = generateSurveyLink(eventCode, receiver.getUserKey());
+
+                // #유저키#를 설문 링크로 치환
+                text = text.replace("#유저키#", surveyLink);
+
+                log.debug("설문 링크 생성 - eventCode: {}, userKey: {}, link: {}",
+                        eventCode, receiver.getUserKey(), surveyLink);
+
+                // MSG_QUEUE에 등록
+                MsgQueue msgQueue = MsgQueue.createForSurvey(
+                        "L", // LMS로 발송
+                        phone,
+                        request.getCallback(),
+                        request.getSubject(),
+                        text,
+                        request.getEventSeq(),
+                        receiver.getUserSeq(),
+                        "1", // 즉시 발송
+                        regId
+                );
+
+                msgQueueMapper.insertLms(msgQueue);
+                successCount++;
+
+            } catch (Exception e) {
+                failCount++;
+                failedList.add(receiver.getPhone());
+                log.warn("중복 번호 재발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+            }
+        }
+
+        log.info("중복 번호 재발송 완료 - 성공: {}, 실패: {}", successCount, failCount);
+
+        if (failCount == 0) {
+            return ResendResponse.success(successCount);
+        } else {
+            return ResendResponse.partial(successCount, failCount, failedList);
+        }
+    }
+
+    /**
+     * 설문 링크 생성
+     * 형식: {wisead.url}/auth/{eventCode}/{userKey}
+     */
+    private String generateSurveyLink(String eventCode, String userKey) {
+        return String.format("%s/auth/%s/%s", wiseadUrl, eventCode, userKey);
+    }
+
+    /**
+     * 중복 번호에 새로운 내용으로 발송
+     *
+     * @param request 발송 요청 (새 내용 포함)
+     * @param regId 등록자 ID
+     * @return 발송 결과
+     */
+    @Transactional("smsTransactionManager")
+    public ResendResponse sendNewToDuplicates(ResendRequest request, String regId) {
+        log.info("중복 번호 신규 발송 시작 - eventSeq: {}, regId: {}", request.getEventSeq(), regId);
+
+        // resendToDuplicates와 동일한 로직 사용
+        // 차이점: useOriginalContent = false, 새로운 text 사용
+        return resendToDuplicates(request, regId);
     }
 
     /**

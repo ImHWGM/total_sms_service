@@ -44,8 +44,11 @@ public class SecurityConfig {
             // 인증 관련
             "/api/auth/**",  // 로그인, 회원가입, 사업자번호 검증 등
             "/api/public/**",
-            "/api/users/find-id",
-            "/api/users/find-pw",  // 비밀번호 찾기
+            "/api/users/find-id",           // 아이디 찾기 (레거시)
+            "/api/users/find-id/**",        // 아이디 찾기 (2단계 플로우)
+            "/api/users/find-pw",           // 비밀번호 찾기
+            "/api/users/password/reset-validate",   // 비밀번호 재설정 토큰 검증
+            "/api/users/password/reset-confirm",    // 비밀번호 재설정 확인
             "/api/email/verification/**",  // 이메일 인증 (회원가입, 로그인 시 사용)
             "/api/unsubscribe",  // 이메일 수신거부
             "/unsubscribe",  // 이메일 수신거부 (레거시 호환)

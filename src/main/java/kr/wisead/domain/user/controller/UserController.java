@@ -3,9 +3,13 @@ package kr.wisead.domain.user.controller;
 import jakarta.validation.Valid;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.domain.email.dto.EmailVerificationRequest;
+import kr.wisead.domain.user.dto.FindIdRequest;
+import kr.wisead.domain.user.dto.FindIdResponse;
 import kr.wisead.domain.user.dto.FindPasswordRequest;
 import kr.wisead.domain.user.dto.FindPasswordResponse;
 import kr.wisead.domain.user.dto.MemberUpdateRequest;
+import kr.wisead.domain.user.dto.PasswordResetConfirmRequest;
 import kr.wisead.domain.user.dto.UserResponse;
 import kr.wisead.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -85,7 +89,27 @@ public class UserController {
     }
 
     /**
-     * 아이디 찾기
+     * 아이디 찾기 1단계 - 정보 검증 및 이메일 인증코드 발송
+     * POST /api/users/find-id/request
+     */
+    @PostMapping("/find-id/request")
+    public ApiResponse<FindIdResponse> requestFindId(@Valid @RequestBody FindIdRequest request) {
+        FindIdResponse response = userService.requestFindId(request);
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * 아이디 찾기 2단계 - 인증코드 검증 및 아이디 반환
+     * POST /api/users/find-id/verify
+     */
+    @PostMapping("/find-id/verify")
+    public ApiResponse<FindIdResponse> verifyAndGetUserId(@Valid @RequestBody EmailVerificationRequest request) {
+        FindIdResponse response = userService.verifyAndGetUserId(request.getEmail(), request.getCode());
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * 아이디 찾기 (기존 방식 - 하위 호환용)
      */
     @PostMapping("/find-id")
     public ApiResponse<Map<String, String>> findUserId(@RequestBody Map<String, String> request) {
@@ -144,13 +168,33 @@ public class UserController {
     }
 
     /**
-     * 비밀번호 찾기 (힌트 기반)
+     * 비밀번호 찾기 (힌트 기반 + 이메일 링크 발송)
      * POST /api/users/find-pw
      */
     @PostMapping("/find-pw")
     public ApiResponse<FindPasswordResponse> findPassword(@Valid @RequestBody FindPasswordRequest request) {
         FindPasswordResponse response = userService.findPassword(request);
         return ApiResponse.success(response);
+    }
+
+    /**
+     * 비밀번호 재설정 토큰 유효성 검증
+     * GET /api/users/password/reset-validate?token=xxx
+     */
+    @GetMapping("/password/reset-validate")
+    public ApiResponse<Map<String, Object>> validateResetToken(@RequestParam String token) {
+        Map<String, Object> result = userService.validateResetToken(token);
+        return ApiResponse.success(result);
+    }
+
+    /**
+     * 비밀번호 재설정 확인 (새 비밀번호 설정)
+     * POST /api/users/password/reset-confirm
+     */
+    @PostMapping("/password/reset-confirm")
+    public ApiResponse<Void> resetPasswordWithToken(@Valid @RequestBody PasswordResetConfirmRequest request) {
+        userService.resetPasswordWithToken(request.getToken(), request.getNewPassword());
+        return ApiResponse.success("비밀번호가 성공적으로 변경되었습니다.");
     }
 
     /**

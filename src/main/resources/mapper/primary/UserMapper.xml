@@ -253,4 +253,14 @@
         WHERE SEQ = #{seq}
     </update>
 
+    <!-- 아이디 찾기용 회원 조회 (기업명, 담당자명, 연락처) -->
+    <select id="findByCorpNameAndPersonAndPhone" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM user
+        WHERE CORP_NAME = #{corpName}
+          AND PERSON = #{person}
+          AND PHONE = #{phone}
+          AND USE_YN = 'Y'
+    </select>
+
 </mapper>

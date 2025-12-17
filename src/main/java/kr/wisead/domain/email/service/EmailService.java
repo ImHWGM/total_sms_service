@@ -121,6 +121,26 @@ public class EmailService {
         log.info("이메일 발송 완료: to={}", request.getTo());
     }
 
+    /**
+     * 비밀번호 재설정 이메일 발송
+     * @param to 수신자 이메일
+     * @param resetLink 비밀번호 재설정 링크
+     */
+    public void sendPasswordResetEmail(String to, String resetLink) {
+        String subject = "[WiseAd] 비밀번호 재설정";
+        String content = buildPasswordResetEmailContent(resetLink);
+
+        EmailRequest request = EmailRequest.builder()
+                .to(to)
+                .subject(subject)
+                .content(content)
+                .saveSentMail(false)
+                .build();
+
+        hiworksMailService.send(request);
+        log.info("비밀번호 재설정 이메일 발송 완료: to={}", to);
+    }
+
     // ==================== Private Methods ====================
 
     private String buildVerificationEmailContent(String code) {
@@ -217,5 +237,37 @@ public class EmailService {
                 </p>
             </div>
             """.formatted(answer);
+    }
+
+    private String buildPasswordResetEmailContent(String resetLink) {
+        return """
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: 'Noto Sans KR', Arial, sans-serif;">
+                <h1 style="font-size: 24px; color: #333; margin-bottom: 20px;">비밀번호 재설정</h1>
+                <p style="font-size: 16px; color: #666; margin-bottom: 20px;">
+                    비밀번호 재설정을 요청하셨습니다.<br>
+                    아래 버튼을 클릭하여 새로운 비밀번호를 설정해주세요.
+                </p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="%s" style="display: inline-block; background-color: #007bff; color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold;">
+                        비밀번호 재설정
+                    </a>
+                </div>
+                <p style="font-size: 14px; color: #999; margin-top: 20px;">
+                    또는 아래 링크를 브라우저에 직접 입력해주세요:
+                </p>
+                <p style="font-size: 12px; color: #666; word-break: break-all; background-color: #f4f4f4; padding: 10px; border-radius: 4px;">
+                    %s
+                </p>
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+                    <p style="font-size: 14px; color: #ff6b6b; margin-bottom: 10px;">
+                        ⚠️ 이 링크는 <strong>10분간</strong> 유효합니다.
+                    </p>
+                    <p style="font-size: 14px; color: #999;">
+                        본인이 요청하지 않은 경우 이 메일을 무시해주세요.<br>
+                        본 메일은 발신 전용입니다.
+                    </p>
+                </div>
+            </div>
+            """.formatted(resetLink, resetLink);
     }
 }

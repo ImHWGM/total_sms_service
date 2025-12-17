@@ -138,4 +138,12 @@ public interface UserMapper {
      * 회원 정보 수정 (기업 정보)
      */
     int updateMemberInfo(User user);
+
+    /**
+     * 아이디 찾기용 회원 조회 (기업명, 담당자명, 연락처로)
+     */
+    Optional<User> findByCorpNameAndPersonAndPhone(
+            @Param("corpName") String corpName,
+            @Param("person") String person,
+            @Param("phone") String phone);
 }

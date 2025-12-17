@@ -47,4 +47,9 @@ public interface AuthUserMappingMapper {
      */
     int checkHasAnswer(@Param("eventSeq") Integer eventSeq,
                        @Param("userKey") String userKey);
+
+    /**
+     * 인증 매핑 배치 등록
+     */
+    int insertBatch(@Param("list") List<AuthUserMapping> list);
 }

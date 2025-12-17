@@ -139,4 +139,54 @@ public class PaymentController {
         Payment payment = paymentService.getPaymentByTradeId(tradeId);
         return ApiResponse.success(payment);
     }
+
+    // ==================== KG 모빌리언스 전용 엔드포인트 ====================
+
+    /**
+     * KG 모빌리언스 결제 알림 콜백
+     * POST /api/payment/kg/noti
+     *
+     * 레거시 호환용: KG 모빌리언스 PG에서 결제 완료 시 호출
+     * 반환값: "SUCCESS" 또는 "FAIL" (PG 규격)
+     */
+    @PostMapping(value = "/kg/noti", produces = "text/plain;charset=EUC-KR")
+    @ResponseBody
+    public String kgPaymentNoti(@RequestParam Map<String, String> paymentResult) {
+        log.info("KG 결제 콜백 수신: {}", paymentResult);
+
+        try {
+            // 결제 검증
+            if (!paymentService.validatePayment(paymentResult)) {
+                log.error("KG 결제 검증 실패");
+                return "FAIL";
+            }
+
+            // 결제 처리
+            boolean isProcessed = paymentService.processPayment(paymentResult);
+            if (isProcessed) {
+                log.info("KG 결제 처리 성공");
+                return "SUCCESS";
+            } else {
+                log.error("KG 결제 처리 실패");
+                return "FAIL";
+            }
+        } catch (Exception e) {
+            log.error("KG 결제 처리 중 오류: {}", e.getMessage(), e);
+            return "FAIL";
+        }
+    }
+
+    /**
+     * KG 모빌리언스 결제 완료 결과 조회
+     * POST /api/payment/kg/result
+     *
+     * 결제 완료 후 클라이언트에서 결과 조회용
+     */
+    @PostMapping("/kg/result")
+    public ApiResponse<Map<String, Object>> kgPaymentResult(@RequestParam Map<String, String> paymentResult) {
+        log.info("KG 결제 결과 조회: {}", paymentResult);
+
+        Map<String, Object> result = paymentService.collectPaymentResult(paymentResult);
+        return ApiResponse.success(result);
+    }
 }

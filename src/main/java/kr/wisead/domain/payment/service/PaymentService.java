@@ -170,6 +170,28 @@ public class PaymentService {
     }
 
     /**
+     * 결제 결과 정보 수집 (클라이언트 표시용)
+     */
+    public Map<String, Object> collectPaymentResult(Map<String, String> paymentResult) {
+        Map<String, Object> result = new java.util.HashMap<>();
+
+        result.put("resultCd", paymentResult.get("Resultcd"));
+        result.put("resultMsg", paymentResult.get("Resultmsg"));
+        result.put("tradeId", paymentResult.get("Tradeid"));
+        result.put("prdtNm", paymentResult.get("Prdtnm"));
+        result.put("prdtPrice", paymentResult.get("Prdtprice"));
+        result.put("signDate", paymentResult.get("Signdate"));
+        result.put("cardName", paymentResult.get("Cardname"));
+        result.put("apprNo", paymentResult.get("Apprno"));
+
+        // 결제 성공 여부
+        boolean isSuccess = "0000".equals(paymentResult.get("Resultcd"));
+        result.put("success", isSuccess);
+
+        return result;
+    }
+
+    /**
      * Map을 Payment Entity로 변환
      */
     private Payment convertToPayment(Map<String, String> paymentResult) {

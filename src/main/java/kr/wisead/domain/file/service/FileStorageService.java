@@ -79,6 +79,13 @@ public class FileStorageService {
     }
 
     /**
+     * MMS 이미지 저장 (광고문자용)
+     */
+    public String storeMmsImage(MultipartFile file) {
+        return storeMmsFileRelative(file);
+    }
+
+    /**
      * 사업자등록증 파일 저장
      */
     public String storeBizRegFile(MultipartFile file) {

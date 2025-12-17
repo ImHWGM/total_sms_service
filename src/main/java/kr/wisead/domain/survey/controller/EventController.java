@@ -7,10 +7,18 @@ import kr.wisead.domain.survey.dto.*;
 import kr.wisead.domain.survey.service.EventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -162,5 +170,82 @@ public class EventController {
             @PathVariable String userKey) {
         eventService.deleteAuthKey(eventSeq, userKey);
         return ApiResponse.success(null);
+    }
+
+    /**
+     * 범용인증키 설명문구 조회
+     */
+    @GetMapping("/{eventSeq}/auth-key-desc")
+    public ApiResponse<Map<String, String>> getAuthKeyDesc(@PathVariable Integer eventSeq) {
+        String authKeyDesc = eventService.getAuthKeyDesc(eventSeq);
+        return ApiResponse.success(Map.of("authKeyDesc", authKeyDesc != null ? authKeyDesc : ""));
+    }
+
+    /**
+     * 범용인증키 설명문구 수정
+     */
+    @PutMapping("/{eventSeq}/auth-key-desc")
+    public ApiResponse<Void> updateAuthKeyDesc(
+            @PathVariable Integer eventSeq,
+            @RequestBody Map<String, String> request) {
+        String authKeyDesc = request.get("authKeyDesc");
+        eventService.updateAuthKeyDesc(eventSeq, authKeyDesc);
+        return ApiResponse.success(null);
+    }
+
+    /**
+     * 유저키 생성
+     */
+    @PostMapping("/{eventSeq}/user-keys")
+    public ApiResponse<Map<String, Object>> generateUserKeys(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Integer eventSeq,
+            @RequestParam int count) {
+        String regId = userDetails.getUsername();
+        List<String> userKeys = eventService.generateUserKeys(eventSeq, count, regId);
+        return ApiResponse.success(Map.of(
+                "count", userKeys.size(),
+                "userKeys", userKeys
+        ));
+    }
+
+    /**
+     * 범용인증코드 엑셀 업로드
+     * POST /api/event/auth-keys/excel
+     */
+    @PostMapping(value = "/auth-keys/excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<Map<String, Object>> uploadAuthKeyExcel(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam("file") MultipartFile file) {
+        String regId = userDetails.getUsername();
+        log.info("범용인증코드 엑셀 업로드 요청 - 파일명: {}, 사용자: {}",
+                file.getOriginalFilename(), regId);
+        Map<String, Object> result = eventService.uploadAuthKeyExcel(file, regId);
+        return ApiResponse.success(result);
+    }
+
+    /**
+     * 이벤트 결과 엑셀 다운로드
+     * GET /api/event/{eventSeq}/excel
+     */
+    @GetMapping("/{eventSeq}/excel")
+    public ResponseEntity<byte[]> downloadEventResultExcel(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Integer eventSeq) {
+
+        log.info("이벤트 결과 엑셀 다운로드 요청 - eventSeq: {}, 사용자: {}",
+                eventSeq, userDetails.getUsername());
+
+        byte[] content = eventService.generateEventResultExcel(eventSeq);
+
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        String fileName = "이벤트_참여_관리_" + timestamp + ".xlsx";
+        String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8)
+                .replace("+", "%20");
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFileName + "\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(content);
     }
 }

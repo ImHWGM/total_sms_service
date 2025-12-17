@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.EmailUnsubscribeMapper">
+
+    <!-- EmailUnsubscribe ResultMap -->
+    <resultMap id="EmailUnsubscribeResultMap" type="kr.wisead.domain.email.entity.EmailUnsubscribe">
+        <id property="eId" column="e_id"/>
+        <result property="eEmail" column="e_email"/>
+        <result property="unsubscribeDate" column="unsubscribe_date"/>
+    </resultMap>
+
+    <!-- 이메일로 수신거부 조회 -->
+    <select id="findByEmail" resultMap="EmailUnsubscribeResultMap">
+        SELECT e_id, e_email, unsubscribe_date
+        FROM email_unsubscribe
+        WHERE e_email = #{email}
+    </select>
+
+    <!-- 수신거부 등록 -->
+    <insert id="insert" parameterType="kr.wisead.domain.email.entity.EmailUnsubscribe" useGeneratedKeys="true" keyProperty="eId">
+        INSERT INTO email_unsubscribe (e_email, unsubscribe_date)
+        VALUES (#{eEmail}, NOW())
+        ON DUPLICATE KEY UPDATE unsubscribe_date = NOW()
+    </insert>
+
+    <!-- 수신거부 여부 확인 -->
+    <select id="existsByEmail" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM email_unsubscribe WHERE e_email = #{email})
+    </select>
+
+</mapper>

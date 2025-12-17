@@ -7,6 +7,7 @@ import kr.wisead.domain.user.dto.LoginResponse;
 import kr.wisead.domain.user.dto.SignUpRequest;
 import kr.wisead.domain.user.dto.TokenRefreshRequest;
 import kr.wisead.domain.user.service.AuthService;
+import kr.wisead.domain.user.service.BusinessNoValidationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +22,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final BusinessNoValidationService businessNoValidationService;
 
     /**
      * 로그인
@@ -65,5 +67,16 @@ public class AuthController {
     public ApiResponse<Map<String, Boolean>> checkEmail(@RequestParam String email) {
         boolean isDuplicate = authService.checkEmailDuplicate(email);
         return ApiResponse.success(Map.of("duplicate", isDuplicate));
+    }
+
+    /**
+     * 사업자등록번호 유효성 검증
+     * POST /api/auth/validate-bizno
+     */
+    @PostMapping("/validate-bizno")
+    public ApiResponse<Map<String, Object>> validateBizNo(@RequestBody Map<String, String> request) {
+        String bizNum = request.get("bizNum");
+        Map<String, Object> result = businessNoValidationService.validateBizNo(bizNum);
+        return ApiResponse.success(result);
     }
 }

@@ -321,7 +321,7 @@
             U.REG_DATE as regDate
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
-        LEFT JOIN CUSTOMER_COMPANY C ON M.MANAGER_SEQ = C.SEQ
+        LEFT JOIN CUSTOMER_COMPANY C ON M.USER_SEQ = C.SEQ
         <where>
             U.DEL_YN = 'N'
             <if test="eventSeq != null">
@@ -375,7 +375,7 @@
         SELECT COUNT(*)
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
-        LEFT JOIN CUSTOMER_COMPANY C ON M.MANAGER_SEQ = C.SEQ
+        LEFT JOIN CUSTOMER_COMPANY C ON M.USER_SEQ = C.SEQ
         <where>
             U.DEL_YN = 'N'
             <if test="eventSeq != null">

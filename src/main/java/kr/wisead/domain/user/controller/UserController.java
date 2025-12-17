@@ -1,7 +1,11 @@
 package kr.wisead.domain.user.controller;
 
+import jakarta.validation.Valid;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.domain.user.dto.FindPasswordRequest;
+import kr.wisead.domain.user.dto.FindPasswordResponse;
+import kr.wisead.domain.user.dto.MemberUpdateRequest;
 import kr.wisead.domain.user.dto.UserResponse;
 import kr.wisead.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -136,5 +141,53 @@ public class UserController {
         String newPassword = request.get("newPassword");
         userService.changeExpiredPassword(userDetails.getUsername(), newPassword);
         return ApiResponse.success("비밀번호가 변경되었습니다.");
+    }
+
+    /**
+     * 비밀번호 찾기 (힌트 기반)
+     * POST /api/users/find-pw
+     */
+    @PostMapping("/find-pw")
+    public ApiResponse<FindPasswordResponse> findPassword(@Valid @RequestBody FindPasswordRequest request) {
+        FindPasswordResponse response = userService.findPassword(request);
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * 회원 삭제 (단건) - 관리자 전용
+     * DELETE /api/users/{seq}
+     */
+    @DeleteMapping("/{seq}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> deleteUser(@PathVariable Long seq) {
+        userService.deleteUser(seq);
+        return ApiResponse.success("회원이 삭제되었습니다.");
+    }
+
+    /**
+     * 회원 삭제 (일괄) - 관리자 전용
+     * DELETE /api/users
+     */
+    @DeleteMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> deleteUsers(@RequestBody Map<String, List<Long>> request) {
+        List<Long> seqList = request.get("seqList");
+        userService.deleteUsers(seqList);
+        return ApiResponse.success("회원들이 삭제되었습니다.");
+    }
+
+    /**
+     * 회원 정보 수정 (기업 정보) - 관리자 전용
+     * PUT /api/users/{seq}/info
+     */
+    @PutMapping("/{seq}/info")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> updateMemberInfo(
+            @PathVariable Long seq,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody MemberUpdateRequest request) {
+        request.setSeq(seq);
+        userService.updateMemberInfo(request.toEntity(), userDetails.getUsername());
+        return ApiResponse.success("회원 정보가 수정되었습니다.");
     }
 }

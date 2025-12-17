@@ -109,4 +109,33 @@ public interface UserMapper {
      * 비밀번호 초기화 (관리자용)
      */
     int resetPassword(@Param("userId") String userId, @Param("userPass") String userPass);
+
+    /**
+     * 상점코드 조회 (광고문자 수신거부용)
+     */
+    String selectStoreCodeByUserId(@Param("userId") String userId);
+
+    /**
+     * 비밀번호 찾기용 회원 조회 (아이디, 기업명, 담당자명, 연락처로)
+     */
+    Optional<User> findByUserIdAndCorpNameAndPersonAndPhone(
+            @Param("userId") String userId,
+            @Param("corpName") String corpName,
+            @Param("person") String person,
+            @Param("phone") String phone);
+
+    /**
+     * 회원 삭제 (USE_YN = 'N' 처리)
+     */
+    int deleteBySeq(@Param("seq") Long seq);
+
+    /**
+     * 회원 일괄 삭제 (USE_YN = 'N' 처리)
+     */
+    int deleteBySeqList(@Param("seqList") java.util.List<Long> seqList);
+
+    /**
+     * 회원 정보 수정 (기업 정보)
+     */
+    int updateMemberInfo(User user);
 }

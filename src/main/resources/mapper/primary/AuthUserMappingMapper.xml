@@ -72,4 +72,21 @@
         AND u.USER_KEY = #{userKey}
     </select>
 
+    <!-- 인증 매핑 배치 등록 -->
+    <insert id="insertBatch" parameterType="list">
+        INSERT INTO AUTH_USER_MAPPING (
+            EVENT_SEQ, USER_SEQ, USER_KEY, GENERAL_AUTH_CODE, REG_ID, REG_DATE
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.eventSeq},
+                #{item.userSeq},
+                #{item.userKey},
+                #{item.generalAuthCode},
+                #{item.regId},
+                NOW()
+            )
+        </foreach>
+    </insert>
+
 </mapper>

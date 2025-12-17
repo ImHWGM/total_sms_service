@@ -42,10 +42,13 @@ public class SecurityConfig {
      */
     private static final String[] PUBLIC_ENDPOINTS = {
             // 인증 관련
-            "/api/auth/**",
+            "/api/auth/**",  // 로그인, 회원가입, 사업자번호 검증 등
             "/api/public/**",
             "/api/users/find-id",
+            "/api/users/find-pw",  // 비밀번호 찾기
             "/api/email/verification/**",  // 이메일 인증 (회원가입, 로그인 시 사용)
+            "/api/unsubscribe",  // 이메일 수신거부
+            "/unsubscribe",  // 이메일 수신거부 (레거시 호환)
 
             // 설문 참여 (비로그인 허용)
             "/api/survey/**",
@@ -56,6 +59,10 @@ public class SecurityConfig {
 
             // ARS 수신거부 (외부 ARS 시스템 호출)
             "/ars/**",
+
+            // 결제 콜백 (PG사 호출)
+            "/api/payment/kg/**",
+            "/api/payment/callback",
 
             // 파일 다운로드
             "/files/**",

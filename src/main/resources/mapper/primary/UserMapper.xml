@@ -195,4 +195,62 @@
         WHERE USER_ID = #{userId}
     </update>
 
+    <!-- 상점코드 조회 (광고문자 수신거부용) -->
+    <select id="selectStoreCodeByUserId" resultType="string">
+        SELECT STORE_CODE
+        FROM user
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <!-- 비밀번호 찾기용 회원 조회 -->
+    <select id="findByUserIdAndCorpNameAndPersonAndPhone" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM user
+        WHERE USER_ID = #{userId}
+          AND CORP_NAME = #{corpName}
+          AND PERSON = #{person}
+          AND PHONE = #{phone}
+          AND USE_YN = 'Y'
+    </select>
+
+    <!-- 회원 삭제 (USE_YN = 'N' 처리) -->
+    <update id="deleteBySeq">
+        UPDATE user
+        SET USE_YN = 'N',
+            UPT_DATE = NOW()
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- 회원 일괄 삭제 (USE_YN = 'N' 처리) -->
+    <update id="deleteBySeqList">
+        UPDATE user
+        SET USE_YN = 'N',
+            UPT_DATE = NOW()
+        WHERE SEQ IN
+        <foreach collection="seqList" item="seq" open="(" separator="," close=")">
+            #{seq}
+        </foreach>
+    </update>
+
+    <!-- 회원 정보 수정 (기업 정보) -->
+    <update id="updateMemberInfo" parameterType="kr.wisead.domain.user.entity.User">
+        UPDATE user
+        SET
+            CORP_NAME = #{corpName},
+            CORP_ADDR = #{corpAddr},
+            BIZ_NUM = #{bizNum},
+            BIZ_TEL = #{bizTel},
+            PERSON = #{person},
+            PHONE = #{phone},
+            EMAIL = #{email},
+            USER_LEVEL = #{userLevel},
+            ALLOW_IP_YN = #{allowIpYn},
+            ALLOW_IP = #{allowIp},
+            STATUS = #{status},
+            CALLBACK = #{callback},
+            UPT_DATE = NOW(),
+            UPT_ID = #{uptId}
+        WHERE SEQ = #{seq}
+    </update>
+
 </mapper>

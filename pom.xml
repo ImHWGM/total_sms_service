@@ -117,6 +117,13 @@
             <version>3.0.4</version>
         </dependency>
 
+        <!-- Jsoup (HTML Parsing - 사업자등록번호 검증용) -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.18.1</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

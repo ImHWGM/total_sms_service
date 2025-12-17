@@ -35,6 +35,7 @@ public class EventService {
     private final SurveyUserMapper surveyUserMapper;
     private final SurveyAnswerMapper surveyAnswerMapper;
     private final AuthUserMappingMapper authUserMappingMapper;
+    private final UserMapper userMapper;
     private final ExcelService excelService;
 
     /**
@@ -89,7 +90,13 @@ public class EventService {
      * 이벤트 생성
      */
     @Transactional
-    public EventResponse createEvent(Integer userSeq, EventRequest request, String regId) {
+    public EventResponse createEvent(String userId, EventRequest request) {
+        // 사용자 조회하여 userSeq 획득
+        Integer userSeq = userMapper.findByUserId(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자를 찾을 수 없습니다."))
+                .getSeq()
+                .intValue();
+
         // 이벤트 코드 생성
         String eventCode = generateEventCode();
 
@@ -110,7 +117,7 @@ public class EventService {
                 .qrCode(request.getQrCode())
                 .endMessage(request.getEndMessage())
                 .qrCodeVisits(0)
-                .regId(regId)
+                .regId(userId)
                 .build();
 
         surveyMasterMapper.insert(event);
@@ -118,7 +125,7 @@ public class EventService {
 
         // 문항 등록
         if (request.getQuestions() != null && !request.getQuestions().isEmpty()) {
-            saveQuestions(event.getEventSeq(), request.getQuestions(), regId);
+            saveQuestions(event.getEventSeq(), request.getQuestions(), userId);
         }
 
         return getEventDetail(event.getEventSeq());

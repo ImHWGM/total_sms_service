@@ -254,6 +254,22 @@ CREATE TABLE IF NOT EXISTS `user_password_hint` (
 
 -- 내보낼 데이터가 선택되어 있지 않습니다.
 
+-- 테이블 wise_ad.password_reset_token 구조 내보내기
+CREATE TABLE IF NOT EXISTS `password_reset_token` (
+    `SEQ` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '토큰 시퀀스',
+    `USER_ID` varchar(20) NOT NULL COMMENT '사용자 아이디',
+    `TOKEN` varchar(100) NOT NULL COMMENT '재설정 토큰 (UUID)',
+    `EXPIRE_DATE` datetime NOT NULL COMMENT '만료일시',
+    `USED_YN` char(1) NOT NULL DEFAULT 'N' COMMENT '사용여부 (Y/N)',
+    `REG_DATE` timestamp NOT NULL DEFAULT current_timestamp() COMMENT '등록일',
+  PRIMARY KEY (`SEQ`),
+  UNIQUE KEY `TOKEN` (`TOKEN`),
+  KEY `idx_user_id` (`USER_ID`),
+  KEY `idx_expire_date` (`EXPIRE_DATE`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='비밀번호 재설정 토큰';
+
+-- 내보낼 데이터가 선택되어 있지 않습니다.
+
 -- 테이블 qvey.sms_send 구조 내보내기
 CREATE TABLE IF NOT EXISTS `sms_send` (
     `SEQ` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '시퀀스',

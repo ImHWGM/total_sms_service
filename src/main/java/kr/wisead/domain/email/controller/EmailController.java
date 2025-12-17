@@ -1,7 +1,9 @@
 package kr.wisead.domain.email.controller;
 
+import jakarta.validation.Valid;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.domain.email.dto.EmailRequest;
+import kr.wisead.domain.email.dto.EmailVerificationRequest;
 import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.email.service.EmailService;
 import lombok.RequiredArgsConstructor;
@@ -22,23 +24,25 @@ public class EmailController {
 
     /**
      * 인증 코드 발송
-     * POST /api/email/verification?email=test@example.com
+     * POST /api/email/verification
+     * Body: { "email": "test@example.com" }
      */
     @PostMapping("/verification")
-    public ApiResponse<Void> sendVerificationCode(@RequestParam String email) {
-        emailAuthService.sendVerificationCode(email);
+    public ApiResponse<Void> sendVerificationCode(
+            @Valid @RequestBody EmailVerificationRequest request) {
+        emailAuthService.sendVerificationCode(request.getEmail());
         return ApiResponse.success(null, "인증 코드가 발송되었습니다.");
     }
 
     /**
      * 인증 코드 검증
-     * POST /api/email/verification/verify?email=test@example.com&code=ABC12345
+     * POST /api/email/verification/verify
+     * Body: { "email": "test@example.com", "code": "ABC12345" }
      */
     @PostMapping("/verification/verify")
     public ApiResponse<Boolean> verifyCode(
-            @RequestParam String email,
-            @RequestParam String code) {
-        boolean verified = emailAuthService.verifyCode(email, code);
+            @Valid @RequestBody EmailVerificationRequest request) {
+        boolean verified = emailAuthService.verifyCode(request.getEmail(), request.getCode());
         return ApiResponse.success(verified, "이메일 인증이 완료되었습니다.");
     }
 
@@ -55,11 +59,13 @@ public class EmailController {
 
     /**
      * 인증 코드 재발송
-     * POST /api/email/verification/resend?email=test@example.com
+     * POST /api/email/verification/resend
+     * Body: { "email": "test@example.com" }
      */
     @PostMapping("/verification/resend")
-    public ApiResponse<Void> resendVerificationCode(@RequestParam String email) {
-        emailAuthService.resendVerificationCode(email);
+    public ApiResponse<Void> resendVerificationCode(
+            @Valid @RequestBody EmailVerificationRequest request) {
+        emailAuthService.resendVerificationCode(request.getEmail());
         return ApiResponse.success(null, "인증 코드가 재발송되었습니다.");
     }
 

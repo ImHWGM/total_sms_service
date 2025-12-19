@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.EventActionTypeMapper">
+
+    <sql id="selectColumns">
+        SEQ as seq,
+        EVENT_SEQ as eventSeq,
+        ACTION_CODE as actionCode,
+        ACTION_NAME as actionName,
+        REQUIRE_ADMIN_AUTH as requireAdminAuth,
+        ALLOW_MULTIPLE as allowMultiple,
+        SORT_ORDER as sortOrder,
+        USE_YN as useYn,
+        REG_DATE as regDate
+    </sql>
+
+    <!-- 시퀀스로 조회 -->
+    <select id="selectBySeq" resultType="kr.wisead.domain.event.entity.EventActionType">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM EVENT_ACTION_TYPE
+        WHERE SEQ = #{seq}
+    </select>
+
+    <!-- 이벤트의 액션 유형 목록 조회 -->
+    <select id="selectByEventSeq" resultType="kr.wisead.domain.event.entity.EventActionType">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM EVENT_ACTION_TYPE
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND USE_YN = 'Y'
+        ORDER BY SORT_ORDER ASC
+    </select>
+
+    <!-- 이벤트 + 액션코드로 조회 -->
+    <select id="selectByEventSeqAndActionCode" resultType="kr.wisead.domain.event.entity.EventActionType">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM EVENT_ACTION_TYPE
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND ACTION_CODE = #{actionCode}
+    </select>
+
+    <!-- 액션 유형 등록 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO EVENT_ACTION_TYPE (
+            EVENT_SEQ, ACTION_CODE, ACTION_NAME, REQUIRE_ADMIN_AUTH,
+            ALLOW_MULTIPLE, SORT_ORDER, USE_YN, REG_DATE
+        ) VALUES (
+            #{eventSeq}, #{actionCode}, #{actionName}, #{requireAdminAuth},
+            #{allowMultiple}, #{sortOrder}, #{useYn}, NOW()
+        )
+    </insert>
+
+    <!-- 액션 유형 일괄 등록 -->
+    <insert id="insertBatch">
+        INSERT INTO EVENT_ACTION_TYPE (
+            EVENT_SEQ, ACTION_CODE, ACTION_NAME, REQUIRE_ADMIN_AUTH,
+            ALLOW_MULTIPLE, SORT_ORDER, USE_YN, REG_DATE
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.eventSeq}, #{item.actionCode}, #{item.actionName}, #{item.requireAdminAuth},
+             #{item.allowMultiple}, #{item.sortOrder}, #{item.useYn}, NOW())
+        </foreach>
+    </insert>
+
+    <!-- 액션 유형 수정 -->
+    <update id="update">
+        UPDATE EVENT_ACTION_TYPE
+        SET ACTION_NAME = #{actionName},
+            REQUIRE_ADMIN_AUTH = #{requireAdminAuth},
+            ALLOW_MULTIPLE = #{allowMultiple},
+            SORT_ORDER = #{sortOrder},
+            USE_YN = #{useYn}
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- 액션 유형 삭제 -->
+    <delete id="delete">
+        DELETE FROM EVENT_ACTION_TYPE
+        WHERE SEQ = #{seq}
+    </delete>
+
+    <!-- 이벤트의 모든 액션 유형 삭제 -->
+    <delete id="deleteByEventSeq">
+        DELETE FROM EVENT_ACTION_TYPE
+        WHERE EVENT_SEQ = #{eventSeq}
+    </delete>
+
+    <!-- 사용 여부 변경 -->
+    <update id="updateUseYn">
+        UPDATE EVENT_ACTION_TYPE
+        SET USE_YN = #{useYn}
+        WHERE SEQ = #{seq}
+    </update>
+
+</mapper>

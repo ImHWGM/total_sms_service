@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.EventActionLogMapper">
+
+    <sql id="selectColumns">
+        L.SEQ as seq,
+        L.PARTICIPANT_SEQ as participantSeq,
+        L.ACTION_TYPE_SEQ as actionTypeSeq,
+        L.ACTION_TIME as actionTime,
+        L.DEVICE_INFO as deviceInfo,
+        L.CONFIRMED_BY as confirmedBy,
+        L.MEMO as memo
+    </sql>
+
+    <sql id="selectWithJoinColumns">
+        <include refid="selectColumns"/>,
+        T.ACTION_CODE as actionCode,
+        T.ACTION_NAME as actionName,
+        U.USER_NAME as userName,
+        P.DEPARTMENT as department,
+        P.POSITION as position
+    </sql>
+
+    <!-- 시퀀스로 조회 -->
+    <select id="selectBySeq" resultType="kr.wisead.domain.event.entity.EventActionLog">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM EVENT_ACTION_LOG L
+        WHERE L.SEQ = #{seq}
+    </select>
+
+    <!-- 참가자의 액션 로그 목록 조회 -->
+    <select id="selectByParticipantSeq" resultType="kr.wisead.domain.event.entity.EventActionLog">
+        SELECT
+            <include refid="selectColumns"/>,
+            T.ACTION_CODE as actionCode,
+            T.ACTION_NAME as actionName
+        FROM EVENT_ACTION_LOG L
+        INNER JOIN EVENT_ACTION_TYPE T ON L.ACTION_TYPE_SEQ = T.SEQ
+        WHERE L.PARTICIPANT_SEQ = #{participantSeq}
+        ORDER BY L.ACTION_TIME DESC
+    </select>
+
+    <!-- 참가자의 특정 액션 로그 조회 -->
+    <select id="selectByParticipantSeqAndActionTypeSeq" resultType="kr.wisead.domain.event.entity.EventActionLog">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM EVENT_ACTION_LOG L
+        WHERE L.PARTICIPANT_SEQ = #{participantSeq}
+        AND L.ACTION_TYPE_SEQ = #{actionTypeSeq}
+        ORDER BY L.ACTION_TIME DESC
+    </select>
+
+    <!-- 참가자가 특정 액션을 수행했는지 확인 -->
+    <select id="existsByParticipantSeqAndActionTypeSeq" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM EVENT_ACTION_LOG
+            WHERE PARTICIPANT_SEQ = #{participantSeq}
+            AND ACTION_TYPE_SEQ = #{actionTypeSeq}
+        )
+    </select>
+
+    <!-- 이벤트의 전체 액션 로그 조회 (페이징) -->
+    <select id="selectByEventSeqWithPaging" parameterType="map" resultType="kr.wisead.domain.event.entity.EventActionLog">
+        SELECT
+            <include refid="selectWithJoinColumns"/>
+        FROM EVENT_ACTION_LOG L
+        INNER JOIN EVENT_PARTICIPANT P ON L.PARTICIPANT_SEQ = P.SEQ
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        INNER JOIN EVENT_ACTION_TYPE T ON L.ACTION_TYPE_SEQ = T.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        <if test="actionCode != null and actionCode != ''">
+            AND T.ACTION_CODE = #{actionCode}
+        </if>
+        ORDER BY L.ACTION_TIME DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 이벤트의 전체 액션 로그 수 -->
+    <select id="countByEventSeq" resultType="int">
+        SELECT COUNT(*)
+        FROM EVENT_ACTION_LOG L
+        INNER JOIN EVENT_PARTICIPANT P ON L.PARTICIPANT_SEQ = P.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+    </select>
+
+    <!-- 이벤트의 특정 액션 로그 조회 -->
+    <select id="selectByEventSeqAndActionCode" parameterType="map" resultType="kr.wisead.domain.event.entity.EventActionLog">
+        SELECT
+            <include refid="selectWithJoinColumns"/>
+        FROM EVENT_ACTION_LOG L
+        INNER JOIN EVENT_PARTICIPANT P ON L.PARTICIPANT_SEQ = P.SEQ
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        INNER JOIN EVENT_ACTION_TYPE T ON L.ACTION_TYPE_SEQ = T.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND T.ACTION_CODE = #{actionCode}
+        ORDER BY L.ACTION_TIME DESC
+        <if test="limit != null">
+            LIMIT #{limit} OFFSET #{offset}
+        </if>
+    </select>
+
+    <!-- 이벤트의 특정 액션 수행 인원 수 -->
+    <select id="countByEventSeqAndActionTypeSeq" resultType="int">
+        SELECT COUNT(DISTINCT L.PARTICIPANT_SEQ)
+        FROM EVENT_ACTION_LOG L
+        INNER JOIN EVENT_PARTICIPANT P ON L.PARTICIPANT_SEQ = P.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND L.ACTION_TYPE_SEQ = #{actionTypeSeq}
+    </select>
+
+    <!-- 액션 로그 등록 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO EVENT_ACTION_LOG (
+            PARTICIPANT_SEQ, ACTION_TYPE_SEQ, ACTION_TIME,
+            DEVICE_INFO, CONFIRMED_BY, MEMO
+        ) VALUES (
+            #{participantSeq}, #{actionTypeSeq}, NOW(),
+            #{deviceInfo}, #{confirmedBy}, #{memo}
+        )
+    </insert>
+
+    <!-- 액션 로그 삭제 -->
+    <delete id="delete">
+        DELETE FROM EVENT_ACTION_LOG
+        WHERE SEQ = #{seq}
+    </delete>
+
+    <!-- 참가자의 모든 액션 로그 삭제 -->
+    <delete id="deleteByParticipantSeq">
+        DELETE FROM EVENT_ACTION_LOG
+        WHERE PARTICIPANT_SEQ = #{participantSeq}
+    </delete>
+
+    <!-- 이벤트의 모든 액션 로그 삭제 -->
+    <delete id="deleteByEventSeq">
+        DELETE L FROM EVENT_ACTION_LOG L
+        INNER JOIN EVENT_PARTICIPANT P ON L.PARTICIPANT_SEQ = P.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+    </delete>
+
+    <!-- 참가자의 액션 현황 조회 -->
+    <select id="selectActionStatusByParticipantSeq" resultType="map">
+        SELECT
+            T.SEQ as actionTypeSeq,
+            T.ACTION_CODE as actionCode,
+            T.ACTION_NAME as actionName,
+            T.REQUIRE_ADMIN_AUTH as requireAdminAuth,
+            T.ALLOW_MULTIPLE as allowMultiple,
+            CASE WHEN L.SEQ IS NOT NULL THEN 'Y' ELSE 'N' END as completed,
+            L.ACTION_TIME as completedAt,
+            L.CONFIRMED_BY as confirmedBy
+        FROM EVENT_ACTION_TYPE T
+        LEFT JOIN (
+            SELECT * FROM EVENT_ACTION_LOG
+            WHERE PARTICIPANT_SEQ = #{participantSeq}
+        ) L ON T.SEQ = L.ACTION_TYPE_SEQ
+        WHERE T.EVENT_SEQ = #{eventSeq}
+        AND T.USE_YN = 'Y'
+        ORDER BY T.SORT_ORDER ASC
+    </select>
+
+    <!-- 이벤트 액션별 통계 조회 -->
+    <select id="selectActionStatsByEventSeq" resultType="map">
+        SELECT
+            T.SEQ as actionTypeSeq,
+            T.ACTION_CODE as actionCode,
+            T.ACTION_NAME as actionName,
+            COUNT(DISTINCT L.PARTICIPANT_SEQ) as completedCount,
+            (SELECT COUNT(*) FROM EVENT_PARTICIPANT WHERE EVENT_SEQ = #{eventSeq}) as totalCount
+        FROM EVENT_ACTION_TYPE T
+        LEFT JOIN EVENT_ACTION_LOG L ON T.SEQ = L.ACTION_TYPE_SEQ
+        WHERE T.EVENT_SEQ = #{eventSeq}
+        AND T.USE_YN = 'Y'
+        GROUP BY T.SEQ, T.ACTION_CODE, T.ACTION_NAME
+        ORDER BY T.SORT_ORDER ASC
+    </select>
+
+</mapper>

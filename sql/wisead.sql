@@ -434,6 +434,85 @@ CREATE TABLE IF NOT EXISTS `user_notification_setting` (
 
 -- 내보낼 데이터가 선택되어 있지 않습니다.
 
+-- 테이블 wise_ad.event_action_type 구조 내보내기
+-- 행사별 액션 유형 정의 (입장, 경품수령, 기념품수령 등)
+CREATE TABLE IF NOT EXISTS `event_action_type` (
+    `SEQ` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '액션 유형 시퀀스',
+    `EVENT_SEQ` int(10) unsigned NOT NULL COMMENT '이벤트 시퀀스 (SURVEY_MASTER)',
+    `ACTION_CODE` varchar(30) NOT NULL COMMENT '액션 코드 (CHECK_IN, PRIZE, GIFT, MEAL 등)',
+    `ACTION_NAME` varchar(100) NOT NULL COMMENT '액션 이름 (입장, 경품 수령 등)',
+    `REQUIRE_ADMIN_AUTH` char(1) NOT NULL DEFAULT 'N' COMMENT '관리자 인증 필요 여부 (Y/N)',
+    `ALLOW_MULTIPLE` char(1) NOT NULL DEFAULT 'N' COMMENT '중복 허용 여부 (Y/N)',
+    `SORT_ORDER` int(11) NOT NULL DEFAULT 0 COMMENT '정렬 순서',
+    `USE_YN` char(1) NOT NULL DEFAULT 'Y' COMMENT '사용 여부',
+    `REG_DATE` timestamp NOT NULL DEFAULT current_timestamp() COMMENT '등록일',
+  PRIMARY KEY (`SEQ`),
+  UNIQUE KEY `uk_event_action` (`EVENT_SEQ`, `ACTION_CODE`),
+  KEY `idx_event_seq` (`EVENT_SEQ`),
+  CONSTRAINT `fk_event_action_type_survey_master` FOREIGN KEY (`EVENT_SEQ`) REFERENCES `survey_master` (`EVENT_SEQ`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='행사별 액션 유형 정의 테이블';
+
+-- 내보낼 데이터가 선택되어 있지 않습니다.
+
+-- 테이블 wise_ad.event_participant 구조 내보내기
+-- 행사 참가자 확장 정보 (SURVEY_USER와 1:1)
+CREATE TABLE IF NOT EXISTS `event_participant` (
+    `SEQ` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '참가자 시퀀스',
+    `SURVEY_USER_SEQ` int(10) unsigned NOT NULL COMMENT 'SURVEY_USER 시퀀스 (1:1)',
+    `EVENT_SEQ` int(10) unsigned NOT NULL COMMENT '이벤트 시퀀스 (SURVEY_MASTER)',
+    `CHECK_CODE` varchar(50) NOT NULL COMMENT 'QR용 고유 코드 (UUID)',
+    `DEPARTMENT` varchar(100) DEFAULT NULL COMMENT '소속/부서',
+    `POSITION` varchar(100) DEFAULT NULL COMMENT '직책',
+    `PARTICIPANT_TYPE` varchar(20) DEFAULT NULL COMMENT '참가자 유형 (VIP, 일반, 스태프 등)',
+    `MEMO` varchar(500) DEFAULT NULL COMMENT '메모',
+    `NAMETAG_PRINTED` char(1) NOT NULL DEFAULT 'N' COMMENT '명찰 출력 여부',
+    `REG_DATE` timestamp NOT NULL DEFAULT current_timestamp() COMMENT '등록일',
+    `MOD_DATE` timestamp NULL DEFAULT NULL COMMENT '수정일',
+  PRIMARY KEY (`SEQ`),
+  UNIQUE KEY `uk_survey_user_seq` (`SURVEY_USER_SEQ`),
+  UNIQUE KEY `uk_check_code` (`CHECK_CODE`),
+  KEY `idx_event_seq` (`EVENT_SEQ`),
+  CONSTRAINT `fk_event_participant_survey_user` FOREIGN KEY (`SURVEY_USER_SEQ`) REFERENCES `survey_user` (`SEQ`),
+  CONSTRAINT `fk_event_participant_survey_master` FOREIGN KEY (`EVENT_SEQ`) REFERENCES `survey_master` (`EVENT_SEQ`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='행사 참가자 확장 정보 테이블';
+
+-- 내보낼 데이터가 선택되어 있지 않습니다.
+
+-- 테이블 wise_ad.event_action_log 구조 내보내기
+-- 액션 로그 (입장, 경품수령, 기념품수령 등 모든 기록)
+CREATE TABLE IF NOT EXISTS `event_action_log` (
+    `SEQ` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '로그 시퀀스',
+    `PARTICIPANT_SEQ` bigint(20) NOT NULL COMMENT '참가자 시퀀스 (EVENT_PARTICIPANT)',
+    `ACTION_TYPE_SEQ` bigint(20) NOT NULL COMMENT '액션 유형 시퀀스 (EVENT_ACTION_TYPE)',
+    `ACTION_TIME` timestamp NOT NULL DEFAULT current_timestamp() COMMENT '액션 시간',
+    `DEVICE_INFO` varchar(100) DEFAULT NULL COMMENT '체크인 기기 정보',
+    `CONFIRMED_BY` varchar(50) DEFAULT NULL COMMENT '관리자 인증 시 관리자 ID',
+    `MEMO` varchar(200) DEFAULT NULL COMMENT '메모',
+  PRIMARY KEY (`SEQ`),
+  KEY `idx_participant_seq` (`PARTICIPANT_SEQ`),
+  KEY `idx_action_type_seq` (`ACTION_TYPE_SEQ`),
+  KEY `idx_action_time` (`ACTION_TIME`),
+  CONSTRAINT `fk_event_action_log_participant` FOREIGN KEY (`PARTICIPANT_SEQ`) REFERENCES `event_participant` (`SEQ`),
+  CONSTRAINT `fk_event_action_log_action_type` FOREIGN KEY (`ACTION_TYPE_SEQ`) REFERENCES `event_action_type` (`SEQ`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='행사 액션 로그 테이블';
+
+-- 내보낼 데이터가 선택되어 있지 않습니다.
+
+-- 테이블 wise_ad.event_nametag_log 구조 내보내기
+-- 명찰 출력 이력
+CREATE TABLE IF NOT EXISTS `event_nametag_log` (
+    `SEQ` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '로그 시퀀스',
+    `PARTICIPANT_SEQ` bigint(20) NOT NULL COMMENT '참가자 시퀀스 (EVENT_PARTICIPANT)',
+    `PRINT_TIME` timestamp NOT NULL DEFAULT current_timestamp() COMMENT '출력 시간',
+    `TEMPLATE_TYPE` varchar(50) DEFAULT NULL COMMENT '명찰 템플릿 유형',
+    `PRINT_BY` varchar(50) DEFAULT NULL COMMENT '출력자 ID',
+  PRIMARY KEY (`SEQ`),
+  KEY `idx_participant_seq` (`PARTICIPANT_SEQ`),
+  CONSTRAINT `fk_event_nametag_log_participant` FOREIGN KEY (`PARTICIPANT_SEQ`) REFERENCES `event_participant` (`SEQ`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='명찰 출력 이력 테이블';
+
+-- 내보낼 데이터가 선택되어 있지 않습니다.
+
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
 /*!40014 SET FOREIGN_KEY_CHECKS=IF(@OLD_FOREIGN_KEY_CHECKS IS NULL, 1, @OLD_FOREIGN_KEY_CHECKS) */;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

@@ -185,7 +185,7 @@ class SurveyWorkflowIntegrationTest {
         // Given: 대상자 등록 요청
         SurveyUserRequest request = SurveyUserRequest.builder()
                 .eventSeq(TEST_EVENT_SEQ)
-                .userPhone("01012345678")
+                .userPhone("01023456789")
                 .build();
 
         // Mock: 대상자 등록 응답
@@ -217,7 +217,7 @@ class SurveyWorkflowIntegrationTest {
         SmsSendRequest request = SmsSendRequest.builder()
                 .msgType("L")  // LMS
                 .callback("01011112222")
-                .receivers(List.of("01012345678"))
+                .receivers(List.of("01023456789"))
                 .subject("[설문조사] 고객 만족도 조사")
                 .text("안녕하세요. 고객 만족도 설문조사에 참여해주세요.\n" +
                         "설문 링크: https://wisead.kr/survey/" + TEST_USER_KEY)
@@ -294,7 +294,7 @@ class SurveyWorkflowIntegrationTest {
         SurveySubmitRequest request = SurveySubmitRequest.builder()
                 .userKey(TEST_USER_KEY)
                 .userName("응답자홍길동")
-                .userPhone("01012345678")
+                .userPhone("01023456789")
                 .userEmail("respondent@test.com")
                 .answers(List.of(
                         SurveySubmitRequest.AnswerRequest.builder()

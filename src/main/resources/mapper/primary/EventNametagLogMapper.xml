@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.EventNametagLogMapper">
+
+    <sql id="selectColumns">
+        N.SEQ as seq,
+        N.PARTICIPANT_SEQ as participantSeq,
+        N.PRINT_TIME as printTime,
+        N.TEMPLATE_TYPE as templateType,
+        N.PRINT_BY as printBy
+    </sql>
+
+    <sql id="selectWithJoinColumns">
+        <include refid="selectColumns"/>,
+        U.USER_NAME as userName,
+        P.DEPARTMENT as department,
+        P.POSITION as position,
+        P.PARTICIPANT_TYPE as participantType
+    </sql>
+
+    <!-- 시퀀스로 조회 -->
+    <select id="selectBySeq" resultType="kr.wisead.domain.event.entity.EventNametagLog">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM EVENT_NAMETAG_LOG N
+        WHERE N.SEQ = #{seq}
+    </select>
+
+    <!-- 참가자의 명찰 출력 이력 조회 -->
+    <select id="selectByParticipantSeq" resultType="kr.wisead.domain.event.entity.EventNametagLog">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM EVENT_NAMETAG_LOG N
+        WHERE N.PARTICIPANT_SEQ = #{participantSeq}
+        ORDER BY N.PRINT_TIME DESC
+    </select>
+
+    <!-- 이벤트의 명찰 출력 이력 조회 (페이징) -->
+    <select id="selectByEventSeqWithPaging" parameterType="map" resultType="kr.wisead.domain.event.entity.EventNametagLog">
+        SELECT
+            <include refid="selectWithJoinColumns"/>
+        FROM EVENT_NAMETAG_LOG N
+        INNER JOIN EVENT_PARTICIPANT P ON N.PARTICIPANT_SEQ = P.SEQ
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        ORDER BY N.PRINT_TIME DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 이벤트의 명찰 출력 건수 -->
+    <select id="countByEventSeq" resultType="int">
+        SELECT COUNT(*)
+        FROM EVENT_NAMETAG_LOG N
+        INNER JOIN EVENT_PARTICIPANT P ON N.PARTICIPANT_SEQ = P.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+    </select>
+
+    <!-- 참가자의 명찰 출력 여부 확인 -->
+    <select id="existsByParticipantSeq" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM EVENT_NAMETAG_LOG WHERE PARTICIPANT_SEQ = #{participantSeq}
+        )
+    </select>
+
+    <!-- 명찰 출력 로그 등록 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO EVENT_NAMETAG_LOG (
+            PARTICIPANT_SEQ, PRINT_TIME, TEMPLATE_TYPE, PRINT_BY
+        ) VALUES (
+            #{participantSeq}, NOW(), #{templateType}, #{printBy}
+        )
+    </insert>
+
+    <!-- 명찰 출력 로그 삭제 -->
+    <delete id="delete">
+        DELETE FROM EVENT_NAMETAG_LOG
+        WHERE SEQ = #{seq}
+    </delete>
+
+    <!-- 참가자의 모든 명찰 출력 로그 삭제 -->
+    <delete id="deleteByParticipantSeq">
+        DELETE FROM EVENT_NAMETAG_LOG
+        WHERE PARTICIPANT_SEQ = #{participantSeq}
+    </delete>
+
+    <!-- 이벤트의 모든 명찰 출력 로그 삭제 -->
+    <delete id="deleteByEventSeq">
+        DELETE N FROM EVENT_NAMETAG_LOG N
+        INNER JOIN EVENT_PARTICIPANT P ON N.PARTICIPANT_SEQ = P.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+    </delete>
+
+    <!-- 이벤트의 명찰 출력 통계 (템플릿별) -->
+    <select id="selectPrintStatsByEventSeq" resultType="map">
+        SELECT
+            IFNULL(N.TEMPLATE_TYPE, 'DEFAULT') as templateType,
+            COUNT(*) as printCount
+        FROM EVENT_NAMETAG_LOG N
+        INNER JOIN EVENT_PARTICIPANT P ON N.PARTICIPANT_SEQ = P.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        GROUP BY N.TEMPLATE_TYPE
+    </select>
+
+</mapper>

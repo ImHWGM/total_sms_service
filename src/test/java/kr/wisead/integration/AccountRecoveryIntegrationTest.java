@@ -59,7 +59,7 @@ class AccountRecoveryIntegrationTest {
     private static final String TEST_USER_ID = "testuser01";
     private static final String TEST_CORP_NAME = "테스트기업";
     private static final String TEST_PERSON = "홍길동";
-    private static final String TEST_PHONE = "010-1234-5678";
+    private static final String TEST_PHONE = "010-2345-6789";
     private static final String TEST_EMAIL = "test@example.com";
     private static final String TEST_MASKED_EMAIL = "te***@example.com";
     private static final String TEST_MASKED_USER_ID = "tes*******";

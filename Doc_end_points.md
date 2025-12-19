@@ -1,7 +1,7 @@
 # WiseAd API 엔드포인트 목록
 
 > 최종 업데이트: 2025-12-17
-> 총 엔드포인트 수: **251개**
+> 총 엔드포인트 수: **255개**
 
 ---
 
@@ -74,9 +74,13 @@
 | GET | `/api/users/{seq}` | getUserBySeq | 회원 정보 조회 | 관리자 | Path: `seq` |
 | GET | `/api/users` | getUsers | 회원 목록 조회 | 관리자 | Query: `page`, `size` |
 | PUT | `/api/users/me/password` | changePassword | 비밀번호 변경 | O | JSON: `{ "currentPassword": "...", "newPassword": "..." }` |
-| PUT | `/api/users/{userId}/status` | updateStatus | 회원 상태 변경 | 관리자 | Path: `userId`, JSON: `{ "status": "APPROVED/PENDING/..." }` |
-| POST | `/api/users/find-id` | findUserId | 아이디 찾기 | X | JSON: `{ "email": "...", "person": "..." }` |
-| POST | `/api/users/find-pw` | findPassword | 비밀번호 찾기 (힌트 기반) | X | JSON: `{ "userId": "...", "corpName": "...", "person": "...", "phone": "...", "hintQuestion": "...", "hintAnswer": "..." }` |
+| PUT | `/api/users/{userId}/status` | updateStatus | 회원 상태 변경 | 관리자 | Path: `userId`, JSON: `{ "status": "승인/미승인/보류/탈퇴" }` |
+| POST | `/api/users/find-id` | findUserId | 아이디 찾기 (레거시) | X | JSON: `{ "email": "...", "person": "..." }` |
+| POST | `/api/users/find-id/request` | requestFindId | 아이디 찾기 1단계 (인증코드 발송) | X | JSON: `{ "corpName": "...", "person": "...", "phone": "..." }` |
+| POST | `/api/users/find-id/verify` | verifyAndGetUserId | 아이디 찾기 2단계 (인증 후 아이디 반환) | X | JSON: `{ "email": "...", "code": "..." }` |
+| POST | `/api/users/find-pw` | findPassword | 비밀번호 찾기 (힌트 검증 → 이메일 링크 발송) | X | JSON: `{ "userId": "...", "corpName": "...", "person": "...", "phone": "...", "hintQuestion": "...", "hintAnswer": "..." }` |
+| GET | `/api/users/password/reset-validate` | validateResetToken | 비밀번호 재설정 토큰 검증 | X | Query: `token` |
+| POST | `/api/users/password/reset-confirm` | resetPasswordWithToken | 비밀번호 재설정 확인 (새 비밀번호 설정) | X | JSON: `{ "token": "...", "newPassword": "..." }` |
 | PUT | `/api/users/{userId}/password/reset` | resetPassword | 비밀번호 초기화 | 관리자 | Path: `userId`, JSON: `{ "newPassword": "..." }` |
 | PUT | `/api/users/{userId}/unlock` | unlockAccount | 계정 잠금 해제 | 관리자 | Path: `userId` |
 | PUT | `/api/users/me/password/extend` | extendPasswordExpiry | 비밀번호 만료일 연장 | O | None |
@@ -505,3 +509,223 @@
 | GET | `/api/privacy-consent/download/user/{userSeq}/event/{eventSeq}` | downloadUserPrivacyConsent | 단건 동의서 PDF 다운로드 | O | Path params, Query: `includeSignature` |
 | GET | `/api/privacy-consent/download/event/{eventSeq}` | downloadEventPrivacyConsentZip | 전체 PDF ZIP 다운로드 | O | Path params, Query: `includeSignature` |
 | POST | `/api/privacy-consent/preview` | previewPrivacyConsent | 안내문 미리보기 PDF | O | JSON: `{ "title": "...", "content": "..." }` |
+
+---
+
+## Postman 테스트 가이드
+
+### 계정 복구 API 테스트
+
+#### 1. 아이디 찾기 플로우 (2단계)
+
+**Step 1: 아이디 찾기 요청 (인증코드 발송)**
+
+```http
+POST {{base_url}}/api/users/find-id/request
+Content-Type: application/json
+
+{
+    "corpName": "테스트기업",
+    "person": "홍길동",
+    "phone": "010-1234-5678"
+}
+```
+
+> 💡 `person`과 `phone`은 평문으로 전송하며, 백엔드에서 암호화하여 DB와 비교합니다.
+
+**응답 예시 (성공):**
+```json
+{
+    "success": true,
+    "code": 200,
+    "message": "SUCCESS",
+    "data": {
+        "resultCode": 1,
+        "message": "인증 코드가 발송되었습니다.",
+        "maskedEmail": "te***@example.com",
+        "maskedUserId": null
+    }
+}
+```
+
+**응답 예시 (실패 - 계정 없음):**
+```json
+{
+    "success": true,
+    "code": 200,
+    "data": {
+        "resultCode": 2,
+        "message": "입력하신 정보와 일치하는 계정이 없습니다."
+    }
+}
+```
+
+---
+
+**Step 2: 인증코드 검증 및 아이디 확인**
+
+```http
+POST {{base_url}}/api/users/find-id/verify
+Content-Type: application/json
+
+{
+    "email": "test@example.com",
+    "code": "ABC12345"
+}
+```
+
+**응답 예시 (성공):**
+```json
+{
+    "success": true,
+    "code": 200,
+    "data": {
+        "resultCode": 1,
+        "message": "아이디 조회가 완료되었습니다.",
+        "maskedEmail": null,
+        "maskedUserId": "tes*******"
+    }
+}
+```
+
+**응답 예시 (실패 - 인증코드 오류):**
+```json
+{
+    "success": true,
+    "code": 200,
+    "data": {
+        "resultCode": 3,
+        "message": "인증 코드가 일치하지 않습니다."
+    }
+}
+```
+
+---
+
+#### 2. 비밀번호 찾기 플로우 (3단계)
+
+**Step 1: 비밀번호 찾기 요청 (재설정 링크 발송)**
+
+```http
+POST {{base_url}}/api/users/find-pw
+Content-Type: application/json
+
+{
+    "userId": "testuser01",
+    "corpName": "테스트기업",
+    "person": "홍길동",
+    "phone": "010-1234-5678",
+    "hintQuestion": "첫 번째 애완동물 이름은?",
+    "hintAnswer": "뽀삐"
+}
+```
+
+> 💡 `person`과 `phone`은 평문으로 전송하며, 백엔드에서 암호화하여 DB와 비교합니다.
+
+**응답 예시 (성공):**
+```json
+{
+    "success": true,
+    "code": 200,
+    "data": {
+        "resultCode": 1,
+        "message": "비밀번호 재설정 링크가 이메일로 발송되었습니다.",
+        "maskedEmail": "te***@example.com"
+    }
+}
+```
+
+**응답 예시 (실패 - 힌트 불일치):**
+```json
+{
+    "success": true,
+    "code": 200,
+    "data": {
+        "resultCode": 3,
+        "message": "비밀번호 힌트가 일치하지 않습니다."
+    }
+}
+```
+
+---
+
+**Step 2: 재설정 토큰 유효성 검증**
+
+사용자가 이메일 링크 클릭 시 프론트엔드에서 호출:
+
+```http
+GET {{base_url}}/api/users/password/reset-validate?token=550e8400-e29b-41d4-a716-446655440000
+```
+
+**응답 예시 (유효):**
+```json
+{
+    "success": true,
+    "code": 200,
+    "data": {
+        "valid": true,
+        "userId": "tes*******"
+    }
+}
+```
+
+**응답 예시 (만료):**
+```json
+{
+    "success": false,
+    "code": 400,
+    "message": "만료된 토큰입니다."
+}
+```
+
+---
+
+**Step 3: 새 비밀번호 설정**
+
+```http
+POST {{base_url}}/api/users/password/reset-confirm
+Content-Type: application/json
+
+{
+    "token": "550e8400-e29b-41d4-a716-446655440000",
+    "newPassword": "NewPass123!@"
+}
+```
+
+**응답 예시 (성공):**
+```json
+{
+    "success": true,
+    "code": 200,
+    "message": "비밀번호가 성공적으로 변경되었습니다."
+}
+```
+
+**응답 예시 (실패 - 이미 사용된 토큰):**
+```json
+{
+    "success": false,
+    "code": 400,
+    "message": "이미 사용된 토큰입니다."
+}
+```
+
+---
+
+#### Postman Environment Variables
+
+| 변수명 | 설명 | 예시 |
+|--------|------|------|
+| `base_url` | API 서버 주소 | `http://localhost:8100` |
+| `encrypted_person` | AES256 암호화된 담당자명 | `Base64EncodedString` |
+| `encrypted_phone` | AES256 암호화된 연락처 | `Base64EncodedString` |
+
+#### 비밀번호 유효성 규칙
+
+새 비밀번호는 다음 조건을 만족해야 합니다:
+- 8~20자
+- 영문 포함
+- 숫자 포함
+- 특수문자(`@$!%*#?&`) 포함
+
+정규식: `^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,20}$`

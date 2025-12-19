@@ -91,7 +91,7 @@ public class MemberUpdateRequest {
                 .bizNum(this.bizNum)
                 .bizTel(this.bizTel)
                 .person(this.person)
-                .phone(this.phone)
+                .phone(this.phone != null ? this.phone.replace("-", "") : null)
                 .email(this.email)
                 .userLevel(this.userLevel)
                 .allowIpYn(this.allowIpYn)

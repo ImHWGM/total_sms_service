@@ -76,7 +76,7 @@ class UserAuthIntegrationTest {
                 .bizNum("123-45-67890")
                 .bizTel("02-1234-5678")
                 .person("홍길동")
-                .phone("010-1234-5678")
+                .phone("010-2345-6789")
                 .email(TEST_EMAIL)
                 .build();
 

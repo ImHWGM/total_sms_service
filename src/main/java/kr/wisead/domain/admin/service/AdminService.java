@@ -2,6 +2,7 @@ package kr.wisead.domain.admin.service;
 
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.admin.dto.AdminAccountRequest;
 import kr.wisead.domain.payment.entity.Balance;
 import kr.wisead.domain.user.dto.UserResponse;
@@ -48,6 +49,18 @@ public class AdminService {
         // 비밀번호 암호화
         String encodedPassword = passwordEncoder.encode(request.getUserPass());
 
+        // 연락처 암호화 처리
+        String encryptedPhone = null;
+        if (request.getPhone() != null) {
+            try {
+                String phone = request.getPhone().replace("-", "");
+                encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(phone));
+            } catch (Exception e) {
+                log.error("연락처 암호화 실패: {}", e.getMessage());
+                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "연락처 암호화에 실패했습니다.");
+            }
+        }
+
         // 회원 정보 생성
         User user = User.builder()
                 .userId(request.getUserId())
@@ -57,7 +70,7 @@ public class AdminService {
                 .bizNum(request.getBizNum())
                 .bizTel(request.getBizTel())
                 .person(request.getPerson())
-                .phone(request.getPhone())
+                .phone(encryptedPhone)
                 .email(request.getEmail())
                 .userLevel(request.getUserLevel())
                 .useYn("Y")

@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.EventParticipantMapper">
+
+    <sql id="selectColumns">
+        P.SEQ as seq,
+        P.SURVEY_USER_SEQ as surveyUserSeq,
+        P.EVENT_SEQ as eventSeq,
+        P.CHECK_CODE as checkCode,
+        P.DEPARTMENT as department,
+        P.POSITION as position,
+        P.PARTICIPANT_TYPE as participantType,
+        P.MEMO as memo,
+        P.NAMETAG_PRINTED as nametagPrinted,
+        P.REG_DATE as regDate,
+        P.MOD_DATE as modDate
+    </sql>
+
+    <sql id="selectWithUserColumns">
+        <include refid="selectColumns"/>,
+        U.USER_NAME as userName,
+        U.USER_PHONE as userPhone,
+        U.USER_EMAIL as userEmail
+    </sql>
+
+    <sql id="selectDetailColumns">
+        <include refid="selectWithUserColumns"/>,
+        M.EVENT_NAME as eventName
+    </sql>
+
+    <!-- 시퀀스로 조회 -->
+    <select id="selectBySeq" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM EVENT_PARTICIPANT P
+        WHERE P.SEQ = #{seq}
+    </select>
+
+    <!-- 체크코드로 조회 -->
+    <select id="selectByCheckCode" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM EVENT_PARTICIPANT P
+        WHERE P.CHECK_CODE = #{checkCode}
+    </select>
+
+    <!-- SURVEY_USER 시퀀스로 조회 -->
+    <select id="selectBySurveyUserSeq" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM EVENT_PARTICIPANT P
+        WHERE P.SURVEY_USER_SEQ = #{surveyUserSeq}
+    </select>
+
+    <!-- 이벤트의 참가자 목록 조회 -->
+    <select id="selectByEventSeq" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectWithUserColumns"/>
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+        ORDER BY P.REG_DATE DESC
+    </select>
+
+    <!-- 이벤트의 참가자 목록 조회 (페이징) -->
+    <select id="selectByEventSeqWithPaging" parameterType="map" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectWithUserColumns"/>
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+        ORDER BY P.REG_DATE DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 이벤트의 참가자 수 조회 -->
+    <select id="countByEventSeq" resultType="int">
+        SELECT COUNT(*)
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+    </select>
+
+    <!-- 참가자 검색 -->
+    <select id="searchParticipants" parameterType="map" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectWithUserColumns"/>
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+        <if test="keyword != null and keyword != ''">
+            AND (
+                U.USER_NAME LIKE CONCAT('%', #{keyword}, '%')
+                OR P.DEPARTMENT LIKE CONCAT('%', #{keyword}, '%')
+                OR P.POSITION LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="participantType != null and participantType != ''">
+            AND P.PARTICIPANT_TYPE = #{participantType}
+        </if>
+        ORDER BY P.REG_DATE DESC
+        <if test="limit != null">
+            LIMIT #{limit} OFFSET #{offset}
+        </if>
+    </select>
+
+    <!-- 참가자 검색 수 -->
+    <select id="countSearchParticipants" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+        <if test="keyword != null and keyword != ''">
+            AND (
+                U.USER_NAME LIKE CONCAT('%', #{keyword}, '%')
+                OR P.DEPARTMENT LIKE CONCAT('%', #{keyword}, '%')
+                OR P.POSITION LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="participantType != null and participantType != ''">
+            AND P.PARTICIPANT_TYPE = #{participantType}
+        </if>
+    </select>
+
+    <!-- 참가자 등록 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO EVENT_PARTICIPANT (
+            SURVEY_USER_SEQ, EVENT_SEQ, CHECK_CODE, DEPARTMENT,
+            POSITION, PARTICIPANT_TYPE, MEMO, NAMETAG_PRINTED, REG_DATE
+        ) VALUES (
+            #{surveyUserSeq}, #{eventSeq}, #{checkCode}, #{department},
+            #{position}, #{participantType}, #{memo}, #{nametagPrinted}, NOW()
+        )
+    </insert>
+
+    <!-- 참가자 일괄 등록 -->
+    <insert id="insertBatch">
+        INSERT INTO EVENT_PARTICIPANT (
+            SURVEY_USER_SEQ, EVENT_SEQ, CHECK_CODE, DEPARTMENT,
+            POSITION, PARTICIPANT_TYPE, MEMO, NAMETAG_PRINTED, REG_DATE
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.surveyUserSeq}, #{item.eventSeq}, #{item.checkCode}, #{item.department},
+             #{item.position}, #{item.participantType}, #{item.memo}, #{item.nametagPrinted}, NOW())
+        </foreach>
+    </insert>
+
+    <!-- 참가자 수정 -->
+    <update id="update">
+        UPDATE EVENT_PARTICIPANT
+        SET DEPARTMENT = #{department},
+            POSITION = #{position},
+            PARTICIPANT_TYPE = #{participantType},
+            MEMO = #{memo},
+            MOD_DATE = NOW()
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- 명찰 출력 여부 변경 -->
+    <update id="updateNametagPrinted">
+        UPDATE EVENT_PARTICIPANT
+        SET NAMETAG_PRINTED = #{nametagPrinted},
+            MOD_DATE = NOW()
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- 참가자 삭제 -->
+    <delete id="delete">
+        DELETE FROM EVENT_PARTICIPANT
+        WHERE SEQ = #{seq}
+    </delete>
+
+    <!-- 이벤트의 모든 참가자 삭제 -->
+    <delete id="deleteByEventSeq">
+        DELETE FROM EVENT_PARTICIPANT
+        WHERE EVENT_SEQ = #{eventSeq}
+    </delete>
+
+    <!-- 체크코드 존재 여부 확인 -->
+    <select id="existsByCheckCode" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM EVENT_PARTICIPANT WHERE CHECK_CODE = #{checkCode}
+        )
+    </select>
+
+    <!-- 참가자 상세 조회 -->
+    <select id="selectDetailBySeq" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectDetailColumns"/>
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        INNER JOIN SURVEY_MASTER M ON P.EVENT_SEQ = M.EVENT_SEQ
+        WHERE P.SEQ = #{seq}
+        AND U.DEL_YN = 'N'
+    </select>
+
+    <!-- 참가자 상세 조회 by 체크코드 -->
+    <select id="selectDetailByCheckCode" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectDetailColumns"/>
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        INNER JOIN SURVEY_MASTER M ON P.EVENT_SEQ = M.EVENT_SEQ
+        WHERE P.CHECK_CODE = #{checkCode}
+        AND U.DEL_YN = 'N'
+    </select>
+
+    <!-- 참가자 유형별 통계 -->
+    <select id="selectParticipantTypeStats" resultType="map">
+        SELECT
+            COALESCE(P.PARTICIPANT_TYPE, '미지정') as participantType,
+            COUNT(*) as count,
+            COUNT(CASE WHEN EXISTS (
+                SELECT 1 FROM EVENT_ACTION_LOG L
+                INNER JOIN EVENT_ACTION_TYPE T ON L.ACTION_TYPE_SEQ = T.SEQ
+                WHERE L.PARTICIPANT_SEQ = P.SEQ AND T.ACTION_CODE = 'CHECK_IN'
+            ) THEN 1 END) as checkedInCount
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+        GROUP BY P.PARTICIPANT_TYPE
+        ORDER BY count DESC
+    </select>
+
+    <!-- 명찰 출력 통계 -->
+    <select id="selectNametagStats" resultType="map">
+        SELECT
+            COUNT(*) as totalCount,
+            SUM(CASE WHEN P.NAMETAG_PRINTED = 'Y' THEN 1 ELSE 0 END) as printedCount,
+            SUM(CASE WHEN P.NAMETAG_PRINTED != 'Y' OR P.NAMETAG_PRINTED IS NULL THEN 1 ELSE 0 END) as notPrintedCount
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+    </select>
+
+    <!-- 체크인 통계 (CHECK_IN 액션 기준) -->
+    <select id="selectCheckInStats" resultType="map">
+        SELECT
+            (SELECT COUNT(*)
+             FROM EVENT_PARTICIPANT P
+             INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+             WHERE P.EVENT_SEQ = #{eventSeq} AND U.DEL_YN = 'N') as totalCount,
+            COUNT(DISTINCT L.PARTICIPANT_SEQ) as checkedInCount
+        FROM EVENT_ACTION_LOG L
+        INNER JOIN EVENT_PARTICIPANT P ON L.PARTICIPANT_SEQ = P.SEQ
+        INNER JOIN EVENT_ACTION_TYPE T ON L.ACTION_TYPE_SEQ = T.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND T.ACTION_CODE = 'CHECK_IN'
+    </select>
+
+    <!-- 엑셀용 전체 참가자 목록 (액션 현황 포함) -->
+    <select id="selectAllForExcel" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectDetailColumns"/>,
+            (SELECT GROUP_CONCAT(CONCAT(T2.ACTION_NAME, ':', COALESCE(DATE_FORMAT(L2.ACTION_TIME, '%Y-%m-%d %H:%i'), '미완료')) SEPARATOR ' | ')
+             FROM EVENT_ACTION_TYPE T2
+             LEFT JOIN EVENT_ACTION_LOG L2 ON T2.SEQ = L2.ACTION_TYPE_SEQ AND L2.PARTICIPANT_SEQ = P.SEQ
+             WHERE T2.EVENT_SEQ = P.EVENT_SEQ AND T2.USE_YN = 'Y'
+             ORDER BY T2.SORT_ORDER) as actionSummary
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        INNER JOIN SURVEY_MASTER M ON P.EVENT_SEQ = M.EVENT_SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+        ORDER BY P.REG_DATE ASC
+    </select>
+
+</mapper>

@@ -3,7 +3,9 @@ package kr.wisead.domain.survey.service;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.common.util.QrCodeUtils;
 import kr.wisead.domain.excel.service.ExcelService;
 import kr.wisead.domain.survey.dto.*;
 import kr.wisead.domain.survey.entity.*;
@@ -13,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,6 +40,15 @@ public class EventService {
     private final AuthUserMappingMapper authUserMappingMapper;
     private final UserMapper userMapper;
     private final ExcelService excelService;
+
+    @Value("${upload.dir:./uploads}")
+    private String uploadDir;
+
+    @Value("${qr.url:http://localhost:8100/files/qrcode}")
+    private String qrUrl;
+
+    @Value("${wisead.url:http://localhost:3100}")
+    private String wiseadUrl;
 
     /**
      * 이벤트 목록 조회 (페이징)
@@ -100,6 +112,14 @@ public class EventService {
         // 이벤트 코드 생성
         String eventCode = generateEventCode();
 
+        // QR 간편인증 사용 시 authCodeUrl과 QR 이미지 생성
+        String authCodeUrl = null;
+        String qrCodeImgPath = null;
+        if ("Y".equals(request.getQrCode())) {
+            authCodeUrl = CommonUtils.randomCode(20);
+            qrCodeImgPath = generateQrCodeImage(authCodeUrl);
+        }
+
         SurveyMaster event = SurveyMaster.builder()
                 .userSeq(userSeq)
                 .eventCode(eventCode)
@@ -115,13 +135,15 @@ public class EventService {
                 .privacyPolicyDesc(request.getPrivacyPolicyDesc())
                 .auth(request.getAuth())
                 .qrCode(request.getQrCode())
+                .authCodeUrl(authCodeUrl)
+                .qrCodeImgPath(qrCodeImgPath)
                 .endMessage(request.getEndMessage())
                 .qrCodeVisits(0)
                 .regId(userId)
                 .build();
 
         surveyMasterMapper.insert(event);
-        log.info("이벤트 생성 완료 - eventSeq: {}, eventCode: {}", event.getEventSeq(), eventCode);
+        log.info("이벤트 생성 완료 - eventSeq: {}, eventCode: {}, qrCode: {}", event.getEventSeq(), eventCode, request.getQrCode());
 
         // 문항 등록
         if (request.getQuestions() != null && !request.getQuestions().isEmpty()) {
@@ -138,6 +160,15 @@ public class EventService {
     public EventResponse updateEvent(Integer eventSeq, EventRequest request, String uptId) {
         SurveyMaster event = surveyMasterMapper.selectByEventSeq(eventSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+        // QR 간편인증 사용으로 변경되었고, 기존에 authCodeUrl이 없으면 새로 생성
+        if ("Y".equals(request.getQrCode()) &&
+                (event.getAuthCodeUrl() == null || event.getAuthCodeUrl().isEmpty())) {
+            String authCodeUrl = CommonUtils.randomCode(20);
+            String qrCodeImgPath = generateQrCodeImage(authCodeUrl);
+            event.setQrCodeInfo(qrCodeImgPath, authCodeUrl);
+            log.info("QR 코드 생성 - eventSeq: {}, authCodeUrl: {}", eventSeq, authCodeUrl);
+        }
 
         event.update(
                 request.getEventName(),
@@ -678,6 +709,38 @@ public class EventService {
         } catch (Exception e) {
             log.debug("데이터 복호화 실패: {}", e.getMessage());
             return encryptedData;
+        }
+    }
+
+    /**
+     * QR 코드 이미지 생성
+     * @param authCodeUrl QR 코드가 가리킬 인증 URL 코드
+     * @return QR 코드 이미지 접근 URL
+     */
+    private String generateQrCodeImage(String authCodeUrl) {
+        try {
+            QrCodeUtils qrCodeUtils = new QrCodeUtils();
+
+            // QR 코드에 담길 URL (프론트엔드 설문 접근 URL)
+            String qrContents = wiseadUrl + "/auth/qrcode/" + authCodeUrl;
+
+            // QR 코드 이미지 저장 경로
+            String savePath = uploadDir + "/qrcode/";
+
+            // QR 코드 생성 및 파일명 반환
+            String fileName = qrCodeUtils.createQrCode(qrContents, savePath);
+
+            if (fileName == null || fileName.isEmpty()) {
+                log.error("QR 코드 생성 실패 - authCodeUrl: {}", authCodeUrl);
+                return null;
+            }
+
+            // 접근 가능한 URL 반환
+            return qrUrl + "/" + fileName;
+
+        } catch (Exception e) {
+            log.error("QR 코드 이미지 생성 중 오류 발생: ", e);
+            return null;
         }
     }
 }

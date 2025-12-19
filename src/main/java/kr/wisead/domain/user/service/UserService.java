@@ -138,12 +138,9 @@ public class UserService {
     @Transactional(readOnly = true)
     public FindIdResponse requestFindId(FindIdRequest request) {
         try {
-            // 1. 담당자명, 연락처 복호화 후 재암호화 (DB 저장 형식에 맞게)
-            String decryptedPerson = CryptoUtils.getDecryptedAES256Data(request.getPerson());
-            String decryptedPhone = CryptoUtils.getDecryptedAES256Data(request.getPhone());
-
-            String encryptedPerson = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(decryptedPerson));
-            String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(decryptedPhone));
+            // 1. 평문 담당자명, 연락처를 암호화 (DB 저장 형식에 맞게)
+            String encryptedPerson = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(request.getPerson()));
+            String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(request.getPhone()));
 
             // 2. 회원 정보 조회
             User user = userMapper.findByCorpNameAndPersonAndPhone(
@@ -303,13 +300,9 @@ public class UserService {
     @Transactional
     public FindPasswordResponse findPassword(FindPasswordRequest request) {
         try {
-            // 1. 담당자명, 연락처 복호화
-            String decryptedPerson = CryptoUtils.getDecryptedAES256Data(request.getPerson());
-            String decryptedPhone = CryptoUtils.getDecryptedAES256Data(request.getPhone());
-
-            // 암호화된 값으로 DB 조회를 위해 다시 암호화
-            String encryptedPerson = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(decryptedPerson));
-            String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(decryptedPhone));
+            // 1. 평문 담당자명, 연락처를 암호화 (DB 저장 형식에 맞게)
+            String encryptedPerson = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(request.getPerson()));
+            String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(request.getPhone()));
 
             // 2. 회원 정보 조회
             User user = userMapper.findByUserIdAndCorpNameAndPersonAndPhone(

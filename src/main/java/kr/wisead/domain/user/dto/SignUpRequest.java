@@ -50,7 +50,7 @@ public class SignUpRequest {
     private String person;
 
     @NotBlank(message = "담당자 연락처를 입력해주세요.")
-    @Pattern(regexp = "^01[0-9]-?\\d{3,4}-?\\d{4}$", message = "연락처 형식이 올바르지 않습니다.")
+    @Pattern(regexp = "^010-?[2-9]\\d{3}-?\\d{4}$", message = "연락처 형식이 올바르지 않습니다. (예: 010-2345-6789)")
     private String phone;
 
     @NotBlank(message = "이메일을 입력해주세요.")

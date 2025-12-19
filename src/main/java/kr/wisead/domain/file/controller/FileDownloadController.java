@@ -141,9 +141,9 @@ public class FileDownloadController {
 
     /**
      * QR 코드 이미지 서빙 (하위 호환성)
-     * 이전 프로젝트에서 사용하던 경로: /survey/qvey/qrcode/{fileName}
+     * 이전 프로젝트에서 사용하던 경로: /survey/qrcode/{fileName}
      */
-    @GetMapping("/survey/qvey/qrcode/{fileName:.+}")
+    @GetMapping("/survey/qrcode/{fileName:.+}")
     public ResponseEntity<Resource> serveQrCodeFileLegacy(
             @PathVariable String fileName) throws Exception {
         return serveQrImage(fileName);

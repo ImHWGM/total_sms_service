@@ -15,7 +15,7 @@ import lombok.Setter;
 public class PhoneValidationRequest {
 
     @NotBlank(message = "휴대폰 번호는 필수입니다.")
-    @Pattern(regexp = "^01[0-9]-?\\d{3,4}-?\\d{4}$", message = "올바른 휴대폰 번호 형식이 아닙니다.")
+    @Pattern(regexp = "^010-?[2-9]\\d{3}-?\\d{4}$", message = "올바른 휴대폰 번호 형식이 아닙니다. (예: 010-2345-6789)")
     private String phone;
 
     private String eventCode;       // 이벤트 코드로 검증 시

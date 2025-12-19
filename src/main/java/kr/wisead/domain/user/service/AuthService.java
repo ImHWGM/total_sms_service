@@ -2,6 +2,7 @@ package kr.wisead.domain.user.service;
 
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.payment.entity.Balance;
 import kr.wisead.domain.payment.service.StandardRateService;
 import kr.wisead.domain.user.dto.LoginRequest;
@@ -115,7 +116,17 @@ public class AuthService {
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL, "이미 등록된 이메일입니다.");
         }
 
-        // 4. 사용자 생성
+        // 4. 연락처 암호화 처리
+        String encryptedPhone = null;
+        try {
+            String phone = request.getPhone().replace("-", "");
+            encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(phone));
+        } catch (Exception e) {
+            log.error("연락처 암호화 실패: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "연락처 암호화에 실패했습니다.");
+        }
+
+        // 5. 사용자 생성
         User user = User.builder()
                 .userId(request.getUserId())
                 .userPass(passwordEncoder.encode(request.getUserPass()))
@@ -124,7 +135,7 @@ public class AuthService {
                 .bizNum(request.getBizNum())
                 .bizTel(request.getBizTel())
                 .person(request.getPerson())
-                .phone(request.getPhone())
+                .phone(encryptedPhone)
                 .email(request.getEmail())
                 .userLevel(1) // 일반 회원
                 .useYn("Y")

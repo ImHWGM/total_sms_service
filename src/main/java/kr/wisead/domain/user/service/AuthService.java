@@ -88,13 +88,19 @@ public class AuthService {
                     throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다. 관리자에게 문의하세요.");
                 }
 
-                // 이메일 인증 코드 발송
-                try {
-                    emailAuthService.sendVerificationCode(email);
-                    log.info("이메일 인증 코드 발송: userId={}, email={}", user.getUserId(), maskEmail(email));
-                } catch (BusinessException e) {
-                    // 재발송 제한 등의 경우에도 이메일 인증이 필요함을 알림
-                    log.warn("이메일 인증 코드 발송 실패 (재발송 제한 등): {}", e.getMessage());
+                // 이미 인증 코드가 발송되었는지 확인
+                var verificationStatus = emailAuthService.getVerificationStatus(email);
+                if (!verificationStatus.codeSent()) {
+                    // 인증 코드가 발송되지 않은 경우에만 발송
+                    try {
+                        emailAuthService.sendVerificationCode(email);
+                        log.info("이메일 인증 코드 발송: userId={}, email={}", user.getUserId(), maskEmail(email));
+                    } catch (BusinessException e) {
+                        log.warn("이메일 인증 코드 발송 실패: {}", e.getMessage());
+                        throw e;
+                    }
+                } else {
+                    log.info("이메일 인증 코드 이미 발송됨 (재사용): userId={}, email={}", user.getUserId(), maskEmail(email));
                 }
 
                 // 이메일 인증 필요 응답 반환

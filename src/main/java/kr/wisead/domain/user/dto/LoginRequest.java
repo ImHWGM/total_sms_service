@@ -20,9 +20,13 @@ public class LoginRequest {
     @NotBlank(message = "비밀번호를 입력해주세요.")
     private String userPass;
 
+    // 이메일 인증 코드 (2단계 인증 시 사용)
+    private String emailCode;
+
     @Builder
-    public LoginRequest(String userId, String userPass) {
+    public LoginRequest(String userId, String userPass, String emailCode) {
         this.userId = userId;
         this.userPass = userPass;
+        this.emailCode = emailCode;
     }
 }

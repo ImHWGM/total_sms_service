@@ -15,6 +15,10 @@ public class LoginResponse {
     private Long expiresIn;
     private UserInfo user;
 
+    // 이메일 인증 관련 필드
+    private Boolean emailRequired;      // 이메일 인증 필요 여부
+    private String maskedEmail;         // 마스킹된 이메일 (예: abc***@example.com)
+
     @Getter
     @Builder
     public static class UserInfo {

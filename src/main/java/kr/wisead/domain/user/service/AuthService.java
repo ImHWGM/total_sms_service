@@ -3,6 +3,7 @@ package kr.wisead.domain.user.service;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.payment.entity.Balance;
 import kr.wisead.domain.payment.service.StandardRateService;
 import kr.wisead.domain.user.dto.LoginRequest;
@@ -20,8 +21,10 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 
@@ -38,9 +41,12 @@ public class AuthService {
     private final StandardRateService standardRateService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final EmailAuthService emailAuthService;
 
     /**
      * 로그인
+     * - 이메일 인증 필요 여부: 오늘 로그인한 적이 없으면 이메일 인증 필요
+     * - 이메일 인증 필요시 서버가 자동으로 이메일 발송
      */
     @Transactional
     public LoginResponse login(LoginRequest request) {
@@ -70,10 +76,47 @@ public class AuthService {
             throw new BusinessException(ErrorCode.LOGIN_FAILED, "아이디 또는 비밀번호가 일치하지 않습니다.");
         }
 
-        // 5. 로그인 성공 처리
+        // 5. 이메일 인증 처리
+        String emailCode = request.getEmailCode();
+
+        if (!StringUtils.hasText(emailCode)) {
+            // 5-1. 이메일 코드가 없는 경우: 이메일 인증 필요 여부 판단
+            if (!isLoggedInToday(user)) {
+                // 오늘 로그인한 적이 없으면 이메일 인증 필요
+                String email = user.getEmail();
+                if (!StringUtils.hasText(email)) {
+                    throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다. 관리자에게 문의하세요.");
+                }
+
+                // 이메일 인증 코드 발송
+                try {
+                    emailAuthService.sendVerificationCode(email);
+                    log.info("이메일 인증 코드 발송: userId={}, email={}", user.getUserId(), maskEmail(email));
+                } catch (BusinessException e) {
+                    // 재발송 제한 등의 경우에도 이메일 인증이 필요함을 알림
+                    log.warn("이메일 인증 코드 발송 실패 (재발송 제한 등): {}", e.getMessage());
+                }
+
+                // 이메일 인증 필요 응답 반환
+                return LoginResponse.builder()
+                        .emailRequired(true)
+                        .maskedEmail(maskEmail(email))
+                        .build();
+            }
+            // 오늘 이미 로그인한 경우: 이메일 인증 불필요, 바로 로그인 성공
+        } else {
+            // 5-2. 이메일 코드가 있는 경우: 코드 검증
+            String email = user.getEmail();
+            if (!emailAuthService.verifyCode(email, emailCode)) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드가 일치하지 않습니다.");
+            }
+            log.info("이메일 인증 성공: userId={}", user.getUserId());
+        }
+
+        // 6. 로그인 성공 처리
         userMapper.updateLastLogin(request.getUserId());
 
-        // 6. JWT 토큰 생성 (사용자 이름 포함)
+        // 7. JWT 토큰 생성 (사용자 이름 포함)
         Authentication authentication = createAuthentication(user);
         String accessToken = jwtTokenProvider.createAccessToken(authentication, user.getPerson());
         String refreshToken = jwtTokenProvider.createRefreshToken(authentication, user.getPerson());
@@ -84,6 +127,7 @@ public class AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .expiresIn(jwtTokenProvider.getAccessTokenValidityInSeconds())
+                .emailRequired(false)
                 .user(LoginResponse.UserInfo.builder()
                         .seq(user.getSeq())
                         .userId(user.getUserId())
@@ -93,6 +137,72 @@ public class AuthService {
                         .userLevel(user.getUserLevel())
                         .status(user.getStatus())
                         .build())
+                .build();
+    }
+
+    /**
+     * 오늘 로그인한 적이 있는지 확인
+     */
+    private boolean isLoggedInToday(User user) {
+        if (user.getLastLogin() == null) {
+            return false;
+        }
+        LocalDate lastLoginDate = user.getLastLogin().toLocalDate();
+        LocalDate today = LocalDate.now();
+        return lastLoginDate.equals(today);
+    }
+
+    /**
+     * 이메일 마스킹 (예: abc***@example.com)
+     */
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return "***";
+        }
+        int atIndex = email.indexOf("@");
+        if (atIndex <= 3) {
+            return email.charAt(0) + "***" + email.substring(atIndex);
+        }
+        return email.substring(0, 3) + "***" + email.substring(atIndex);
+    }
+
+    /**
+     * 로그인 이메일 인증 코드 재발송
+     * - ID/PW 검증 후 이메일 인증 코드 재발송
+     */
+    public LoginResponse resendLoginEmailCode(LoginRequest request) {
+        // 1. 사용자 조회
+        User user = userMapper.findByUserId(request.getUserId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED, "아이디 또는 비밀번호가 일치하지 않습니다."));
+
+        // 2. 계정 잠금 확인
+        if (user.isLocked()) {
+            throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, "로그인 실패 횟수 초과로 계정이 잠겼습니다. 관리자에게 문의하세요.");
+        }
+
+        // 3. 계정 상태 확인
+        if (!user.isActive()) {
+            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "비활성화된 계정입니다.");
+        }
+
+        // 4. 비밀번호 확인
+        if (!passwordEncoder.matches(request.getUserPass(), user.getUserPass())) {
+            throw new BusinessException(ErrorCode.LOGIN_FAILED, "아이디 또는 비밀번호가 일치하지 않습니다.");
+        }
+
+        // 5. 이메일 확인
+        String email = user.getEmail();
+        if (!StringUtils.hasText(email)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다. 관리자에게 문의하세요.");
+        }
+
+        // 6. 이메일 인증 코드 재발송 (기존 코드 무효화 후 새 코드 발송)
+        emailAuthService.resendVerificationCode(email);
+        log.info("이메일 인증 코드 재발송: userId={}, email={}", user.getUserId(), maskEmail(email));
+
+        return LoginResponse.builder()
+                .emailRequired(true)
+                .maskedEmail(maskEmail(email))
                 .build();
     }
 

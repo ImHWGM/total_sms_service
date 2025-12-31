@@ -34,6 +34,15 @@ public class AuthController {
     }
 
     /**
+     * 로그인 이메일 인증 코드 재발송
+     */
+    @PostMapping("/resend-email-code")
+    public ApiResponse<LoginResponse> resendEmailCode(@Valid @RequestBody LoginRequest request) {
+        LoginResponse response = authService.resendLoginEmailCode(request);
+        return ApiResponse.success(response, "인증 코드가 재발송되었습니다.");
+    }
+
+    /**
      * 회원가입
      */
     @PostMapping("/signup")

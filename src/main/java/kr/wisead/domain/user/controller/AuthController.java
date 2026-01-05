@@ -30,6 +30,9 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse response = authService.login(request);
+        if (Boolean.TRUE.equals(response.getEmailRequired())) {
+            return ApiResponse.success(response, "이메일 인증이 필요합니다.");
+        }
         return ApiResponse.success(response, "로그인 성공");
     }
 

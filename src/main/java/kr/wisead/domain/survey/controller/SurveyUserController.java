@@ -29,21 +29,40 @@ public class SurveyUserController {
 
     /**
      * 참여자 목록 조회 (검색 + 페이징)
-     * GET /api/survey/users?eventSeq=1&userName=홍길동&userPhone=01012345678&status=COMPLETED&startDate=2025-01-01&endDate=2025-01-31&page=1&size=10
+     * GET /api/survey/users?eventType=P&searchType=winnerName&keyword=홍길동&page=1&size=10
+     *
+     * eventType: P(개인정보취합), S(설문조사)
+     *
+     * 개인정보취합(P) searchType:
+     *   - number: 번호(SEQ)
+     *   - customerName: 고객사명
+     *   - eventName: 이벤트명
+     *   - winnerName: 당첨자명
+     *   - phoneNumber: 전화번호
+     *   - rrn: 주민등록번호
+     *   - address: 주소
+     *   - depositDate: 입금일자
+     *   - shipmentDate: 출고일자
+     *
+     * 설문조사(S) searchType:
+     *   - number: 번호(SEQ)
+     *   - customerName: 고객사명
+     *   - eventName: 이벤트명
+     *   - phoneNumber: 전화번호
+     *   - userKey: 난수
+     *   - lastAccessDate: 최종접속일
+     *   - completionDate: 최종완료일
      */
     @GetMapping
     public ApiResponse<PageResponse<SurveyUserResponse>> searchUsers(
             @RequestParam(required = false) Integer eventSeq,
             @RequestParam(required = false) String eventType,
-            @RequestParam(required = false) String userName,
-            @RequestParam(required = false) String userPhone,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String searchType,
+            @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         PageResponse<SurveyUserResponse> response = surveyUserService.searchUsers(
-                eventSeq, eventType, userName, userPhone, status, startDate, endDate, page, size);
+                eventSeq, eventType, searchType, keyword, page, size);
         return ApiResponse.success(response);
     }
 

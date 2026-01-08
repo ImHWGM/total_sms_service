@@ -38,6 +38,7 @@ public class SurveyUserResponse {
     private String privacyPolicyYn;         // 개인정보취합 안내 노출여부
     private String privacyPolicyTtl;        // 개인정보 취합 타이틀
     private String privacyPolicyDesc;       // 개인정보 취합 안내
+    private String corpName;                // 고객사명
 
     /**
      * Entity -> Response 변환

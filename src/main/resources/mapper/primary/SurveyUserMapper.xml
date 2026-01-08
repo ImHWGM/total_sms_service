@@ -501,30 +501,58 @@
             <if test="eventType != null and eventType != ''">
                 AND M.EVENT_TYPE = #{eventType}
             </if>
-            <if test="userName != null and userName != ''">
-                AND U.USER_NAME LIKE CONCAT('%', #{userName}, '%')
-            </if>
-            <if test="userPhone != null and userPhone != ''">
-                AND U.RESEND_USER_PHONE = #{userPhone}
-            </if>
-            <if test="status != null and status != ''">
+            <!-- searchType + keyword 검색 -->
+            <if test="searchType != null and searchType != '' and keyword != null and keyword != ''">
                 <choose>
-                    <when test="status == 'COMPLETED'">
-                        AND U.SUBMISSION_DATE IS NOT NULL
+                    <!-- 번호 (SEQ) -->
+                    <when test="searchType == 'number'">
+                        AND U.SEQ = #{keyword}
                     </when>
-                    <when test="status == 'IN_PROGRESS'">
-                        AND U.SUBMISSION_DATE IS NULL AND U.SURVEY_START_TIME IS NOT NULL
+                    <!-- 고객사명 -->
+                    <when test="searchType == 'customerName'">
+                        AND C.CORP_NAME LIKE CONCAT('%', #{keyword}, '%')
                     </when>
-                    <when test="status == 'NOT_STARTED'">
-                        AND U.SUBMISSION_DATE IS NULL AND U.SURVEY_START_TIME IS NULL
+                    <!-- 이벤트명 -->
+                    <when test="searchType == 'eventName'">
+                        AND M.EVENT_NAME LIKE CONCAT('%', #{keyword}, '%')
+                    </when>
+                    <!-- 당첨자명 (개인정보취합) - 암호화됨 -->
+                    <when test="searchType == 'winnerName'">
+                        AND U.USER_NAME = #{keyword}
+                    </when>
+                    <!-- 전화번호 - 암호화됨 -->
+                    <when test="searchType == 'phoneNumber'">
+                        AND U.RESEND_USER_PHONE = #{keyword}
+                    </when>
+                    <!-- 주민등록번호 (개인정보취합) - 암호화됨 -->
+                    <when test="searchType == 'rrn'">
+                        AND U.JUMIN_NUM = #{keyword}
+                    </when>
+                    <!-- 주소 (개인정보취합) - 암호화됨 -->
+                    <when test="searchType == 'address'">
+                        AND U.ADDRESS = #{keyword}
+                    </when>
+                    <!-- 입금일자 (개인정보취합) -->
+                    <when test="searchType == 'depositDate'">
+                        AND DATE(U.DEPOSIT_DATE) = #{keyword}
+                    </when>
+                    <!-- 출고일자 (개인정보취합) -->
+                    <when test="searchType == 'shipmentDate'">
+                        AND DATE(U.SHIPMENT_DATE) = #{keyword}
+                    </when>
+                    <!-- 난수 (설문조사) -->
+                    <when test="searchType == 'userKey'">
+                        AND U.USER_KEY LIKE CONCAT('%', #{keyword}, '%')
+                    </when>
+                    <!-- 최종접속일 (설문조사) -->
+                    <when test="searchType == 'lastAccessDate'">
+                        AND DATE(U.SURVEY_START_TIME) = #{keyword}
+                    </when>
+                    <!-- 최종완료일 (설문조사) -->
+                    <when test="searchType == 'completionDate'">
+                        AND DATE(U.SUBMISSION_DATE) = #{keyword}
                     </when>
                 </choose>
-            </if>
-            <if test="startDate != null and startDate != ''">
-                AND DATE(U.SUBMISSION_DATE) >= #{startDate}
-            </if>
-            <if test="endDate != null and endDate != ''">
-                AND DATE(U.SUBMISSION_DATE) &lt;= #{endDate}
             </if>
         </where>
     </sql>
@@ -538,9 +566,11 @@
             M.EVENT_NAME as eventName,
             M.PRIVACY_POLICY_YN as privacyPolicyYn,
             M.PRIVACY_POLICY_TTL as privacyPolicyTtl,
-            M.PRIVACY_POLICY_DESC as privacyPolicyDesc
+            M.PRIVACY_POLICY_DESC as privacyPolicyDesc,
+            C.CORP_NAME as corpName
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+        LEFT JOIN CUSTOMER_COMPANY C ON M.USER_SEQ = C.SEQ
         <include refid="searchCondition"/>
         ORDER BY U.REG_DATE DESC
         <if test="offset != null and size != null">
@@ -553,6 +583,7 @@
         SELECT COUNT(*)
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+        LEFT JOIN CUSTOMER_COMPANY C ON M.USER_SEQ = C.SEQ
         <include refid="searchCondition"/>
     </select>
 

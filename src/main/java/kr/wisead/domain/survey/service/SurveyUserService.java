@@ -49,46 +49,73 @@ public class SurveyUserService {
 
     /**
      * 검색 조건으로 참여자 목록 조회 (페이징)
+     *
+     * 개인정보취합(P) searchType: number, customerName, eventName, winnerName, phoneNumber, rrn, address, depositDate, shipmentDate
+     * 설문조사(S) searchType: number, customerName, eventName, phoneNumber, userKey, lastAccessDate, completionDate
      */
     @Transactional(readOnly = true)
     public PageResponse<SurveyUserResponse> searchUsers(
             Integer eventSeq,
             String eventType,
-            String userName,
-            String userPhone,
-            String status,
-            String startDate,
-            String endDate,
+            String searchType,
+            String keyword,
             int page,
             int size) {
 
         Map<String, Object> params = new HashMap<>();
         params.put("eventSeq", eventSeq);
         params.put("eventType", eventType);
-        params.put("status", status);
-        params.put("startDate", startDate);
-        params.put("endDate", endDate);
+        params.put("searchType", searchType);
         params.put("offset", (page - 1) * size);
         params.put("size", size);
 
-        // 이름/전화번호 검색 시 암호화 필요
-        if (!CommonUtils.isNullOrEmpty(userName)) {
-            try {
-                String encryptedName = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(userName));
-                params.put("userName", encryptedName);
-            } catch (Exception e) {
-                log.error("이름 암호화 실패", e);
-                params.put("userName", userName);
-            }
-        }
-
-        if (!CommonUtils.isNullOrEmpty(userPhone)) {
-            try {
-                String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(userPhone));
-                params.put("userPhone", encryptedPhone);
-            } catch (Exception e) {
-                log.error("전화번호 암호화 실패", e);
-                params.put("userPhone", userPhone);
+        // 검색 키워드 처리 (암호화 필요한 필드)
+        if (!CommonUtils.isNullOrEmpty(keyword) && !CommonUtils.isNullOrEmpty(searchType)) {
+            switch (searchType) {
+                case "winnerName":
+                    // 당첨자명 암호화
+                    try {
+                        String encryptedName = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(keyword));
+                        params.put("keyword", encryptedName);
+                    } catch (Exception e) {
+                        log.error("이름 암호화 실패", e);
+                        params.put("keyword", keyword);
+                    }
+                    break;
+                case "phoneNumber":
+                    // 전화번호 암호화
+                    try {
+                        String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(keyword));
+                        params.put("keyword", encryptedPhone);
+                    } catch (Exception e) {
+                        log.error("전화번호 암호화 실패", e);
+                        params.put("keyword", keyword);
+                    }
+                    break;
+                case "rrn":
+                    // 주민등록번호 암호화
+                    try {
+                        String encryptedRrn = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(keyword));
+                        params.put("keyword", encryptedRrn);
+                    } catch (Exception e) {
+                        log.error("주민등록번호 암호화 실패", e);
+                        params.put("keyword", keyword);
+                    }
+                    break;
+                case "address":
+                    // 주소 암호화
+                    try {
+                        String encryptedAddress = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(keyword));
+                        params.put("keyword", encryptedAddress);
+                    } catch (Exception e) {
+                        log.error("주소 암호화 실패", e);
+                        params.put("keyword", keyword);
+                    }
+                    break;
+                default:
+                    // 나머지 필드는 암호화 없이 사용
+                    params.put("keyword", keyword);
+                    break;
             }
         }
 
@@ -447,6 +474,7 @@ public class SurveyUserService {
                 .privacyPolicyYn(user.getPrivacyPolicyYn())
                 .privacyPolicyTtl(user.getPrivacyPolicyTtl())
                 .privacyPolicyDesc(user.getPrivacyPolicyDesc())
+                .corpName(user.getCorpName())
                 .build();
     }
 

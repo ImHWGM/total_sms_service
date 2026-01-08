@@ -35,6 +35,9 @@ public class SurveyUserResponse {
     private String eventCode;               // 이벤트 코드
     private String eventType;               // 이벤트 타입 (P:개인정보, S:설문조사)
     private String generalAuthCode;         // 범용인증코드
+    private String privacyPolicyYn;         // 개인정보취합 안내 노출여부
+    private String privacyPolicyTtl;        // 개인정보 취합 타이틀
+    private String privacyPolicyDesc;       // 개인정보 취합 안내
 
     /**
      * Entity -> Response 변환

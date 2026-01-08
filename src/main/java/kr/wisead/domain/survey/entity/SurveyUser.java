@@ -42,6 +42,9 @@ public class SurveyUser {
     private String eventName;               // 이벤트 명
     private String auth;                    // 인증종류
     private String generalAuthCode;         // 범용인증코드
+    private String privacyPolicyYn;         // 개인정보취합 안내 노출여부
+    private String privacyPolicyTtl;        // 개인정보 취합 타이틀
+    private String privacyPolicyDesc;       // 개인정보 취합 안내
 
     /**
      * 설문 참여자 생성 (발송용)

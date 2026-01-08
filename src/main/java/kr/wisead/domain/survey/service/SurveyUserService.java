@@ -444,6 +444,9 @@ public class SurveyUserService {
                 .eventType(user.getEventType())
                 .eventName(user.getEventName())
                 .generalAuthCode(user.getGeneralAuthCode())
+                .privacyPolicyYn(user.getPrivacyPolicyYn())
+                .privacyPolicyTtl(user.getPrivacyPolicyTtl())
+                .privacyPolicyDesc(user.getPrivacyPolicyDesc())
                 .build();
     }
 

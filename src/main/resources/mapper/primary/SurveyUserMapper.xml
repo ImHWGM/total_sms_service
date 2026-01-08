@@ -535,7 +535,10 @@
             <include refid="selectColumns"/>,
             M.EVENT_CODE as eventCode,
             M.EVENT_TYPE as eventType,
-            M.EVENT_NAME as eventName
+            M.EVENT_NAME as eventName,
+            M.PRIVACY_POLICY_YN as privacyPolicyYn,
+            M.PRIVACY_POLICY_TTL as privacyPolicyTtl,
+            M.PRIVACY_POLICY_DESC as privacyPolicyDesc
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
         <include refid="searchCondition"/>

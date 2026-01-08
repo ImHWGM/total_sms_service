@@ -180,4 +180,14 @@ public interface SurveyUserMapper {
                           @Param("depositDate") java.time.LocalDate depositDate,
                           @Param("shipmentDate") java.time.LocalDate shipmentDate,
                           @Param("uptId") String uptId);
+
+    /**
+     * 검색 조건으로 참여자 목록 조회 (페이징)
+     */
+    List<SurveyUser> selectWithSearch(Map<String, Object> params);
+
+    /**
+     * 검색 조건으로 참여자 수 조회
+     */
+    int countWithSearch(Map<String, Object> params);
 }

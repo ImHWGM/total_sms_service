@@ -15,8 +15,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import kr.wisead.common.response.PageResponse;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,6 +45,61 @@ public class SurveyUserService {
         return users.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 검색 조건으로 참여자 목록 조회 (페이징)
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<SurveyUserResponse> searchUsers(
+            Integer eventSeq,
+            String eventType,
+            String userName,
+            String userPhone,
+            String status,
+            String startDate,
+            String endDate,
+            int page,
+            int size) {
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("eventSeq", eventSeq);
+        params.put("eventType", eventType);
+        params.put("status", status);
+        params.put("startDate", startDate);
+        params.put("endDate", endDate);
+        params.put("offset", (page - 1) * size);
+        params.put("size", size);
+
+        // 이름/전화번호 검색 시 암호화 필요
+        if (!CommonUtils.isNullOrEmpty(userName)) {
+            try {
+                String encryptedName = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(userName));
+                params.put("userName", encryptedName);
+            } catch (Exception e) {
+                log.error("이름 암호화 실패", e);
+                params.put("userName", userName);
+            }
+        }
+
+        if (!CommonUtils.isNullOrEmpty(userPhone)) {
+            try {
+                String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(userPhone));
+                params.put("userPhone", encryptedPhone);
+            } catch (Exception e) {
+                log.error("전화번호 암호화 실패", e);
+                params.put("userPhone", userPhone);
+            }
+        }
+
+        int total = surveyUserMapper.countWithSearch(params);
+        List<SurveyUser> users = surveyUserMapper.selectWithSearch(params);
+
+        List<SurveyUserResponse> content = users.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+
+        return PageResponse.of(content, page, size, total);
     }
 
     /**

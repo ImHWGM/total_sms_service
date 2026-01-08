@@ -2,6 +2,7 @@ package kr.wisead.domain.survey.controller;
 
 import jakarta.validation.Valid;
 import kr.wisead.common.response.ApiResponse;
+import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.survey.dto.SurveyUserRequest;
 import kr.wisead.domain.survey.dto.SurveyUserResponse;
 import kr.wisead.domain.survey.service.SurveyUserService;
@@ -27,12 +28,22 @@ public class SurveyUserController {
     private final SurveyUserService surveyUserService;
 
     /**
-     * 이벤트별 참여자 목록 조회
+     * 참여자 목록 조회 (검색 + 페이징)
+     * GET /api/survey/users?eventSeq=1&userName=홍길동&userPhone=01012345678&status=COMPLETED&startDate=2025-01-01&endDate=2025-01-31&page=1&size=10
      */
     @GetMapping
-    public ApiResponse<List<SurveyUserResponse>> getUsersByEventSeq(
-            @RequestParam Integer eventSeq) {
-        List<SurveyUserResponse> response = surveyUserService.getUsersByEventSeq(eventSeq);
+    public ApiResponse<PageResponse<SurveyUserResponse>> searchUsers(
+            @RequestParam(required = false) Integer eventSeq,
+            @RequestParam(required = false) String eventType,
+            @RequestParam(required = false) String userName,
+            @RequestParam(required = false) String userPhone,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        PageResponse<SurveyUserResponse> response = surveyUserService.searchUsers(
+                eventSeq, eventType, userName, userPhone, status, startDate, endDate, page, size);
         return ApiResponse.success(response);
     }
 

@@ -491,4 +491,66 @@
         WHERE SEQ = #{userSeq}
     </update>
 
+    <!-- 검색 조건 공통 -->
+    <sql id="searchCondition">
+        <where>
+            U.DEL_YN = 'N'
+            <if test="eventSeq != null">
+                AND U.EVENT_SEQ = #{eventSeq}
+            </if>
+            <if test="eventType != null and eventType != ''">
+                AND M.EVENT_TYPE = #{eventType}
+            </if>
+            <if test="userName != null and userName != ''">
+                AND U.USER_NAME LIKE CONCAT('%', #{userName}, '%')
+            </if>
+            <if test="userPhone != null and userPhone != ''">
+                AND U.RESEND_USER_PHONE = #{userPhone}
+            </if>
+            <if test="status != null and status != ''">
+                <choose>
+                    <when test="status == 'COMPLETED'">
+                        AND U.SUBMISSION_DATE IS NOT NULL
+                    </when>
+                    <when test="status == 'IN_PROGRESS'">
+                        AND U.SUBMISSION_DATE IS NULL AND U.SURVEY_START_TIME IS NOT NULL
+                    </when>
+                    <when test="status == 'NOT_STARTED'">
+                        AND U.SUBMISSION_DATE IS NULL AND U.SURVEY_START_TIME IS NULL
+                    </when>
+                </choose>
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND DATE(U.SUBMISSION_DATE) >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND DATE(U.SUBMISSION_DATE) &lt;= #{endDate}
+            </if>
+        </where>
+    </sql>
+
+    <!-- 검색 조건으로 참여자 목록 조회 (페이징) -->
+    <select id="selectWithSearch" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            <include refid="selectColumns"/>,
+            M.EVENT_CODE as eventCode,
+            M.EVENT_TYPE as eventType,
+            M.EVENT_NAME as eventName
+        FROM SURVEY_USER U
+        INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+        <include refid="searchCondition"/>
+        ORDER BY U.REG_DATE DESC
+        <if test="offset != null and size != null">
+            LIMIT #{offset}, #{size}
+        </if>
+    </select>
+
+    <!-- 검색 조건으로 참여자 수 조회 -->
+    <select id="countWithSearch" resultType="int">
+        SELECT COUNT(*)
+        FROM SURVEY_USER U
+        INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+        <include refid="searchCondition"/>
+    </select>
+
 </mapper>

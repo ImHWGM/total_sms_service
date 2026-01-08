@@ -65,17 +65,37 @@
             </if>
             <if test="params.keyword != null and params.keyword != ''">
                 <choose>
-                    <when test="params.type == 'dstAddr'">
+                    <!-- A: 메시지타입 -->
+                    <when test="params.type == 'A'">
+                        AND MSG_TYPE LIKE CONCAT('%', #{params.keyword}, '%')
+                    </when>
+                    <!-- B: 수신번호 -->
+                    <when test="params.type == 'B' or params.type == 'dstAddr'">
                         AND DST_ADDR LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
-                    <when test="params.type == 'callBack'">
+                    <!-- C: 발신번호 -->
+                    <when test="params.type == 'C' or params.type == 'callBack'">
                         AND CALLBACK LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
-                    <when test="params.type == 'subject'">
+                    <!-- D: 제목 -->
+                    <when test="params.type == 'D' or params.type == 'subject'">
                         AND SUBJECT LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
-                    <when test="params.type == 'text'">
+                    <!-- E: 내용 -->
+                    <when test="params.type == 'E' or params.type == 'text'">
                         AND TEXT LIKE CONCAT('%', #{params.keyword}, '%')
+                    </when>
+                    <!-- F: 상태 -->
+                    <when test="params.type == 'F'">
+                        AND STAT = #{params.keyword}
+                    </when>
+                    <!-- G: 등록자 -->
+                    <when test="params.type == 'G'">
+                        AND EXT_COL3 LIKE CONCAT('%', #{params.keyword}, '%')
+                    </when>
+                    <!-- H: 결과 -->
+                    <when test="params.type == 'H'">
+                        AND RESULT LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
                     <otherwise>
                         AND (

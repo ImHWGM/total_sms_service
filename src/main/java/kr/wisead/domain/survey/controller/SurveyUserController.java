@@ -29,18 +29,26 @@ public class SurveyUserController {
 
     /**
      * 참여자 목록 조회 (검색 + 페이징)
-     * GET /api/survey/users?eventType=P&searchType=winnerName&keyword=홍길동&page=1&size=10
+     * GET /api/survey/users?eventType=P&searchType=winnerName&keyword=홍길동&startDate=2025-01-01&endDate=2025-01-31&status=COMPLETED&page=1&size=10
      *
-     * eventType: P(개인정보취합), S(설문조사)
+     * @param eventSeq 이벤트 시퀀스
+     * @param eventType P(개인정보취합), S(설문조사)
+     * @param searchType 검색 조건 (아래 참조)
+     * @param keyword 검색어
+     * @param startDate 시작일 (yyyy-MM-dd)
+     * @param endDate 종료일 (yyyy-MM-dd)
+     * @param status 제출 상태 (COMPLETED: 제출완료, IN_PROGRESS: 미제출)
+     * @param page 페이지 번호
+     * @param size 페이지 크기
      *
      * 개인정보취합(P) searchType:
      *   - number: 번호(SEQ)
      *   - customerName: 고객사명
      *   - eventName: 이벤트명
-     *   - winnerName: 당첨자명
-     *   - phoneNumber: 전화번호
-     *   - rrn: 주민등록번호
-     *   - address: 주소
+     *   - winnerName: 당첨자명 (암호화)
+     *   - phoneNumber: 전화번호 (암호화)
+     *   - rrn: 주민등록번호 (암호화)
+     *   - address: 주소 (암호화)
      *   - depositDate: 입금일자
      *   - shipmentDate: 출고일자
      *
@@ -48,7 +56,7 @@ public class SurveyUserController {
      *   - number: 번호(SEQ)
      *   - customerName: 고객사명
      *   - eventName: 이벤트명
-     *   - phoneNumber: 전화번호
+     *   - phoneNumber: 전화번호 (암호화)
      *   - userKey: 난수
      *   - lastAccessDate: 최종접속일
      *   - completionDate: 최종완료일
@@ -59,10 +67,13 @@ public class SurveyUserController {
             @RequestParam(required = false) String eventType,
             @RequestParam(required = false) String searchType,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         PageResponse<SurveyUserResponse> response = surveyUserService.searchUsers(
-                eventSeq, eventType, searchType, keyword, page, size);
+                eventSeq, eventType, searchType, keyword, startDate, endDate, status, page, size);
         return ApiResponse.success(response);
     }
 

@@ -59,6 +59,9 @@ public class SurveyUserService {
             String eventType,
             String searchType,
             String keyword,
+            String startDate,
+            String endDate,
+            String status,
             int page,
             int size) {
 
@@ -66,6 +69,9 @@ public class SurveyUserService {
         params.put("eventSeq", eventSeq);
         params.put("eventType", eventType);
         params.put("searchType", searchType);
+        params.put("startDate", startDate);
+        params.put("endDate", endDate);
+        params.put("status", status);
         params.put("offset", (page - 1) * size);
         params.put("size", size);
 

@@ -501,6 +501,24 @@
             <if test="eventType != null and eventType != ''">
                 AND M.EVENT_TYPE = #{eventType}
             </if>
+            <!-- 날짜 범위 조건 -->
+            <if test="startDate != null and startDate != ''">
+                AND DATE(U.REG_DATE) &gt;= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND DATE(U.REG_DATE) &lt;= #{endDate}
+            </if>
+            <!-- 제출 상태 조건 -->
+            <if test="status != null and status != ''">
+                <choose>
+                    <when test="status == 'COMPLETED'">
+                        AND U.SUBMISSION_DATE IS NOT NULL
+                    </when>
+                    <when test="status == 'IN_PROGRESS'">
+                        AND U.SUBMISSION_DATE IS NULL
+                    </when>
+                </choose>
+            </if>
             <!-- searchType + keyword 검색 -->
             <if test="searchType != null and searchType != '' and keyword != null and keyword != ''">
                 <choose>

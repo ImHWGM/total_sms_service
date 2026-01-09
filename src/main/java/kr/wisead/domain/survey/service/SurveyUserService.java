@@ -447,6 +447,9 @@ public class SurveyUserService {
         // 복호화
         String decryptedPhone = decryptData(user.getResendUserPhone());
         String decryptedName = decryptData(user.getUserName());
+        String decryptedJuminNum = decryptData(user.getJuminNum());
+        String decryptedAddress = decryptData(user.getAddress());
+        String decryptedAddress2 = decryptData(user.getAddress2());
 
         // 상태 결정
         String status;
@@ -463,10 +466,12 @@ public class SurveyUserService {
                 .eventSeq(user.getEventSeq())
                 .userKey(user.getUserKey())
                 .userName(maskName(decryptedName))
+                .juminNum(maskJuminNum(decryptedJuminNum))
                 .userPhone(maskPhone(decryptedPhone))
                 .resendUserPhone(maskPhone(decryptedPhone))
                 .userEmail(maskEmail(user.getUserEmail()))
-                .address(maskAddress(user.getAddress()))
+                .address(maskAddress(decryptedAddress))
+                .address2(maskAddress(decryptedAddress2))
                 .depositDate(user.getDepositDate())
                 .shipmentDate(user.getShipmentDate())
                 .submissionDate(user.getSubmissionDate())
@@ -539,6 +544,21 @@ public class SurveyUserService {
             return address;
         }
         return address.substring(0, 10) + "***";
+    }
+
+    /**
+     * 주민등록번호 마스킹 (앞 6자리 + -*******)
+     */
+    private String maskJuminNum(String juminNum) {
+        if (CommonUtils.isNullOrEmpty(juminNum)) {
+            return juminNum;
+        }
+        // 하이픈 제거 후 처리
+        String cleaned = juminNum.replace("-", "");
+        if (cleaned.length() < 6) {
+            return juminNum;
+        }
+        return cleaned.substring(0, 6) + "-*******";
     }
 
     /**

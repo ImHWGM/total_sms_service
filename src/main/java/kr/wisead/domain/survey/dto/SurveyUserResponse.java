@@ -19,10 +19,12 @@ public class SurveyUserResponse {
     private Integer eventSeq;               // 이벤트 시퀀스
     private String userKey;                 // 사용자 키
     private String userName;                // 사용자 명
+    private String juminNum;                // 주민등록번호 (마스킹)
     private String userPhone;               // 휴대전화 (마스킹)
     private String resendUserPhone;         // 재발송 전화번호 (마스킹)
     private String userEmail;               // 이메일
     private String address;                 // 주소
+    private String address2;                // 상세주소
     private LocalDate depositDate;          // 입금일자
     private LocalDate shipmentDate;         // 배송일자
     private LocalDateTime submissionDate;   // 설문완료일

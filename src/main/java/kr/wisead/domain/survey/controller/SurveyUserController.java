@@ -71,7 +71,13 @@ public class SurveyUserController {
             @RequestParam(required = false) String endDate,
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        String userId = userDetails != null ? userDetails.getUsername() : "ANONYMOUS";
+        log.info("[발송조회 검색] userId={}, eventType={}, searchType={}, keyword={}, startDate={}, endDate={}, status={}",
+                userId, eventType, searchType, keyword, startDate, endDate, status);
+
         PageResponse<SurveyUserResponse> response = surveyUserService.searchUsers(
                 eventSeq, eventType, searchType, keyword, startDate, endDate, status, page, size);
         return ApiResponse.success(response);

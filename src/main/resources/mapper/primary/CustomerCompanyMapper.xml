@@ -48,7 +48,12 @@
             USER_ID AS userId,
             PERSON AS person,
             CORP_NAME AS corpName,
-            BIZ_NUM AS bizNum
+            BIZ_NUM AS bizNum,
+            PHONE AS phone,
+            USER_LEVEL AS userLevel,
+            REG_DATE AS regDate,
+            LAST_LOGIN AS lastLogin,
+            STATUS AS status
         FROM USER
         WHERE 1=1
         <choose>

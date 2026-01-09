@@ -27,6 +27,13 @@ public class CustomerCompanyResponse {
     private LocalDateTime uptDate;
     private String chkedYn;
 
+    // 기업관리 리스트용 추가 필드
+    private String phone;                   // 전화번호
+    private Integer userLevel;              // 권한 레벨
+    private LocalDateTime regDate;          // 등록일
+    private LocalDateTime lastLogin;        // 로그인 일시
+    private String status;                  // 회원상태
+
     public static CustomerCompanyResponse from(CustomerCompany entity) {
         return CustomerCompanyResponse.builder()
                 .seq(entity.getSeq())

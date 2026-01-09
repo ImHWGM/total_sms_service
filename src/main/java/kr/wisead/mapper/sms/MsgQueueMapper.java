@@ -86,4 +86,13 @@ public interface MsgQueueMapper {
      * 등록자별 대기 건수 조회
      */
     long countPendingByRegId(@Param("regId") String regId);
+
+    /**
+     * 등록자별 대기 중인 발송 목록 조회 (페이징)
+     */
+    List<MsgQueue> findPendingByRegIdPaging(
+            @Param("regId") String regId,
+            @Param("offset") int offset,
+            @Param("limit") int limit
+    );
 }

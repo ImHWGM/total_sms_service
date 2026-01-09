@@ -203,6 +203,23 @@ public class MessageSendService {
     }
 
     /**
+     * 대기 중인 발송 목록 조회 (페이징)
+     */
+    @Transactional(value = "smsTransactionManager", readOnly = true)
+    public PageResponse<MsgQueueResponse> getPendingMessages(String regId, int page, int size) {
+        long total = msgQueueMapper.countPendingByRegId(regId);
+
+        int offset = (page - 1) * size;
+        List<MsgQueue> results = msgQueueMapper.findPendingByRegIdPaging(regId, offset, size);
+
+        List<MsgQueueResponse> content = results.stream()
+                .map(MsgQueueResponse::from)
+                .collect(Collectors.toList());
+
+        return PageResponse.of(content, page, size, total);
+    }
+
+    /**
      * 메시지 타입별 INSERT 분기
      */
     private void insertMsgQueue(String msgType, MsgQueue msgQueue) {

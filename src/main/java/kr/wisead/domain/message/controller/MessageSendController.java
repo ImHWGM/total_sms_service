@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.message.dto.*;
-import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.message.service.MessageSendService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +13,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * 메시지 발송 Controller
@@ -80,11 +78,13 @@ public class MessageSendController {
      * 예약 발송 대기 목록 조회
      */
     @GetMapping("/pending")
-    public ApiResponse<List<MsgQueue>> getPendingMessages(
-            @AuthenticationPrincipal UserDetails userDetails) {
+    public ApiResponse<PageResponse<MsgQueueResponse>> getPendingMessages(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
         String regId = userDetails.getUsername();
-        List<MsgQueue> list = messageSendService.getPendingMessages(regId);
-        return ApiResponse.success(list);
+        PageResponse<MsgQueueResponse> response = messageSendService.getPendingMessages(regId, page, size);
+        return ApiResponse.success(response);
     }
 
     /**

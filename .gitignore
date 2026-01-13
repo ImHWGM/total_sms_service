@@ -59,3 +59,4 @@ Thumbs.db
 ### Application ###
 *.pid
 *.seed
+.claude/

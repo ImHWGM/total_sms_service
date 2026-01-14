@@ -97,10 +97,10 @@ public class CustomerCompanyService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사용자 ID가 필요합니다.");
         }
 
-        // selectedUserId 필수값 체크
-        if (request.getSelectedUserId() == null || request.getSelectedUserId().isBlank()) {
-            log.error("고객사 일괄 등록 실패: selectedUserId가 없습니다.");
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "선택된 사용자 ID가 필요합니다.");
+        // selectedUserIds 필수값 체크
+        if (request.getSelectedUserIds() == null || request.getSelectedUserIds().isEmpty()) {
+            log.error("고객사 일괄 등록 실패: selectedUserIds가 없습니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "선택된 사용자 ID 목록이 필요합니다.");
         }
 
         if (request.getCustCompNames() == null || request.getCustCompNames().isEmpty()) {
@@ -108,12 +108,26 @@ public class CustomerCompanyService {
             return false;
         }
 
-        // 빈 문자열 및 null 값 필터링, 중복 제거
-        List<String> validNames = request.getCustCompNames().stream()
-                .filter(name -> name != null && !name.isBlank())
-                .map(String::trim)
-                .distinct()
-                .collect(Collectors.toList());
+        // selectedUserIds와 custCompNames 개수가 일치해야 함
+        if (request.getSelectedUserIds().size() != request.getCustCompNames().size()) {
+            log.error("고객사 일괄 등록 실패: selectedUserIds와 custCompNames 개수가 일치하지 않습니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "선택된 사용자 ID 목록과 고객사명 목록의 개수가 일치해야 합니다.");
+        }
+
+        // 유효한 데이터만 필터링 (빈 문자열 및 null 값 제외)
+        List<String> validNames = new java.util.ArrayList<>();
+        List<String> validUserIds = new java.util.ArrayList<>();
+
+        for (int i = 0; i < request.getCustCompNames().size(); i++) {
+            String name = request.getCustCompNames().get(i);
+            String selectedUserId = request.getSelectedUserIds().get(i);
+
+            if (name != null && !name.isBlank() && selectedUserId != null && !selectedUserId.isBlank()) {
+                validNames.add(name.trim());
+                validUserIds.add(selectedUserId.trim());
+            }
+        }
 
         if (validNames.isEmpty()) {
             log.warn("고객사 일괄 등록: 유효한 고객사명이 없습니다. userId={}", request.getUserId());
@@ -122,12 +136,11 @@ public class CustomerCompanyService {
 
         int result = customerCompanyMapper.insertCustomerCompanyBatch(
                 request.getUserId(),
-                request.getSelectedUserId(),
+                validUserIds,
                 operatorId,
                 validNames);
 
-        log.info("고객사 일괄 등록 완료: userId={}, selectedUserId={}, count={}",
-                request.getUserId(), request.getSelectedUserId(), result);
+        log.info("고객사 일괄 등록 완료: userId={}, count={}", request.getUserId(), result);
         return result > 0;
     }
 

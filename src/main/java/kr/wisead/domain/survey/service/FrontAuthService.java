@@ -102,8 +102,8 @@ public class FrontAuthService {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "이벤트 코드 또는 QR코드 URL이 필요합니다.");
         }
 
-        SurveyUser user = userOpt.orElseThrow(() ->
-                new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "등록된 휴대폰 번호가 아닙니다."));
+        SurveyUser user = userOpt
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "등록된 휴대폰 번호가 아닙니다."));
 
         if (user.isSubmitted()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "이미 설문에 참여하셨습니다.");

@@ -1,4 +1,4 @@
-ㅡpackage kr.wisead.integration;
+package kr.wisead.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.wisead.domain.message.dto.ResendRequest;

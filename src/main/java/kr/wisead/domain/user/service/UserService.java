@@ -132,6 +132,7 @@ public class UserService {
 
     /**
      * 아이디 찾기 1단계 - 정보 검증 및 이메일 인증코드 발송
+     * 
      * @param request 아이디 찾기 요청 (기업명, 담당자명, 연락처)
      * @return 마스킹된 이메일 정보
      */
@@ -146,8 +147,7 @@ public class UserService {
             User user = userMapper.findByCorpNameAndPersonAndPhone(
                     request.getCorpName(),
                     encryptedPerson,
-                    encryptedPhone
-            ).orElse(null);
+                    encryptedPhone).orElse(null);
 
             if (user == null) {
                 log.warn("아이디 찾기 실패 - 계정 정보 없음: corpName={}", request.getCorpName());
@@ -177,8 +177,9 @@ public class UserService {
 
     /**
      * 아이디 찾기 2단계 - 인증코드 검증 및 아이디 반환
+     * 
      * @param email 이메일
-     * @param code 인증코드
+     * @param code  인증코드
      * @return 마스킹된 아이디
      */
     @Transactional(readOnly = true)
@@ -228,9 +229,9 @@ public class UserService {
      */
     private boolean isValidStatus(String status) {
         return "미승인".equals(status) ||
-               "승인".equals(status) ||
-               "보류".equals(status) ||
-               "탈퇴".equals(status);
+                "승인".equals(status) ||
+                "보류".equals(status) ||
+                "탈퇴".equals(status);
     }
 
     /**
@@ -263,7 +264,8 @@ public class UserService {
 
     /**
      * 비밀번호 초기화 (관리자용)
-     * @param userId 대상 사용자 ID
+     * 
+     * @param userId      대상 사용자 ID
      * @param newPassword 새 비밀번호
      */
     @Transactional
@@ -294,6 +296,7 @@ public class UserService {
 
     /**
      * 비밀번호 찾기 (힌트 기반 + 이메일 링크 발송)
+     * 
      * @param request 비밀번호 찾기 요청
      * @return 비밀번호 찾기 결과
      */
@@ -309,8 +312,7 @@ public class UserService {
                     request.getUserId(),
                     request.getCorpName(),
                     encryptedPerson,
-                    encryptedPhone
-            ).orElse(null);
+                    encryptedPhone).orElse(null);
 
             if (user == null) {
                 log.warn("비밀번호 찾기 실패 - 계정 정보 없음: userId={}", request.getUserId());
@@ -321,8 +323,7 @@ public class UserService {
             int hintResult = passwordHintMapper.verifyHint(
                     user.getSeq(),
                     request.getHintQuestion(),
-                    request.getHintAnswer()
-            );
+                    request.getHintAnswer());
 
             if (hintResult == 0) {
                 log.warn("비밀번호 찾기 실패 - 힌트 불일치: userId={}", request.getUserId());
@@ -363,6 +364,7 @@ public class UserService {
 
     /**
      * 비밀번호 재설정 토큰 유효성 검증
+     * 
      * @param token 재설정 토큰
      * @return 토큰 정보 (userId 포함)
      */
@@ -386,13 +388,13 @@ public class UserService {
 
         return Map.of(
                 "valid", true,
-                "userId", maskUserId(user.getUserId())
-        );
+                "userId", maskUserId(user.getUserId()));
     }
 
     /**
      * 토큰을 이용한 비밀번호 재설정
-     * @param token 재설정 토큰
+     * 
+     * @param token       재설정 토큰
      * @param newPassword 새 비밀번호
      */
     @Transactional
@@ -427,6 +429,7 @@ public class UserService {
 
     /**
      * 회원 삭제 (단건)
+     * 
      * @param seq 삭제할 회원 시퀀스
      */
     @Transactional
@@ -440,6 +443,7 @@ public class UserService {
 
     /**
      * 회원 삭제 (일괄)
+     * 
      * @param seqList 삭제할 회원 시퀀스 목록
      */
     @Transactional
@@ -454,13 +458,14 @@ public class UserService {
 
     /**
      * 회원 정보 수정 (기업 정보)
-     * @param user 수정할 회원 정보
+     * 
+     * @param user       수정할 회원 정보
      * @param operatorId 수정자 ID
      */
     @Transactional
     public void updateMemberInfo(User user, String operatorId) {
-        // 회원 존재 여부 확인
-        userMapper.findBySeq(user.getSeq())
+        // 회원 존재 여부 확인 및 기존 정보 조회
+        User existingUser = userMapper.findBySeq(user.getSeq())
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         // 연락처 암호화 처리 (이미 암호화되어 있지 않은 경우)
@@ -473,21 +478,31 @@ public class UserService {
             log.error("연락처 암호화 실패: {}", e.getMessage());
         }
 
-        // 수정용 User 객체 생성 (uptId, phone 포함)
+        // 담당자명 암호화 처리
+        String encryptedPerson = user.getPerson();
+        try {
+            if (user.getPerson() != null && !user.getPerson().isEmpty()) {
+                encryptedPerson = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(user.getPerson()));
+            }
+        } catch (Exception e) {
+            log.error("담당자명 암호화 실패: {}", e.getMessage());
+        }
+
+        // 수정용 User 객체 생성 - null인 필드는 기존 값 유지
         User updateUser = User.builder()
                 .seq(user.getSeq())
-                .corpName(user.getCorpName())
-                .corpAddr(user.getCorpAddr())
-                .bizNum(user.getBizNum())
-                .bizTel(user.getBizTel())
-                .person(user.getPerson())
-                .phone(encryptedPhone)
-                .email(user.getEmail())
-                .userLevel(user.getUserLevel())
-                .allowIpYn(user.getAllowIpYn())
-                .allowIp(user.getAllowIp())
-                .status(user.getStatus())
-                .callback(user.getCallback())
+                .corpName(user.getCorpName() != null ? user.getCorpName() : existingUser.getCorpName())
+                .corpAddr(user.getCorpAddr() != null ? user.getCorpAddr() : existingUser.getCorpAddr())
+                .bizNum(user.getBizNum() != null ? user.getBizNum() : existingUser.getBizNum())
+                .bizTel(user.getBizTel() != null ? user.getBizTel() : existingUser.getBizTel())
+                .person(encryptedPerson != null ? encryptedPerson : existingUser.getPerson())
+                .phone(encryptedPhone != null ? encryptedPhone : existingUser.getPhone())
+                .email(user.getEmail() != null ? user.getEmail() : existingUser.getEmail())
+                .userLevel(user.getUserLevel() != null ? user.getUserLevel() : existingUser.getUserLevel())
+                .allowIpYn(user.getAllowIpYn() != null ? user.getAllowIpYn() : existingUser.getAllowIpYn())
+                .allowIp(user.getAllowIp() != null ? user.getAllowIp() : existingUser.getAllowIp())
+                .status(user.getStatus() != null ? user.getStatus() : existingUser.getStatus())
+                .callback(user.getCallback() != null ? user.getCallback() : existingUser.getCallback())
                 .uptId(operatorId)
                 .build();
 

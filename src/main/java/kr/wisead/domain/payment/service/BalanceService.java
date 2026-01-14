@@ -5,6 +5,7 @@ import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.payment.dto.BalanceResponse;
 import kr.wisead.domain.payment.dto.ChargeRequest;
+import kr.wisead.domain.payment.dto.SmsPriceRequest;
 import kr.wisead.domain.payment.entity.Balance;
 import kr.wisead.mapper.primary.BalanceMapper;
 import lombok.RequiredArgsConstructor;
@@ -79,9 +80,12 @@ public class BalanceService {
             if (latest.getSubtractUnitPrice() != null) {
                 surveyPrice = latest.getSubtractUnitPrice();
             }
-            if (latest.getSmsPrice() != null) smsPrice = latest.getSmsPrice();
-            if (latest.getLmsPrice() != null) lmsPrice = latest.getLmsPrice();
-            if (latest.getMmsPrice() != null) mmsPrice = latest.getMmsPrice();
+            if (latest.getSmsPrice() != null)
+                smsPrice = latest.getSmsPrice();
+            if (latest.getLmsPrice() != null)
+                lmsPrice = latest.getLmsPrice();
+            if (latest.getMmsPrice() != null)
+                mmsPrice = latest.getMmsPrice();
         }
 
         BigDecimal newBalance = currentBalance.add(request.getAmount());
@@ -190,5 +194,46 @@ public class BalanceService {
             return false;
         }
         return latest.getTotalBalance().compareTo(requiredAmount) >= 0;
+    }
+
+    /**
+     * 문자 요금 설정
+     */
+    @Transactional
+    public BalanceResponse updateSmsPrice(SmsPriceRequest request, String operatorId) {
+        if (request.getUserId() == null || request.getUserId().isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사용자 ID가 필요합니다.");
+        }
+
+        Balance latest = balanceMapper.selectLatestBalance(request.getUserId());
+
+        if (latest == null) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "해당 사용자의 잔액 정보가 없습니다.");
+        }
+
+        // 변경된 단가만 업데이트, 없으면 기존 값 유지
+        BigDecimal smsPrice = request.getSmsPrice() != null ? request.getSmsPrice() : latest.getSmsPrice();
+        BigDecimal lmsPrice = request.getLmsPrice() != null ? request.getLmsPrice() : latest.getLmsPrice();
+        BigDecimal mmsPrice = request.getMmsPrice() != null ? request.getMmsPrice() : latest.getMmsPrice();
+
+        // 단가 변경 이력을 위한 레코드 추가 (잔액 변동 없이 단가만 변경)
+        Balance balance = Balance.builder()
+                .userId(request.getUserId())
+                .balance(BigDecimal.ZERO)
+                .totalBalance(latest.getTotalBalance())
+                .operation("U") // Update
+                .comment("문자 요금 설정 변경")
+                .subtractUnitPrice(latest.getSubtractUnitPrice())
+                .smsPrice(smsPrice)
+                .lmsPrice(lmsPrice)
+                .mmsPrice(mmsPrice)
+                .regId(operatorId)
+                .build();
+
+        balanceMapper.insertBalance(balance);
+        log.info("문자 요금 변경: userId={}, SMS={}, LMS={}, MMS={}",
+                request.getUserId(), smsPrice, lmsPrice, mmsPrice);
+
+        return BalanceResponse.from(balance);
     }
 }

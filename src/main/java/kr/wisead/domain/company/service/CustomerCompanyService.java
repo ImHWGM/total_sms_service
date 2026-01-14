@@ -1,5 +1,7 @@
 package kr.wisead.domain.company.service;
 
+import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.company.dto.CustomerCompanyRequest;
 import kr.wisead.domain.company.dto.CustomerCompanyResponse;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 고객사 관리 서비스
@@ -55,8 +58,7 @@ public class CustomerCompanyService {
         String exists = customerCompanyMapper.selectCompanyExists(
                 request.getUserId(),
                 request.getSelectedUserId(),
-                request.getCustCompName()
-        );
+                request.getCustCompName());
 
         CustomerCompany company = CustomerCompany.builder()
                 .userId(request.getUserId())
@@ -89,16 +91,35 @@ public class CustomerCompanyService {
      */
     @Transactional
     public boolean enrollCompanies(CustomerCompanyRequest request, String operatorId) {
+        // userId 필수값 체크
+        if (request.getUserId() == null || request.getUserId().isBlank()) {
+            log.error("고객사 일괄 등록 실패: userId가 없습니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사용자 ID가 필요합니다.");
+        }
+
         if (request.getCustCompNames() == null || request.getCustCompNames().isEmpty()) {
+            log.warn("고객사 일괄 등록: 등록할 고객사명이 없습니다. userId={}", request.getUserId());
+            return false;
+        }
+
+        // 빈 문자열 및 null 값 필터링, 중복 제거
+        List<String> validNames = request.getCustCompNames().stream()
+                .filter(name -> name != null && !name.isBlank())
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (validNames.isEmpty()) {
+            log.warn("고객사 일괄 등록: 유효한 고객사명이 없습니다. userId={}", request.getUserId());
             return false;
         }
 
         int result = customerCompanyMapper.insertCustomerCompanyBatch(
                 request.getUserId(),
                 operatorId,
-                request.getCustCompNames()
-        );
+                validNames);
 
+        log.info("고객사 일괄 등록 완료: userId={}, count={}", request.getUserId(), result);
         return result > 0;
     }
 

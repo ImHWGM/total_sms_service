@@ -59,15 +59,14 @@ public class AuthService {
             throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, "로그인 실패 횟수 초과로 계정이 잠겼습니다. 관리자에게 문의하세요.");
         }
 
-        // 3. 계정 상태 확인
+        // 3. 계정 상태 확인 (Java 21 Switch Expression)
         if (!user.isActive()) {
-            if ("미승인".equals(user.getStatus())) {
-                throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "승인 대기 중인 계정입니다.");
-            } else if ("탈퇴".equals(user.getStatus())) {
-                throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "탈퇴된 계정입니다.");
-            } else {
-                throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "비활성화된 계정입니다.");
-            }
+            String message = switch (user.getStatus()) {
+                case "미승인" -> "승인 대기 중인 계정입니다.";
+                case "탈퇴" -> "탈퇴된 계정입니다.";
+                default -> "비활성화된 계정입니다.";
+            };
+            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, message);
         }
 
         // 4. 비밀번호 확인

@@ -4,7 +4,9 @@ import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.payment.dto.BalanceResponse;
 import kr.wisead.domain.payment.dto.ChargeRequest;
+import kr.wisead.domain.payment.dto.SmsPriceRequest;
 import kr.wisead.domain.payment.entity.Payment;
+import org.springframework.security.access.prepost.PreAuthorize;
 import kr.wisead.domain.payment.service.BalanceService;
 import kr.wisead.domain.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
@@ -94,6 +96,34 @@ public class PaymentController {
         String userId = userDetails.getUsername();
         boolean hasEnough = balanceService.hasEnoughBalance(userId, amount);
         return ApiResponse.success(hasEnough);
+    }
+
+    /**
+     * 문자 요금 설정 (관리자용)
+     * PUT /api/payment/sms-price
+     */
+    @PutMapping("/sms-price")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<BalanceResponse> updateSmsPrice(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody SmsPriceRequest request) {
+        String operatorId = userDetails.getUsername();
+        BalanceResponse response = balanceService.updateSmsPrice(request, operatorId);
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * 특정 사용자 잔액 내역 조회 (관리자용)
+     * GET /api/payment/balance/history/{userId}
+     */
+    @GetMapping("/balance/history/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<PageResponse<BalanceResponse>> getBalanceHistoryByUserId(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        PageResponse<BalanceResponse> response = balanceService.getBalanceHistory(userId, page, size);
+        return ApiResponse.success(response);
     }
 
     /**

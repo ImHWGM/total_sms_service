@@ -91,8 +91,11 @@ public class MessageSendController {
      * 예약 발송 취소 (단건)
      */
     @DeleteMapping("/cancel/{mseq}")
-    public ApiResponse<Integer> cancelMessage(@PathVariable Integer mseq) {
-        int deleted = messageSendService.cancelScheduledMessage(mseq);
+    public ApiResponse<Integer> cancelMessage(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Integer mseq) {
+        String regId = userDetails.getUsername();
+        int deleted = messageSendService.cancelScheduledMessage(mseq, regId);
         return ApiResponse.success(deleted);
     }
 
@@ -100,8 +103,11 @@ public class MessageSendController {
      * 예약 발송 취소 (배치 전체)
      */
     @DeleteMapping("/cancel/batch/{userKey}")
-    public ApiResponse<Integer> cancelBatch(@PathVariable String userKey) {
-        int deleted = messageSendService.cancelScheduledBatch(userKey);
+    public ApiResponse<Integer> cancelBatch(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable String userKey) {
+        String regId = userDetails.getUsername();
+        int deleted = messageSendService.cancelScheduledBatch(userKey, regId);
         return ApiResponse.success(deleted);
     }
 

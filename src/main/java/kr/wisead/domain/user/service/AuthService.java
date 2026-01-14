@@ -4,14 +4,15 @@ import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.email.service.EmailAuthService;
-import kr.wisead.domain.payment.entity.Balance;
+import kr.wisead.domain.payment.entity.UserServiceRate;
 import kr.wisead.domain.payment.service.StandardRateService;
+import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.user.dto.LoginRequest;
 import kr.wisead.domain.user.dto.LoginResponse;
 import kr.wisead.domain.user.dto.SignUpRequest;
 import kr.wisead.domain.user.entity.User;
-import kr.wisead.mapper.primary.BalanceMapper;
 import kr.wisead.mapper.primary.UserMapper;
+import kr.wisead.mapper.primary.UserServiceRateMapper;
 import kr.wisead.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +38,8 @@ import java.util.List;
 public class AuthService {
 
     private final UserMapper userMapper;
-    private final BalanceMapper balanceMapper;
+    private final WalletService walletService;
+    private final UserServiceRateMapper userServiceRateMapper;
     private final StandardRateService standardRateService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
@@ -260,28 +262,27 @@ public class AuthService {
 
         userMapper.insert(user);
 
-        // 5. 잔액 정보 초기화 (standard_rate 테이블 기준, VAT 포함)
-        Balance balance = Balance.builder()
-                .userId(request.getUserId())
-                .balance(BigDecimal.ZERO)
-                .totalBalance(BigDecimal.ZERO)
-                .operation("P") // 최초 등록
-                .comment("회원가입 초기 설정")
-                .subtractUnitPrice(standardRateService.getStandardRateWithVat("survey"))   // 설문 단가
-                .smsPrice(standardRateService.getStandardRateWithVat("msg_sms"))           // SMS 단가
-                .lmsPrice(standardRateService.getStandardRateWithVat("msg_lms"))           // LMS 단가
-                .mmsPrice(standardRateService.getStandardRateWithVat("msg_mms"))           // MMS 단가
-                .regId(request.getUserId())
-                .build();
+        // 6. 지갑 초기화
+        walletService.initializeWallet(request.getUserId());
 
-        balanceMapper.insertBalance(balance);
+        // 7. 사용자별 서비스 단가 초기화 (standard_rate 기준, VAT 포함)
+        LocalDate today = LocalDate.now();
+        String userId = request.getUserId();
 
-        log.info("회원가입 완료: userId={}, 설문단가={}, SMS단가={}, LMS단가={}, MMS단가={}",
-                request.getUserId(),
-                balance.getSubtractUnitPrice(),
-                balance.getSmsPrice(),
-                balance.getLmsPrice(),
-                balance.getMmsPrice());
+        BigDecimal surveyRate = standardRateService.getStandardRateWithVat("survey");
+        BigDecimal smsRate = standardRateService.getStandardRateWithVat("msg_sms");
+        BigDecimal lmsRate = standardRateService.getStandardRateWithVat("msg_lms");
+        BigDecimal mmsRate = standardRateService.getStandardRateWithVat("msg_mms");
+        BigDecimal qrRate = standardRateService.getStandardRateWithVat("qr_code");
+
+        userServiceRateMapper.insert(UserServiceRate.create(userId, "survey", surveyRate, today));
+        userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_sms", smsRate, today));
+        userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_lms", lmsRate, today));
+        userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_mms", mmsRate, today));
+        userServiceRateMapper.insert(UserServiceRate.create(userId, "qr_code", qrRate, today));
+
+        log.info("회원가입 완료: userId={}, 설문단가={}, SMS단가={}, LMS단가={}, MMS단가={}, QR단가={}",
+                userId, surveyRate, smsRate, lmsRate, mmsRate, qrRate);
     }
 
     /**

@@ -5,9 +5,8 @@ import kr.wisead.common.response.ErrorCode;
 import kr.wisead.domain.message.dto.MultiMessageRequest;
 import kr.wisead.domain.message.dto.MultiMessageResponse;
 import kr.wisead.domain.message.entity.MsgQueue;
-import kr.wisead.domain.payment.entity.Balance;
+import kr.wisead.domain.payment.service.BalanceService;
 import kr.wisead.domain.user.entity.User;
-import kr.wisead.mapper.primary.BalanceMapper;
 import kr.wisead.mapper.primary.BlockedSenderMapper;
 import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.mapper.sms.MsgQueueMapper;
@@ -33,7 +32,7 @@ import java.util.stream.Collectors;
 public class MultiMessageService {
 
     private final MsgQueueMapper msgQueueMapper;
-    private final BalanceMapper balanceMapper;
+    private final BalanceService balanceService;
     private final BlockedSenderMapper blockedSenderMapper;
     private final UserMapper userMapper;
 
@@ -55,8 +54,8 @@ public class MultiMessageService {
         }
 
         // 1. 잔액 조회
-        Balance balance = balanceMapper.selectLatestBalance(regId);
-        if (balance == null) {
+        var balanceResponse = balanceService.getCurrentBalance(regId);
+        if (balanceResponse == null) {
             log.warn("잔액 정보 없음 - regId: {}", regId);
             return MultiMessageResponse.insufficientBalance();
         }
@@ -114,11 +113,11 @@ public class MultiMessageService {
         }
 
         // 3. 요금 계산 및 잔액 확인
-        BigDecimal unitPrice = getUnitPrice(balance, request.getMessageType());
+        BigDecimal unitPrice = getUnitPrice(balanceResponse, request.getMessageType());
         BigDecimal totalCharge = unitPrice.multiply(BigDecimal.valueOf(receivers.size()));
 
-        if (balance.getTotalBalance().compareTo(totalCharge) < 0) {
-            log.warn("잔액 부족 - 필요: {}, 보유: {}", totalCharge, balance.getTotalBalance());
+        if (!balanceService.hasEnoughBalance(regId, totalCharge)) {
+            log.warn("잔액 부족 - 필요: {}, 보유: {}", totalCharge, balanceResponse.getTotalBalance());
             return MultiMessageResponse.insufficientBalance();
         }
 
@@ -148,10 +147,13 @@ public class MultiMessageService {
             }
         }
 
-        // 6. 잔액 차감
+        // 6. 잔액 차감 (BalanceService.deductMessageCharge 사용)
         if (successCount > 0) {
             BigDecimal chargedAmount = unitPrice.multiply(BigDecimal.valueOf(successCount));
-            deductBalance(regId, balance, chargedAmount, request.getMessageType(), successCount);
+            String msgType = request.getMessageType() != null ? request.getMessageType().toUpperCase() : "SMS";
+            String comment = "문자발송 : " + msgType + "  " + successCount + "건";
+
+            balanceService.deductMessageCharge(regId, successCount, msgType, comment);
 
             log.info("Multi 메시지 발송 완료 - 성공: {}, 중복: {}, 수신거부: {}, 차감: {}",
                     successCount, duplicateCount, blockedCount, chargedAmount);
@@ -181,9 +183,9 @@ public class MultiMessageService {
     }
 
     /**
-     * 메시지 타입별 단가 조회
+     * 메시지 타입별 단가 조회 (BalanceResponse 사용)
      */
-    private BigDecimal getUnitPrice(Balance balance, String messageType) {
+    private BigDecimal getUnitPrice(kr.wisead.domain.payment.dto.BalanceResponse balance, String messageType) {
         if (messageType == null) return balance.getSubtractUnitPrice();
 
         return switch (messageType.toUpperCase()) {
@@ -262,26 +264,6 @@ public class MultiMessageService {
             case "M" -> msgQueueMapper.insertMms(msgQueue);
             default -> msgQueueMapper.insertSms(msgQueue);
         }
-    }
-
-    /**
-     * 잔액 차감
-     */
-    private void deductBalance(String userId, Balance current, BigDecimal amount, String msgType, int count) {
-        Balance newBalance = Balance.builder()
-                .userId(userId)
-                .balance(amount)
-                .totalBalance(current.getTotalBalance().subtract(amount))
-                .operation("M")
-                .comment("문자발송 : " + msgType + "  " + count + "건")
-                .subtractUnitPrice(current.getSubtractUnitPrice())
-                .smsPrice(current.getSmsPrice())
-                .lmsPrice(current.getLmsPrice())
-                .mmsPrice(current.getMmsPrice())
-                .regId(userId)
-                .build();
-
-        balanceMapper.insertBalance(newBalance);
     }
 
     /**

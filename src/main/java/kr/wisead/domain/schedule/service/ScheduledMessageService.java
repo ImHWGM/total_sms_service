@@ -3,11 +3,12 @@ package kr.wisead.domain.schedule.service;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
-import kr.wisead.domain.payment.entity.Balance;
+import kr.wisead.domain.payment.dto.BalanceResponse;
+import kr.wisead.domain.payment.dto.ChargeRequest;
+import kr.wisead.domain.payment.service.BalanceService;
 import kr.wisead.domain.schedule.dto.ScheduledMessageResponse;
 import kr.wisead.domain.schedule.dto.ScheduledMessageSearchRequest;
 import kr.wisead.domain.schedule.entity.ScheduledMessage;
-import kr.wisead.mapper.primary.BalanceMapper;
 import kr.wisead.mapper.sms.ScheduledMessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +20,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 예약 메시지 서비스
+ * 예약 메시지 서비스 (리팩토링 버전)
+ * - BalanceService 사용
  */
 @Slf4j
 @Service
@@ -27,7 +29,7 @@ import java.util.List;
 public class ScheduledMessageService {
 
     private final ScheduledMessageMapper scheduledMessageMapper;
-    private final BalanceMapper balanceMapper;
+    private final BalanceService balanceService;
 
     /**
      * 예약 메시지 목록 조회
@@ -93,7 +95,7 @@ public class ScheduledMessageService {
 
         if (messageCount > 0) {
             // 2. 현재 잔액 정보 조회
-            Balance currentBalance = balanceMapper.selectLatestBalance(userId);
+            BalanceResponse currentBalance = balanceService.getCurrentBalance(userId);
             if (currentBalance == null) {
                 log.error("예약 취소 - 사용자 잔액 정보를 찾을 수 없습니다: {}", userId);
                 throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자 잔액 정보를 찾을 수 없습니다.");
@@ -103,22 +105,17 @@ public class ScheduledMessageService {
             BigDecimal refundAmount = calculateRefundAmount(msgType, messageCount, currentBalance);
             log.info("예약 취소 - 환불 금액: {}", refundAmount);
 
-            // 4. 환불 처리 (잔액 복구)
+            // 4. 환불 처리 (BalanceService.charge 사용)
             if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
-                Balance refundBalance = Balance.builder()
+                String comment = "예약문자 취소 환불: " + getTypeLabel(msgType) + " " + messageCount + "건";
+
+                ChargeRequest chargeRequest = ChargeRequest.builder()
                         .userId(userId)
-                        .balance(refundAmount)
-                        .totalBalance(currentBalance.getTotalBalance().add(refundAmount))
-                        .operation("R")  // 환불
-                        .comment("예약문자 취소 환불: " + getTypeLabel(msgType) + " " + messageCount + "건")
-                        .subtractUnitPrice(currentBalance.getSubtractUnitPrice())
-                        .smsPrice(currentBalance.getSmsPrice())
-                        .lmsPrice(currentBalance.getLmsPrice())
-                        .mmsPrice(currentBalance.getMmsPrice())
-                        .regId(userId)
+                        .amount(refundAmount)
+                        .comment(comment)
                         .build();
 
-                balanceMapper.insertBalance(refundBalance);
+                balanceService.charge(chargeRequest, userId);
                 log.info("예약 취소 - 환불 완료: {} 원", refundAmount);
             }
         }
@@ -130,7 +127,7 @@ public class ScheduledMessageService {
 
     // ==================== Private Methods ====================
 
-    private BigDecimal calculateRefundAmount(String msgType, int messageCount, Balance balance) {
+    private BigDecimal calculateRefundAmount(String msgType, int messageCount, BalanceResponse balance) {
         BigDecimal unitPrice = switch (msgType) {
             case "S" -> balance.getSmsPrice() != null ? balance.getSmsPrice() : balance.getSubtractUnitPrice();
             case "L" -> balance.getLmsPrice() != null ? balance.getLmsPrice() : balance.getSubtractUnitPrice();

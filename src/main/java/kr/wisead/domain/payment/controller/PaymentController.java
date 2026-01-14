@@ -219,4 +219,62 @@ public class PaymentController {
         Map<String, Object> result = paymentService.collectPaymentResult(paymentResult);
         return ApiResponse.success(result);
     }
+
+    // ==================== 신규 결제 시스템 API ====================
+
+    /**
+     * 지갑 요약 조회 (CASH/POINT/BONUS 분리)
+     * GET /api/payment/wallet/summary
+     */
+    @GetMapping("/wallet/summary")
+    public ApiResponse<kr.wisead.domain.payment.dto.WalletSummaryResponse> getWalletSummary(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String userId = userDetails.getUsername();
+        return ApiResponse.success(balanceService.getWalletSummary(userId));
+    }
+
+    /**
+     * 활성 Lot 목록 조회 (만료일 포함)
+     * GET /api/payment/wallet/lots
+     */
+    @GetMapping("/wallet/lots")
+    public ApiResponse<java.util.List<kr.wisead.domain.payment.dto.WalletLotResponse>> getActiveLots(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String userId = userDetails.getUsername();
+        return ApiResponse.success(balanceService.getActiveLots(userId));
+    }
+
+    /**
+     * 거래 이력 조회 (신규)
+     * GET /api/payment/transactions
+     */
+    @GetMapping("/transactions")
+    public ApiResponse<PageResponse<kr.wisead.domain.payment.dto.TransactionResponse>> getTransactions(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        String userId = userDetails.getUsername();
+        return ApiResponse.success(balanceService.getTransactionHistory(userId, page, size));
+    }
+
+    /**
+     * 환불 미리보기
+     * GET /api/payment/refund/preview?txGroupId={id}
+     */
+    @GetMapping("/refund/preview")
+    public ApiResponse<kr.wisead.domain.payment.dto.RefundPreviewResponse> previewRefund(
+            @RequestParam String txGroupId) {
+        return ApiResponse.success(balanceService.previewRefund(txGroupId));
+    }
+
+    /**
+     * 환불 처리
+     * POST /api/payment/refund/{txGroupId}
+     */
+    @PostMapping("/refund/{txGroupId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<kr.wisead.domain.payment.dto.RefundResult> processRefund(
+            @PathVariable String txGroupId) {
+        return ApiResponse.success(balanceService.refund(txGroupId));
+    }
 }

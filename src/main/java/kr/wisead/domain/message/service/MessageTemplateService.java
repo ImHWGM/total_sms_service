@@ -81,12 +81,18 @@ public class MessageTemplateService {
     }
 
     /**
-     * 템플릿 상세 조회
+     * 템플릿 상세 조회 (소유자 검증 포함)
      */
     @Transactional(readOnly = true)
-    public MessageTemplateResponse getOne(Long templateSeq) {
+    public MessageTemplateResponse getOne(Long templateSeq, Long userSeq) {
         MessageTemplate template = messageTemplateMapper.findBySeq(templateSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "템플릿을 찾을 수 없습니다."));
+
+        // 소유자 확인
+        if (!template.getUserSeq().equals(userSeq)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 템플릿에 대한 권한이 없습니다.");
+        }
+
         return MessageTemplateResponse.from(template);
     }
 

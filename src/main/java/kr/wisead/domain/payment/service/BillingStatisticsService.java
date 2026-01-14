@@ -1,8 +1,8 @@
 package kr.wisead.domain.payment.service;
 
 import kr.wisead.domain.payment.dto.*;
-import kr.wisead.domain.payment.entity.Balance;
-import kr.wisead.mapper.primary.BalanceMapper;
+import kr.wisead.domain.payment.entity.Transaction;
+import kr.wisead.mapper.primary.TransactionMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,21 +16,24 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 과금 통계 서비스
+ * 과금 통계 서비스 (리팩토링 버전)
+ * - TransactionMapper 사용
+ * - WalletService 연동
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class BillingStatisticsService {
 
-    private final BalanceMapper balanceMapper;
+    private final TransactionMapper transactionMapper;
+    private final WalletService walletService;
 
     /**
      * 일별 과금 통계 조회
      */
     @Transactional(readOnly = true)
     public List<DailyBillingStatsResponse> getDailyBillingStats(BillingStatsSearchRequest request) {
-        List<Map<String, Object>> rawStats = balanceMapper.selectDailyBillingStats(
+        List<Map<String, Object>> rawStats = transactionMapper.selectDailyStats(
                 request.getUserId(),
                 request.getStartDate(),
                 request.getEndDate()
@@ -46,7 +49,7 @@ public class BillingStatisticsService {
      */
     @Transactional(readOnly = true)
     public List<MonthlyBillingStatsResponse> getMonthlyBillingStats(BillingStatsSearchRequest request) {
-        List<Map<String, Object>> rawStats = balanceMapper.selectMonthlyBillingStats(
+        List<Map<String, Object>> rawStats = transactionMapper.selectMonthlyStats(
                 request.getUserId(),
                 request.getStartDate(),
                 request.getEndDate()
@@ -62,7 +65,7 @@ public class BillingStatisticsService {
      */
     @Transactional(readOnly = true)
     public List<ServiceTypeBillingStatsResponse> getBillingStatsByServiceType(BillingStatsSearchRequest request) {
-        List<Map<String, Object>> rawStats = balanceMapper.selectBillingStatsByServiceType(
+        List<Map<String, Object>> rawStats = transactionMapper.selectStatsByServiceId(
                 request.getUserId(),
                 request.getStartDate(),
                 request.getEndDate()
@@ -78,8 +81,13 @@ public class BillingStatisticsService {
      */
     @Transactional(readOnly = true)
     public List<UserBillingStatsResponse> getBillingStatsByUser(BillingStatsSearchRequest request) {
-        List<Map<String, Object>> rawStats = balanceMapper.selectBillingStatsByUser(
-                request.getUserIds(),
+        List<String> userIds = request.getUserIds();
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Map<String, Object>> rawStats = transactionMapper.selectStatsByUsers(
+                userIds,
                 request.getStartDate(),
                 request.getEndDate()
         );
@@ -89,7 +97,7 @@ public class BillingStatisticsService {
 
         for (Map<String, Object> stat : rawStats) {
             String userId = (String) stat.get("userId");
-            String operation = (String) stat.get("operation");
+            String txType = (String) stat.get("txType");
             int transactionCount = getIntValue(stat, "transactionCount");
             BigDecimal totalAmount = getBigDecimalValue(stat, "totalAmount");
 
@@ -101,16 +109,16 @@ public class BillingStatisticsService {
                             .totalRefund(BigDecimal.ZERO)
                             .build());
 
-            switch (operation) {
-                case "P" -> {
+            switch (txType) {
+                case "CHARGE" -> {
                     userStats.setTotalCharge(userStats.getTotalCharge().add(totalAmount));
                     userStats.setChargeCount(userStats.getChargeCount() + transactionCount);
                 }
-                case "M" -> {
+                case "DEDUCT" -> {
                     userStats.setTotalDeduct(userStats.getTotalDeduct().add(totalAmount));
                     userStats.setDeductCount(userStats.getDeductCount() + transactionCount);
                 }
-                case "R" -> {
+                case "REFUND" -> {
                     userStats.setTotalRefund(userStats.getTotalRefund().add(totalAmount));
                     userStats.setRefundCount(userStats.getRefundCount() + transactionCount);
                 }
@@ -118,9 +126,8 @@ public class BillingStatisticsService {
         }
 
         // 현재 잔액 정보 추가
-        List<String> userIds = new ArrayList<>(userStatsMap.keySet());
-        if (!userIds.isEmpty()) {
-            List<Map<String, Object>> balances = balanceMapper.selectCurrentBalanceByUsers(userIds);
+        if (!userStatsMap.isEmpty()) {
+            List<Map<String, Object>> balances = transactionMapper.selectUserBalanceSummary(userIds);
             for (Map<String, Object> balance : balances) {
                 String userId = (String) balance.get("userId");
                 UserBillingStatsResponse userStats = userStatsMap.get(userId);
@@ -129,6 +136,19 @@ public class BillingStatisticsService {
                     Object lastTxDate = balance.get("lastTransactionDate");
                     if (lastTxDate instanceof LocalDateTime) {
                         userStats.setLastTransactionDate((LocalDateTime) lastTxDate);
+                    }
+                }
+            }
+
+            // 잔액 정보가 없는 사용자 처리 (새 wallet 기반)
+            for (String userId : userIds) {
+                UserBillingStatsResponse userStats = userStatsMap.get(userId);
+                if (userStats != null && userStats.getCurrentBalance() == null) {
+                    try {
+                        WalletSummaryResponse summary = walletService.getWalletSummary(userId);
+                        userStats.setCurrentBalance(summary.getTotal());
+                    } catch (Exception e) {
+                        userStats.setCurrentBalance(BigDecimal.ZERO);
                     }
                 }
             }
@@ -142,7 +162,7 @@ public class BillingStatisticsService {
      */
     @Transactional(readOnly = true)
     public BillingSummaryResponse getBillingSummary(BillingStatsSearchRequest request) {
-        Map<String, Object> rawSummary = balanceMapper.selectBillingSummary(
+        Map<String, Object> rawSummary = transactionMapper.selectSummary(
                 request.getUserId(),
                 request.getStartDate(),
                 request.getEndDate()
@@ -177,8 +197,18 @@ public class BillingStatisticsService {
      * 최근 거래 내역 조회
      */
     @Transactional(readOnly = true)
-    public List<Balance> getRecentTransactions(String operation, int limit) {
-        return balanceMapper.selectRecentTransactions(operation, limit);
+    public List<Transaction> getRecentTransactions(String txType, int limit) {
+        return transactionMapper.selectRecent(txType, limit);
+    }
+
+    /**
+     * 최근 거래 내역 조회 (Response 변환)
+     */
+    @Transactional(readOnly = true)
+    public List<TransactionResponse> getRecentTransactionsAsResponse(String txType, int limit) {
+        return transactionMapper.selectRecent(txType, limit).stream()
+                .map(TransactionResponse::from)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -195,11 +225,13 @@ public class BillingStatisticsService {
         List<UserBillingStatsResponse> stats = getBillingStatsByUser(request);
         if (stats.isEmpty()) {
             // 해당 기간 거래가 없어도 현재 잔액은 조회
-            Balance latestBalance = balanceMapper.selectLatestBalance(userId);
+            WalletSummaryResponse summary = walletService.getWalletSummary(userId);
+            LocalDateTime lastTxDate = transactionMapper.selectLastTransactionDate(userId);
+
             return UserBillingStatsResponse.builder()
                     .userId(userId)
-                    .currentBalance(latestBalance != null ? latestBalance.getTotalBalance() : BigDecimal.ZERO)
-                    .lastTransactionDate(latestBalance != null ? latestBalance.getRegDate() : null)
+                    .currentBalance(summary.getTotal())
+                    .lastTransactionDate(lastTxDate)
                     .totalCharge(BigDecimal.ZERO)
                     .totalDeduct(BigDecimal.ZERO)
                     .totalRefund(BigDecimal.ZERO)
@@ -271,12 +303,23 @@ public class BillingStatisticsService {
                 .build());
     }
 
+    /**
+     * 통화 유형별 잔액 조회 (신규)
+     */
+    @Transactional(readOnly = true)
+    public WalletSummaryResponse getWalletSummary(String userId) {
+        return walletService.getWalletSummary(userId);
+    }
+
     // ==================== Private Methods ====================
 
     private DailyBillingStatsResponse toDailyBillingStatsResponse(Map<String, Object> raw) {
-        String operation = (String) raw.get("operation");
+        String txType = (String) raw.get("txType");
         Object statDateObj = raw.get("statDate");
         String statDate = statDateObj != null ? statDateObj.toString() : null;
+
+        // txType을 operation으로 변환
+        String operation = convertTxTypeToOperation(txType);
 
         return DailyBillingStatsResponse.builder()
                 .statDate(statDate)
@@ -288,7 +331,8 @@ public class BillingStatisticsService {
     }
 
     private MonthlyBillingStatsResponse toMonthlyBillingStatsResponse(Map<String, Object> raw) {
-        String operation = (String) raw.get("operation");
+        String txType = (String) raw.get("txType");
+        String operation = convertTxTypeToOperation(txType);
 
         return MonthlyBillingStatsResponse.builder()
                 .statMonth((String) raw.get("statMonth"))
@@ -300,14 +344,24 @@ public class BillingStatisticsService {
     }
 
     private ServiceTypeBillingStatsResponse toServiceTypeBillingStatsResponse(Map<String, Object> raw) {
-        String serviceType = (String) raw.get("serviceType");
+        String serviceId = (String) raw.get("serviceId");
 
         return ServiceTypeBillingStatsResponse.builder()
-                .serviceType(serviceType)
-                .serviceTypeName(ServiceTypeBillingStatsResponse.getServiceTypeName(serviceType))
+                .serviceType(serviceId)
+                .serviceTypeName(ServiceTypeBillingStatsResponse.getServiceTypeName(serviceId))
                 .transactionCount(getIntValue(raw, "transactionCount"))
                 .totalAmount(getBigDecimalValue(raw, "totalAmount"))
                 .build();
+    }
+
+    private String convertTxTypeToOperation(String txType) {
+        if (txType == null) return "E";
+        return switch (txType) {
+            case "CHARGE" -> "P";
+            case "DEDUCT" -> "M";
+            case "REFUND" -> "R";
+            default -> "E";
+        };
     }
 
     private int getIntValue(Map<String, Object> map, String key) {

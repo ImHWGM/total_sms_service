@@ -2,7 +2,6 @@ package kr.wisead.domain.payment.controller;
 
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.domain.payment.dto.*;
-import kr.wisead.domain.payment.entity.Balance;
 import kr.wisead.domain.payment.service.BillingStatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -204,14 +203,14 @@ public class BillingStatisticsController {
 
     /**
      * 최근 거래 내역 조회
-     * GET /api/billing/statistics/recent?operation=P&limit=20
+     * GET /api/billing/statistics/recent?txType=CHARGE&limit=20
      */
     @GetMapping("/recent")
-    public ApiResponse<List<Balance>> getRecentTransactions(
-            @RequestParam(required = false) String operation,
+    public ApiResponse<List<TransactionResponse>> getRecentTransactions(
+            @RequestParam(required = false) String txType,
             @RequestParam(defaultValue = "20") int limit) {
 
-        List<Balance> response = billingStatisticsService.getRecentTransactions(operation, limit);
+        List<TransactionResponse> response = billingStatisticsService.getRecentTransactionsAsResponse(txType, limit);
         return ApiResponse.success(response);
     }
 }

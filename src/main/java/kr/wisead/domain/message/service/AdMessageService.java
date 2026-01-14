@@ -6,9 +6,8 @@ import kr.wisead.domain.ars.service.BlockedNumberService;
 import kr.wisead.domain.message.dto.AdMessageRequest;
 import kr.wisead.domain.message.dto.AdMessageResponse;
 import kr.wisead.domain.message.entity.MsgQueue;
-import kr.wisead.domain.payment.entity.Balance;
+import kr.wisead.domain.payment.dto.BalanceResponse;
 import kr.wisead.domain.payment.service.BalanceService;
-import kr.wisead.mapper.primary.BalanceMapper;
 import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.mapper.sms.MsgQueueMapper;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +31,6 @@ import java.util.stream.Collectors;
 public class AdMessageService {
 
     private final MsgQueueMapper msgQueueMapper;
-    private final BalanceMapper balanceMapper;
     private final UserMapper userMapper;
     private final BalanceService balanceService;
     private final BlockedNumberService blockedNumberService;
@@ -121,8 +119,8 @@ public class AdMessageService {
             return AdMessageResponse.allBlocked(blockedCount, maskedBlockedNumbers);
         }
 
-        // 6. 잔액 확인 및 차감
-        Balance latestBalance = balanceMapper.selectLatestBalance(userId);
+        // 6. 잔액 확인
+        BalanceResponse latestBalance = balanceService.getCurrentBalance(userId);
         if (latestBalance == null) {
             return AdMessageResponse.insufficientBalance("잔액 정보가 없습니다.\n요금 충전 후 서비스 이용이 가능합니다.");
         }
@@ -130,7 +128,7 @@ public class AdMessageService {
         BigDecimal unitPrice = getUnitPrice(latestBalance, request.getMsgTypeLabel());
         BigDecimal totalCharge = unitPrice.multiply(BigDecimal.valueOf(filteredRecipients.size()));
 
-        if (latestBalance.getTotalBalance().compareTo(totalCharge) < 0) {
+        if (!balanceService.hasEnoughBalance(userId, totalCharge)) {
             return AdMessageResponse.insufficientBalance(
                     String.format("충전 금액이 부족합니다.\n필요: %s원, 잔액: %s원",
                             totalCharge.stripTrailingZeros().toPlainString(),
@@ -199,9 +197,9 @@ public class AdMessageService {
     }
 
     /**
-     * 메시지 타입별 단가 조회
+     * 메시지 타입별 단가 조회 (BalanceResponse 사용)
      */
-    private BigDecimal getUnitPrice(Balance balance, String msgTypeLabel) {
+    private BigDecimal getUnitPrice(BalanceResponse balance, String msgTypeLabel) {
         return switch (msgTypeLabel.toUpperCase()) {
             case "SMS" -> balance.getSmsPrice() != null ? balance.getSmsPrice() : balance.getSubtractUnitPrice();
             case "LMS" -> balance.getLmsPrice() != null ? balance.getLmsPrice() : balance.getSubtractUnitPrice();

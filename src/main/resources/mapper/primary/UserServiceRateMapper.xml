@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.UserServiceRateMapper">
+
+    <!-- 단가 등록 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO user_service_rate (
+            user_id,
+            service_id,
+            rate,
+            start_date,
+            end_date
+        ) VALUES (
+            #{userId},
+            #{serviceId},
+            #{rate},
+            #{startDate},
+            #{endDate}
+        )
+    </insert>
+
+    <!-- 현재 유효한 단가 조회 -->
+    <select id="selectActiveRate" resultType="kr.wisead.domain.payment.entity.UserServiceRate">
+        SELECT
+            seq,
+            user_id AS userId,
+            service_id AS serviceId,
+            rate,
+            start_date AS startDate,
+            end_date AS endDate,
+            reg_date AS regDate
+        FROM user_service_rate
+        WHERE user_id = #{userId}
+          AND service_id = #{serviceId}
+          AND start_date <![CDATA[<=]]> #{today}
+          AND (end_date IS NULL OR end_date >= #{today})
+        ORDER BY start_date DESC
+        LIMIT 1
+    </select>
+
+    <!-- 사용자의 모든 유효한 단가 조회 -->
+    <select id="selectAllActiveRates" resultType="kr.wisead.domain.payment.entity.UserServiceRate">
+        SELECT
+            seq,
+            user_id AS userId,
+            service_id AS serviceId,
+            rate,
+            start_date AS startDate,
+            end_date AS endDate,
+            reg_date AS regDate
+        FROM user_service_rate
+        WHERE user_id = #{userId}
+          AND start_date <![CDATA[<=]]> #{today}
+          AND (end_date IS NULL OR end_date >= #{today})
+        ORDER BY service_id, start_date DESC
+    </select>
+
+    <!-- 단가 이력 조회 -->
+    <select id="selectHistory" resultType="kr.wisead.domain.payment.entity.UserServiceRate">
+        SELECT
+            seq,
+            user_id AS userId,
+            service_id AS serviceId,
+            rate,
+            start_date AS startDate,
+            end_date AS endDate,
+            reg_date AS regDate
+        FROM user_service_rate
+        WHERE user_id = #{userId}
+          AND service_id = #{serviceId}
+        ORDER BY start_date DESC
+    </select>
+
+    <!-- 종료일 업데이트 -->
+    <update id="updateEndDate">
+        UPDATE user_service_rate
+        SET end_date = #{endDate}
+        WHERE seq = #{seq}
+    </update>
+
+    <!-- 단가 삭제 -->
+    <delete id="delete">
+        DELETE FROM user_service_rate
+        WHERE seq = #{seq}
+    </delete>
+
+    <!-- 사용자 단가 조회 (없으면 NULL) -->
+    <select id="selectUserRate" resultType="java.math.BigDecimal">
+        SELECT rate
+        FROM user_service_rate
+        WHERE user_id = #{userId}
+          AND service_id = #{serviceId}
+          AND start_date <![CDATA[<=]]> #{today}
+          AND (end_date IS NULL OR end_date >= #{today})
+        ORDER BY start_date DESC
+        LIMIT 1
+    </select>
+
+    <!-- 기준 단가 조회 (VAT 미포함) -->
+    <select id="selectStandardRate" resultType="java.math.BigDecimal">
+        SELECT service_rate
+        FROM standard_rate
+        WHERE service_id = #{serviceId}
+    </select>
+
+</mapper>

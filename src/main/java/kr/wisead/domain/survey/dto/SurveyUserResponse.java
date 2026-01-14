@@ -1,7 +1,9 @@
 package kr.wisead.domain.survey.dto;
 
+import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.survey.entity.SurveyUser;
 import lombok.*;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -9,6 +11,7 @@ import java.time.LocalDateTime;
 /**
  * 설문 참여자 응답 DTO
  */
+@Slf4j
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -43,7 +46,7 @@ public class SurveyUserResponse {
     private String corpName;                // 고객사명
 
     /**
-     * Entity -> Response 변환
+     * Entity -> Response 변환 (암호화된 개인정보 복호화 포함)
      */
     public static SurveyUserResponse from(SurveyUser entity) {
         String status;
@@ -55,15 +58,21 @@ public class SurveyUserResponse {
             status = "미참여";
         }
 
+        // 복호화된 전화번호를 마스킹
+        String decryptedPhone = decryptField(entity.getUserPhone());
+        String decryptedResendPhone = decryptField(entity.getResendUserPhone());
+
         return SurveyUserResponse.builder()
                 .userSeq(entity.getSeq())
                 .eventSeq(entity.getEventSeq())
                 .userKey(entity.getUserKey())
-                .userName(entity.getUserName())
-                .userPhone(maskPhone(entity.getUserPhone()))
-                .resendUserPhone(maskPhone(entity.getResendUserPhone()))
-                .userEmail(entity.getUserEmail())
-                .address(entity.getAddress())
+                .userName(decryptField(entity.getUserName()))
+                .juminNum(maskJuminNum(decryptField(entity.getJuminNum())))
+                .userPhone(maskPhone(decryptedPhone))
+                .resendUserPhone(maskPhone(decryptedResendPhone))
+                .userEmail(decryptField(entity.getUserEmail()))
+                .address(decryptField(entity.getAddress()))
+                .address2(decryptField(entity.getAddress2()))
                 .depositDate(entity.getDepositDate())
                 .shipmentDate(entity.getShipmentDate())
                 .submissionDate(entity.getSubmissionDate())
@@ -78,6 +87,21 @@ public class SurveyUserResponse {
     }
 
     /**
+     * 암호화된 필드 복호화 (AES256 + Base64)
+     */
+    private static String decryptField(String encryptedValue) {
+        if (encryptedValue == null || encryptedValue.isEmpty()) {
+            return encryptedValue;
+        }
+        try {
+            return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedValue));
+        } catch (Exception e) {
+            log.debug("필드 복호화 실패, 원본 반환: {}", e.getMessage());
+            return encryptedValue;
+        }
+    }
+
+    /**
      * 전화번호 마스킹
      */
     private static String maskPhone(String phone) {
@@ -86,5 +110,16 @@ public class SurveyUserResponse {
         }
         // 뒷 4자리만 표시
         return "*".repeat(phone.length() - 4) + phone.substring(phone.length() - 4);
+    }
+
+    /**
+     * 주민번호 마스킹 (앞 6자리만 표시)
+     */
+    private static String maskJuminNum(String juminNum) {
+        if (juminNum == null || juminNum.length() < 7) {
+            return juminNum;
+        }
+        // 앞 6자리만 표시, 나머지 마스킹
+        return juminNum.substring(0, 6) + "-*******";
     }
 }

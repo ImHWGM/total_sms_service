@@ -3,60 +3,95 @@ package kr.wisead.domain.payment.service;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
-import kr.wisead.domain.payment.dto.BalanceResponse;
-import kr.wisead.domain.payment.dto.ChargeRequest;
-import kr.wisead.domain.payment.dto.SmsPriceRequest;
-import kr.wisead.domain.payment.entity.Balance;
+import kr.wisead.domain.payment.dto.*;
+import kr.wisead.domain.payment.entity.Transaction;
+import kr.wisead.domain.payment.entity.UserServiceRate;
 import kr.wisead.mapper.primary.BalanceMapper;
+import kr.wisead.mapper.primary.TransactionMapper;
+import kr.wisead.mapper.primary.UserServiceRateMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 잔액 관리 서비스
+ * 잔액 관리 서비스 (리팩토링 버전)
+ * - 내부적으로 WalletService 사용
+ * - 기존 API 호환성 유지
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class BalanceService {
 
-    private final BalanceMapper balanceMapper;
-
-    private static final BigDecimal VAT = BigDecimal.valueOf(1.1);
-    private static final BigDecimal DEFAULT_SURVEY_PRICE = BigDecimal.valueOf(33);
-    private static final BigDecimal DEFAULT_SMS_PRICE = BigDecimal.valueOf(11);
-    private static final BigDecimal DEFAULT_LMS_PRICE = BigDecimal.valueOf(33);
-    private static final BigDecimal DEFAULT_MMS_PRICE = BigDecimal.valueOf(110);
+    private final WalletService walletService;
+    private final TransactionMapper transactionMapper;
+    private final UserServiceRateMapper userServiceRateMapper;
+    private final BalanceMapper balanceMapper; // 레거시 호환용
 
     /**
      * 현재 잔액 조회
      */
     public BalanceResponse getCurrentBalance(String userId) {
-        Balance balance = balanceMapper.selectLatestBalance(userId);
-        if (balance == null) {
-            return BalanceResponse.builder()
-                    .userId(userId)
-                    .totalBalance(BigDecimal.ZERO)
-                    .build();
-        }
-        return BalanceResponse.from(balance);
+        WalletSummaryResponse summary = walletService.getWalletSummary(userId);
+
+        return BalanceResponse.builder()
+                .userId(userId)
+                .totalBalance(summary.getTotal())
+                .balance(BigDecimal.ZERO)
+                .operation("Q") // Query
+                .operationName("조회")
+                .smsPrice(getSmsPrice(userId))
+                .lmsPrice(getLmsPrice(userId))
+                .mmsPrice(getMmsPrice(userId))
+                .subtractUnitPrice(getSurveyPrice(userId))
+                .build();
     }
 
     /**
-     * 잔액 내역 조회 (페이징)
+     * 확장된 잔액 조회 (CASH + POINT + BONUS 분리)
+     */
+    public WalletSummaryResponse getWalletSummary(String userId) {
+        return walletService.getWalletSummary(userId);
+    }
+
+    /**
+     * 활성 Lot 목록 조회
+     */
+    public List<WalletLotResponse> getActiveLots(String userId) {
+        return walletService.getActiveLots(userId);
+    }
+
+    /**
+     * 잔액 내역 조회 (페이징) - 새 트랜잭션 테이블 사용
+     */
+    public PageResponse<TransactionResponse> getTransactionHistory(String userId, int page, int size) {
+        int offset = (page - 1) * size;
+        List<Transaction> list = transactionMapper.selectHistory(userId, offset, size);
+        int total = transactionMapper.selectHistoryCount(userId);
+
+        List<TransactionResponse> responses = list.stream()
+                .map(TransactionResponse::from)
+                .collect(Collectors.toList());
+
+        return PageResponse.of(responses, page, size, total);
+    }
+
+    /**
+     * 잔액 내역 조회 (페이징) - 레거시 호환용
      */
     public PageResponse<BalanceResponse> getBalanceHistory(String userId, int page, int size) {
         int offset = (page - 1) * size;
-        List<Balance> list = balanceMapper.selectBalanceHistory(userId, offset, size);
-        int total = balanceMapper.selectBalanceHistoryCount(userId);
+        List<Transaction> list = transactionMapper.selectHistory(userId, offset, size);
+        int total = transactionMapper.selectHistoryCount(userId);
 
         List<BalanceResponse> responses = list.stream()
-                .map(BalanceResponse::from)
+                .map(this::convertToBalanceResponse)
                 .collect(Collectors.toList());
 
         return PageResponse.of(responses, page, size, total);
@@ -67,78 +102,57 @@ public class BalanceService {
      */
     @Transactional
     public BalanceResponse charge(ChargeRequest request, String operatorId) {
-        Balance latest = balanceMapper.selectLatestBalance(request.getUserId());
+        String comment = request.getComment() != null ? request.getComment() : "충전";
+        TransactionResponse txResponse = walletService.charge(request.getUserId(), request.getAmount(), comment);
 
-        BigDecimal currentBalance = BigDecimal.ZERO;
-        BigDecimal surveyPrice = DEFAULT_SURVEY_PRICE.multiply(VAT);
-        BigDecimal smsPrice = DEFAULT_SMS_PRICE.multiply(VAT);
-        BigDecimal lmsPrice = DEFAULT_LMS_PRICE.multiply(VAT);
-        BigDecimal mmsPrice = DEFAULT_MMS_PRICE.multiply(VAT);
+        log.info("충전 완료: userId={}, amount={}, balanceAfter={}",
+                request.getUserId(), request.getAmount(), txResponse.getBalanceAfter());
 
-        if (latest != null) {
-            currentBalance = latest.getTotalBalance();
-            if (latest.getSubtractUnitPrice() != null) {
-                surveyPrice = latest.getSubtractUnitPrice();
-            }
-            if (latest.getSmsPrice() != null)
-                smsPrice = latest.getSmsPrice();
-            if (latest.getLmsPrice() != null)
-                lmsPrice = latest.getLmsPrice();
-            if (latest.getMmsPrice() != null)
-                mmsPrice = latest.getMmsPrice();
-        }
-
-        BigDecimal newBalance = currentBalance.add(request.getAmount());
-
-        Balance balance = Balance.builder()
-                .userId(request.getUserId())
-                .balance(request.getAmount())
-                .totalBalance(newBalance)
+        return BalanceResponse.builder()
+                .seq(txResponse.getSeq())
+                .userId(txResponse.getUserId())
+                .balance(txResponse.getAmount())
+                .totalBalance(txResponse.getBalanceAfter())
                 .operation("P")
-                .comment(request.getComment() != null ? request.getComment() : "충전")
-                .subtractUnitPrice(surveyPrice)
-                .smsPrice(smsPrice)
-                .lmsPrice(lmsPrice)
-                .mmsPrice(mmsPrice)
-                .regId(operatorId)
+                .operationName("충전")
+                .comment(comment)
+                .regDate(txResponse.getRegDate())
+                .smsPrice(getSmsPrice(request.getUserId()))
+                .lmsPrice(getLmsPrice(request.getUserId()))
+                .mmsPrice(getMmsPrice(request.getUserId()))
+                .subtractUnitPrice(getSurveyPrice(request.getUserId()))
                 .build();
-
-        balanceMapper.insertBalance(balance);
-        log.info("충전 완료: userId={}, amount={}, newBalance={}", request.getUserId(), request.getAmount(), newBalance);
-
-        return BalanceResponse.from(balance);
     }
 
     /**
-     * 차감
+     * 차감 (금액 직접 지정)
      */
     @Transactional
     public BalanceResponse deduct(String userId, BigDecimal amount, String comment, String operatorId) {
-        Balance latest = balanceMapper.selectLatestBalance(userId);
-
-        if (latest == null || latest.getTotalBalance().compareTo(amount) < 0) {
+        // 잔액 확인
+        if (!walletService.hasEnoughBalance(userId, amount)) {
             throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "잔액이 부족합니다.");
         }
 
-        BigDecimal newBalance = latest.getTotalBalance().subtract(amount);
+        // 우선순위 차감 (BONUS → POINT → CASH) - 금액 직접 차감
+        String txGroupId = walletService.deductByAmount(userId, amount, comment);
 
-        Balance balance = Balance.builder()
+        WalletSummaryResponse summary = walletService.getWalletSummary(userId);
+
+        log.info("차감 완료: userId={}, amount={}, balanceAfter={}", userId, amount, summary.getTotal());
+
+        return BalanceResponse.builder()
                 .userId(userId)
                 .balance(amount)
-                .totalBalance(newBalance)
+                .totalBalance(summary.getTotal())
                 .operation("M")
+                .operationName("차감")
                 .comment(comment)
-                .subtractUnitPrice(latest.getSubtractUnitPrice())
-                .smsPrice(latest.getSmsPrice())
-                .lmsPrice(latest.getLmsPrice())
-                .mmsPrice(latest.getMmsPrice())
-                .regId(operatorId)
+                .smsPrice(getSmsPrice(userId))
+                .lmsPrice(getLmsPrice(userId))
+                .mmsPrice(getMmsPrice(userId))
+                .subtractUnitPrice(getSurveyPrice(userId))
                 .build();
-
-        balanceMapper.insertBalance(balance);
-        log.info("차감 완료: userId={}, amount={}, newBalance={}", userId, amount, newBalance);
-
-        return BalanceResponse.from(balance);
     }
 
     /**
@@ -146,58 +160,34 @@ public class BalanceService {
      */
     @Transactional
     public void deductMessageCharge(String userId, int count, String msgType, String comment) {
-        Balance latest = balanceMapper.selectLatestBalance(userId);
+        String serviceId = getServiceIdByMsgType(msgType);
+        BigDecimal quantity = BigDecimal.valueOf(count);
 
-        if (latest == null) {
-            throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "잔액 정보가 없습니다.");
-        }
+        // 단가 조회
+        BigDecimal unitPrice = walletService.getAppliedRate(userId, serviceId);
+        BigDecimal totalCharge = unitPrice.multiply(quantity);
 
-        BigDecimal unitPrice = switch (msgType.toUpperCase()) {
-            case "SMS" -> latest.getSmsPrice();
-            case "LMS" -> latest.getLmsPrice();
-            case "MMS" -> latest.getMmsPrice();
-            default -> latest.getSubtractUnitPrice();
-        };
-
-        BigDecimal totalCharge = unitPrice.multiply(BigDecimal.valueOf(count));
-
-        if (latest.getTotalBalance().compareTo(totalCharge) < 0) {
+        // 잔액 확인
+        if (!walletService.hasEnoughBalance(userId, totalCharge)) {
             throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "잔액이 부족합니다.");
         }
 
-        BigDecimal newBalance = latest.getTotalBalance().subtract(totalCharge);
+        // 우선순위 차감
+        String txGroupId = walletService.deductWithPriority(userId, serviceId, quantity, comment);
 
-        Balance balance = Balance.builder()
-                .userId(userId)
-                .balance(totalCharge)
-                .totalBalance(newBalance)
-                .operation("M")
-                .comment(comment)
-                .subtractUnitPrice(latest.getSubtractUnitPrice())
-                .smsPrice(latest.getSmsPrice())
-                .lmsPrice(latest.getLmsPrice())
-                .mmsPrice(latest.getMmsPrice())
-                .regId(userId)
-                .build();
-
-        balanceMapper.insertBalance(balance);
-        log.info("메시지 비용 차감: userId={}, count={}, type={}, charge={}, newBalance={}",
-                userId, count, msgType, totalCharge, newBalance);
+        log.info("메시지 비용 차감: userId={}, count={}, type={}, charge={}, txGroupId={}",
+                userId, count, msgType, totalCharge, txGroupId);
     }
 
     /**
      * 잔액 충분 여부 확인
      */
     public boolean hasEnoughBalance(String userId, BigDecimal requiredAmount) {
-        Balance latest = balanceMapper.selectLatestBalance(userId);
-        if (latest == null) {
-            return false;
-        }
-        return latest.getTotalBalance().compareTo(requiredAmount) >= 0;
+        return walletService.hasEnoughBalance(userId, requiredAmount);
     }
 
     /**
-     * 문자 요금 설정
+     * 문자 요금 설정 (사용자별 단가)
      */
     @Transactional
     public BalanceResponse updateSmsPrice(SmsPriceRequest request, String operatorId) {
@@ -205,35 +195,143 @@ public class BalanceService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사용자 ID가 필요합니다.");
         }
 
-        Balance latest = balanceMapper.selectLatestBalance(request.getUserId());
+        LocalDate today = LocalDate.now();
 
-        if (latest == null) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "해당 사용자의 잔액 정보가 없습니다.");
+        // SMS 단가 설정
+        if (request.getSmsPrice() != null) {
+            updateUserServiceRate(request.getUserId(), "msg_sms", request.getSmsPrice(), today);
         }
 
-        // 변경된 단가만 업데이트, 없으면 기존 값 유지
-        BigDecimal smsPrice = request.getSmsPrice() != null ? request.getSmsPrice() : latest.getSmsPrice();
-        BigDecimal lmsPrice = request.getLmsPrice() != null ? request.getLmsPrice() : latest.getLmsPrice();
-        BigDecimal mmsPrice = request.getMmsPrice() != null ? request.getMmsPrice() : latest.getMmsPrice();
+        // LMS 단가 설정
+        if (request.getLmsPrice() != null) {
+            updateUserServiceRate(request.getUserId(), "msg_lms", request.getLmsPrice(), today);
+        }
 
-        // 단가 변경 이력을 위한 레코드 추가 (잔액 변동 없이 단가만 변경)
-        Balance balance = Balance.builder()
-                .userId(request.getUserId())
-                .balance(BigDecimal.ZERO)
-                .totalBalance(latest.getTotalBalance())
-                .operation("U") // Update
-                .comment("문자 요금 설정 변경")
-                .subtractUnitPrice(latest.getSubtractUnitPrice())
-                .smsPrice(smsPrice)
-                .lmsPrice(lmsPrice)
-                .mmsPrice(mmsPrice)
-                .regId(operatorId)
-                .build();
+        // MMS 단가 설정
+        if (request.getMmsPrice() != null) {
+            updateUserServiceRate(request.getUserId(), "msg_mms", request.getMmsPrice(), today);
+        }
 
-        balanceMapper.insertBalance(balance);
         log.info("문자 요금 변경: userId={}, SMS={}, LMS={}, MMS={}",
-                request.getUserId(), smsPrice, lmsPrice, mmsPrice);
+                request.getUserId(), request.getSmsPrice(), request.getLmsPrice(), request.getMmsPrice());
 
-        return BalanceResponse.from(balance);
+        WalletSummaryResponse summary = walletService.getWalletSummary(request.getUserId());
+
+        return BalanceResponse.builder()
+                .userId(request.getUserId())
+                .totalBalance(summary.getTotal())
+                .balance(BigDecimal.ZERO)
+                .operation("U")
+                .operationName("단가변경")
+                .comment("문자 요금 설정 변경")
+                .smsPrice(getSmsPrice(request.getUserId()))
+                .lmsPrice(getLmsPrice(request.getUserId()))
+                .mmsPrice(getMmsPrice(request.getUserId()))
+                .subtractUnitPrice(getSurveyPrice(request.getUserId()))
+                .build();
+    }
+
+    /**
+     * 환불 미리보기
+     */
+    @Transactional(readOnly = true)
+    public RefundPreviewResponse previewRefund(String txGroupId) {
+        return walletService.previewRefund(txGroupId);
+    }
+
+    /**
+     * 환불 처리
+     */
+    @Transactional
+    public RefundResult refund(String txGroupId) {
+        return walletService.refundByGroup(txGroupId);
+    }
+
+    // ========== Private Helper Methods ==========
+
+    private String getServiceIdByMsgType(String msgType) {
+        return switch (msgType.toUpperCase()) {
+            case "SMS" -> "msg_sms";
+            case "LMS" -> "msg_lms";
+            case "MMS" -> "msg_mms";
+            default -> "survey";
+        };
+    }
+
+    private BigDecimal getSmsPrice(String userId) {
+        return getRate(userId, "msg_sms", BigDecimal.valueOf(12.1));
+    }
+
+    private BigDecimal getLmsPrice(String userId) {
+        return getRate(userId, "msg_lms", BigDecimal.valueOf(36.3));
+    }
+
+    private BigDecimal getMmsPrice(String userId) {
+        return getRate(userId, "msg_mms", BigDecimal.valueOf(121));
+    }
+
+    private BigDecimal getSurveyPrice(String userId) {
+        return getRate(userId, "survey", BigDecimal.valueOf(36.3));
+    }
+
+    private static final BigDecimal VAT_RATE = new BigDecimal("1.1");
+
+    private BigDecimal getRate(String userId, String serviceId, BigDecimal defaultRate) {
+        try {
+            // 1. 사용자 단가 조회 (VAT 포함)
+            BigDecimal userRate = userServiceRateMapper.selectUserRate(userId, serviceId, LocalDate.now());
+            if (userRate != null) {
+                return userRate;
+            }
+
+            // 2. 기준 단가 조회 (VAT 미포함)
+            BigDecimal standardRate = userServiceRateMapper.selectStandardRate(serviceId);
+            if (standardRate != null) {
+                return standardRate.multiply(VAT_RATE).setScale(2, java.math.RoundingMode.HALF_UP);
+            }
+
+            return defaultRate;
+        } catch (Exception e) {
+            return defaultRate;
+        }
+    }
+
+    private void updateUserServiceRate(String userId, String serviceId, BigDecimal rate, LocalDate startDate) {
+        // 기존 유효한 단가 종료 처리
+        userServiceRateMapper.selectActiveRate(userId, serviceId, startDate)
+                .ifPresent(existing -> {
+                    userServiceRateMapper.updateEndDate(existing.getSeq(), startDate.minusDays(1));
+                });
+
+        // 새 단가 등록
+        UserServiceRate newRate = UserServiceRate.create(userId, serviceId, rate, startDate);
+        userServiceRateMapper.insert(newRate);
+    }
+
+    private BalanceResponse convertToBalanceResponse(Transaction tx) {
+        String opName = switch (tx.getTxType()) {
+            case "CHARGE" -> "충전";
+            case "DEDUCT" -> "차감";
+            case "REFUND" -> "환불";
+            default -> tx.getTxType();
+        };
+
+        String operation = switch (tx.getTxType()) {
+            case "CHARGE" -> "P";
+            case "DEDUCT" -> "M";
+            case "REFUND" -> "R";
+            default -> "E";
+        };
+
+        return BalanceResponse.builder()
+                .seq(tx.getSeq())
+                .userId(tx.getUserId())
+                .balance(tx.getAmount())
+                .totalBalance(tx.getBalanceAfter())
+                .operation(operation)
+                .operationName(opName)
+                .comment(tx.getComment())
+                .regDate(tx.getRegDate())
+                .build();
     }
 }

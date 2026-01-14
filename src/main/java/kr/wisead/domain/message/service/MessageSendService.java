@@ -168,29 +168,48 @@ public class MessageSendService {
     }
 
     /**
-     * 예약 발송 취소
+     * 예약 발송 취소 (소유자 검증 포함)
      */
     @Transactional("smsTransactionManager")
-    public int cancelScheduledMessage(Integer mseq) {
+    public int cancelScheduledMessage(Integer mseq, String regId) {
         MsgQueue msgQueue = msgQueueMapper.findByMseq(mseq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "발송 정보를 찾을 수 없습니다."));
+
+        // 소유자 검증 (extCol3 = regId)
+        if (!regId.equals(msgQueue.getExtCol3())) {
+            log.warn("발송 취소 권한 없음 - mseq: {}, 요청자: {}, 소유자: {}", mseq, regId, msgQueue.getExtCol3());
+            throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 발송을 취소할 권한이 없습니다.");
+        }
 
         if (!msgQueue.isPending()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "대기 중인 발송만 취소할 수 있습니다.");
         }
 
         int deleted = msgQueueMapper.delete(mseq);
-        log.info("예약 발송 취소 - mseq: {}", mseq);
+        log.info("예약 발송 취소 - mseq: {}, regId: {}", mseq, regId);
         return deleted;
     }
 
     /**
-     * 배치 전체 예약 취소
+     * 배치 전체 예약 취소 (소유자 검증 포함)
      */
     @Transactional("smsTransactionManager")
-    public int cancelScheduledBatch(String userKey) {
+    public int cancelScheduledBatch(String userKey, String regId) {
+        // 배치의 첫 번째 메시지로 소유자 검증
+        List<MsgQueue> messages = msgQueueMapper.findByUserKey(userKey);
+        if (messages.isEmpty()) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "발송 정보를 찾을 수 없습니다.");
+        }
+
+        // 소유자 검증
+        MsgQueue firstMsg = messages.get(0);
+        if (!regId.equals(firstMsg.getExtCol3())) {
+            log.warn("배치 취소 권한 없음 - userKey: {}, 요청자: {}, 소유자: {}", userKey, regId, firstMsg.getExtCol3());
+            throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 발송을 취소할 권한이 없습니다.");
+        }
+
         int deleted = msgQueueMapper.deleteByUserKey(userKey);
-        log.info("배치 예약 발송 취소 - userKey: {}, count: {}", userKey, deleted);
+        log.info("배치 예약 발송 취소 - userKey: {}, count: {}, regId: {}", userKey, deleted, regId);
         return deleted;
     }
 

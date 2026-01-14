@@ -112,12 +112,14 @@ public class MessageTemplateController {
     }
 
     /**
-     * 템플릿 상세 조회
+     * 템플릿 상세 조회 (소유자 검증 포함)
      */
     @GetMapping("/{templateSeq}")
     public ApiResponse<MessageTemplateResponse> getOne(
+            @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long templateSeq) {
-        MessageTemplateResponse response = messageTemplateService.getOne(templateSeq);
+        Long userSeq = getUserSeq(userDetails);
+        MessageTemplateResponse response = messageTemplateService.getOne(templateSeq, userSeq);
         return ApiResponse.success(response);
     }
 

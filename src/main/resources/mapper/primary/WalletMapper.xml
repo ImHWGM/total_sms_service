@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.WalletMapper">
+
+    <!-- 지갑 생성 -->
+    <insert id="insert">
+        INSERT INTO wallet (
+            user_id,
+            currency_type,
+            balance
+        ) VALUES (
+            #{userId},
+            #{currencyType},
+            #{balance}
+        )
+    </insert>
+
+    <!-- 지갑 생성 (중복 무시) -->
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO wallet (
+            user_id,
+            currency_type,
+            balance
+        ) VALUES (
+            #{userId},
+            #{currencyType},
+            #{balance}
+        )
+    </insert>
+
+    <!-- 사용자 지갑 조회 -->
+    <select id="selectByUserId" resultType="kr.wisead.domain.payment.entity.Wallet">
+        SELECT
+            user_id AS userId,
+            currency_type AS currencyType,
+            balance,
+            upt_date AS uptDate
+        FROM wallet
+        WHERE user_id = #{userId}
+          AND currency_type = #{currencyType}
+    </select>
+
+    <!-- 사용자 지갑 조회 (FOR UPDATE) -->
+    <select id="selectForUpdate" resultType="kr.wisead.domain.payment.entity.Wallet">
+        SELECT
+            user_id AS userId,
+            currency_type AS currencyType,
+            balance,
+            upt_date AS uptDate
+        FROM wallet
+        WHERE user_id = #{userId}
+          AND currency_type = #{currencyType}
+        FOR UPDATE
+    </select>
+
+    <!-- 잔액 업데이트 -->
+    <update id="updateBalance">
+        UPDATE wallet
+        SET balance = #{balance}
+        WHERE user_id = #{userId}
+          AND currency_type = #{currencyType}
+    </update>
+
+    <!-- 잔액 증가 -->
+    <update id="addBalance">
+        UPDATE wallet
+        SET balance = balance + #{amount}
+        WHERE user_id = #{userId}
+          AND currency_type = #{currencyType}
+    </update>
+
+    <!-- 잔액 차감 -->
+    <update id="subtractBalance">
+        UPDATE wallet
+        SET balance = balance - #{amount}
+        WHERE user_id = #{userId}
+          AND currency_type = #{currencyType}
+          AND balance >= #{amount}
+    </update>
+
+    <!-- 다중 사용자 지갑 조회 -->
+    <select id="selectByUserIds" resultType="kr.wisead.domain.payment.entity.Wallet">
+        SELECT
+            user_id AS userId,
+            currency_type AS currencyType,
+            balance,
+            upt_date AS uptDate
+        FROM wallet
+        WHERE currency_type = #{currencyType}
+        <if test="userIds != null and userIds.size() > 0">
+            AND user_id IN
+            <foreach collection="userIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+
+    <!-- 지갑 존재 여부 확인 -->
+    <select id="existsByUserId" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM wallet
+            WHERE user_id = #{userId}
+              AND currency_type = #{currencyType}
+        )
+    </select>
+
+</mapper>

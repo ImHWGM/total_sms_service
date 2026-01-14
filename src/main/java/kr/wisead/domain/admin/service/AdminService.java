@@ -4,11 +4,13 @@ import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.admin.dto.AdminAccountRequest;
-import kr.wisead.domain.payment.entity.Balance;
+import kr.wisead.domain.payment.entity.UserServiceRate;
+import kr.wisead.domain.payment.service.StandardRateService;
+import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.user.dto.UserResponse;
 import kr.wisead.domain.user.entity.User;
-import kr.wisead.mapper.primary.BalanceMapper;
 import kr.wisead.mapper.primary.UserMapper;
+import kr.wisead.mapper.primary.UserServiceRateMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,9 +18,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
- * 관리자 서비스
+ * 관리자 서비스 (리팩토링 버전)
+ * - WalletService 사용
  */
 @Slf4j
 @Service
@@ -26,13 +30,16 @@ import java.math.BigDecimal;
 public class AdminService {
 
     private final UserMapper userMapper;
-    private final BalanceMapper balanceMapper;
+    private final WalletService walletService;
+    private final UserServiceRateMapper userServiceRateMapper;
+    private final StandardRateService standardRateService;
     private final PasswordEncoder passwordEncoder;
 
     /**
      * 관리자 계정 생성
      * - 회원 등록
-     * - 충전 정보 등록
+     * - 지갑 초기화
+     * - 서비스 단가 등록
      */
     @Transactional
     public UserResponse createAdminAccount(AdminAccountRequest request, String creatorId) {
@@ -84,18 +91,13 @@ public class AdminService {
         userMapper.insert(user);
         log.info("관리자 계정 생성: userId={}, level={}", request.getUserId(), request.getUserLevel());
 
-        // 충전 정보 등록 (초기 잔액 0)
-        Balance balance = Balance.builder()
-                .userId(request.getUserId())
-                .balance(java.math.BigDecimal.ZERO)
-                .totalBalance(java.math.BigDecimal.ZERO)
-                .operation("P")  // 초기 등록
-                .comment("계정 생성")
-                .regId(request.getUserId())
-                .build();
+        // 지갑 초기화
+        walletService.initializeWallet(request.getUserId());
+        log.info("지갑 초기화 완료: userId={}", request.getUserId());
 
-        balanceMapper.insertBalance(balance);
-        log.info("충전 정보 등록: userId={}", request.getUserId());
+        // 서비스 단가 등록 (standard_rate 기준)
+        initializeUserServiceRates(request.getUserId());
+        log.info("서비스 단가 등록 완료: userId={}", request.getUserId());
 
         return getUserResponse(user);
     }
@@ -144,6 +146,22 @@ public class AdminService {
     }
 
     // ==================== Private Methods ====================
+
+    private void initializeUserServiceRates(String userId) {
+        LocalDate today = LocalDate.now();
+
+        BigDecimal surveyRate = standardRateService.getStandardRateWithVat("survey");
+        BigDecimal smsRate = standardRateService.getStandardRateWithVat("msg_sms");
+        BigDecimal lmsRate = standardRateService.getStandardRateWithVat("msg_lms");
+        BigDecimal mmsRate = standardRateService.getStandardRateWithVat("msg_mms");
+        BigDecimal qrRate = standardRateService.getStandardRateWithVat("qr_code");
+
+        userServiceRateMapper.insert(UserServiceRate.create(userId, "survey", surveyRate, today));
+        userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_sms", smsRate, today));
+        userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_lms", lmsRate, today));
+        userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_mms", mmsRate, today));
+        userServiceRateMapper.insert(UserServiceRate.create(userId, "qr_code", qrRate, today));
+    }
 
     private UserResponse getUserResponse(User user) {
         return UserResponse.builder()

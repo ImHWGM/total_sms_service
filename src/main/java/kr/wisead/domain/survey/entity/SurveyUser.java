@@ -1,6 +1,8 @@
 package kr.wisead.domain.survey.entity;
 
+import kr.wisead.common.util.CryptoUtils;
 import lombok.*;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -8,6 +10,7 @@ import java.time.LocalDateTime;
 /**
  * 설문 참여자 Entity (SURVEY_USER)
  */
+@Slf4j
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -74,18 +77,35 @@ public class SurveyUser {
     }
 
     /**
-     * 설문 제출 처리
+     * 설문 제출 처리 (개인정보 AES256 암호화 적용)
      */
     public void submit(String userName, String juminNum, String userPhone,
                        String userEmail, String address, String address2, String uptId) {
-        this.userName = userName;
-        this.juminNum = juminNum;
-        this.userPhone = userPhone;
-        this.userEmail = userEmail;
-        this.address = address;
-        this.address2 = address2;
+        // 개인정보 암호화 (AES256 + Base64)
+        this.userName = encryptField(userName);
+        this.juminNum = encryptField(juminNum);
+        this.userPhone = encryptField(userPhone);
+        this.userEmail = encryptField(userEmail);
+        this.address = encryptField(address);
+        this.address2 = encryptField(address2);
         this.uptId = uptId;
         this.submissionDate = LocalDateTime.now();
+    }
+
+    /**
+     * 개인정보 필드 암호화 (AES256 + Base64)
+     */
+    private String encryptField(String plainText) {
+        if (plainText == null || plainText.isEmpty()) {
+            return plainText;
+        }
+        try {
+            String encrypted = CryptoUtils.encryptAES256(plainText);
+            return CryptoUtils.encodeBase64(encrypted);
+        } catch (Exception e) {
+            log.warn("필드 암호화 실패, 원본 저장: {}", e.getMessage());
+            return plainText;
+        }
     }
 
     /**

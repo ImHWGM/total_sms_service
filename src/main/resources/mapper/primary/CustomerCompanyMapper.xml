@@ -4,10 +4,10 @@
 
     <!-- 고객사 선택 등록 -->
     <insert id="insertCustomerCompany" useGeneratedKeys="true" keyProperty="seq">
-        INSERT INTO CUST_COMP (
+        INSERT INTO customer_company (
             USER_ID,
             SELECTED_USER_ID,
-            CUST_COMP_NAME,
+            customer_company_NAME,
             UPT_DATE,
             UPT_ID,
             CHKED_YN
@@ -23,9 +23,10 @@
 
     <!-- 고객사 일괄 등록 -->
     <insert id="insertCustomerCompanyBatch">
-        INSERT INTO CUST_COMP (
+        INSERT INTO customer_company (
             USER_ID,
-            CUST_COMP_NAME,
+            SELECTED_USER_ID,
+            customer_company_NAME,
             UPT_DATE,
             UPT_ID,
             CHKED_YN
@@ -33,6 +34,7 @@
         <foreach item="custCompName" collection="custCompNames" separator=",">
             (
                 #{userId},
+                #{selectedUserId},
                 #{custCompName},
                 NOW(),
                 #{uptId},
@@ -95,11 +97,11 @@
             SEQ AS seq,
             USER_ID AS userId,
             SELECTED_USER_ID AS selectedUserId,
-            CUST_COMP_NAME AS custCompName,
+            customer_company_NAME AS custCompName,
             UPT_DATE AS uptDate,
             UPT_ID AS uptId,
             CHKED_YN AS chkedYn
-        FROM CUST_COMP
+        FROM customer_company
         WHERE USER_ID = #{userId}
           AND CHKED_YN = 'Y'
     </select>
@@ -107,28 +109,28 @@
     <!-- 고객사 선택 여부 확인 -->
     <select id="selectCompanyExists" resultType="string">
         SELECT SELECTED_USER_ID
-        FROM CUST_COMP
+        FROM customer_company
         WHERE USER_ID = #{userId}
           AND SELECTED_USER_ID = #{selectedUserId}
-          AND CUST_COMP_NAME = #{custCompName}
+          AND customer_company_NAME = #{custCompName}
     </select>
 
     <!-- 고객사 선택 상태 수정 -->
     <update id="updateCompanyChecked">
-        UPDATE CUST_COMP
+        UPDATE customer_company
         SET UPT_DATE = NOW(),
             UPT_ID = #{uptId},
             CHKED_YN = #{chkedYn}
         WHERE USER_ID = #{userId}
           AND SELECTED_USER_ID = #{selectedUserId}
-          AND CUST_COMP_NAME = #{custCompName}
+          AND customer_company_NAME = #{custCompName}
     </update>
 
     <!-- 고객사명 일괄 수정 -->
     <update id="updateCompanyName">
-        UPDATE CUST_COMP
-        SET CUST_COMP_NAME = #{newName}
-        WHERE CUST_COMP_NAME = #{oldName}
+        UPDATE customer_company
+        SET customer_company_NAME = #{newName}
+        WHERE customer_company_NAME = #{oldName}
     </update>
 
     <!-- 담당자명 조회 -->
@@ -147,10 +149,10 @@
 
     <!-- 고객사 정보 수정 -->
     <update id="updateCustomerCompany">
-        UPDATE CUST_COMP
+        UPDATE customer_company
         SET
             <if test="custCompName != null">
-                CUST_COMP_NAME = #{custCompName},
+                customer_company_NAME = #{custCompName},
             </if>
             UPT_DATE = NOW(),
             UPT_ID = #{uptId}
@@ -163,11 +165,11 @@
             SEQ AS seq,
             USER_ID AS userId,
             SELECTED_USER_ID AS selectedUserId,
-            CUST_COMP_NAME AS custCompName,
+            customer_company_NAME AS custCompName,
             UPT_DATE AS uptDate,
             UPT_ID AS uptId,
             CHKED_YN AS chkedYn
-        FROM CUST_COMP
+        FROM customer_company
         WHERE SEQ = #{seq}
     </select>
 

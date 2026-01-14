@@ -23,6 +23,7 @@ public interface CustomerCompanyMapper {
      * 고객사 일괄 등록
      */
     int insertCustomerCompanyBatch(@Param("userId") String userId,
+                                    @Param("selectedUserId") String selectedUserId,
                                     @Param("uptId") String uptId,
                                     @Param("custCompNames") List<String> custCompNames);
 

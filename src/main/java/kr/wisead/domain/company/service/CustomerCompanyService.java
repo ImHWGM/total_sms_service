@@ -97,6 +97,12 @@ public class CustomerCompanyService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사용자 ID가 필요합니다.");
         }
 
+        // selectedUserId 필수값 체크
+        if (request.getSelectedUserId() == null || request.getSelectedUserId().isBlank()) {
+            log.error("고객사 일괄 등록 실패: selectedUserId가 없습니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "선택된 사용자 ID가 필요합니다.");
+        }
+
         if (request.getCustCompNames() == null || request.getCustCompNames().isEmpty()) {
             log.warn("고객사 일괄 등록: 등록할 고객사명이 없습니다. userId={}", request.getUserId());
             return false;
@@ -116,10 +122,12 @@ public class CustomerCompanyService {
 
         int result = customerCompanyMapper.insertCustomerCompanyBatch(
                 request.getUserId(),
+                request.getSelectedUserId(),
                 operatorId,
                 validNames);
 
-        log.info("고객사 일괄 등록 완료: userId={}, count={}", request.getUserId(), result);
+        log.info("고객사 일괄 등록 완료: userId={}, selectedUserId={}, count={}",
+                request.getUserId(), request.getSelectedUserId(), result);
         return result > 0;
     }
 

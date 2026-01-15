@@ -139,7 +139,7 @@ public class AdMessageService {
 
         // 7. 메시지 발송 등록 (txGroupId를 MsgQueue에 저장)
         String batchId = generateBatchId();
-        String txGroupId = UUID.randomUUID().toString();
+        String txGroupId = UUID.randomUUID().toString().replace("-", "");
         int successCount = 0;
 
         for (AdMessageRequest.Recipient recipient : filteredRecipients) {

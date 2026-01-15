@@ -132,7 +132,7 @@ public class WalletService {
      */
     @Transactional
     public String deductByAmount(String userId, BigDecimal amount, String comment) {
-        String txGroupId = UUID.randomUUID().toString();
+        String txGroupId = UUID.randomUUID().toString().replace("-", "");
         return deductByAmount(userId, amount, comment, txGroupId);
     }
 
@@ -172,7 +172,7 @@ public class WalletService {
      */
     @Transactional
     public String deductWithPriority(String userId, String serviceId, BigDecimal quantity, String comment) {
-        String txGroupId = UUID.randomUUID().toString();
+        String txGroupId = UUID.randomUUID().toString().replace("-", "");
         return deductWithPriority(userId, serviceId, quantity, comment, txGroupId);
     }
 
@@ -415,7 +415,7 @@ public class WalletService {
         }));
 
         LocalDate today = LocalDate.now();
-        String refundTxGroupId = UUID.randomUUID().toString();
+        String refundTxGroupId = UUID.randomUUID().toString().replace("-", "");
         BigDecimal totalRequested = BigDecimal.ZERO;
         BigDecimal refundedAmount = BigDecimal.ZERO;
         BigDecimal expiredAmount = BigDecimal.ZERO;
@@ -592,7 +592,7 @@ public class WalletService {
         BigDecimal balanceAfter = wallet.getBalance().add(amount);
 
         // 거래 내역 기록
-        String txGroupId = UUID.randomUUID().toString();
+        String txGroupId = UUID.randomUUID().toString().replace("-", "");
         Transaction tx = Transaction.builder()
                 .txGroupId(txGroupId)
                 .userId(userId)

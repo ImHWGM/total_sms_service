@@ -1,6 +1,9 @@
 package kr.wisead.domain.inquiry.service;
 
+import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.inquiry.dto.InquiryAnswerRequest;
 import kr.wisead.domain.inquiry.dto.InquiryRequest;
 import kr.wisead.domain.inquiry.dto.InquiryResponse;
@@ -23,6 +26,7 @@ import java.util.stream.Collectors;
 public class InquiryService {
 
     private final InquiryMapper inquiryMapper;
+    private final AdminService adminService;
 
     /**
      * 문의 등록
@@ -72,10 +76,16 @@ public class InquiryService {
     }
 
     /**
-     * 답변 등록
+     * 답변 등록 (A레벨만 가능)
      */
     @Transactional
     public InquiryResponse answerInquiry(Long inquiryId, InquiryAnswerRequest request, String answeredBy) {
+        // 권한 체크: A레벨만 답변 가능
+        Integer userLevel = adminService.getUserLevel(answeredBy);
+        if (!adminService.isLevelA(userLevel)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED, "문의 답변 권한이 없습니다.");
+        }
+
         inquiryMapper.updateInquiryAnswer(inquiryId, request.getAnswer(), answeredBy);
         log.info("문의 답변 등록: inquiryId={}, answeredBy={}", inquiryId, answeredBy);
 
@@ -84,7 +94,22 @@ public class InquiryService {
     }
 
     /**
-     * 문의 상태 변경
+     * 문의 상태 변경 (A레벨만 가능)
+     */
+    @Transactional
+    public void updateStatus(Long inquiryId, String status, String userId) {
+        // 권한 체크: A레벨만 상태 변경 가능
+        Integer userLevel = adminService.getUserLevel(userId);
+        if (!adminService.isLevelA(userLevel)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED, "문의 상태 변경 권한이 없습니다.");
+        }
+
+        inquiryMapper.updateInquiryStatus(inquiryId, status);
+        log.info("문의 상태 변경: inquiryId={}, status={}", inquiryId, status);
+    }
+
+    /**
+     * 문의 상태 변경 (하위 호환)
      */
     @Transactional
     public void updateStatus(Long inquiryId, String status) {
@@ -93,7 +118,22 @@ public class InquiryService {
     }
 
     /**
-     * 문의 삭제
+     * 문의 삭제 (A레벨만 가능)
+     */
+    @Transactional
+    public void deleteInquiry(Long inquiryId, String userId) {
+        // 권한 체크: A레벨만 삭제 가능
+        Integer userLevel = adminService.getUserLevel(userId);
+        if (!adminService.isLevelA(userLevel)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED, "문의 삭제 권한이 없습니다.");
+        }
+
+        inquiryMapper.deleteInquiry(inquiryId);
+        log.info("문의 삭제: inquiryId={}", inquiryId);
+    }
+
+    /**
+     * 문의 삭제 (하위 호환)
      */
     @Transactional
     public void deleteInquiry(Long inquiryId) {

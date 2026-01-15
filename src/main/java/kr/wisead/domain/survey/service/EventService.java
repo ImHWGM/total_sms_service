@@ -6,7 +6,9 @@ import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.QrCodeUtils;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.excel.service.ExcelService;
+import kr.wisead.domain.file.service.FileStorageService;
 import kr.wisead.domain.survey.dto.*;
 import kr.wisead.domain.survey.entity.*;
 import kr.wisead.mapper.primary.*;
@@ -40,6 +42,8 @@ public class EventService {
     private final AuthUserMappingMapper authUserMappingMapper;
     private final UserMapper userMapper;
     private final ExcelService excelService;
+    private final AdminService adminService;
+    private final FileStorageService fileStorageService;
 
     @Value("${upload.dir:./uploads}")
     private String uploadDir;
@@ -144,6 +148,14 @@ public class EventService {
         surveyMasterMapper.insert(event);
         log.info("이벤트 생성 완료 - eventSeq: {}, eventCode: {}, qrCode: {}", event.getEventSeq(), eventCode, request.getQrCode());
 
+        // tempId가 있으면 임시 이미지 파일을 이벤트 폴더로 이동
+        if (request.getTempId() != null && !request.getTempId().isBlank()) {
+            boolean moved = fileStorageService.moveSurveyTempToEvent(request.getTempId(), event.getEventSeq());
+            if (moved) {
+                log.info("설문 임시 이미지 이동 완료 - tempId: {}, eventSeq: {}", request.getTempId(), event.getEventSeq());
+            }
+        }
+
         // 문항 등록
         if (request.getQuestions() != null && !request.getQuestions().isEmpty()) {
             saveQuestions(event.getEventSeq(), request.getQuestions(), userId);
@@ -159,6 +171,10 @@ public class EventService {
     public EventResponse updateEvent(Integer eventSeq, EventRequest request, String uptId) {
         SurveyMaster event = surveyMasterMapper.selectByEventSeq(eventSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+        // 권한 체크: 이벤트 소유자 또는 A레벨만 수정 가능
+        Integer userLevel = adminService.getUserLevel(uptId);
+        adminService.validateModifyPermission(uptId, userLevel, event.getRegId());
 
         // QR 간편인증 사용으로 변경되었고, 기존에 authCodeUrl이 없으면 새로 생성
         if ("Y".equals(request.getQrCode()) &&
@@ -209,9 +225,13 @@ public class EventService {
      * 이벤트 상태 변경
      */
     @Transactional
-    public void updateEventStatus(Integer eventSeq, String status) {
+    public void updateEventStatus(Integer eventSeq, String status, String userId) {
         SurveyMaster event = surveyMasterMapper.selectByEventSeq(eventSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+        // 권한 체크: 이벤트 소유자 또는 A레벨만 수정 가능
+        Integer userLevel = adminService.getUserLevel(userId);
+        adminService.validateModifyPermission(userId, userLevel, event.getRegId());
 
         surveyMasterMapper.updateStatus(eventSeq, status);
         log.info("이벤트 상태 변경 - eventSeq: {}, status: {}", eventSeq, status);
@@ -315,6 +335,13 @@ public class EventService {
      */
     @Transactional
     public void addAuthKey(Integer eventSeq, String authCode, String regId) {
+        // 이벤트 존재 확인 및 권한 체크
+        SurveyMaster event = surveyMasterMapper.selectByEventSeq(eventSeq)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+        Integer userLevel = adminService.getUserLevel(regId);
+        adminService.validateModifyPermission(regId, userLevel, event.getRegId());
+
         // 중복 확인
         if (authUserMappingMapper.checkDuplicateAuthCode(eventSeq, authCode) > 0) {
             throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "이미 등록된 인증코드입니다.");
@@ -338,7 +365,14 @@ public class EventService {
      * 범용인증키 삭제
      */
     @Transactional
-    public void deleteAuthKey(Integer eventSeq, String userKey) {
+    public void deleteAuthKey(Integer eventSeq, String userKey, String userId) {
+        // 이벤트 존재 확인 및 권한 체크
+        SurveyMaster event = surveyMasterMapper.selectByEventSeq(eventSeq)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+        Integer userLevel = adminService.getUserLevel(userId);
+        adminService.validateModifyPermission(userId, userLevel, event.getRegId());
+
         // 답변 확인
         if (authUserMappingMapper.checkHasAnswer(eventSeq, userKey) > 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "응답이 있는 인증키는 삭제할 수 없습니다.");
@@ -426,10 +460,13 @@ public class EventService {
      * 범용인증키 설명문구 수정
      */
     @Transactional
-    public void updateAuthKeyDesc(Integer eventSeq, String authKeyDesc) {
-        // 이벤트 존재 확인
-        surveyMasterMapper.selectByEventSeq(eventSeq)
+    public void updateAuthKeyDesc(Integer eventSeq, String authKeyDesc, String userId) {
+        // 이벤트 존재 확인 및 권한 체크
+        SurveyMaster event = surveyMasterMapper.selectByEventSeq(eventSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+        Integer userLevel = adminService.getUserLevel(userId);
+        adminService.validateModifyPermission(userId, userLevel, event.getRegId());
 
         surveyMasterMapper.updateAuthKeyDesc(eventSeq, authKeyDesc);
         log.info("범용인증키 설명문구 수정 완료 - eventSeq: {}", eventSeq);
@@ -440,9 +477,12 @@ public class EventService {
      */
     @Transactional
     public List<String> generateUserKeys(Integer eventSeq, int count, String regId) {
-        // 이벤트 존재 확인
+        // 이벤트 존재 확인 및 권한 체크
         SurveyMaster event = surveyMasterMapper.selectByEventSeq(eventSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+        Integer userLevel = adminService.getUserLevel(regId);
+        adminService.validateModifyPermission(regId, userLevel, event.getRegId());
 
         List<String> generatedKeys = new ArrayList<>();
 

@@ -91,11 +91,13 @@ public class BillingService {
 
         // 잔액 확인
         if (!walletService.hasEnoughBalance(userId, overageFee)) {
-            log.warn("QR 추가 과금 실패 - 잔액 부족: userId={}, required={}", userId, overageFee);
-            // 과금 실패 시 마지막 방문 로그 삭제 (롤백)
+            log.warn("QR 추가 과금 실패 - 잔액 부족: userId={}, visits={}, required={}",
+                    userId, currentVisits, overageFee);
+            // 과금 실패 시 마지막 방문 로그 삭제
             qrVisitLogMapper.deleteLastActiveVisitByAuthCodeUrl(authCodeUrl);
-            throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE,
-                    "QR 코드 추가 과금 비용이 부족합니다. 필요 금액: " + overageFee + "원");
+            // 참가자에게는 일반적인 메시지 표시 (과금 상세 노출 X)
+            throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE,
+                    "현재 설문에 참여할 수 없습니다. 잠시 후 다시 시도해주세요.");
         }
 
         // 우선순위 차감

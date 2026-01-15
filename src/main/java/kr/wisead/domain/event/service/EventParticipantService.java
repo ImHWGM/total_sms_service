@@ -4,6 +4,7 @@ import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.event.dto.*;
 import kr.wisead.domain.event.entity.*;
 import kr.wisead.domain.survey.entity.SurveyMaster;
@@ -33,6 +34,7 @@ public class EventParticipantService {
     private final EventNametagLogMapper nametagLogMapper;
     private final SurveyUserMapper surveyUserMapper;
     private final SurveyMasterMapper surveyMasterMapper;
+    private final AdminService adminService;
 
     @Value("${wisead.url:http://localhost:8080}")
     private String wiseadUrl;

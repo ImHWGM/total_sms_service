@@ -2,10 +2,12 @@ package kr.wisead.domain.message.service;
 
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.message.dto.MessageTemplateRequest;
 import kr.wisead.domain.message.dto.MessageTemplateResponse;
 import kr.wisead.domain.message.entity.MessageTemplate;
 import kr.wisead.mapper.primary.MessageTemplateMapper;
+import kr.wisead.mapper.primary.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,8 @@ import java.util.stream.Collectors;
 public class MessageTemplateService {
 
     private final MessageTemplateMapper messageTemplateMapper;
+    private final UserMapper userMapper;
+    private final AdminService adminService;
 
     /**
      * 템플릿 생성
@@ -100,13 +104,16 @@ public class MessageTemplateService {
      * 템플릿 수정
      */
     @Transactional
-    public MessageTemplateResponse update(Long templateSeq, Long userSeq, MessageTemplateRequest request) {
+    public MessageTemplateResponse update(Long templateSeq, Long userSeq, MessageTemplateRequest request, String currentUserId) {
         MessageTemplate template = messageTemplateMapper.findBySeq(templateSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "템플릿을 찾을 수 없습니다."));
 
-        // 소유자 확인
+        // 권한 체크: 본인 또는 A레벨만 수정 가능
         if (!template.getUserSeq().equals(userSeq)) {
-            throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 템플릿에 대한 권한이 없습니다.");
+            Integer userLevel = adminService.getUserLevel(currentUserId);
+            if (!adminService.isLevelA(userLevel)) {
+                throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 템플릿에 대한 권한이 없습니다.");
+            }
         }
 
         template.update(
@@ -124,24 +131,43 @@ public class MessageTemplateService {
     }
 
     /**
+     * 템플릿 수정 (하위 호환)
+     */
+    @Transactional
+    public MessageTemplateResponse update(Long templateSeq, Long userSeq, MessageTemplateRequest request) {
+        return update(templateSeq, userSeq, request, null);
+    }
+
+    /**
      * 템플릿 삭제
      */
     @Transactional
-    public void delete(Long templateSeq, Long userSeq) {
+    public void delete(Long templateSeq, Long userSeq, String currentUserId) {
         MessageTemplate template = messageTemplateMapper.findBySeq(templateSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "템플릿을 찾을 수 없습니다."));
 
-        // 소유자 확인
+        // 권한 체크: 본인 또는 A레벨만 삭제 가능
         if (!template.getUserSeq().equals(userSeq)) {
-            throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 템플릿에 대한 권한이 없습니다.");
+            Integer userLevel = adminService.getUserLevel(currentUserId);
+            if (!adminService.isLevelA(userLevel)) {
+                throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 템플릿에 대한 권한이 없습니다.");
+            }
         }
 
         messageTemplateMapper.delete(templateSeq);
 
         // 순서 재정렬
-        recompactOrder(userSeq);
+        recompactOrder(template.getUserSeq());
 
         log.info("템플릿 삭제 완료 - templateSeq: {}", templateSeq);
+    }
+
+    /**
+     * 템플릿 삭제 (하위 호환)
+     */
+    @Transactional
+    public void delete(Long templateSeq, Long userSeq) {
+        delete(templateSeq, userSeq, null);
     }
 
     /**

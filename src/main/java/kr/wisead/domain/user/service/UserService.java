@@ -5,6 +5,7 @@ import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.PasswordValidator;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.email.service.EmailService;
 import kr.wisead.domain.user.dto.FindIdRequest;
@@ -45,6 +46,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final EmailAuthService emailAuthService;
     private final EmailService emailService;
+    private final AdminService adminService;
 
     @Value("${wisead.base-url:http://localhost:3000}")
     private String baseUrl;
@@ -473,7 +475,7 @@ public class UserService {
 
     /**
      * 회원 정보 수정 (기업 정보)
-     * 
+     *
      * @param user       수정할 회원 정보
      * @param operatorId 수정자 ID
      */
@@ -482,6 +484,10 @@ public class UserService {
         // 회원 존재 여부 확인 및 기존 정보 조회
         User existingUser = userMapper.findBySeq(user.getSeq())
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        // 권한 체크: 본인 또는 A레벨만 수정 가능
+        Integer userLevel = adminService.getUserLevel(operatorId);
+        adminService.validateModifyPermission(operatorId, userLevel, existingUser.getUserId());
 
         // 연락처 암호화 처리 (이미 암호화되어 있지 않은 경우)
         String encryptedPhone = user.getPhone();

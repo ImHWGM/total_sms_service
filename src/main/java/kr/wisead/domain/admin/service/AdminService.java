@@ -163,6 +163,69 @@ public class AdminService {
     }
 
     /**
+     * A 레벨 여부 확인 (전체 쓰기 권한)
+     * - 99: 최고관리자(A) - 전체 데이터 수정/삭제 가능
+     * - 60: 운영관리자(A) - 관리 범위 내 데이터 수정/삭제 가능
+     */
+    public boolean isLevelA(Integer userLevel) {
+        return userLevel != null && (userLevel == 99 || userLevel == 60);
+    }
+
+    /**
+     * B 레벨 여부 확인 (본인 데이터만 쓰기 권한)
+     * - 90: 최고관리자(B) - 전체 조회 가능, 본인 데이터만 수정/삭제
+     * - 50: 운영관리자(B) - 관리 범위 조회 가능, 본인 데이터만 수정/삭제
+     * - 10: 기업관리자 - 본인 데이터만 조회/수정/삭제
+     */
+    public boolean isLevelB(Integer userLevel) {
+        return userLevel != null && (userLevel == 90 || userLevel == 50 || userLevel == 10);
+    }
+
+    /**
+     * 대상 데이터에 대한 수정/삭제 권한 확인
+     *
+     * @param currentUserId  현재 로그인한 사용자 ID
+     * @param currentLevel   현재 사용자 권한 레벨
+     * @param targetOwnerId  대상 데이터 소유자 ID
+     * @return 수정/삭제 가능 여부
+     */
+    public boolean canModify(String currentUserId, Integer currentLevel, String targetOwnerId) {
+        if (currentUserId == null || currentLevel == null || targetOwnerId == null) {
+            return false;
+        }
+
+        // 본인 데이터는 항상 수정 가능
+        if (currentUserId.equals(targetOwnerId)) {
+            return true;
+        }
+
+        // A 레벨은 조회 가능 범위 내 데이터 수정 가능
+        if (isLevelA(currentLevel)) {
+            // 최고관리자(A) - 전체 수정 가능
+            if (currentLevel == 99) {
+                return true;
+            }
+            // 운영관리자(A) - 관리 계정 데이터만 수정 가능
+            if (currentLevel == 60) {
+                java.util.List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(currentUserId);
+                return managedUserIds != null && managedUserIds.contains(targetOwnerId);
+            }
+        }
+
+        // B 레벨은 본인 데이터만 수정 가능 (위에서 이미 체크됨)
+        return false;
+    }
+
+    /**
+     * 수정/삭제 권한 검증 (권한 없으면 예외 발생)
+     */
+    public void validateModifyPermission(String currentUserId, Integer currentLevel, String targetOwnerId) {
+        if (!canModify(currentUserId, currentLevel, targetOwnerId)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 데이터를 수정/삭제할 권한이 없습니다.");
+        }
+    }
+
+    /**
      * 권한별 조회 대상 사용자 ID 결정
      * - 레벨 90 이상: "ALL" (전체 조회)
      * - 레벨 50-89: 본인 + 관리하는 계정들 (콤마 구분)

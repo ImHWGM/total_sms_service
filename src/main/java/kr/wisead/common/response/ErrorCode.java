@@ -49,6 +49,7 @@ public enum ErrorCode {
     SURVEY_NOT_FOUND(HttpStatus.NOT_FOUND, "S001", "설문을 찾을 수 없습니다."),
     SURVEY_CLOSED(HttpStatus.BAD_REQUEST, "S002", "종료된 설문입니다."),
     ALREADY_ANSWERED(HttpStatus.CONFLICT, "S003", "이미 응답한 설문입니다."),
+    SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "S004", "서비스를 일시적으로 이용할 수 없습니다."),
 
     // Payment (P)
     PAYMENT_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "P001", "결제에 실패했습니다."),

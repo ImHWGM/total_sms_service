@@ -2,8 +2,10 @@ package kr.wisead.domain.survey.service;
 
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.survey.dto.SurveyUserRequest;
 import kr.wisead.domain.survey.dto.SurveyUserResponse;
 import kr.wisead.domain.survey.entity.SurveyMaster;
@@ -14,8 +16,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import kr.wisead.common.response.PageResponse;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -35,6 +35,7 @@ public class SurveyUserService {
 
     private final SurveyUserMapper surveyUserMapper;
     private final SurveyMasterMapper surveyMasterMapper;
+    private final AdminService adminService;
 
     /**
      * 이벤트별 참여자 목록 조회
@@ -292,6 +293,12 @@ public class SurveyUserService {
         SurveyUser existingUser = surveyUserMapper.selectBySeq(userSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
+        // 권한 체크: 이벤트 소유자 또는 A레벨만 수정 가능
+        SurveyMaster event = surveyMasterMapper.selectByEventSeq(existingUser.getEventSeq())
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+        Integer userLevel = adminService.getUserLevel(uptId);
+        adminService.validateModifyPermission(uptId, userLevel, event.getRegId());
+
         // 전화번호 암호화
         String encryptedPhone = null;
         if (!CommonUtils.isNullOrEmpty(request.getUserPhone())) {
@@ -335,6 +342,14 @@ public class SurveyUserService {
      */
     @Transactional
     public void updateResendPhone(Integer userSeq, String phone, String uptId) {
+        // 권한 체크
+        SurveyUser existingUser = surveyUserMapper.selectBySeq(userSeq)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        SurveyMaster event = surveyMasterMapper.selectByEventSeq(existingUser.getEventSeq())
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+        Integer userLevel = adminService.getUserLevel(uptId);
+        adminService.validateModifyPermission(uptId, userLevel, event.getRegId());
+
         // 전화번호 암호화
         String encryptedPhone = null;
         try {
@@ -353,6 +368,14 @@ public class SurveyUserService {
      */
     @Transactional
     public void updatePaymentInfo(Integer userSeq, LocalDate depositDate, LocalDate shipmentDate, String uptId) {
+        // 권한 체크
+        SurveyUser existingUser = surveyUserMapper.selectBySeq(userSeq)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        SurveyMaster event = surveyMasterMapper.selectByEventSeq(existingUser.getEventSeq())
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+        Integer userLevel = adminService.getUserLevel(uptId);
+        adminService.validateModifyPermission(uptId, userLevel, event.getRegId());
+
         surveyUserMapper.updatePaymentInfo(userSeq, depositDate, shipmentDate, uptId);
         log.info("입금/출고 정보 수정 완료: userSeq={}", userSeq);
     }
@@ -362,6 +385,14 @@ public class SurveyUserService {
      */
     @Transactional
     public void deleteUser(Integer userSeq, String uptId) {
+        // 권한 체크
+        SurveyUser existingUser = surveyUserMapper.selectBySeq(userSeq)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        SurveyMaster event = surveyMasterMapper.selectByEventSeq(existingUser.getEventSeq())
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+        Integer userLevel = adminService.getUserLevel(uptId);
+        adminService.validateModifyPermission(uptId, userLevel, event.getRegId());
+
         surveyUserMapper.softDelete(userSeq, uptId);
         log.info("설문 참여자 삭제 완료: userSeq={}", userSeq);
     }
@@ -371,6 +402,12 @@ public class SurveyUserService {
      */
     @Transactional
     public void deleteUsersByEventSeq(Integer eventSeq, String uptId) {
+        // 권한 체크
+        SurveyMaster event = surveyMasterMapper.selectByEventSeq(eventSeq)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+        Integer userLevel = adminService.getUserLevel(uptId);
+        adminService.validateModifyPermission(uptId, userLevel, event.getRegId());
+
         surveyUserMapper.softDeleteByEventSeq(eventSeq, uptId);
         log.info("이벤트 참여자 전체 삭제 완료: eventSeq={}", eventSeq);
     }

@@ -48,4 +48,7 @@ public class EventRequest {
 
     // 문항 목록 (설문 생성 시)
     private List<QuestionRequest> questions;
+
+    // 임시 파일 디렉토리 ID (신규 이벤트 생성 시 이미지 파일 이동용)
+    private String tempId;
 }

@@ -105,9 +105,11 @@ public class EventController {
      */
     @PatchMapping("/{eventSeq}/status")
     public ApiResponse<Void> updateStatus(
+            @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Integer eventSeq,
             @RequestParam String status) {
-        eventService.updateEventStatus(eventSeq, status);
+        String userId = userDetails.getUsername();
+        eventService.updateEventStatus(eventSeq, status, userId);
         return ApiResponse.success(null);
     }
 
@@ -165,9 +167,11 @@ public class EventController {
      */
     @DeleteMapping("/{eventSeq}/auth-keys/{userKey}")
     public ApiResponse<Void> deleteAuthKey(
+            @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Integer eventSeq,
             @PathVariable String userKey) {
-        eventService.deleteAuthKey(eventSeq, userKey);
+        String userId = userDetails.getUsername();
+        eventService.deleteAuthKey(eventSeq, userKey, userId);
         return ApiResponse.success(null);
     }
 
@@ -185,10 +189,12 @@ public class EventController {
      */
     @PutMapping("/{eventSeq}/auth-key-desc")
     public ApiResponse<Void> updateAuthKeyDesc(
+            @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Integer eventSeq,
             @RequestBody Map<String, String> request) {
+        String userId = userDetails.getUsername();
         String authKeyDesc = request.get("authKeyDesc");
-        eventService.updateAuthKeyDesc(eventSeq, authKeyDesc);
+        eventService.updateAuthKeyDesc(eventSeq, authKeyDesc, userId);
         return ApiResponse.success(null);
     }
 

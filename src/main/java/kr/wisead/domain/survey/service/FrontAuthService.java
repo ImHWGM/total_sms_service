@@ -6,8 +6,10 @@ import kr.wisead.common.util.CommonUtils;
 import kr.wisead.domain.survey.dto.KeypadResponse;
 import kr.wisead.domain.survey.dto.PhoneValidationRequest;
 import kr.wisead.domain.survey.dto.SurveyUserResponse;
+import kr.wisead.domain.survey.entity.QrVisitLog;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
+import kr.wisead.mapper.primary.QrVisitLogMapper;
 import kr.wisead.mapper.primary.SurveyMasterMapper;
 import kr.wisead.mapper.primary.SurveyUserMapper;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,7 @@ public class FrontAuthService {
 
     private final SurveyMasterMapper surveyMasterMapper;
     private final SurveyUserMapper surveyUserMapper;
+    private final QrVisitLogMapper qrVisitLogMapper;
 
     // RSA 키 저장소 (keypadId -> KeyPair)
     private final Map<String, KeyPairInfo> keyPairStore = new ConcurrentHashMap<>();
@@ -65,8 +68,9 @@ public class FrontAuthService {
 
         surveyUserMapper.insertQrUser(user);
 
-        // 5. QR 방문 수 증가
-        surveyMasterMapper.incrementQrCodeVisits(authCodeUrl);
+        // 5. QR 방문 로그 기록 (이벤트 상태와 함께 저장)
+        QrVisitLog visitLog = QrVisitLog.create(event.getEventSeq(), event.getStatus());
+        qrVisitLogMapper.insert(visitLog);
 
         log.info("QR 사용자 생성 - eventSeq: {}, userKey: {}", event.getEventSeq(), userKey);
 

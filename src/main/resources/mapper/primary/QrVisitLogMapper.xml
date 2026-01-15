@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.QrVisitLogMapper">
+
+    <!-- QR 방문 로그 등록 -->
+    <insert id="insert" parameterType="kr.wisead.domain.survey.entity.QrVisitLog"
+            useGeneratedKeys="true" keyProperty="seq" keyColumn="SEQ">
+        INSERT INTO QR_VISIT_LOG (
+            EVENT_SEQ, EVENT_STATUS, VISIT_DATE
+        ) VALUES (
+            #{eventSeq}, #{eventStatus}, NOW()
+        )
+    </insert>
+
+    <!-- 이벤트별 방문 수 조회 (진행 중 상태만 - 요금 계산용) -->
+    <select id="countByEventSeqAndActiveStatus" resultType="long">
+        SELECT COUNT(*)
+        FROM QR_VISIT_LOG
+        WHERE EVENT_SEQ = #{eventSeq}
+          AND EVENT_STATUS = 'P'
+    </select>
+
+    <!-- 이벤트별 전체 방문 수 조회 -->
+    <select id="countByEventSeq" resultType="long">
+        SELECT COUNT(*)
+        FROM QR_VISIT_LOG
+        WHERE EVENT_SEQ = #{eventSeq}
+    </select>
+
+</mapper>

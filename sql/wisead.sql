@@ -421,6 +421,20 @@ CREATE TABLE IF NOT EXISTS `survey_user` (
 
 -- 내보낼 데이터가 선택되어 있지 않습니다.
 
+-- 테이블 qvey.qr_visit_log 구조 내보내기
+CREATE TABLE IF NOT EXISTS `qr_visit_log` (
+    `SEQ` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '방문 시퀀스',
+    `EVENT_SEQ` int(10) unsigned NOT NULL COMMENT '이벤트 시퀀스 (SURVEY_MASTER)',
+    `EVENT_STATUS` char(1) NOT NULL COMMENT '방문 시점의 이벤트 상태 (P:진행중, F:종료 등)',
+    `VISIT_DATE` datetime NOT NULL DEFAULT current_timestamp() COMMENT '방문 일시',
+    PRIMARY KEY (`SEQ`),
+    KEY `idx_qr_visit_log_event_seq` (`EVENT_SEQ`),
+    KEY `idx_qr_visit_log_visit_date` (`VISIT_DATE`),
+    CONSTRAINT `fk_qr_visit_log_survey_master` FOREIGN KEY (`EVENT_SEQ`) REFERENCES `survey_master` (`EVENT_SEQ`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='QR 코드 방문 로그 테이블';
+
+-- 내보낼 데이터가 선택되어 있지 않습니다.
+
 -- 테이블 qvey.user_notification_setting 구조 내보내기
 CREATE TABLE IF NOT EXISTS `user_notification_setting` (
     `noti_seq` int(10) NOT NULL AUTO_INCREMENT,

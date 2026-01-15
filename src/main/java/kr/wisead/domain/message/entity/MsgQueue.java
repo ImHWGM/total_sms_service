@@ -27,13 +27,13 @@ import java.time.format.DateTimeFormatter;
  * [설문 발송 (insertMSGQueue)]
  * - EXT_COL0: eventSeq (설문 시퀀스)
  * - EXT_COL1: userSeq (설문 참여자 시퀀스)
- * - EXT_COL2: 발송타입 (1: 직접, 2: 대량)
+ * - EXT_COL2: txGroupId (결제 거래 그룹 ID, 환불용)
  * - EXT_COL3: regId (등록자 아이디)
  *
  * [일반 문자 발송 (insertMSGQueueSMS/LMS/MMS)]
  * - EXT_COL0: NULL
  * - EXT_COL1: userKey (배치 추적용, yyyyMMdd-HHmmssSSS)
- * - EXT_COL2: 발송타입 (1: 직접, 2: 대량)
+ * - EXT_COL2: txGroupId (결제 거래 그룹 ID, 환불용)
  * - EXT_COL3: regId (등록자 아이디)
  * </pre>
  */
@@ -93,7 +93,7 @@ public class MsgQueue {
     // 확장 컬럼 (업무용) - 설문/일반 발송에 따라 다름
     private Integer extCol0;          // 설문: eventSeq / 일반: NULL
     private String extCol1;           // 설문: userSeq / 일반: userKey(배치ID)
-    private String extCol2;           // 발송타입 (1: 직접, 2: 대량)
+    private String extCol2;           // txGroupId (결제 거래 그룹 ID, 환불용)
     private String extCol3;           // regId (등록자 아이디)
 
     @Builder
@@ -178,13 +178,13 @@ public class MsgQueue {
      * @param text 내용
      * @param eventSeq 설문 시퀀스
      * @param userSeq 설문 참여자 시퀀스
-     * @param sendType 발송타입 (1: 직접, 2: 대량)
+     * @param txGroupId 결제 거래 그룹 ID (환불용)
      * @param regId 등록자 아이디
      */
     public static MsgQueue createForSurvey(String msgType, String dstaddr, String callback,
                                             String subject, String text,
                                             Integer eventSeq, Integer userSeq,
-                                            String sendType, String regId) {
+                                            String txGroupId, String regId) {
         LocalDateTime now = LocalDateTime.now();
         return MsgQueue.builder()
                 .msgType(msgType)
@@ -198,7 +198,7 @@ public class MsgQueue {
                 .senderCode("301200115")
                 .extCol0(eventSeq)
                 .extCol1(userSeq != null ? String.valueOf(userSeq) : null)
-                .extCol2(sendType)
+                .extCol2(txGroupId)
                 .extCol3(regId)
                 .build();
     }
@@ -207,9 +207,10 @@ public class MsgQueue {
 
     /**
      * 일반 SMS 발송용 빌더
+     * @param txGroupId 결제 거래 그룹 ID (환불용)
      */
     public static MsgQueue createSms(String dstaddr, String callback, String subject, String text,
-                                      String userKey, String sendType, String regId) {
+                                      String userKey, String txGroupId, String regId) {
         LocalDateTime now = LocalDateTime.now();
         return MsgQueue.builder()
                 .msgType("S")
@@ -224,16 +225,17 @@ public class MsgQueue {
                 .senderCode("301200115")
                 .extCol0(null)
                 .extCol1(userKey)
-                .extCol2(sendType)
+                .extCol2(txGroupId)
                 .extCol3(regId)
                 .build();
     }
 
     /**
      * 일반 LMS 발송용 빌더
+     * @param txGroupId 결제 거래 그룹 ID (환불용)
      */
     public static MsgQueue createLms(String dstaddr, String callback, String subject, String text,
-                                      String userKey, String sendType, String regId) {
+                                      String userKey, String txGroupId, String regId) {
         LocalDateTime now = LocalDateTime.now();
         return MsgQueue.builder()
                 .msgType("L")
@@ -248,17 +250,18 @@ public class MsgQueue {
                 .senderCode("301200115")
                 .extCol0(null)
                 .extCol1(userKey)
-                .extCol2(sendType)
+                .extCol2(txGroupId)
                 .extCol3(regId)
                 .build();
     }
 
     /**
      * 일반 MMS 발송용 빌더
+     * @param txGroupId 결제 거래 그룹 ID (환불용)
      */
     public static MsgQueue createMms(String dstaddr, String callback, String subject, String text,
                                       int fileCnt, String fileloc1, String fileloc2, String fileloc3,
-                                      String userKey, String sendType, String regId) {
+                                      String userKey, String txGroupId, String regId) {
         LocalDateTime now = LocalDateTime.now();
         return MsgQueue.builder()
                 .msgType("M")
@@ -276,7 +279,7 @@ public class MsgQueue {
                 .senderCode("301200115")
                 .extCol0(null)
                 .extCol1(userKey)
-                .extCol2(sendType)
+                .extCol2(txGroupId)
                 .extCol3(regId)
                 .build();
     }
@@ -329,5 +332,12 @@ public class MsgQueue {
      */
     public boolean isCompleted() {
         return "3".equals(stat);
+    }
+
+    /**
+     * 결제 거래 그룹 ID (환불용)
+     */
+    public String getTxGroupId() {
+        return extCol2;
     }
 }

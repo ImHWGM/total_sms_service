@@ -61,7 +61,6 @@ public class MessageSendService {
 
         // 2. 메시지 발송 등록
         String userKey = MsgQueue.generateUserKey();
-        String sendType = request.getSendType() != null ? request.getSendType() : "1";
         List<Integer> mseqList = new ArrayList<>();
 
         for (String receiver : request.getReceivers()) {
@@ -75,7 +74,7 @@ public class MessageSendService {
                         request.getSubject(),
                         request.getText(),
                         userKey,
-                        sendType,
+                        txGroupId,
                         regId
                 );
                 case "L" -> msgQueue = MsgQueue.createLms(
@@ -84,7 +83,7 @@ public class MessageSendService {
                         request.getSubject(),
                         request.getText(),
                         userKey,
-                        sendType,
+                        txGroupId,
                         regId
                 );
                 case "M" -> msgQueue = MsgQueue.createMms(
@@ -97,7 +96,7 @@ public class MessageSendService {
                         request.getFileloc2(),
                         request.getFileloc3(),
                         userKey,
-                        sendType,
+                        txGroupId,
                         regId
                 );
                 default -> throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 메시지 타입입니다.");

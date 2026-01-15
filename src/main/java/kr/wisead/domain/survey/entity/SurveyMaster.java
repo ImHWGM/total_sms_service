@@ -69,7 +69,8 @@ public class SurveyMaster {
                        String eventDesc, String startDate, String endDate,
                        String status, String privacyPolicyYn, String privacyPolicyTtl,
                        String privacyPolicyDesc, String auth, String qrCode,
-                       String endMessage, String uptId) {
+                       String endMessage, String eventDescImg, String eventEndImg,
+                       String uptId) {
         this.eventName = eventName;
         this.eventEmphasisYn = eventEmphasisYn;
         this.eventType = eventType;
@@ -83,6 +84,8 @@ public class SurveyMaster {
         this.auth = auth;
         this.qrCode = qrCode;
         this.endMessage = endMessage;
+        this.eventDescImg = eventDescImg;
+        this.eventEndImg = eventEndImg;
         this.uptId = uptId;
     }
 

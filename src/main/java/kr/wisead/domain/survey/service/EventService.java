@@ -199,6 +199,8 @@ public class EventService {
                 request.getAuth(),
                 request.getQrCode(),
                 request.getEndMessage(),
+                request.getEventDescImg(),
+                request.getEventEndImg(),
                 uptId
         );
 

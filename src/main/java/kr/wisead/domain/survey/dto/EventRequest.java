@@ -46,6 +46,10 @@ public class EventRequest {
 
     private String endMessage;              // 설문 종료 메시지
 
+    private String eventDescImg;            // 이벤트 설명 이미지 경로
+
+    private String eventEndImg;             // 설문 종료 이미지 경로
+
     // 문항 목록 (설문 생성 시)
     private List<QuestionRequest> questions;
 

@@ -1,5 +1,8 @@
 package kr.wisead.domain.payment.service;
 
+import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.response.ErrorCode;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.payment.dto.ChargeBonusEventRequest;
 import kr.wisead.domain.payment.dto.ChargeBonusEventResponse;
 import kr.wisead.domain.payment.entity.ChargeBonusEvent;
@@ -16,6 +19,7 @@ import java.util.stream.Collectors;
 
 /**
  * 충전 보너스 이벤트 관리 서비스
+ * - 최고관리자A(level 99)만 사용 가능
  */
 @Slf4j
 @Service
@@ -23,12 +27,15 @@ import java.util.stream.Collectors;
 public class ChargeBonusEventService {
 
     private final ChargeBonusEventMapper chargeBonusEventMapper;
+    private final AdminService adminService;
 
     /**
      * 이벤트 생성
      */
     @Transactional
     public ChargeBonusEventResponse createEvent(ChargeBonusEventRequest request, String createdBy) {
+        // 권한 체크: 최고관리자A(level 99)만 생성 가능
+        validateSuperAdmin(createdBy);
         validateRequest(request);
 
         ChargeBonusEvent event = ChargeBonusEvent.builder()
@@ -84,7 +91,9 @@ public class ChargeBonusEventService {
      * 이벤트 수정
      */
     @Transactional
-    public ChargeBonusEventResponse updateEvent(Long eventSeq, ChargeBonusEventRequest request) {
+    public ChargeBonusEventResponse updateEvent(Long eventSeq, ChargeBonusEventRequest request, String userId) {
+        // 권한 체크: 최고관리자A(level 99)만 수정 가능
+        validateSuperAdmin(userId);
         validateRequest(request);
 
         ChargeBonusEvent existing = chargeBonusEventMapper.selectBySeq(eventSeq)
@@ -107,7 +116,7 @@ public class ChargeBonusEventService {
                 .build();
 
         chargeBonusEventMapper.update(updated);
-        log.info("충전 보너스 이벤트 수정: eventSeq={}, eventName={}", eventSeq, request.getEventName());
+        log.info("충전 보너스 이벤트 수정: eventSeq={}, eventName={}, modifiedBy={}", eventSeq, request.getEventName(), userId);
 
         return ChargeBonusEventResponse.from(updated);
     }
@@ -116,7 +125,10 @@ public class ChargeBonusEventService {
      * 이벤트 상태 변경
      */
     @Transactional
-    public void updateEventStatus(Long eventSeq, String status) {
+    public void updateEventStatus(Long eventSeq, String status, String userId) {
+        // 권한 체크: 최고관리자A(level 99)만 상태 변경 가능
+        validateSuperAdmin(userId);
+
         if (!isValidStatus(status)) {
             throw new IllegalArgumentException("유효하지 않은 상태입니다: " + status);
         }
@@ -125,19 +137,22 @@ public class ChargeBonusEventService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이벤트입니다: " + eventSeq));
 
         chargeBonusEventMapper.updateStatus(eventSeq, status);
-        log.info("충전 보너스 이벤트 상태 변경: eventSeq={}, status={}", eventSeq, status);
+        log.info("충전 보너스 이벤트 상태 변경: eventSeq={}, status={}, modifiedBy={}", eventSeq, status, userId);
     }
 
     /**
      * 이벤트 삭제
      */
     @Transactional
-    public void deleteEvent(Long eventSeq) {
+    public void deleteEvent(Long eventSeq, String userId) {
+        // 권한 체크: 최고관리자A(level 99)만 삭제 가능
+        validateSuperAdmin(userId);
+
         chargeBonusEventMapper.selectBySeq(eventSeq)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이벤트입니다: " + eventSeq));
 
         chargeBonusEventMapper.delete(eventSeq);
-        log.info("충전 보너스 이벤트 삭제: eventSeq={}", eventSeq);
+        log.info("충전 보너스 이벤트 삭제: eventSeq={}, deletedBy={}", eventSeq, userId);
     }
 
     /**
@@ -170,5 +185,15 @@ public class ChargeBonusEventService {
 
     private boolean isValidStatus(String status) {
         return "ACTIVE".equals(status) || "INACTIVE".equals(status);
+    }
+
+    /**
+     * 최고관리자A(level 99) 권한 검증
+     */
+    private void validateSuperAdmin(String userId) {
+        Integer userLevel = adminService.getUserLevel(userId);
+        if (userLevel == null || userLevel != 99) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED, "충전 보너스 이벤트 관리 권한이 없습니다. (최고관리자A만 가능)");
+        }
     }
 }

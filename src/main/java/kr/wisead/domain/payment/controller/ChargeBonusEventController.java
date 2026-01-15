@@ -67,8 +67,9 @@ public class ChargeBonusEventController {
     @PutMapping("/{eventSeq}")
     public ApiResponse<ChargeBonusEventResponse> updateEvent(
             @PathVariable Long eventSeq,
-            @Valid @RequestBody ChargeBonusEventRequest request) {
-        ChargeBonusEventResponse event = chargeBonusEventService.updateEvent(eventSeq, request);
+            @Valid @RequestBody ChargeBonusEventRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        ChargeBonusEventResponse event = chargeBonusEventService.updateEvent(eventSeq, request, userDetails.getUsername());
         return ApiResponse.success(event);
     }
 
@@ -79,8 +80,9 @@ public class ChargeBonusEventController {
     @PatchMapping("/{eventSeq}/status")
     public ApiResponse<Void> updateEventStatus(
             @PathVariable Long eventSeq,
-            @RequestParam String status) {
-        chargeBonusEventService.updateEventStatus(eventSeq, status);
+            @RequestParam String status,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        chargeBonusEventService.updateEventStatus(eventSeq, status, userDetails.getUsername());
         return ApiResponse.success(null);
     }
 
@@ -89,8 +91,10 @@ public class ChargeBonusEventController {
      * DELETE /api/admin/charge-bonus-event/{eventSeq}
      */
     @DeleteMapping("/{eventSeq}")
-    public ApiResponse<Void> deleteEvent(@PathVariable Long eventSeq) {
-        chargeBonusEventService.deleteEvent(eventSeq);
+    public ApiResponse<Void> deleteEvent(
+            @PathVariable Long eventSeq,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        chargeBonusEventService.deleteEvent(eventSeq, userDetails.getUsername());
         return ApiResponse.success(null);
     }
 

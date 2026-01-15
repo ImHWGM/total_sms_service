@@ -95,8 +95,9 @@ public class EventParticipantController {
     public ApiResponse<EventParticipantResponse> updateParticipant(
             @PathVariable Integer eventSeq,
             @PathVariable Long seq,
-            @Valid @RequestBody EventParticipantRequest request) {
-        return ApiResponse.success(participantService.updateParticipant(seq, request), "참가자 정보가 수정되었습니다.");
+            @Valid @RequestBody EventParticipantRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ApiResponse.success(participantService.updateParticipant(seq, request, userDetails.getUsername()), "참가자 정보가 수정되었습니다.");
     }
 
     /**

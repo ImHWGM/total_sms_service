@@ -93,12 +93,7 @@
             INSERT_TIME, REQUEST_TIME, SENDER_CODE,
             EXT_COL0, EXT_COL1, EXT_COL2, EXT_COL3
         ) VALUES (
-            #{msgType}, #{dstaddr}, #{callback}, '0',
-            <choose>
-                <when test='msgType == "S" or subject == null or subject == ""'>'-'</when>
-                <otherwise>#{subject}</otherwise>
-            </choose>,
-            #{text}, NOW(),
+            #{msgType}, #{dstaddr}, #{callback}, '0', #{subject}, #{text}, NOW(),
             <choose>
                 <when test="requestTime != null">#{requestTime}</when>
                 <otherwise>NOW()</otherwise>

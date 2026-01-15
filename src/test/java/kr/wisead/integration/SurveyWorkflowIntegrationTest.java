@@ -166,7 +166,7 @@ class SurveyWorkflowIntegrationTest {
     @DisplayName("2. 설문 상태를 '진행중'으로 변경")
     void updateEventStatus_ToProgress() throws Exception {
         // Given: 상태 변경 요청
-        doNothing().when(eventService).updateEventStatus(TEST_EVENT_SEQ, "P");
+        doNothing().when(eventService).updateEventStatus(eq(TEST_EVENT_SEQ), eq("P"), anyString());
 
         // When & Then
         mockMvc.perform(patch("/api/event/{eventSeq}/status", TEST_EVENT_SEQ)
@@ -175,7 +175,7 @@ class SurveyWorkflowIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
-        verify(eventService, times(1)).updateEventStatus(TEST_EVENT_SEQ, "P");
+        verify(eventService, times(1)).updateEventStatus(eq(TEST_EVENT_SEQ), eq("P"), anyString());
     }
 
     @Test

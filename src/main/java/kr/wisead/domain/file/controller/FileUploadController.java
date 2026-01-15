@@ -53,37 +53,49 @@ public class FileUploadController {
 
     /**
      * 설문 문항 이미지 업로드 (Base64)
+     * - eventSeq가 있으면 해당 이벤트 폴더에 저장
+     * - eventSeq가 없으면 tempId 폴더에 저장 (신규 이벤트 생성용)
      */
     @PostMapping("/survey/question")
     public ApiResponse<FileUploadResponse> uploadSurveyQuestionImg(
-            @RequestParam("eventSeq") int eventSeq,
+            @RequestParam(value = "eventSeq", required = false) Integer eventSeq,
+            @RequestParam(value = "tempId", required = false) String tempId,
             @RequestParam("questionSeq") int questionSeq,
             @RequestBody String base64Image) {
-        String filePath = fileStorageService.storeSurveyQuestionImg(base64Image, eventSeq, questionSeq);
+        String directoryId = resolveDirectoryId(eventSeq, tempId);
+        String filePath = fileStorageService.storeSurveyQuestionImg(base64Image, directoryId, questionSeq);
         return ApiResponse.success(FileUploadResponse.success(filePath));
     }
 
     /**
      * 설문 항목 이미지 업로드 (Base64)
+     * - eventSeq가 있으면 해당 이벤트 폴더에 저장
+     * - eventSeq가 없으면 tempId 폴더에 저장 (신규 이벤트 생성용)
      */
     @PostMapping("/survey/item")
     public ApiResponse<FileUploadResponse> uploadSurveyItemImg(
-            @RequestParam("eventSeq") int eventSeq,
+            @RequestParam(value = "eventSeq", required = false) Integer eventSeq,
+            @RequestParam(value = "tempId", required = false) String tempId,
             @RequestParam("questionSeq") int questionSeq,
             @RequestParam("order") int order,
             @RequestBody String base64Image) {
-        String filePath = fileStorageService.storeSurveyItemImg(base64Image, eventSeq, questionSeq, order);
+        String directoryId = resolveDirectoryId(eventSeq, tempId);
+        String filePath = fileStorageService.storeSurveyItemImg(base64Image, directoryId, questionSeq, order);
         return ApiResponse.success(FileUploadResponse.success(filePath));
     }
 
     /**
      * 설문 설명 이미지 업로드
+     * - eventSeq가 있으면 해당 이벤트 폴더에 저장
+     * - eventSeq가 없으면 tempId 폴더에 저장 (신규 이벤트 생성용)
      */
     @PostMapping("/survey/desc")
     public ApiResponse<FileUploadResponse> uploadSurveyDescImg(
-            @RequestParam("eventSeq") int eventSeq,
+            @RequestParam(value = "eventSeq", required = false) Integer eventSeq,
+            @RequestParam(value = "tempId", required = false) String tempId,
             @RequestParam("file") MultipartFile file) {
-        String filePath = fileStorageService.storeSurveyDescImg(file, eventSeq);
+        String directoryId = resolveDirectoryId(eventSeq, tempId);
+        String filePath = fileStorageService.storeSurveyDescImg(file, directoryId);
         FileUploadResponse response = FileUploadResponse.success(filePath);
         response.setOriginalFileName(file.getOriginalFilename());
         response.setFileSize(file.getSize());
@@ -92,16 +104,52 @@ public class FileUploadController {
 
     /**
      * 설문 종료 이미지 업로드
+     * - eventSeq가 있으면 해당 이벤트 폴더에 저장
+     * - eventSeq가 없으면 tempId 폴더에 저장 (신규 이벤트 생성용)
      */
     @PostMapping("/survey/end")
     public ApiResponse<FileUploadResponse> uploadSurveyEndImg(
-            @RequestParam("eventSeq") int eventSeq,
+            @RequestParam(value = "eventSeq", required = false) Integer eventSeq,
+            @RequestParam(value = "tempId", required = false) String tempId,
             @RequestParam("file") MultipartFile file) {
-        String filePath = fileStorageService.storeSurveyEndImg(file, eventSeq);
+        String directoryId = resolveDirectoryId(eventSeq, tempId);
+        String filePath = fileStorageService.storeSurveyEndImg(file, directoryId);
         FileUploadResponse response = FileUploadResponse.success(filePath);
         response.setOriginalFileName(file.getOriginalFilename());
         response.setFileSize(file.getSize());
         return ApiResponse.success(response);
+    }
+
+    /**
+     * 디렉토리 ID 결정
+     * - eventSeq가 있으면 eventSeq 사용
+     * - eventSeq가 없으면 tempId 사용
+     * - 둘 다 없으면 UUID 생성
+     */
+    private String resolveDirectoryId(Integer eventSeq, String tempId) {
+        if (eventSeq != null && eventSeq > 0) {
+            return String.valueOf(eventSeq);
+        }
+        if (tempId != null && !tempId.isBlank()) {
+            return "temp_" + tempId;
+        }
+        return "temp_" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    /**
+     * 설문 임시 이미지를 이벤트 디렉토리로 이동
+     * - 신규 이벤트 생성 후 호출
+     */
+    @PostMapping("/survey/move-temp")
+    public ApiResponse<Boolean> moveSurveyTempFiles(
+            @RequestParam("tempId") String tempId,
+            @RequestParam("eventSeq") int eventSeq) {
+        boolean success = fileStorageService.moveSurveyTempToEvent(tempId, eventSeq);
+        if (success) {
+            return ApiResponse.success(true);
+        } else {
+            return ApiResponse.error("FILE_MOVE_ERROR", "이미지 파일 이동에 실패했습니다.");
+        }
     }
 
     /**

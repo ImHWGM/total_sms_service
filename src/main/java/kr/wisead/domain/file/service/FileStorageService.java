@@ -101,13 +101,13 @@ public class FileStorageService {
 
     /**
      * 설문 문항 이미지 저장 (Base64)
+     * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
      */
-    public String storeSurveyQuestionImg(String base64Image, int eventSeq, int questionSeq) {
+    public String storeSurveyQuestionImg(String base64Image, String directoryId, int questionSeq) {
         byte[] imageBytes = decodeBase64Image(base64Image);
         String extension = getExtensionFromBase64(base64Image);
 
-        String directoryName = String.valueOf(eventSeq);
-        Path targetLocation = Paths.get(surveyImgFilePath, directoryName).toAbsolutePath().normalize();
+        Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = questionSeq + extension;
         return saveBytes(imageBytes, targetLocation, fileName);
@@ -115,13 +115,13 @@ public class FileStorageService {
 
     /**
      * 설문 항목 이미지 저장 (Base64)
+     * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
      */
-    public String storeSurveyItemImg(String base64Image, int eventSeq, int questionSeq, int order) {
+    public String storeSurveyItemImg(String base64Image, String directoryId, int questionSeq, int order) {
         byte[] imageBytes = decodeBase64Image(base64Image);
         String extension = getExtensionFromBase64(base64Image);
 
-        String directoryName = String.valueOf(eventSeq);
-        Path targetLocation = Paths.get(surveyImgFilePath, directoryName).toAbsolutePath().normalize();
+        Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = questionSeq + "_" + order + extension;
         return saveBytes(imageBytes, targetLocation, fileName);
@@ -129,14 +129,14 @@ public class FileStorageService {
 
     /**
      * 설문 설명 이미지 저장
+     * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
      */
-    public String storeSurveyDescImg(MultipartFile file, int eventSeq) {
+    public String storeSurveyDescImg(MultipartFile file, String directoryId) {
         validateFile(file);
         validateImageExtension(file);
 
         String extension = getExtension(file.getOriginalFilename());
-        String directoryName = String.valueOf(eventSeq);
-        Path targetLocation = Paths.get(surveyImgFilePath, directoryName).toAbsolutePath().normalize();
+        Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = "Desc" + extension;
         return saveFile(file, targetLocation, fileName);
@@ -144,17 +144,86 @@ public class FileStorageService {
 
     /**
      * 설문 종료 이미지 저장
+     * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
      */
-    public String storeSurveyEndImg(MultipartFile file, int eventSeq) {
+    public String storeSurveyEndImg(MultipartFile file, String directoryId) {
         validateFile(file);
         validateImageExtension(file);
 
         String extension = getExtension(file.getOriginalFilename());
-        String directoryName = String.valueOf(eventSeq);
-        Path targetLocation = Paths.get(surveyImgFilePath, directoryName).toAbsolutePath().normalize();
+        Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = "End" + extension;
         return saveFile(file, targetLocation, fileName);
+    }
+
+    /**
+     * 설문 임시 디렉토리를 이벤트 시퀀스 디렉토리로 이동
+     * - 신규 이벤트 생성 후 호출하여 temp 파일들을 eventSeq 폴더로 이동
+     *
+     * @param tempId 임시 ID (temp_ 접두사 제외)
+     * @param eventSeq 생성된 이벤트 시퀀스
+     * @return 이동 성공 여부
+     */
+    public boolean moveSurveyTempToEvent(String tempId, int eventSeq) {
+        if (tempId == null || tempId.isBlank()) {
+            return false;
+        }
+
+        String tempDirName = "temp_" + tempId;
+        Path tempDir = Paths.get(surveyImgFilePath, tempDirName).toAbsolutePath().normalize();
+        Path eventDir = Paths.get(surveyImgFilePath, String.valueOf(eventSeq)).toAbsolutePath().normalize();
+
+        if (!Files.exists(tempDir)) {
+            log.warn("임시 디렉토리가 존재하지 않음: {}", tempDir);
+            return false;
+        }
+
+        try {
+            // 이벤트 디렉토리가 이미 존재하면 파일들을 복사
+            if (Files.exists(eventDir)) {
+                // 기존 디렉토리가 있으면 파일만 복사
+                Files.walk(tempDir)
+                        .filter(Files::isRegularFile)
+                        .forEach(source -> {
+                            try {
+                                Path dest = eventDir.resolve(tempDir.relativize(source));
+                                Files.createDirectories(dest.getParent());
+                                Files.copy(source, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                            } catch (IOException e) {
+                                log.error("파일 복사 실패: {} -> {}", source, eventDir, e);
+                            }
+                        });
+                // temp 디렉토리 삭제
+                deleteDirectory(tempDir);
+            } else {
+                // 디렉토리 이름 변경 (이동)
+                Files.move(tempDir, eventDir, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            log.info("설문 이미지 디렉토리 이동 완료: {} -> {}", tempDirName, eventSeq);
+            return true;
+        } catch (IOException e) {
+            log.error("설문 이미지 디렉토리 이동 실패: {} -> {}", tempDirName, eventSeq, e);
+            return false;
+        }
+    }
+
+    /**
+     * 디렉토리 삭제 (하위 파일 포함)
+     */
+    private void deleteDirectory(Path directory) throws IOException {
+        if (Files.exists(directory)) {
+            Files.walk(directory)
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            log.error("파일 삭제 실패: {}", path, e);
+                        }
+                    });
+        }
     }
 
     /**

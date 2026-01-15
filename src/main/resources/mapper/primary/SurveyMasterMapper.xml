@@ -151,13 +151,13 @@
             END_DATE = #{endDate},
             STATUS = #{status},
             PRIVACY_POLICY_YN = #{privacyPolicyYn},
-            <if test="privacyPolicyYn == 'Y'">
+            <if test="privacyPolicyYn != null and privacyPolicyYn == 'Y'.toString()">
                 PRIVACY_POLICY_TTL = #{privacyPolicyTtl},
                 PRIVACY_POLICY_DESC = #{privacyPolicyDesc},
             </if>
             AUTH = #{auth},
             QR_CODE = #{qrCode},
-            <if test="qrCode == 'Y' and qrCodeImgPath != null">
+            <if test="qrCode != null and qrCode == 'Y'.toString() and qrCodeImgPath != null">
                 QR_CODE_IMG_PATH = #{qrCodeImgPath},
                 AUTH_CODE_URL = #{authCodeUrl},
             </if>

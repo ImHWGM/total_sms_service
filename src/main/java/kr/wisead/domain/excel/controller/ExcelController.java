@@ -3,8 +3,11 @@ package kr.wisead.domain.excel.controller;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.admin.service.ActionLogService;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.excel.dto.ExcelExportRequest;
+import kr.wisead.domain.excel.service.BillingExcelService;
 import kr.wisead.domain.excel.service.ExcelService;
+import kr.wisead.domain.payment.dto.BillingStatsSearchRequest;
 import kr.wisead.domain.statistics.dto.DailyStatsResponse;
 import kr.wisead.domain.statistics.dto.StatsSearchRequest;
 import kr.wisead.domain.statistics.service.StatisticsService;
@@ -41,10 +44,12 @@ import java.util.*;
 public class ExcelController {
 
     private final ExcelService excelService;
+    private final BillingExcelService billingExcelService;
     private final StatisticsService statisticsService;
     private final SurveyUserMapper surveyUserMapper;
     private final UserMapper userMapper;
     private final ActionLogService actionLogService;
+    private final AdminService adminService;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -122,6 +127,72 @@ public class ExcelController {
             log.error("Excel 다운로드 실패", e);
             throw new RuntimeException("Excel 파일 생성에 실패했습니다.");
         }
+    }
+
+    /**
+     * 과금 통계 Excel 다운로드 (다중 시트)
+     * GET /api/excel/billing/download?startDate=2025-01-01&endDate=2025-01-31
+     */
+    @GetMapping("/billing/download")
+    public ResponseEntity<byte[]> downloadBillingExcel(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) String reason) {
+
+        String currentUserId = userDetails.getUsername();
+        User user = userMapper.findByUserId(currentUserId).orElseThrow();
+        Integer userLevel = user.getUserLevel();
+
+        log.info("[엑셀 다운로드 시작] 과금 통계 - 사용자: {}, 기간: {} ~ {}", currentUserId, startDate, endDate);
+
+        // 활동 로그 기록
+        actionLogService.logDownload(currentUserId, "과금통계 엑셀다운로드", reason);
+
+        // 기본 날짜 설정
+        LocalDate now = LocalDate.now();
+        if (startDate == null || startDate.isEmpty()) {
+            startDate = now.withDayOfMonth(1).format(DateTimeFormatter.ISO_DATE);
+        }
+        if (endDate == null || endDate.isEmpty()) {
+            endDate = now.format(DateTimeFormatter.ISO_DATE);
+        }
+
+        // 조회 대상 사용자 결정
+        List<String> targetUserIds = new ArrayList<>();
+        if (userId != null && !userId.isEmpty()) {
+            targetUserIds.add(userId);
+        } else {
+            // 권한에 따른 조회 대상 결정
+            String queryUserIds = adminService.determineQueryUserIds(currentUserId, userLevel);
+            if ("ALL".equals(queryUserIds)) {
+                // 전체 조회 (관리자)
+                targetUserIds = null; // 전체
+            } else if (queryUserIds.contains(",")) {
+                targetUserIds.addAll(Arrays.asList(queryUserIds.split(",")));
+            } else {
+                targetUserIds.add(queryUserIds);
+            }
+        }
+
+        // Excel 생성
+        BillingStatsSearchRequest request = BillingStatsSearchRequest.builder()
+                .userId(userId)
+                .startDate(startDate)
+                .endDate(endDate)
+                .build();
+
+        byte[] content = billingExcelService.generateBillingExcel(request, currentUserId, targetUserIds);
+
+        String fileName = "과금통계_" + startDate + "_" + endDate + ".xlsx";
+        String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8)
+                .replace("+", "%20");
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFileName + "\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(content);
     }
 
     /**

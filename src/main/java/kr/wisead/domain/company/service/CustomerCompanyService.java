@@ -134,11 +134,18 @@ public class CustomerCompanyService {
             return false;
         }
 
-        int result = customerCompanyMapper.insertCustomerCompanyBatch(
-                request.getUserId(),
-                validUserIds,
-                operatorId,
-                validNames);
+        // CustomerCompany 객체 리스트 생성
+        List<CustomerCompany> companies = new java.util.ArrayList<>();
+        for (int i = 0; i < validNames.size(); i++) {
+            companies.add(CustomerCompany.builder()
+                    .userId(request.getUserId())
+                    .selectedUserId(validUserIds.get(i))
+                    .custCompName(validNames.get(i))
+                    .uptId(operatorId)
+                    .build());
+        }
+
+        int result = customerCompanyMapper.insertCustomerCompanyBatch(companies);
 
         log.info("고객사 일괄 등록 완료: userId={}, count={}", request.getUserId(), result);
         return result > 0;

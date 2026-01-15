@@ -304,7 +304,7 @@
     <select id="selectForExcelDownload" resultType="map">
         SELECT
             U.SEQ as seq,
-            C.CORP_NAME as corpName,
+            USR.CORP_NAME as corpName,
             M.EVENT_NAME as eventName,
             M.EVENT_TYPE as eventType,
             U.USER_KEY as userKey,
@@ -321,7 +321,7 @@
             U.REG_DATE as regDate
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
-        LEFT JOIN CUSTOMER_COMPANY C ON M.USER_SEQ = C.SEQ
+        LEFT JOIN USER USR ON M.USER_SEQ = USR.SEQ
         <where>
             U.DEL_YN = 'N'
             <if test="eventSeq != null">
@@ -343,7 +343,7 @@
                     </when>
                     <otherwise>
                         AND (M.EVENT_NAME LIKE CONCAT('%', #{keyword}, '%')
-                            OR C.CORP_NAME LIKE CONCAT('%', #{keyword}, '%'))
+                            OR USR.CORP_NAME LIKE CONCAT('%', #{keyword}, '%'))
                     </otherwise>
                 </choose>
             </if>
@@ -375,7 +375,7 @@
         SELECT COUNT(*)
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
-        LEFT JOIN CUSTOMER_COMPANY C ON M.USER_SEQ = C.SEQ
+        LEFT JOIN USER USR ON M.USER_SEQ = USR.SEQ
         <where>
             U.DEL_YN = 'N'
             <if test="eventSeq != null">
@@ -397,7 +397,7 @@
                     </when>
                     <otherwise>
                         AND (M.EVENT_NAME LIKE CONCAT('%', #{keyword}, '%')
-                            OR C.CORP_NAME LIKE CONCAT('%', #{keyword}, '%'))
+                            OR USR.CORP_NAME LIKE CONCAT('%', #{keyword}, '%'))
                     </otherwise>
                 </choose>
             </if>
@@ -528,7 +528,7 @@
                     </when>
                     <!-- 고객사명 -->
                     <when test="searchType == 'customerName'">
-                        AND C.CORP_NAME LIKE CONCAT('%', #{keyword}, '%')
+                        AND USR.CORP_NAME LIKE CONCAT('%', #{keyword}, '%')
                     </when>
                     <!-- 이벤트명 -->
                     <when test="searchType == 'eventName'">
@@ -585,10 +585,10 @@
             M.PRIVACY_POLICY_YN as privacyPolicyYn,
             M.PRIVACY_POLICY_TTL as privacyPolicyTtl,
             M.PRIVACY_POLICY_DESC as privacyPolicyDesc,
-            C.CORP_NAME as corpName
+            USR.CORP_NAME as corpName
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
-        LEFT JOIN CUSTOMER_COMPANY C ON M.USER_SEQ = C.SEQ
+        LEFT JOIN USER USR ON M.USER_SEQ = USR.SEQ
         <include refid="searchCondition"/>
         ORDER BY U.REG_DATE DESC
         <if test="offset != null and size != null">
@@ -601,7 +601,7 @@
         SELECT COUNT(*)
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
-        LEFT JOIN CUSTOMER_COMPANY C ON M.USER_SEQ = C.SEQ
+        LEFT JOIN USER USR ON M.USER_SEQ = USR.SEQ
         <include refid="searchCondition"/>
     </select>
 

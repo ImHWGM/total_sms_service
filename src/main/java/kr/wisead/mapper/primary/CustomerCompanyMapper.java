@@ -22,10 +22,7 @@ public interface CustomerCompanyMapper {
     /**
      * 고객사 일괄 등록
      */
-    int insertCustomerCompanyBatch(@Param("userId") String userId,
-                                    @Param("selectedUserIds") List<String> selectedUserIds,
-                                    @Param("uptId") String uptId,
-                                    @Param("custCompNames") List<String> custCompNames);
+    int insertCustomerCompanyBatch(List<CustomerCompany> companies);
 
     /**
      * 고객사 목록 조회 (USER 기반)
@@ -79,4 +76,11 @@ public interface CustomerCompanyMapper {
      * 고객사 시퀀스로 조회
      */
     CustomerCompany selectBySeq(@Param("seq") Integer seq);
+
+    /**
+     * 관리 계정 사용자 ID 목록 조회
+     * - 운영 관리자(level 50-89)가 관리하는 계정 목록
+     * - customer_company에 등록되고 checked_yn='Y'인 계정들
+     */
+    List<String> selectManagedUserIds(@Param("userId") String userId);
 }

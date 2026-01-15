@@ -128,6 +128,14 @@
           AND remaining > 0
     </update>
 
+    <!-- 환불 시 잔여 금액 증가 + 상태 복원 (단일 쿼리) -->
+    <update id="addRemainingAndReactivate">
+        UPDATE wallet_lot
+        SET remaining = remaining + #{amount},
+            status = 'ACTIVE'
+        WHERE lot_seq = #{lotSeq}
+    </update>
+
     <!-- 만료 처리 (배치용) -->
     <update id="updateExpiredStatus">
         UPDATE wallet_lot

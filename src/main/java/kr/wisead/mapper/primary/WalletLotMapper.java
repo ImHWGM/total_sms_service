@@ -75,6 +75,13 @@ public interface WalletLotMapper {
     int reactivateIfNeeded(@Param("lotSeq") Long lotSeq);
 
     /**
+     * 환불 시 잔여 금액 증가 + 상태 복원 (단일 쿼리)
+     * - N+1 최적화: addRemaining + reactivateIfNeeded 통합
+     */
+    int addRemainingAndReactivate(@Param("lotSeq") Long lotSeq,
+                                   @Param("amount") BigDecimal amount);
+
+    /**
      * 만료 처리 (배치용)
      */
     int updateExpiredStatus(@Param("today") LocalDate today);

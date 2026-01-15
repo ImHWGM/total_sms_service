@@ -2,7 +2,9 @@ package kr.wisead.domain.payment.service;
 
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.payment.dto.ChargeRequest;
+import kr.wisead.domain.payment.entity.ChargeBonusEvent;
 import kr.wisead.domain.payment.entity.Payment;
+import kr.wisead.mapper.primary.ChargeBonusEventMapper;
 import kr.wisead.mapper.primary.PaymentMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,11 +13,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 /**
  * 결제 서비스 (KG모빌리언스 연동)
+ * - Wallet 시스템 기반 충전 처리
+ * - 충전 보너스 이벤트 지원
  */
 @Slf4j
 @Service
@@ -24,9 +29,13 @@ public class PaymentService {
 
     private final PaymentMapper paymentMapper;
     private final BalanceService balanceService;
+    private final WalletService walletService;
+    private final ChargeBonusEventMapper chargeBonusEventMapper;
 
     /**
      * 결제 결과 처리
+     * - CASH 충전 (Wallet 시스템)
+     * - 활성 보너스 이벤트 시 POINT 추가 적립
      */
     @Transactional
     public boolean processPayment(Map<String, String> paymentResult) {
@@ -44,25 +53,62 @@ public class PaymentService {
             paymentMapper.insertPayment(payment);
             log.info("결제 정보 저장 완료: tradeId={}", tradeId);
 
-            // 잔액 충전 처리
+            // 잔액 충전 처리 (CASH → Wallet)
             String userId = paymentResult.get("Userid");
             String amountStr = paymentResult.get("Prdtprice");
-            BigDecimal amount = new BigDecimal(amountStr);
+            BigDecimal chargeAmount = new BigDecimal(amountStr);
 
-            ChargeRequest chargeRequest = ChargeRequest.builder()
-                    .userId(userId)
-                    .amount(amount)
-                    .comment("결제 충전 (tradeId: " + tradeId + ")")
-                    .tradeId(tradeId)
-                    .build();
+            // 1. CASH 충전 (WalletService 직접 호출)
+            walletService.charge(userId, chargeAmount, "KG결제 충전 (tradeId: " + tradeId + ")");
+            log.info("CASH 충전 완료: userId={}, amount={}", userId, chargeAmount);
 
-            balanceService.charge(chargeRequest, userId);
-            log.info("결제 충전 처리 완료: userId={}, amount={}", userId, amount);
+            // 2. 보너스 포인트 이벤트 처리
+            grantBonusPointIfEligible(userId, chargeAmount, tradeId);
 
             return true;
         } catch (Exception e) {
             log.error("결제 처리 중 오류 발생", e);
             return false;
+        }
+    }
+
+    /**
+     * 충전 보너스 포인트 적립 (이벤트 조건 충족 시)
+     */
+    private void grantBonusPointIfEligible(String userId, BigDecimal chargeAmount, String tradeId) {
+        try {
+            LocalDate today = LocalDate.now();
+
+            // 활성 이벤트 조회 (충전 금액 조건 포함)
+            List<ChargeBonusEvent> activeEvents = chargeBonusEventMapper.selectActiveEvents(today, chargeAmount);
+
+            if (activeEvents.isEmpty()) {
+                log.debug("적용 가능한 충전 보너스 이벤트 없음: userId={}, chargeAmount={}", userId, chargeAmount);
+                return;
+            }
+
+            // 가장 유리한 이벤트 적용 (첫 번째 = 보너스율 높은 순)
+            ChargeBonusEvent event = activeEvents.get(0);
+            BigDecimal bonusAmount = event.calculateBonus(chargeAmount);
+
+            if (bonusAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                log.debug("보너스 금액이 0원: eventSeq={}", event.getEventSeq());
+                return;
+            }
+
+            // 보너스 포인트 만료일 계산
+            LocalDate expireDate = event.calculateExpireDate(today);
+
+            // POINT 적립 (Wallet Lot 시스템)
+            String source = String.format("충전 보너스 [%s] (tradeId: %s)", event.getEventName(), tradeId);
+            walletService.grantPoint(userId, bonusAmount, expireDate, source);
+
+            log.info("충전 보너스 포인트 적립 완료: userId={}, chargeAmount={}, bonusAmount={}, eventName={}, expireDate={}",
+                    userId, chargeAmount, bonusAmount, event.getEventName(), expireDate);
+
+        } catch (Exception e) {
+            // 보너스 적립 실패는 결제 실패로 처리하지 않음 (로그만 남김)
+            log.error("충전 보너스 포인트 적립 중 오류 (결제는 정상 처리됨): userId={}, chargeAmount={}", userId, chargeAmount, e);
         }
     }
 

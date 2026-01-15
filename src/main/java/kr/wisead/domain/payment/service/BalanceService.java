@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -36,9 +38,13 @@ public class BalanceService {
 
     /**
      * 현재 잔액 조회
+     * - N+1 최적화: 4개 단가 조회를 한 번에 처리 (최대 8회 → 최대 2회)
      */
     public BalanceResponse getCurrentBalance(String userId) {
         WalletSummaryResponse summary = walletService.getWalletSummary(userId);
+
+        // N+1 최적화: 모든 단가를 한 번에 조회
+        Map<String, BigDecimal> rates = getAllRates(userId);
 
         return BalanceResponse.builder()
                 .userId(userId)
@@ -46,10 +52,10 @@ public class BalanceService {
                 .balance(BigDecimal.ZERO)
                 .operation("Q") // Query
                 .operationName("조회")
-                .smsPrice(getSmsPrice(userId))
-                .lmsPrice(getLmsPrice(userId))
-                .mmsPrice(getMmsPrice(userId))
-                .subtractUnitPrice(getSurveyPrice(userId))
+                .smsPrice(rates.getOrDefault("msg_sms", BigDecimal.valueOf(12.1)))
+                .lmsPrice(rates.getOrDefault("msg_lms", BigDecimal.valueOf(36.3)))
+                .mmsPrice(rates.getOrDefault("msg_mms", BigDecimal.valueOf(121)))
+                .subtractUnitPrice(rates.getOrDefault("survey", BigDecimal.valueOf(36.3)))
                 .build();
     }
 
@@ -249,6 +255,35 @@ public class BalanceService {
 
     // ========== Private Helper Methods ==========
 
+    private static final BigDecimal VAT_RATE = new BigDecimal("1.1");
+
+    /**
+     * 모든 서비스 단가를 한 번에 조회 (N+1 최적화)
+     * - 최대 8회 DB 호출 → 최대 2회 DB 호출
+     */
+    private Map<String, BigDecimal> getAllRates(String userId) {
+        Map<String, BigDecimal> result = new HashMap<>();
+        LocalDate today = LocalDate.now();
+
+        // 1. 사용자 단가 조회 (VAT 포함) - 1회 쿼리
+        List<UserServiceRate> userRates = userServiceRateMapper.selectAllActiveRates(userId, today);
+        for (UserServiceRate rate : userRates) {
+            result.put(rate.getServiceId(), rate.getRate());
+        }
+
+        // 2. 기준 단가 조회 (VAT 미포함) - 1회 쿼리
+        List<UserServiceRateMapper.ServiceRateEntry> standardRates = userServiceRateMapper.selectAllStandardRates();
+        for (UserServiceRateMapper.ServiceRateEntry entry : standardRates) {
+            // 사용자 단가가 없는 경우에만 기준 단가 × VAT 적용
+            if (!result.containsKey(entry.serviceId())) {
+                BigDecimal rateWithVat = entry.rate().multiply(VAT_RATE).setScale(2, java.math.RoundingMode.HALF_UP);
+                result.put(entry.serviceId(), rateWithVat);
+            }
+        }
+
+        return result;
+    }
+
     private String getServiceIdByMsgType(String msgType) {
         return switch (msgType.toUpperCase()) {
             case "SMS" -> "msg_sms";
@@ -273,8 +308,6 @@ public class BalanceService {
     private BigDecimal getSurveyPrice(String userId) {
         return getRate(userId, "survey", BigDecimal.valueOf(36.3));
     }
-
-    private static final BigDecimal VAT_RATE = new BigDecimal("1.1");
 
     private BigDecimal getRate(String userId, String serviceId, BigDecimal defaultRate) {
         try {

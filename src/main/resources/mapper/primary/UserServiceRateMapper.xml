@@ -103,4 +103,12 @@
         WHERE service_id = #{serviceId}
     </select>
 
+    <!-- 모든 기준 단가 조회 (VAT 미포함) - N+1 최적화 -->
+    <select id="selectAllStandardRates" resultType="kr.wisead.mapper.primary.UserServiceRateMapper$ServiceRateEntry">
+        SELECT
+            service_id AS serviceId,
+            service_rate AS rate
+        FROM standard_rate
+    </select>
+
 </mapper>

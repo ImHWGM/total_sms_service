@@ -58,7 +58,7 @@ public class SendHistoryController {
         Integer userLevel = adminService.getUserLevel(userId);
 
         // 권한에 따른 조회 대상 설정
-        String queryUserId = determineQueryUserId(userId, userLevel);
+        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 
         SendHistorySearchRequest request = SendHistorySearchRequest.builder()
                 .startDate(startDate)
@@ -100,7 +100,7 @@ public class SendHistoryController {
         actionLogService.logDownloadAction(userId, userName, "발송 이력 다운로드", "D", reason, request);
 
         // 권한에 따른 조회 대상 설정
-        String queryUserId = determineQueryUserId(userId, userLevel);
+        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 
         SendHistorySearchRequest searchRequest = SendHistorySearchRequest.builder()
                 .startDate(startDate)
@@ -274,26 +274,4 @@ public class SendHistoryController {
         log.info("수신거부 엑셀 다운로드 완료: userId={}, 건수={}", userId, blockedList.size());
     }
 
-    // ==================== Private Methods ====================
-
-    /**
-     * 권한별 조회 대상 사용자 ID 결정
-     */
-    private String determineQueryUserId(String sessionUserId, Integer userLevel) {
-        if (userLevel == null) return sessionUserId;
-
-        if (userLevel >= 90) {
-            // 90 이상: 모든 데이터 조회
-            log.info("권한 레벨 {}로 모든 데이터 조회 허용", userLevel);
-            return "ALL";
-        } else if (userLevel >= 50) {
-            // 50-89: 관리하는 계정들 조회 (TODO: 관리 계정 목록 조회 필요)
-            log.info("권한 레벨 {}로 본인 데이터만 조회: {}", userLevel, sessionUserId);
-            return sessionUserId;
-        } else {
-            // 50 미만: 본인만
-            log.info("권한 레벨 {}로 본인만 조회: {}", userLevel, sessionUserId);
-            return sessionUserId;
-        }
-    }
 }

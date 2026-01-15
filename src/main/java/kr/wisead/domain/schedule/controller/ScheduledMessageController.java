@@ -51,7 +51,7 @@ public class ScheduledMessageController {
         Integer userLevel = adminService.getUserLevel(userId);
 
         // 권한에 따른 조회 대상 설정
-        String queryUserId = determineQueryUserId(userId, userLevel);
+        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 
         ScheduledMessageSearchRequest request = ScheduledMessageSearchRequest.builder()
                 .msgType(msgType)
@@ -77,7 +77,7 @@ public class ScheduledMessageController {
         String accessToken = token.replace("Bearer ", "");
         String userId = jwtTokenProvider.getUserId(accessToken);
         Integer userLevel = adminService.getUserLevel(userId);
-        String queryUserId = determineQueryUserId(userId, userLevel);
+        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 
         ScheduledMessageResponse response = scheduledMessageService.getMessageById(mSeq, queryUserId);
         if (response == null) {
@@ -100,7 +100,7 @@ public class ScheduledMessageController {
         String accessToken = token.replace("Bearer ", "");
         String userId = jwtTokenProvider.getUserId(accessToken);
         Integer userLevel = adminService.getUserLevel(userId);
-        String queryUserId = determineQueryUserId(userId, userLevel);
+        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 
         // 10분 이내 예약 불가
         LocalDateTime minTime = LocalDateTime.now().plusMinutes(10);
@@ -137,7 +137,7 @@ public class ScheduledMessageController {
         String accessToken = token.replace("Bearer ", "");
         String userId = jwtTokenProvider.getUserId(accessToken);
         Integer userLevel = adminService.getUserLevel(userId);
-        String queryUserId = determineQueryUserId(userId, userLevel);
+        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
 
@@ -172,24 +172,4 @@ public class ScheduledMessageController {
         return ApiResponse.success("삭제되었습니다.");
     }
 
-    // ==================== Private Methods ====================
-
-    /**
-     * 권한별 조회 대상 사용자 ID 결정
-     */
-    private String determineQueryUserId(String sessionUserId, Integer userLevel) {
-        if (userLevel == null) return sessionUserId;
-
-        if (userLevel >= 90) {
-            log.info("예약메시지 - 권한 레벨 {}로 모든 데이터 조회 허용", userLevel);
-            return "ALL";
-        } else if (userLevel >= 50) {
-            // TODO: 관리 계정 목록 조회 필요
-            log.info("예약메시지 - 권한 레벨 {}로 본인 데이터만 조회: {}", userLevel, sessionUserId);
-            return sessionUserId;
-        } else {
-            log.info("예약메시지 - 권한 레벨 {}로 본인만 조회: {}", userLevel, sessionUserId);
-            return sessionUserId;
-        }
-    }
 }

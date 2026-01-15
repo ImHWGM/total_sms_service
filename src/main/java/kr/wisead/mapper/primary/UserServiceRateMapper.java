@@ -62,4 +62,15 @@ public interface UserServiceRateMapper {
      * 기준 단가 조회 (VAT 미포함)
      */
     BigDecimal selectStandardRate(@Param("serviceId") String serviceId);
+
+    /**
+     * 모든 기준 단가 조회 (VAT 미포함)
+     * - N+1 최적화: 여러 서비스의 단가를 한 번에 조회
+     */
+    List<ServiceRateEntry> selectAllStandardRates();
+
+    /**
+     * 서비스 단가 DTO
+     */
+    record ServiceRateEntry(String serviceId, java.math.BigDecimal rate) {}
 }

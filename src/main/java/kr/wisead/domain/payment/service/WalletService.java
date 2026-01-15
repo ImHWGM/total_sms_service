@@ -374,6 +374,7 @@ public class WalletService {
 
     /**
      * 환불 처리 (CASH → POINT → BONUS 역순)
+     * - N+1 최적화: Lot 환불 시 3회 쿼리 → 1회 쿼리 + 메모리 계산
      */
     @Transactional
     public RefundResult refundByGroup(String txGroupId) {
@@ -400,6 +401,14 @@ public class WalletService {
         BigDecimal expiredAmount = BigDecimal.ZERO;
         List<RefundResult.RefundDetail> details = new ArrayList<>();
         int refundedCount = 0;
+
+        // N+1 최적화: 환불 전 POINT/BONUS 잔액을 미리 조회하고, 환불 시 메모리에서 누적 계산
+        String userId = originalTxs.get(0).getUserId();
+        Map<String, BigDecimal> currencyBalances = new HashMap<>();
+        List<WalletLotMapper.CurrencyBalance> lotBalances = walletLotMapper.selectAllSumRemaining(userId, today);
+        for (WalletLotMapper.CurrencyBalance cb : lotBalances) {
+            currencyBalances.put(cb.currencyType(), cb.balance());
+        }
 
         for (Transaction tx : originalTxs) {
             if (!Transaction.TX_TYPE_DEDUCT.equals(tx.getTxType())) continue;
@@ -444,22 +453,25 @@ public class WalletService {
 
             } else {
                 // 포인트/보너스: 유효함 → 원래 Lot에 복원
-                walletLotMapper.addRemaining(tx.getLotSeq(), tx.getAmount());
-                walletLotMapper.reactivateIfNeeded(tx.getLotSeq());
+                // N+1 최적화: addRemaining + reactivateIfNeeded → 단일 쿼리
+                walletLotMapper.addRemainingAndReactivate(tx.getLotSeq(), tx.getAmount());
 
-                BigDecimal lotRemaining = walletLotMapper.selectSumRemaining(
-                        tx.getUserId(), tx.getCurrencyType(), today);
+                // N+1 최적화: 루프 내 selectSumRemaining 제거 → 메모리에서 누적 계산
+                String currencyType = tx.getCurrencyType();
+                BigDecimal currentBalance = currencyBalances.getOrDefault(currencyType, BigDecimal.ZERO);
+                BigDecimal newBalance = currentBalance.add(tx.getAmount());
+                currencyBalances.put(currencyType, newBalance);
 
                 Transaction refundTx = Transaction.createRefund(
-                        refundTxGroupId, tx.getUserId(), tx.getCurrencyType(),
-                        tx.getAmount(), lotRemaining, tx.getSeq(), "환불"
+                        refundTxGroupId, tx.getUserId(), currencyType,
+                        tx.getAmount(), newBalance, tx.getSeq(), "환불"
                 );
                 transactionMapper.insert(refundTx);
 
                 refundedAmount = refundedAmount.add(tx.getAmount());
                 refundedCount++;
                 details.add(RefundResult.RefundDetail.builder()
-                        .currencyType(tx.getCurrencyType())
+                        .currencyType(currencyType)
                         .amount(tx.getAmount())
                         .refunded(true)
                         .build());

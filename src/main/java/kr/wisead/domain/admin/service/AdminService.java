@@ -8,7 +8,10 @@ import kr.wisead.domain.payment.entity.UserServiceRate;
 import kr.wisead.domain.payment.service.StandardRateService;
 import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.user.dto.UserResponse;
+import kr.wisead.domain.user.entity.PasswordHint;
 import kr.wisead.domain.user.entity.User;
+import kr.wisead.mapper.primary.CustomerCompanyMapper;
+import kr.wisead.mapper.primary.PasswordHintMapper;
 import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.mapper.primary.UserServiceRateMapper;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +36,8 @@ public class AdminService {
     private final WalletService walletService;
     private final UserServiceRateMapper userServiceRateMapper;
     private final StandardRateService standardRateService;
+    private final PasswordHintMapper passwordHintMapper;
+    private final CustomerCompanyMapper customerCompanyMapper;
     private final PasswordEncoder passwordEncoder;
 
     /**
@@ -56,16 +61,25 @@ public class AdminService {
         // 비밀번호 암호화
         String encodedPassword = passwordEncoder.encode(request.getUserPass());
 
-        // 연락처 암호화 처리
+        // 개인정보 암호화 처리 (person, phone, email)
+        String encryptedPerson = null;
         String encryptedPhone = null;
-        if (request.getPhone() != null) {
-            try {
+        String encryptedEmail = null;
+
+        try {
+            if (request.getPerson() != null && !request.getPerson().isBlank()) {
+                encryptedPerson = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(request.getPerson()));
+            }
+            if (request.getPhone() != null && !request.getPhone().isBlank()) {
                 String phone = request.getPhone().replace("-", "");
                 encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(phone));
-            } catch (Exception e) {
-                log.error("연락처 암호화 실패: {}", e.getMessage());
-                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "연락처 암호화에 실패했습니다.");
             }
+            if (request.getEmail() != null && !request.getEmail().isBlank()) {
+                encryptedEmail = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(request.getEmail()));
+            }
+        } catch (Exception e) {
+            log.error("개인정보 암호화 실패: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "개인정보 암호화에 실패했습니다.");
         }
 
         // 회원 정보 생성
@@ -76,9 +90,9 @@ public class AdminService {
                 .corpAddr(request.getCorpAddr())
                 .bizNum(request.getBizNum())
                 .bizTel(request.getBizTel())
-                .person(request.getPerson())
+                .person(encryptedPerson)
                 .phone(encryptedPhone)
-                .email(request.getEmail())
+                .email(encryptedEmail)
                 .userLevel(request.getUserLevel())
                 .useYn("Y")
                 .allowIpYn("Y")
@@ -98,6 +112,9 @@ public class AdminService {
         // 서비스 단가 등록 (standard_rate 기준)
         initializeUserServiceRates(request.getUserId());
         log.info("서비스 단가 등록 완료: userId={}", request.getUserId());
+
+        // 비밀번호 힌트 등록
+        registerPasswordHint(user.getSeq(), request.getHintQuestion(), request.getHintAnswer());
 
         return getUserResponse(user);
     }
@@ -145,7 +162,68 @@ public class AdminService {
         };
     }
 
+    /**
+     * 권한별 조회 대상 사용자 ID 결정
+     * - 레벨 90 이상: "ALL" (전체 조회)
+     * - 레벨 50-89: 본인 + 관리하는 계정들 (콤마 구분)
+     * - 레벨 50 미만: 본인만
+     *
+     * @param userId    현재 로그인한 사용자 ID
+     * @param userLevel 사용자 권한 레벨
+     * @return 조회 대상 사용자 ID (단일 ID, 콤마 구분 목록, 또는 "ALL")
+     */
+    public String determineQueryUserIds(String userId, Integer userLevel) {
+        if (userLevel == null) return userId;
+
+        if (userLevel >= 90) {
+            // 90 이상: 모든 데이터 조회
+            log.info("권한 레벨 {}로 모든 데이터 조회 허용: userId={}", userLevel, userId);
+            return "ALL";
+        } else if (userLevel >= 50) {
+            // 50-89: 관리하는 계정들 조회
+            java.util.List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(userId);
+
+            if (managedUserIds == null || managedUserIds.isEmpty()) {
+                log.info("권한 레벨 {} - 관리 계정 없음, 본인만 조회: {}", userLevel, userId);
+                return userId;
+            }
+
+            // 본인 ID 추가
+            if (!managedUserIds.contains(userId)) {
+                managedUserIds.add(userId);
+            }
+
+            String result = String.join(",", managedUserIds);
+            log.info("권한 레벨 {} - 관리 계정 조회: userId={}, 조회대상={}", userLevel, userId, result);
+            return result;
+        } else {
+            // 50 미만: 본인만
+            log.info("권한 레벨 {}로 본인만 조회: {}", userLevel, userId);
+            return userId;
+        }
+    }
+
     // ==================== Private Methods ====================
+
+    /**
+     * 비밀번호 힌트 등록
+     */
+    private void registerPasswordHint(Long mngSeq, String hintQuestion, String hintAnswer) {
+        if (hintQuestion == null || hintQuestion.isBlank() ||
+            hintAnswer == null || hintAnswer.isBlank()) {
+            log.debug("비밀번호 힌트 미입력: mngSeq={}", mngSeq);
+            return;
+        }
+
+        PasswordHint passwordHint = PasswordHint.builder()
+                .mngSeq(mngSeq)
+                .hintQuestion(hintQuestion)
+                .hintAnswer(hintAnswer)
+                .build();
+
+        passwordHintMapper.insert(passwordHint);
+        log.info("비밀번호 힌트 등록 완료: mngSeq={}", mngSeq);
+    }
 
     private void initializeUserServiceRates(String userId) {
         LocalDate today = LocalDate.now();
@@ -164,21 +242,24 @@ public class AdminService {
     }
 
     private UserResponse getUserResponse(User user) {
+        // UserResponse.from()을 사용하여 개인정보 복호화 포함
+        UserResponse response = UserResponse.from(user);
+        // userLevelName 추가를 위해 builder 재구성
         return UserResponse.builder()
-                .seq(user.getSeq())
-                .userId(user.getUserId())
-                .corpName(user.getCorpName())
-                .corpAddr(user.getCorpAddr())
-                .bizNum(user.getBizNum())
-                .bizTel(user.getBizTel())
-                .person(user.getPerson())
-                .phone(user.getPhone())
-                .email(user.getEmail())
-                .userLevel(user.getUserLevel())
+                .seq(response.getSeq())
+                .userId(response.getUserId())
+                .corpName(response.getCorpName())
+                .corpAddr(response.getCorpAddr())
+                .bizNum(response.getBizNum())
+                .bizTel(response.getBizTel())
+                .person(response.getPerson())
+                .phone(response.getPhone())
+                .email(response.getEmail())
+                .userLevel(response.getUserLevel())
                 .userLevelName(getUserLevelName(user.getUserLevel()))
-                .useYn(user.getUseYn())
-                .status(user.getStatus())
-                .regDate(user.getRegDate())
+                .useYn(response.getUseYn())
+                .status(response.getStatus())
+                .regDate(response.getRegDate())
                 .build();
     }
 }

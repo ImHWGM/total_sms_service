@@ -24,11 +24,10 @@ public class SmsSendRequest {
     private String msgType;
 
     @NotBlank(message = "발신번호는 필수입니다.")
-    @Pattern(regexp = "^\\d{2,3}-?\\d{3,4}-?\\d{4}$", message = "올바른 발신번호 형식이 아닙니다.")
     private String callback;
 
     @NotEmpty(message = "수신번호 목록은 필수입니다.")
-    private List<@Pattern(regexp = "^\\d{2,3}-?\\d{3,4}-?\\d{4}$",
+    private List<@Pattern(regexp = "^\\d{2,3}?\\d{3,4}?\\d{4}$",
                           message = "올바른 수신번호 형식이 아닙니다.") String> receivers;
 
     @Size(max = 120, message = "제목은 120자 이내로 입력해주세요.")

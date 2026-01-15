@@ -7,6 +7,7 @@ import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.message.dto.*;
 import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.message.entity.MsgResult;
+import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
 import kr.wisead.mapper.primary.SurveyMasterMapper;
@@ -18,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -36,6 +39,7 @@ public class MessageSendService {
     private final MsgResultMapper msgResultMapper;
     private final SurveyUserMapper surveyUserMapper;
     private final SurveyMasterMapper surveyMasterMapper;
+    private final WalletService walletService;
 
     @Value("${wisead.url:https://wisead.kr}")
     private String wiseadUrl;
@@ -43,10 +47,19 @@ public class MessageSendService {
     /**
      * 일반 문자 발송 (SMS/LMS/MMS)
      * MSG_QUEUE 테이블에 등록하면 외부 에이전트가 발송 처리
+     *
+     * @param request 발송 요청
+     * @param regId 등록자 ID (userId)
      */
     @Transactional("smsTransactionManager")
     public SmsSendResponse sendMessage(SmsSendRequest request, String regId) {
-        // userKey(배치ID) 생성
+        int messageCount = request.getReceivers().size();
+        String serviceId = getServiceIdFromMsgType(request.getMsgType());
+
+        // 1. 잔액 확인 및 차감
+        String txGroupId = deductForMessage(regId, serviceId, messageCount, request.getMsgType());
+
+        // 2. 메시지 발송 등록
         String userKey = MsgQueue.generateUserKey();
         String sendType = request.getSendType() != null ? request.getSendType() : "1";
         List<Integer> mseqList = new ArrayList<>();
@@ -100,10 +113,67 @@ public class MessageSendService {
             mseqList.add(msgQueue.getMseq());
         }
 
-        log.info("문자 발송 등록 완료 - userKey: {}, count: {}, msgType: {}",
-                userKey, mseqList.size(), request.getMsgType());
+        log.info("문자 발송 등록 완료 - userKey: {}, count: {}, msgType: {}, txGroupId: {}",
+                userKey, mseqList.size(), request.getMsgType(), txGroupId);
 
-        return SmsSendResponse.success(mseqList, LocalDateTime.now(), request.isImmediate());
+        return SmsSendResponse.success(mseqList, LocalDateTime.now(), request.isImmediate(), txGroupId);
+    }
+
+    /**
+     * 메시지 발송을 위한 잔액 차감
+     *
+     * @param userId 사용자 ID
+     * @param serviceId 서비스 ID (msg_sms, msg_lms, msg_mms)
+     * @param quantity 발송 건수
+     * @param msgType 메시지 타입 (로깅용)
+     * @return txGroupId (환불 시 사용)
+     */
+    private String deductForMessage(String userId, String serviceId, int quantity, String msgType) {
+        BigDecimal qty = BigDecimal.valueOf(quantity);
+        BigDecimal unitPrice = walletService.getAppliedRate(userId, serviceId);
+        BigDecimal totalAmount = unitPrice.multiply(qty);
+
+        // 잔액 확인
+        if (!walletService.hasEnoughBalance(userId, totalAmount)) {
+            log.warn("잔액 부족 - userId: {}, 필요금액: {}, msgType: {}", userId, totalAmount, msgType);
+            throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE,
+                    String.format("잔액이 부족합니다. 필요 금액: %s원", totalAmount.setScale(0)));
+        }
+
+        // 잔액 차감
+        String txGroupId = walletService.deductWithPriority(
+                userId, serviceId, qty,
+                String.format("%s 발송 %d건", getMsgTypeName(msgType), quantity)
+        );
+
+        log.info("메시지 발송 비용 차감 - userId: {}, serviceId: {}, quantity: {}, totalAmount: {}, txGroupId: {}",
+                userId, serviceId, quantity, totalAmount, txGroupId);
+
+        return txGroupId;
+    }
+
+    /**
+     * 메시지 타입을 서비스 ID로 변환
+     */
+    private String getServiceIdFromMsgType(String msgType) {
+        return switch (msgType) {
+            case "S" -> "msg_sms";
+            case "L" -> "msg_lms";
+            case "M" -> "msg_mms";
+            default -> throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 메시지 타입입니다.");
+        };
+    }
+
+    /**
+     * 메시지 타입명 반환
+     */
+    private String getMsgTypeName(String msgType) {
+        return switch (msgType) {
+            case "S" -> "SMS";
+            case "L" -> "LMS";
+            case "M" -> "MMS";
+            default -> "문자";
+        };
     }
 
     /**
@@ -168,10 +238,10 @@ public class MessageSendService {
     }
 
     /**
-     * 예약 발송 취소 (소유자 검증 포함)
+     * 예약 발송 취소 (소유자 검증 + 환불 포함)
      */
-    @Transactional("smsTransactionManager")
     public int cancelScheduledMessage(Integer mseq, String regId) {
+        // 1. 메시지 조회 및 검증 (SMS DB)
         MsgQueue msgQueue = msgQueueMapper.findByMseq(mseq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "발송 정보를 찾을 수 없습니다."));
 
@@ -185,17 +255,25 @@ public class MessageSendService {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "대기 중인 발송만 취소할 수 있습니다.");
         }
 
-        int deleted = msgQueueMapper.delete(mseq);
-        log.info("예약 발송 취소 - mseq: {}, regId: {}", mseq, regId);
+        String msgType = msgQueue.getMsgType();
+
+        // 2. 메시지 삭제 (SMS DB)
+        int deleted = deleteMsgQueue(mseq);
+
+        // 3. 환불 처리 (Primary DB)
+        if (deleted > 0) {
+            refundForCancelledMessages(regId, msgType, 1);
+        }
+
+        log.info("예약 발송 취소 완료 - mseq: {}, regId: {}, msgType: {}", mseq, regId, msgType);
         return deleted;
     }
 
     /**
-     * 배치 전체 예약 취소 (소유자 검증 포함)
+     * 배치 전체 예약 취소 (소유자 검증 + 환불 포함)
      */
-    @Transactional("smsTransactionManager")
     public int cancelScheduledBatch(String userKey, String regId) {
-        // 배치의 첫 번째 메시지로 소유자 검증
+        // 1. 배치 조회 및 검증 (SMS DB)
         List<MsgQueue> messages = msgQueueMapper.findByUserKey(userKey);
         if (messages.isEmpty()) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "발송 정보를 찾을 수 없습니다.");
@@ -208,9 +286,66 @@ public class MessageSendService {
             throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 발송을 취소할 권한이 없습니다.");
         }
 
-        int deleted = msgQueueMapper.deleteByUserKey(userKey);
-        log.info("배치 예약 발송 취소 - userKey: {}, count: {}, regId: {}", userKey, deleted, regId);
+        // 대기 중인 메시지만 필터링
+        List<MsgQueue> pendingMessages = messages.stream()
+                .filter(MsgQueue::isPending)
+                .toList();
+
+        if (pendingMessages.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "취소 가능한 대기 중인 발송이 없습니다.");
+        }
+
+        String msgType = firstMsg.getMsgType();
+        int pendingCount = pendingMessages.size();
+
+        // 2. 메시지 삭제 (SMS DB)
+        int deleted = deleteMsgQueueByUserKey(userKey);
+
+        // 3. 환불 처리 (Primary DB)
+        if (deleted > 0) {
+            refundForCancelledMessages(regId, msgType, deleted);
+        }
+
+        log.info("배치 예약 발송 취소 완료 - userKey: {}, count: {}, regId: {}, msgType: {}",
+                userKey, deleted, regId, msgType);
         return deleted;
+    }
+
+    /**
+     * 메시지 삭제 (SMS DB 트랜잭션)
+     */
+    @Transactional("smsTransactionManager")
+    public int deleteMsgQueue(Integer mseq) {
+        return msgQueueMapper.delete(mseq);
+    }
+
+    /**
+     * 메시지 배치 삭제 (SMS DB 트랜잭션)
+     */
+    @Transactional("smsTransactionManager")
+    public int deleteMsgQueueByUserKey(String userKey) {
+        return msgQueueMapper.deleteByUserKey(userKey);
+    }
+
+    /**
+     * 취소된 메시지에 대한 환불 처리 (Primary DB)
+     */
+    private void refundForCancelledMessages(String userId, String msgType, int count) {
+        try {
+            String serviceId = getServiceIdFromMsgType(msgType);
+            BigDecimal unitPrice = walletService.getAppliedRate(userId, serviceId);
+            BigDecimal refundAmount = unitPrice.multiply(BigDecimal.valueOf(count));
+
+            String comment = String.format("%s 발송 취소 환불 %d건", getMsgTypeName(msgType), count);
+            walletService.refundToCash(userId, refundAmount, comment);
+
+            log.info("메시지 취소 환불 완료 - userId: {}, msgType: {}, count: {}, refundAmount: {}",
+                    userId, msgType, count, refundAmount);
+        } catch (Exception e) {
+            // 환불 실패 시에도 메시지 취소는 유지 (로그만 남김)
+            log.error("메시지 취소 환불 실패 - userId: {}, msgType: {}, count: {}, error: {}",
+                    userId, msgType, count, e.getMessage(), e);
+        }
     }
 
     /**

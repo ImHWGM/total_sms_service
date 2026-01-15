@@ -540,4 +540,52 @@ public class WalletService {
                 .map(WalletLotResponse::from)
                 .toList();
     }
+
+    /**
+     * CASH로 직접 환불 (취소 시 사용)
+     * - 원래 차감된 화폐를 추적하지 않고 CASH로 직접 환불
+     *
+     * @param userId  사용자 ID
+     * @param amount  환불 금액
+     * @param comment 환불 사유
+     * @return 환불 거래 ID
+     */
+    @Transactional
+    public String refundToCash(String userId, BigDecimal amount, String comment) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+
+        // 지갑 존재 확인
+        Optional<Wallet> walletOpt = walletMapper.selectForUpdate(userId, "CASH");
+        if (walletOpt.isEmpty()) {
+            Wallet newWallet = Wallet.createCashWallet(userId);
+            walletMapper.insertIgnore(newWallet);
+            walletOpt = walletMapper.selectForUpdate(userId, "CASH");
+        }
+
+        Wallet wallet = walletOpt.orElseThrow(() ->
+                new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "지갑 조회 실패"));
+
+        // 잔액 증가
+        walletMapper.addBalance(userId, "CASH", amount);
+        BigDecimal balanceAfter = wallet.getBalance().add(amount);
+
+        // 거래 내역 기록
+        String txGroupId = UUID.randomUUID().toString();
+        Transaction tx = Transaction.builder()
+                .txGroupId(txGroupId)
+                .userId(userId)
+                .currencyType(Transaction.CURRENCY_CASH)
+                .txType(Transaction.TX_TYPE_REFUND)
+                .amount(amount)
+                .balanceAfter(balanceAfter)
+                .comment(comment)
+                .build();
+        transactionMapper.insert(tx);
+
+        log.info("CASH 환불 완료 - userId: {}, amount: {}, balanceAfter: {}, comment: {}",
+                userId, amount, balanceAfter, comment);
+        return txGroupId;
+    }
 }

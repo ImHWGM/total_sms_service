@@ -4,6 +4,7 @@ import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.common.util.PasswordValidator;
 import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.email.service.EmailService;
 import kr.wisead.domain.user.dto.FindIdRequest;
@@ -104,7 +105,15 @@ public class UserService {
             throw new BusinessException(ErrorCode.INVALID_PASSWORD, "현재 비밀번호가 일치하지 않습니다.");
         }
 
-        // 3. 비밀번호 변경
+        // 3. 새 비밀번호 복잡도 검증
+        PasswordValidator.validate(newPassword);
+
+        // 4. 현재 비밀번호와 동일한지 확인
+        if (passwordEncoder.matches(newPassword, user.getUserPass())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "새 비밀번호는 현재 비밀번호와 달라야 합니다.");
+        }
+
+        // 5. 비밀번호 변경
         String encodedPassword = passwordEncoder.encode(newPassword);
         userMapper.updatePassword(userId, encodedPassword);
 

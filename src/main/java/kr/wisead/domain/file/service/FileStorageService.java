@@ -132,6 +132,7 @@ public class FileStorageService {
     /**
      * 설문 설명 이미지 저장
      * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
+     * @return 상대 경로 (directoryId/Desc.확장자)
      */
     public String storeSurveyDescImg(MultipartFile file, String directoryId) {
         validateFile(file);
@@ -141,12 +142,14 @@ public class FileStorageService {
         Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = "Desc" + extension;
-        return saveFile(file, targetLocation, fileName);
+        saveFile(file, targetLocation, fileName);
+        return directoryId + "/" + fileName;
     }
 
     /**
      * 설문 종료 이미지 저장
      * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
+     * @return 상대 경로 (directoryId/End.확장자)
      */
     public String storeSurveyEndImg(MultipartFile file, String directoryId) {
         validateFile(file);
@@ -156,7 +159,8 @@ public class FileStorageService {
         Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = "End" + extension;
-        return saveFile(file, targetLocation, fileName);
+        saveFile(file, targetLocation, fileName);
+        return directoryId + "/" + fileName;
     }
 
     /**

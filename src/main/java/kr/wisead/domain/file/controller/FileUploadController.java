@@ -101,10 +101,15 @@ public class FileUploadController {
             @RequestParam(value = "tempId", required = false) String tempId,
             @RequestParam("file") MultipartFile file) {
         String directoryId = resolveDirectoryId(eventSeq, tempId);
-        String filePath = fileStorageService.storeSurveyDescImg(file, directoryId);
-        FileUploadResponse response = FileUploadResponse.success(filePath);
-        response.setOriginalFileName(file.getOriginalFilename());
-        response.setFileSize(file.getSize());
+        String relativePath = fileStorageService.storeSurveyDescImg(file, directoryId);
+        FileUploadResponse response = FileUploadResponse.builder()
+                .success(true)
+                .message("설문 설명 이미지 업로드가 완료되었습니다.")
+                .filePath(relativePath)
+                .relativePath(relativePath)
+                .originalFileName(file.getOriginalFilename())
+                .fileSize(file.getSize())
+                .build();
         return ApiResponse.success(response);
     }
 
@@ -119,10 +124,15 @@ public class FileUploadController {
             @RequestParam(value = "tempId", required = false) String tempId,
             @RequestParam("file") MultipartFile file) {
         String directoryId = resolveDirectoryId(eventSeq, tempId);
-        String filePath = fileStorageService.storeSurveyEndImg(file, directoryId);
-        FileUploadResponse response = FileUploadResponse.success(filePath);
-        response.setOriginalFileName(file.getOriginalFilename());
-        response.setFileSize(file.getSize());
+        String relativePath = fileStorageService.storeSurveyEndImg(file, directoryId);
+        FileUploadResponse response = FileUploadResponse.builder()
+                .success(true)
+                .message("설문 종료 이미지 업로드가 완료되었습니다.")
+                .filePath(relativePath)
+                .relativePath(relativePath)
+                .originalFileName(file.getOriginalFilename())
+                .fileSize(file.getSize())
+                .build();
         return ApiResponse.success(response);
     }
 

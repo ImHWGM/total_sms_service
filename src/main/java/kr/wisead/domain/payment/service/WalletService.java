@@ -132,12 +132,22 @@ public class WalletService {
      */
     @Transactional
     public String deductByAmount(String userId, BigDecimal amount, String comment) {
+        String txGroupId = UUID.randomUUID().toString();
+        return deductByAmount(userId, amount, comment, txGroupId);
+    }
+
+    /**
+     * 금액 직접 차감 (서비스ID 없이, txGroupId 지정 버전)
+     * - 우선순위: BONUS → POINT → CASH
+     * - 외부에서 생성한 txGroupId를 사용 (메시지 취소 시 환불 추적용)
+     */
+    @Transactional
+    public String deductByAmount(String userId, BigDecimal amount, String comment, String txGroupId) {
         // 잔액 충분 여부 확인
         if (!hasEnoughBalance(userId, amount)) {
             throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "잔액이 부족합니다.");
         }
 
-        String txGroupId = UUID.randomUUID().toString();
         LocalDate today = LocalDate.now();
         BigDecimal remaining = amount;
 
@@ -162,6 +172,17 @@ public class WalletService {
      */
     @Transactional
     public String deductWithPriority(String userId, String serviceId, BigDecimal quantity, String comment) {
+        String txGroupId = UUID.randomUUID().toString();
+        return deductWithPriority(userId, serviceId, quantity, comment, txGroupId);
+    }
+
+    /**
+     * 우선순위 차감 (BONUS → POINT → CASH) - txGroupId 지정 버전
+     * - 서비스ID 기반 단가 조회 후 수량 × 단가로 차감
+     * - 외부에서 생성한 txGroupId를 사용 (메시지 취소 시 환불 추적용)
+     */
+    @Transactional
+    public String deductWithPriority(String userId, String serviceId, BigDecimal quantity, String comment, String txGroupId) {
         BigDecimal unitPrice = getAppliedRate(userId, serviceId);
         BigDecimal totalAmount = unitPrice.multiply(quantity);
 
@@ -170,7 +191,6 @@ public class WalletService {
             throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "잔액이 부족합니다.");
         }
 
-        String txGroupId = UUID.randomUUID().toString();
         LocalDate today = LocalDate.now();
         BigDecimal remaining = totalAmount;
 

@@ -138,7 +138,6 @@ public class EventService {
                 .authCodeUrl(authCodeUrl)
                 .qrCodeImgPath(qrCodeImgPath)
                 .endMessage(request.getEndMessage())
-                .qrCodeVisits(0)
                 .regId(userId)
                 .build();
 

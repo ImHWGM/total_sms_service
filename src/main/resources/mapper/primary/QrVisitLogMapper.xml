@@ -27,4 +27,29 @@
         WHERE EVENT_SEQ = #{eventSeq}
     </select>
 
+    <!-- authCodeUrl 기준 활성 방문 수 조회 (과금용) -->
+    <select id="countActiveVisitsByAuthCodeUrl" resultType="long">
+        SELECT COUNT(*)
+        FROM QR_VISIT_LOG v
+        INNER JOIN SURVEY_MASTER m ON v.EVENT_SEQ = m.EVENT_SEQ
+        WHERE BINARY m.AUTH_CODE_URL = #{authCodeUrl}
+          AND v.EVENT_STATUS = 'P'
+    </select>
+
+    <!-- 이벤트의 마지막 활성 방문 로그 삭제 (롤백용) -->
+    <delete id="deleteLastActiveVisitByAuthCodeUrl">
+        DELETE FROM QR_VISIT_LOG
+        WHERE SEQ = (
+            SELECT seq FROM (
+                SELECT v.SEQ
+                FROM QR_VISIT_LOG v
+                INNER JOIN SURVEY_MASTER m ON v.EVENT_SEQ = m.EVENT_SEQ
+                WHERE BINARY m.AUTH_CODE_URL = #{authCodeUrl}
+                  AND v.EVENT_STATUS = 'P'
+                ORDER BY v.SEQ DESC
+                LIMIT 1
+            ) AS temp
+        )
+    </delete>
+
 </mapper>

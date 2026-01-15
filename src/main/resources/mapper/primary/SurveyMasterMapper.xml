@@ -21,7 +21,6 @@
         M.AUTH_KEY_DESC as authKeyDesc,
         M.QR_CODE as qrCode,
         M.QR_CODE_IMG_PATH as qrCodeImgPath,
-        M.QR_CODE_VISITS as qrCodeVisits,
         M.AUTH_CODE_URL as authCodeUrl,
         M.END_MESSAGE as endMessage,
         M.EVENT_END_IMG as eventEndImg,
@@ -130,13 +129,13 @@
             EVENT_DESC_IMG, EVENT_DESC, EVENT_TYPE, START_DATE, END_DATE,
             STATUS, PRIVACY_POLICY_YN, PRIVACY_POLICY_TTL, PRIVACY_POLICY_DESC,
             AUTH, QR_CODE, QR_CODE_IMG_PATH, AUTH_CODE_URL,
-            END_MESSAGE, EVENT_END_IMG, QR_CODE_VISITS, REG_DATE, REG_ID
+            END_MESSAGE, EVENT_END_IMG, REG_DATE, REG_ID
         ) VALUES (
             #{userSeq}, #{eventCode}, #{eventName}, #{eventEmphasisYn},
             #{eventDescImg}, #{eventDesc}, #{eventType}, #{startDate}, #{endDate},
             #{status}, #{privacyPolicyYn}, #{privacyPolicyTtl}, #{privacyPolicyDesc},
             #{auth}, #{qrCode}, #{qrCodeImgPath}, #{authCodeUrl},
-            #{endMessage}, #{eventEndImg}, IFNULL(#{qrCodeVisits}, 0), NOW(), #{regId}
+            #{endMessage}, #{eventEndImg}, NOW(), #{regId}
         )
     </insert>
 
@@ -197,27 +196,6 @@
         WHERE EVENT_SEQ = #{eventSeq}
     </update>
 
-    <!-- QR코드 방문 수 증가 -->
-    <update id="incrementQrCodeVisits">
-        UPDATE SURVEY_MASTER
-        SET QR_CODE_VISITS = QR_CODE_VISITS + 1
-        WHERE BINARY AUTH_CODE_URL = #{authCodeUrl}
-    </update>
-
-    <!-- QR코드 방문 수 조회 -->
-    <select id="selectQrCodeVisits" resultType="java.lang.Long">
-        SELECT IFNULL(QR_CODE_VISITS, 0)
-        FROM SURVEY_MASTER
-        WHERE BINARY AUTH_CODE_URL = #{authCodeUrl}
-    </select>
-
-    <!-- QR코드 방문 수 롤백 (과금 실패 시) -->
-    <update id="rollbackQrCodeVisits">
-        UPDATE SURVEY_MASTER
-        SET QR_CODE_VISITS = GREATEST(QR_CODE_VISITS - 1, 0)
-        WHERE BINARY AUTH_CODE_URL = #{authCodeUrl}
-    </update>
-
     <!-- 만료된 이벤트 상태 업데이트 -->
     <update id="updateExpiredEventsStatus">
         UPDATE SURVEY_MASTER
@@ -255,14 +233,14 @@
         WHERE EVENT_SEQ = #{eventSeq}
     </update>
 
-    <!-- 사용자별 QR 통계 조회 -->
+    <!-- 사용자별 QR 통계 조회 (진행 중 상태의 방문만 카운트) -->
     <select id="selectQrStatsByUser" resultType="kr.wisead.domain.statistics.dto.UserQrStatsResponse">
         SELECT
             CAST(u.seq AS CHAR) AS userId,
             u.corp_name AS userName,
             m.EVENT_NAME AS eventName,
-            COUNT(*) AS eventCount,
-            IFNULL(SUM(m.QR_CODE_VISITS), 0) AS visitCount
+            COUNT(DISTINCT m.EVENT_SEQ) AS eventCount,
+            IFNULL((SELECT COUNT(*) FROM QR_VISIT_LOG v WHERE v.EVENT_SEQ = m.EVENT_SEQ AND v.EVENT_STATUS = 'P'), 0) AS visitCount
         FROM user u
         JOIN SURVEY_MASTER m ON u.seq = m.USER_SEQ
         WHERE m.QR_CODE = 'Y'
@@ -281,7 +259,7 @@
                 #{seq}
             </foreach>
         </if>
-        GROUP BY u.seq, u.corp_name, m.EVENT_NAME
+        GROUP BY u.seq, u.corp_name, m.EVENT_NAME, m.EVENT_SEQ
         ORDER BY u.seq
     </select>
 

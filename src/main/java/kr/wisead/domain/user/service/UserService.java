@@ -298,6 +298,9 @@ public class UserService {
             throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
         }
 
+        // 비밀번호 복잡도 검증
+        PasswordValidator.validate(newPassword);
+
         String encodedPassword = passwordEncoder.encode(newPassword);
         userMapper.updatePassword(userId, encodedPassword);
         log.info("만료된 비밀번호 변경 완료: userId={}", userId);
@@ -426,11 +429,14 @@ public class UserService {
             throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
         }
 
-        // 3. 비밀번호 변경
+        // 3. 비밀번호 복잡도 검증
+        PasswordValidator.validate(newPassword);
+
+        // 4. 비밀번호 변경
         String encodedPassword = passwordEncoder.encode(newPassword);
         userMapper.updatePassword(resetToken.getUserId(), encodedPassword);
 
-        // 4. 토큰 사용 처리
+        // 5. 토큰 사용 처리
         passwordResetTokenMapper.markAsUsed(token);
 
         log.info("비밀번호 재설정 완료: userId={}", resetToken.getUserId());

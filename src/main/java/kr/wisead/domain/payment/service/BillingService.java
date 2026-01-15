@@ -2,7 +2,7 @@ package kr.wisead.domain.payment.service;
 
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
-import kr.wisead.mapper.primary.SurveyMasterMapper;
+import kr.wisead.mapper.primary.QrVisitLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ import java.math.BigDecimal;
 public class BillingService {
 
     private final WalletService walletService;
-    private final SurveyMasterMapper surveyMasterMapper;
+    private final QrVisitLogMapper qrVisitLogMapper;
 
     // QR 코드 무료 제공 방문 수
     private static final long QR_FREE_VISITS = 3000L;
@@ -72,13 +72,8 @@ public class BillingService {
      */
     @Transactional
     public boolean deductQrOverageCharge(String userId, String comment, String authCodeUrl) {
-        // 현재 방문 수 조회
-        Long currentVisits = surveyMasterMapper.selectQrCodeVisits(authCodeUrl);
-
-        if (currentVisits == null) {
-            log.warn("QR 코드 방문 수를 조회할 수 없습니다: authCodeUrl={}", authCodeUrl);
-            return false;
-        }
+        // 현재 활성 방문 수 조회 (진행 중 상태의 방문만 카운트)
+        long currentVisits = qrVisitLogMapper.countActiveVisitsByAuthCodeUrl(authCodeUrl);
 
         // 무료 제공 건수(3000건) 이하면 과금 없음
         if (currentVisits <= QR_FREE_VISITS) {
@@ -97,8 +92,8 @@ public class BillingService {
         // 잔액 확인
         if (!walletService.hasEnoughBalance(userId, overageFee)) {
             log.warn("QR 추가 과금 실패 - 잔액 부족: userId={}, required={}", userId, overageFee);
-            // 과금 실패 시 방문 수 롤백
-            surveyMasterMapper.rollbackQrCodeVisits(authCodeUrl);
+            // 과금 실패 시 마지막 방문 로그 삭제 (롤백)
+            qrVisitLogMapper.deleteLastActiveVisitByAuthCodeUrl(authCodeUrl);
             throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE,
                     "QR 코드 추가 과금 비용이 부족합니다. 필요 금액: " + overageFee + "원");
         }

@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -121,17 +122,18 @@ public class MultiMessageService {
             return MultiMessageResponse.insufficientBalance();
         }
 
-        // 4. 배치 ID 생성
+        // 4. 배치 ID 및 txGroupId 생성
         String batchId = generateBatchId();
+        String txGroupId = UUID.randomUUID().toString();
         int successCount = 0;
 
-        // 5. 메시지 발송 등록
+        // 5. 메시지 발송 등록 (txGroupId를 MsgQueue에 저장)
         for (MultiMessageRequest.ReceiverInfo receiver : receivers) {
             try {
                 String phone = normalizePhoneNumber(receiver.getPhone());
                 String text = applyReplaceChars(request.getText(), receiver);
 
-                MsgQueue msgQueue = createMsgQueue(request, phone, text, batchId, regId);
+                MsgQueue msgQueue = createMsgQueue(request, phone, text, batchId, txGroupId, regId);
 
                 // 예약 발송 설정
                 if (!request.isImmediate() && request.getReqDate() != null) {
@@ -147,16 +149,16 @@ public class MultiMessageService {
             }
         }
 
-        // 6. 잔액 차감 (BalanceService.deductMessageCharge 사용)
+        // 6. 잔액 차감 (동일한 txGroupId로 차감하여 취소 시 환불 추적 가능)
         if (successCount > 0) {
             BigDecimal chargedAmount = unitPrice.multiply(BigDecimal.valueOf(successCount));
             String msgType = request.getMessageType() != null ? request.getMessageType().toUpperCase() : "SMS";
             String comment = "문자발송 : " + msgType + "  " + successCount + "건";
 
-            balanceService.deductMessageCharge(regId, successCount, msgType, comment);
+            balanceService.deductMessageChargeWithTxGroupId(regId, successCount, msgType, comment, txGroupId);
 
-            log.info("Multi 메시지 발송 완료 - 성공: {}, 중복: {}, 수신거부: {}, 차감: {}",
-                    successCount, duplicateCount, blockedCount, chargedAmount);
+            log.info("Multi 메시지 발송 완료 - 성공: {}, 중복: {}, 수신거부: {}, 차감: {}, txGroupId: {}",
+                    successCount, duplicateCount, blockedCount, chargedAmount, txGroupId);
 
             return MultiMessageResponse.success(successCount, duplicateCount, blockedCount, batchId, chargedAmount);
         }
@@ -217,8 +219,10 @@ public class MultiMessageService {
 
     /**
      * MsgQueue 생성
+     * @param txGroupId 결제 거래 그룹 ID (환불 추적용)
      */
-    private MsgQueue createMsgQueue(MultiMessageRequest request, String phone, String text, String batchId, String regId) {
+    private MsgQueue createMsgQueue(MultiMessageRequest request, String phone, String text,
+                                     String batchId, String txGroupId, String regId) {
         return switch (request.getMsgTypeCode()) {
             case "L" -> MsgQueue.createLms(
                     phone,
@@ -226,7 +230,7 @@ public class MultiMessageService {
                     request.getSubject(),
                     text,
                     batchId,
-                    request.isImmediate() ? "1" : "0",
+                    txGroupId,
                     regId
             );
             case "M" -> MsgQueue.createMms(
@@ -239,7 +243,7 @@ public class MultiMessageService {
                     request.getFileLoc2(),
                     request.getFileLoc3(),
                     batchId,
-                    request.isImmediate() ? "1" : "0",
+                    txGroupId,
                     regId
             );
             default -> MsgQueue.createSms(
@@ -248,7 +252,7 @@ public class MultiMessageService {
                     request.getSubject(),
                     text,
                     batchId,
-                    request.isImmediate() ? "1" : "0",
+                    txGroupId,
                     regId
             );
         };

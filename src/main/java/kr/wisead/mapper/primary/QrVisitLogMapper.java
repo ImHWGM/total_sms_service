@@ -24,4 +24,14 @@ public interface QrVisitLogMapper {
      * 이벤트별 전체 방문 수 조회
      */
     long countByEventSeq(@Param("eventSeq") Integer eventSeq);
+
+    /**
+     * authCodeUrl 기준 활성 방문 수 조회 (과금용)
+     */
+    long countActiveVisitsByAuthCodeUrl(@Param("authCodeUrl") String authCodeUrl);
+
+    /**
+     * 이벤트의 마지막 활성 방문 로그 삭제 (롤백용)
+     */
+    int deleteLastActiveVisitByAuthCodeUrl(@Param("authCodeUrl") String authCodeUrl);
 }

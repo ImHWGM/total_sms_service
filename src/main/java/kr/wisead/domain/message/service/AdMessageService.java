@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -136,8 +137,9 @@ public class AdMessageService {
             );
         }
 
-        // 7. 메시지 발송 등록
+        // 7. 메시지 발송 등록 (txGroupId를 MsgQueue에 저장)
         String batchId = generateBatchId();
+        String txGroupId = UUID.randomUUID().toString();
         int successCount = 0;
 
         for (AdMessageRequest.Recipient recipient : filteredRecipients) {
@@ -155,7 +157,7 @@ public class AdMessageService {
                         request.getFileloc2(),
                         request.getFileloc3(),
                         batchId,
-                        request.isImmediate() ? "1" : "2",
+                        txGroupId,
                         userId
                 );
 
@@ -173,7 +175,7 @@ public class AdMessageService {
             }
         }
 
-        // 8. 잔액 차감
+        // 8. 잔액 차감 (동일한 txGroupId로 차감하여 취소 시 환불 추적 가능)
         if (successCount > 0) {
             BigDecimal actualCharge = unitPrice.multiply(BigDecimal.valueOf(successCount));
             String comment = String.format("광고문자발송 : %s %d건", request.getMsgTypeLabel(), successCount);
@@ -182,15 +184,15 @@ public class AdMessageService {
             }
 
             try {
-                balanceService.deduct(userId, actualCharge, comment, userId);
+                balanceService.deductWithTxGroupId(userId, actualCharge, comment, userId, txGroupId);
             } catch (Exception e) {
-                log.error("잔액 차감 실패 - userId: {}, charge: {}, error: {}",
-                        userId, actualCharge, e.getMessage());
+                log.error("잔액 차감 실패 - userId: {}, charge: {}, txGroupId: {}, error: {}",
+                        userId, actualCharge, txGroupId, e.getMessage());
             }
         }
 
-        log.info("광고문자 발송 완료 - userId: {}, 성공: {}, 중복: {}, 수신거부: {}",
-                userId, successCount, duplicateCount, blockedCount);
+        log.info("광고문자 발송 완료 - userId: {}, 성공: {}, 중복: {}, 수신거부: {}, txGroupId: {}",
+                userId, successCount, duplicateCount, blockedCount, txGroupId);
 
         return AdMessageResponse.success(successCount, duplicateCount, blockedCount,
                 maskedBlockedNumbers, batchId);
@@ -210,17 +212,18 @@ public class AdMessageService {
 
     /**
      * MsgQueue 생성
+     * @param txGroupId 결제 거래 그룹 ID (환불 추적용)
      */
     private MsgQueue createMsgQueue(String msgType, String dstaddr, String callback,
                                     String subject, String text,
                                     Integer fileCnt, String fileloc1, String fileloc2, String fileloc3,
-                                    String userKey, String sendType, String regId) {
+                                    String userKey, String txGroupId, String regId) {
         return switch (msgType) {
-            case "S" -> MsgQueue.createSms(dstaddr, callback, subject, text, userKey, sendType, regId);
-            case "L" -> MsgQueue.createLms(dstaddr, callback, subject, text, userKey, sendType, regId);
+            case "S" -> MsgQueue.createSms(dstaddr, callback, subject, text, userKey, txGroupId, regId);
+            case "L" -> MsgQueue.createLms(dstaddr, callback, subject, text, userKey, txGroupId, regId);
             case "M" -> MsgQueue.createMms(dstaddr, callback, subject, text,
                     fileCnt != null ? fileCnt : 0, fileloc1, fileloc2, fileloc3,
-                    userKey, sendType, regId);
+                    userKey, txGroupId, regId);
             default -> throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 메시지 타입입니다.");
         };
     }

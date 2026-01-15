@@ -162,10 +162,45 @@ public class BalanceService {
     }
 
     /**
-     * 메시지 발송 비용 차감
+     * 차감 (금액 직접 지정, txGroupId 지정 버전)
+     * - 외부에서 생성한 txGroupId를 사용 (MsgQueue에 저장 후 차감 시 동일 ID 사용)
      */
     @Transactional
-    public void deductMessageCharge(String userId, int count, String msgType, String comment) {
+    public BalanceResponse deductWithTxGroupId(String userId, BigDecimal amount, String comment,
+                                                String operatorId, String txGroupId) {
+        // 잔액 확인
+        if (!walletService.hasEnoughBalance(userId, amount)) {
+            throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "잔액이 부족합니다.");
+        }
+
+        // 우선순위 차감 (BONUS → POINT → CASH) - 지정된 txGroupId 사용
+        walletService.deductByAmount(userId, amount, comment, txGroupId);
+
+        WalletSummaryResponse summary = walletService.getWalletSummary(userId);
+
+        log.info("차감 완료: userId={}, amount={}, balanceAfter={}, txGroupId={}",
+                userId, amount, summary.getTotal(), txGroupId);
+
+        return BalanceResponse.builder()
+                .userId(userId)
+                .balance(amount)
+                .totalBalance(summary.getTotal())
+                .operation("M")
+                .operationName("차감")
+                .comment(comment)
+                .smsPrice(getSmsPrice(userId))
+                .lmsPrice(getLmsPrice(userId))
+                .mmsPrice(getMmsPrice(userId))
+                .subtractUnitPrice(getSurveyPrice(userId))
+                .build();
+    }
+
+    /**
+     * 메시지 발송 비용 차감
+     * @return txGroupId 거래 그룹 ID
+     */
+    @Transactional
+    public String deductMessageCharge(String userId, int count, String msgType, String comment) {
         String serviceId = getServiceIdByMsgType(msgType);
         BigDecimal quantity = BigDecimal.valueOf(count);
 
@@ -180,6 +215,33 @@ public class BalanceService {
 
         // 우선순위 차감
         String txGroupId = walletService.deductWithPriority(userId, serviceId, quantity, comment);
+
+        log.info("메시지 비용 차감: userId={}, count={}, type={}, charge={}, txGroupId={}",
+                userId, count, msgType, totalCharge, txGroupId);
+
+        return txGroupId;
+    }
+
+    /**
+     * 메시지 발송 비용 차감 (txGroupId 지정 버전)
+     * - 외부에서 생성한 txGroupId를 사용 (MsgQueue에 저장 후 차감 시 동일 ID 사용)
+     */
+    @Transactional
+    public void deductMessageChargeWithTxGroupId(String userId, int count, String msgType, String comment, String txGroupId) {
+        String serviceId = getServiceIdByMsgType(msgType);
+        BigDecimal quantity = BigDecimal.valueOf(count);
+
+        // 단가 조회
+        BigDecimal unitPrice = walletService.getAppliedRate(userId, serviceId);
+        BigDecimal totalCharge = unitPrice.multiply(quantity);
+
+        // 잔액 확인
+        if (!walletService.hasEnoughBalance(userId, totalCharge)) {
+            throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "잔액이 부족합니다.");
+        }
+
+        // 우선순위 차감 (지정된 txGroupId 사용)
+        walletService.deductWithPriority(userId, serviceId, quantity, comment, txGroupId);
 
         log.info("메시지 비용 차감: userId={}, count={}, type={}, charge={}, txGroupId={}",
                 userId, count, msgType, totalCharge, txGroupId);

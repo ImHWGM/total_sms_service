@@ -352,7 +352,6 @@ CREATE TABLE IF NOT EXISTS `survey_master` (
     `PRIVACY_POLICY_DESC` text DEFAULT NULL COMMENT '개인정보 정책 내용',
     `QR_CODE` char(1) DEFAULT 'N' COMMENT 'QR 간편인증 사용여부',
     `QR_CODE_IMG_PATH` varchar(150) DEFAULT NULL COMMENT 'QR 간편인증 이미지 패스',
-    `QR_CODE_VISITS` int(11) DEFAULT 0,
     `AUTH_CODE_URL` varchar(100) DEFAULT NULL COMMENT '인증코드URL',
     `REG_DATE` timestamp NOT NULL DEFAULT current_timestamp() COMMENT '이벤트 등록일',
     `REG_ID` varchar(20) DEFAULT NULL COMMENT '등록 ID',

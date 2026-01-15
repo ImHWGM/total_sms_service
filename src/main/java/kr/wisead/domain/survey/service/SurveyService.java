@@ -43,16 +43,14 @@ public class SurveyService {
 
     /**
      * QR코드 URL로 설문 정보 조회
+     * (방문 수 증가는 FrontAuthService.createQrUser에서 QR_VISIT_LOG에 기록)
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public EventResponse getSurveyByAuthCodeUrl(String authCodeUrl) {
         SurveyMaster event = surveyMasterMapper.selectByAuthCodeUrl(authCodeUrl)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "설문을 찾을 수 없습니다."));
 
         validateEventActive(event);
-
-        // QR코드 방문 수 증가
-        surveyMasterMapper.incrementQrCodeVisits(authCodeUrl);
 
         return buildSurveyResponse(event);
     }

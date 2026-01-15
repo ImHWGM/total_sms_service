@@ -177,16 +177,18 @@ public class MessageSendService {
 
     /**
      * 설문 문자 발송
+     *
+     * @param txGroupId 결제 거래 그룹 ID (환불 추적용, 결제 없으면 null)
      */
     @Transactional("smsTransactionManager")
     public int sendSurveyMessage(String msgType, String dstaddr, String callback,
                                   String subject, String text,
                                   Integer eventSeq, Integer userSeq,
-                                  String sendType, String regId,
+                                  String txGroupId, String regId,
                                   LocalDateTime requestTime) {
         MsgQueue msgQueue = MsgQueue.createForSurvey(
                 msgType, dstaddr, callback, subject, text,
-                eventSeq, userSeq, sendType, regId
+                eventSeq, userSeq, txGroupId, regId
         );
 
         if (requestTime != null) {
@@ -238,6 +240,7 @@ public class MessageSendService {
 
     /**
      * 예약 발송 취소 (소유자 검증 + 환불 포함)
+     * - 단건 취소: 부분 환불 (취소 건수 × 단가)
      */
     public int cancelScheduledMessage(Integer mseq, String regId) {
         // 1. 메시지 조회 및 검증 (SMS DB)
@@ -255,21 +258,23 @@ public class MessageSendService {
         }
 
         String msgType = msgQueue.getMsgType();
+        String txGroupId = msgQueue.getTxGroupId();
 
         // 2. 메시지 삭제 (SMS DB)
         int deleted = deleteMsgQueue(mseq);
 
-        // 3. 환불 처리 (Primary DB)
-        if (deleted > 0) {
-            refundForCancelledMessages(regId, msgType, 1);
+        // 3. 환불 처리 (Primary DB) - 단건은 부분 환불
+        if (deleted > 0 && txGroupId != null) {
+            refundPartial(regId, msgType, 1, txGroupId);
         }
 
-        log.info("예약 발송 취소 완료 - mseq: {}, regId: {}, msgType: {}", mseq, regId, msgType);
+        log.info("예약 발송 취소 완료 - mseq: {}, regId: {}, msgType: {}, txGroupId: {}", mseq, regId, msgType, txGroupId);
         return deleted;
     }
 
     /**
      * 배치 전체 예약 취소 (소유자 검증 + 환불 포함)
+     * - 전체 취소: txGroupId 기반 전체 환불
      */
     public int cancelScheduledBatch(String userKey, String regId) {
         // 1. 배치 조회 및 검증 (SMS DB)
@@ -295,18 +300,26 @@ public class MessageSendService {
         }
 
         String msgType = firstMsg.getMsgType();
+        String txGroupId = firstMsg.getTxGroupId();
+        int totalCount = messages.size();
         int pendingCount = pendingMessages.size();
 
         // 2. 메시지 삭제 (SMS DB)
         int deleted = deleteMsgQueueByUserKey(userKey);
 
         // 3. 환불 처리 (Primary DB)
-        if (deleted > 0) {
-            refundForCancelledMessages(regId, msgType, deleted);
+        if (deleted > 0 && txGroupId != null) {
+            if (deleted == totalCount) {
+                // 전체 취소: txGroupId 기반 전체 환불
+                refundByTxGroupId(txGroupId);
+            } else {
+                // 부분 취소: 취소 건수만큼 부분 환불
+                refundPartial(regId, msgType, deleted, txGroupId);
+            }
         }
 
-        log.info("배치 예약 발송 취소 완료 - userKey: {}, count: {}, regId: {}, msgType: {}",
-                userKey, deleted, regId, msgType);
+        log.info("배치 예약 발송 취소 완료 - userKey: {}, count: {}, regId: {}, msgType: {}, txGroupId: {}",
+                userKey, deleted, regId, msgType, txGroupId);
         return deleted;
     }
 
@@ -327,23 +340,36 @@ public class MessageSendService {
     }
 
     /**
-     * 취소된 메시지에 대한 환불 처리 (Primary DB)
+     * txGroupId 기반 전체 환불 (원래 결제 화폐로 환불)
      */
-    private void refundForCancelledMessages(String userId, String msgType, int count) {
+    private void refundByTxGroupId(String txGroupId) {
+        try {
+            var result = walletService.refundByGroup(txGroupId);
+            log.info("txGroupId 기반 환불 완료 - txGroupId: {}, refundedAmount: {}, expiredAmount: {}",
+                    txGroupId, result.getRefundedAmount(), result.getExpiredAmount());
+        } catch (Exception e) {
+            log.error("txGroupId 기반 환불 실패 - txGroupId: {}, error: {}", txGroupId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 부분 환불 (취소 건수 × 단가로 CASH 환불)
+     * - 원래 화폐 추적이 어려우므로 CASH로 환불
+     */
+    private void refundPartial(String userId, String msgType, int count, String txGroupId) {
         try {
             String serviceId = getServiceIdFromMsgType(msgType);
             BigDecimal unitPrice = walletService.getAppliedRate(userId, serviceId);
             BigDecimal refundAmount = unitPrice.multiply(BigDecimal.valueOf(count));
 
-            String comment = String.format("%s 발송 취소 환불 %d건", getMsgTypeName(msgType), count);
+            String comment = String.format("%s 발송 취소 환불 %d건 (txGroupId: %s)", getMsgTypeName(msgType), count, txGroupId);
             walletService.refundToCash(userId, refundAmount, comment);
 
-            log.info("메시지 취소 환불 완료 - userId: {}, msgType: {}, count: {}, refundAmount: {}",
-                    userId, msgType, count, refundAmount);
+            log.info("부분 환불 완료 - userId: {}, msgType: {}, count: {}, refundAmount: {}, txGroupId: {}",
+                    userId, msgType, count, refundAmount, txGroupId);
         } catch (Exception e) {
-            // 환불 실패 시에도 메시지 취소는 유지 (로그만 남김)
-            log.error("메시지 취소 환불 실패 - userId: {}, msgType: {}, count: {}, error: {}",
-                    userId, msgType, count, e.getMessage(), e);
+            log.error("부분 환불 실패 - userId: {}, msgType: {}, count: {}, txGroupId: {}, error: {}",
+                    userId, msgType, count, txGroupId, e.getMessage(), e);
         }
     }
 
@@ -462,7 +488,7 @@ public class MessageSendService {
             log.info("새 내용으로 재발송 - userSeq: {}, userKey: {}, link: {}", userSeq, userKey, surveyLink);
         }
 
-        // MSG_QUEUE에 등록
+        // MSG_QUEUE에 등록 (재발송은 별도 결제 없이 진행되므로 txGroupId = null)
         MsgQueue msgQueue = MsgQueue.createForSurvey(
                 "L", // LMS로 발송
                 normalizePhoneNumber(dstaddr),
@@ -471,7 +497,7 @@ public class MessageSendService {
                 finalText,
                 eventSeq,
                 userSeq,
-                "1", // 즉시 발송
+                null, // txGroupId: 재발송은 별도 결제 없음
                 regId
         );
 
@@ -572,7 +598,7 @@ public class MessageSendService {
                 log.debug("설문 링크 생성 - eventCode: {}, userKey: {}, link: {}",
                         eventCode, receiver.getUserKey(), surveyLink);
 
-                // MSG_QUEUE에 등록
+                // MSG_QUEUE에 등록 (중복 번호 재발송은 별도 결제 없이 진행되므로 txGroupId = null)
                 MsgQueue msgQueue = MsgQueue.createForSurvey(
                         "L", // LMS로 발송
                         phone,
@@ -581,7 +607,7 @@ public class MessageSendService {
                         text,
                         request.getEventSeq(),
                         receiver.getUserSeq(),
-                        "1", // 즉시 발송
+                        null, // txGroupId: 재발송은 별도 결제 없음
                         regId
                 );
 

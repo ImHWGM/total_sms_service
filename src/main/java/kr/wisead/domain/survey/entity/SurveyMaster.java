@@ -31,7 +31,6 @@ public class SurveyMaster {
     private String authKeyDesc;             // 범용인증키 설명 문구
     private String qrCode;                  // QR코드 사용여부
     private String qrCodeImgPath;           // QR코드 이미지 경로
-    private Integer qrCodeVisits;           // QR코드 방문 수
     private String authCodeUrl;             // QR코드 간편 URL
     private String endMessage;              // 설문 종료 메시지
     private String eventEndImg;             // 설문 마무리 이미지
@@ -59,7 +58,6 @@ public class SurveyMaster {
                 .endDate(endDate)
                 .status("A")
                 .auth(auth)
-                .qrCodeVisits(0)
                 .regId(regId)
                 .build();
     }
@@ -129,12 +127,5 @@ public class SurveyMaster {
     public void setQrCodeInfo(String qrCodeImgPath, String authCodeUrl) {
         this.qrCodeImgPath = qrCodeImgPath;
         this.authCodeUrl = authCodeUrl;
-    }
-
-    /**
-     * QR코드 방문 수 증가
-     */
-    public void incrementQrCodeVisits() {
-        this.qrCodeVisits = (this.qrCodeVisits == null ? 0 : this.qrCodeVisits) + 1;
     }
 }

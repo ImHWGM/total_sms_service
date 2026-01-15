@@ -65,21 +65,6 @@ public interface SurveyMasterMapper {
     int updateEndImg(@Param("eventSeq") Integer eventSeq, @Param("eventEndImg") String eventEndImg);
 
     /**
-     * QR코드 방문 수 증가
-     */
-    int incrementQrCodeVisits(@Param("authCodeUrl") String authCodeUrl);
-
-    /**
-     * QR코드 방문 수 조회
-     */
-    Long selectQrCodeVisits(@Param("authCodeUrl") String authCodeUrl);
-
-    /**
-     * QR코드 방문 수 롤백 (과금 실패 시)
-     */
-    int rollbackQrCodeVisits(@Param("authCodeUrl") String authCodeUrl);
-
-    /**
      * 만료된 이벤트 상태 업데이트
      */
     int updateExpiredEventsStatus();

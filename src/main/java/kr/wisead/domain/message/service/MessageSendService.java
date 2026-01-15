@@ -4,6 +4,7 @@ import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.common.util.ShortUrlUtils;
 import kr.wisead.domain.message.dto.*;
 import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.message.entity.MsgResult;
@@ -475,17 +476,15 @@ public class MessageSendService {
                 throw new BusinessException(ErrorCode.INVALID_INPUT, "userKey가 존재하지 않습니다.");
             }
 
-            // 이벤트 코드 조회
-            SurveyMaster event = surveyMasterMapper.selectByEventSeq(eventSeq)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트 정보를 찾을 수 없습니다."));
+            // #유저키#를 userKey 값만으로 치환 (전체 URL이 아닌 userKey만)
+            finalText = text.replace("#유저키#", userKey);
 
-            // 설문 링크 생성: https://wisead.kr/auth/{eventCode}/{userKey}
-            String surveyLink = generateSurveyLink(event.getEventCode(), userKey);
+            // URL 패턴을 찾아서 단축 URL로 변환
+            finalText = ShortUrlUtils.shortenUrlsInText(finalText, wiseadUrl);
 
             finalSubject = subject;
-            finalText = text.replace("#유저키#", surveyLink);
             finalCallback = callback;
-            log.info("새 내용으로 재발송 - userSeq: {}, userKey: {}, link: {}", userSeq, userKey, surveyLink);
+            log.info("새 내용으로 재발송 - userSeq: {}, userKey: {}", userSeq, userKey);
         }
 
         // MSG_QUEUE에 등록 (재발송은 별도 결제 없이 진행되므로 txGroupId = null)
@@ -589,14 +588,14 @@ public class MessageSendService {
                     text = text.replace("#대치문자3#", receiver.getRepChar03());
                 }
 
-                // 설문 링크 생성: https://wisead.kr/auth/{eventCode}/{userKey}
-                String surveyLink = generateSurveyLink(eventCode, receiver.getUserKey());
+                // #유저키#를 userKey 값만으로 치환 (전체 URL이 아닌 userKey만)
+                text = text.replace("#유저키#", receiver.getUserKey());
 
-                // #유저키#를 설문 링크로 치환
-                text = text.replace("#유저키#", surveyLink);
+                // URL 패턴을 찾아서 단축 URL로 변환
+                text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);
 
-                log.debug("설문 링크 생성 - eventCode: {}, userKey: {}, link: {}",
-                        eventCode, receiver.getUserKey(), surveyLink);
+                log.debug("설문 문자 준비 완료 - eventCode: {}, userKey: {}",
+                        eventCode, receiver.getUserKey());
 
                 // MSG_QUEUE에 등록 (중복 번호 재발송은 별도 결제 없이 진행되므로 txGroupId = null)
                 MsgQueue msgQueue = MsgQueue.createForSurvey(

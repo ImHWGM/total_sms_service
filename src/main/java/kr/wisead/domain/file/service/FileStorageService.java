@@ -100,31 +100,33 @@ public class FileStorageService {
     }
 
     /**
-     * 설문 문항 이미지 저장 (Base64)
+     * 설문 문항 이미지 저장
      * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
      */
-    public String storeSurveyQuestionImg(String base64Image, String directoryId, int questionSeq) {
-        byte[] imageBytes = decodeBase64Image(base64Image);
-        String extension = getExtensionFromBase64(base64Image);
+    public String storeSurveyQuestionImg(MultipartFile file, String directoryId, int questionSeq) {
+        validateFile(file);
+        validateImageExtension(file);
 
+        String extension = getExtension(file.getOriginalFilename());
         Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = questionSeq + extension;
-        return saveBytes(imageBytes, targetLocation, fileName);
+        return saveFile(file, targetLocation, fileName);
     }
 
     /**
-     * 설문 항목 이미지 저장 (Base64)
+     * 설문 항목 이미지 저장
      * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
      */
-    public String storeSurveyItemImg(String base64Image, String directoryId, int questionSeq, int order) {
-        byte[] imageBytes = decodeBase64Image(base64Image);
-        String extension = getExtensionFromBase64(base64Image);
+    public String storeSurveyItemImg(MultipartFile file, String directoryId, int questionSeq, int order) {
+        validateFile(file);
+        validateImageExtension(file);
 
+        String extension = getExtension(file.getOriginalFilename());
         Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = questionSeq + "_" + order + extension;
-        return saveBytes(imageBytes, targetLocation, fileName);
+        return saveFile(file, targetLocation, fileName);
     }
 
     /**

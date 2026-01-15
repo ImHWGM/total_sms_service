@@ -52,7 +52,7 @@ public class FileUploadController {
     }
 
     /**
-     * 설문 문항 이미지 업로드 (Base64)
+     * 설문 문항 이미지 업로드
      * - eventSeq가 있으면 해당 이벤트 폴더에 저장
      * - eventSeq가 없으면 tempId 폴더에 저장 (신규 이벤트 생성용)
      */
@@ -61,14 +61,17 @@ public class FileUploadController {
             @RequestParam(value = "eventSeq", required = false) Integer eventSeq,
             @RequestParam(value = "tempId", required = false) String tempId,
             @RequestParam("questionSeq") int questionSeq,
-            @RequestBody String base64Image) {
+            @RequestParam("file") MultipartFile file) {
         String directoryId = resolveDirectoryId(eventSeq, tempId);
-        String filePath = fileStorageService.storeSurveyQuestionImg(base64Image, directoryId, questionSeq);
-        return ApiResponse.success(FileUploadResponse.success(filePath));
+        String filePath = fileStorageService.storeSurveyQuestionImg(file, directoryId, questionSeq);
+        FileUploadResponse response = FileUploadResponse.success(filePath);
+        response.setOriginalFileName(file.getOriginalFilename());
+        response.setFileSize(file.getSize());
+        return ApiResponse.success(response);
     }
 
     /**
-     * 설문 항목 이미지 업로드 (Base64)
+     * 설문 항목 이미지 업로드
      * - eventSeq가 있으면 해당 이벤트 폴더에 저장
      * - eventSeq가 없으면 tempId 폴더에 저장 (신규 이벤트 생성용)
      */
@@ -78,10 +81,13 @@ public class FileUploadController {
             @RequestParam(value = "tempId", required = false) String tempId,
             @RequestParam("questionSeq") int questionSeq,
             @RequestParam("order") int order,
-            @RequestBody String base64Image) {
+            @RequestParam("file") MultipartFile file) {
         String directoryId = resolveDirectoryId(eventSeq, tempId);
-        String filePath = fileStorageService.storeSurveyItemImg(base64Image, directoryId, questionSeq, order);
-        return ApiResponse.success(FileUploadResponse.success(filePath));
+        String filePath = fileStorageService.storeSurveyItemImg(file, directoryId, questionSeq, order);
+        FileUploadResponse response = FileUploadResponse.success(filePath);
+        response.setOriginalFileName(file.getOriginalFilename());
+        response.setFileSize(file.getSize());
+        return ApiResponse.success(response);
     }
 
     /**

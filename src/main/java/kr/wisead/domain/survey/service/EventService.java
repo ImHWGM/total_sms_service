@@ -14,9 +14,13 @@ import kr.wisead.domain.survey.entity.*;
 import kr.wisead.mapper.primary.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFColor;
+import org.apache.poi.xssf.usermodel.DefaultIndexedColorMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -768,8 +772,11 @@ public class EventService {
     }
 
     /**
-     * 이벤트 결과 엑셀 다운로드 데이터 생성
-     * - 참여자 정보 + 설문 응답 포함
+     * 이벤트 결과 엑셀 다운로드 데이터 생성 (4개 시트)
+     * - 시트1: 개요 (기본정보, 배포현황, 참여현황, 응답시간)
+     * - 시트2: 전체_응답결과 (문항별 통계)
+     * - 시트3: 개별전체(응답자) (응답자 행동분석 + 응답)
+     * - 시트4: 개별전체(비응답자) (미응답자 목록)
      */
     @Transactional(readOnly = true)
     public byte[] generateEventResultExcel(Integer eventSeq) {
@@ -780,8 +787,14 @@ public class EventService {
         // 문항 목록 조회
         List<SurveyQuestion> questions = surveyQuestionMapper.selectByEventSeq(eventSeq);
 
+        // 항목 목록 조회
+        List<SurveyItem> allItems = surveyItemMapper.selectByEventSeq(eventSeq);
+
         // 참여자 목록 조회 (설문 완료자)
-        List<SurveyUser> users = surveyUserMapper.selectCompletedByEventSeq(eventSeq);
+        List<SurveyUser> participants = surveyUserMapper.selectCompletedByEventSeq(eventSeq);
+
+        // 미응답자/접속자 목록 조회
+        List<SurveyUser> absentees = surveyUserMapper.selectAbsenteesAndLurkers(eventSeq);
 
         // 모든 응답 조회
         List<SurveyAnswer> allAnswers = surveyAnswerMapper.selectByEventSeq(eventSeq);
@@ -794,80 +807,24 @@ public class EventService {
                     .put(answer.getQuestionSeq(), answer.getAnswer());
         }
 
-        try (SXSSFWorkbook workbook = excelService.createWorkbook()) {
-            Sheet sheet = excelService.createSheet(workbook, "이벤트 참여자 정보");
+        // 통계 정보
+        int totalParticipants = surveyUserMapper.countByEventSeq(eventSeq);
+        int completedCount = surveyUserMapper.countCompletedByEventSeq(eventSeq);
+        int absenteesCount = surveyUserMapper.countAbsenteesByEventSeq(eventSeq);
+        int lurkersCount = surveyUserMapper.countLurkersByEventSeq(eventSeq);
 
-            // 헤더 스타일
-            CellStyle headerStyle = excelService.createHeaderStyle(workbook, 11, true, 173, 216, 230);
+        try (SXSSFWorkbook workbook = new SXSSFWorkbook()) {
+            // 시트1: 개요
+            addSurveySummarySheet(workbook, event, questions.size(), totalParticipants, completedCount, absenteesCount, lurkersCount);
 
-            // 헤더 생성
-            List<String> headers = new ArrayList<>(Arrays.asList(
-                    "NO", "이벤트명", "이벤트설명", "이벤트종류",
-                    "발송번호", "이름", "주민번호", "연락처", "이메일",
-                    "설문완료일", "시작일", "종료일", "등록일"
-            ));
+            // 시트2: 전체_응답결과
+            addSurveyResponsesSheet(workbook, eventSeq, questions, allItems);
 
-            // 문항 헤더 추가 (최대 15개)
-            for (int i = 0; i < Math.min(questions.size(), 15); i++) {
-                headers.add("Q" + (i + 1));
-            }
+            // 시트3: 개별전체(응답자)
+            addSurveyParticipantsSheet(workbook, event, questions, participants, userAnswersMap);
 
-            excelService.createHeaderRow(sheet, 0, headers, headerStyle);
-
-            // 데이터 행 생성
-            DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-            int rowNum = 1;
-            for (SurveyUser user : users) {
-                List<Object> rowData = new ArrayList<>();
-
-                rowData.add(rowNum);  // NO
-                rowData.add(event.getEventName() != null ? event.getEventName().replaceAll("[{}]", "") : "");  // 이벤트명
-                rowData.add(event.getEventDesc() != null ? event.getEventDesc() : "");  // 이벤트설명
-                rowData.add("P".equals(event.getEventType()) ? "제세공과금" : "설문조사");  // 이벤트종류
-
-                // 발송번호 복호화
-                String resendPhone = decryptDataSafe(user.getResendUserPhone());
-                rowData.add(resendPhone != null ? resendPhone : "");
-
-                // 이름 복호화
-                String userName = decryptDataSafe(user.getUserName());
-                rowData.add(userName != null ? userName : "");
-
-                // 주민번호 복호화
-                String juminNum = decryptDataSafe(user.getJuminNum());
-                rowData.add(juminNum != null ? juminNum : "");
-
-                // 연락처 복호화
-                String phone = decryptDataSafe(user.getUserPhone());
-                rowData.add(phone != null ? phone : "");
-
-                rowData.add(user.getUserEmail() != null ? user.getUserEmail() : "");  // 이메일
-
-                // 설문완료일
-                rowData.add(user.getSubmissionDate() != null ?
-                        user.getSubmissionDate().format(dateTimeFormatter) : "");
-
-                // 시작일, 종료일
-                rowData.add(event.getStartDate() != null ? event.getStartDate() : "");
-                rowData.add(event.getEndDate() != null ? event.getEndDate() : "");
-
-                // 등록일
-                rowData.add(user.getRegDate() != null ?
-                        user.getRegDate().format(dateFormatter) : "");
-
-                // 문항별 응답 추가
-                Map<Integer, String> userAnswers = userAnswersMap.getOrDefault(user.getSeq(), new HashMap<>());
-                for (int i = 0; i < Math.min(questions.size(), 15); i++) {
-                    SurveyQuestion question = questions.get(i);
-                    String answer = userAnswers.get(question.getQuestionSeq());
-                    // ##를 공백으로 치환 (복수 응답 구분자)
-                    rowData.add(answer != null ? answer.replaceAll("##", " ") : "");
-                }
-
-                excelService.createDataRow(sheet, rowNum++, rowData, null);
-            }
+            // 시트4: 개별전체(비응답자)
+            addSurveyAbsenteesSheet(workbook, absentees);
 
             return excelService.toByteArray(workbook);
 
@@ -875,6 +832,442 @@ public class EventService {
             log.error("이벤트 결과 엑셀 생성 실패 - eventSeq: {}", eventSeq, e);
             throw new BusinessException(ErrorCode.FILE_WRITE_FAILED, "Excel 파일 생성에 실패했습니다.");
         }
+    }
+
+    /**
+     * 시트1: 개요 (기본정보, 배포현황, 참여현황)
+     */
+    private void addSurveySummarySheet(SXSSFWorkbook workbook, SurveyMaster event,
+                                        int questionCount, int totalParticipants, int completedCount,
+                                        int absenteesCount, int lurkersCount) {
+        Sheet sheet = workbook.createSheet("개요");
+        sheet.setDefaultColumnWidth(22);
+
+        // 스타일 생성
+        CellStyle titleStyle = createExcelStyle(workbook, 17, true, 255, 255, 255);
+        titleStyle.setAlignment(HorizontalAlignment.CENTER);
+
+        CellStyle headerStyle = createExcelStyle(workbook, 12, true, 255, 255, 255);
+        CellStyle labelStyle = createExcelStyle(workbook, 10, false, 255, 255, 204); // 노란색 배경
+        CellStyle valueStyle = createExcelStyle(workbook, 10, false, 255, 255, 255);
+
+        setBorder(labelStyle);
+        setBorder(valueStyle);
+
+        int rowIdx = 1;
+
+        // 제목
+        Row titleRow = sheet.createRow(rowIdx++);
+        Cell titleCell = titleRow.createCell(0);
+        String eventName = event.getEventName() != null ? event.getEventName().replaceAll("[{}]", "") : "";
+        titleCell.setCellValue(eventName);
+        titleCell.setCellStyle(titleStyle);
+        sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 3));
+
+        rowIdx += 2;
+
+        // ■ 기본정보
+        Row basicInfoHeader = sheet.createRow(rowIdx++);
+        Cell basicCell = basicInfoHeader.createCell(0);
+        basicCell.setCellValue("■  기본정보");
+        basicCell.setCellStyle(headerStyle);
+        sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 0, 3));
+
+        // 제목
+        Row row1 = sheet.createRow(rowIdx++);
+        createLabelValueRow(row1, 0, "제목", eventName, labelStyle, valueStyle);
+        sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 1, 3));
+
+        // 기간
+        Row row2 = sheet.createRow(rowIdx++);
+        String period = (event.getStartDate() != null ? event.getStartDate() : "") + " ~ " +
+                        (event.getEndDate() != null ? event.getEndDate() : "");
+        createLabelValueRow(row2, 0, "기간", period, labelStyle, valueStyle);
+        sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 1, 3));
+
+        // 진행상태 / 개인정보제공동의
+        Row row3 = sheet.createRow(rowIdx++);
+        String status = getStatusText(event.getStatus());
+        String privacyYn = "Y".equals(event.getPrivacyPolicyYn()) ? "사용" : "미사용";
+        createLabelValueRow(row3, 0, "진행상태", status, labelStyle, valueStyle);
+        createLabelValueRow(row3, 2, "개인정보제공동의", privacyYn, labelStyle, valueStyle);
+
+        // 인증 / QR코드
+        Row row4 = sheet.createRow(rowIdx++);
+        String auth = getAuthText(event.getAuth());
+        String qrCode = "Y".equals(event.getQrCode()) ? "사용" : "미사용";
+        createLabelValueRow(row4, 0, "인증", auth, labelStyle, valueStyle);
+        createLabelValueRow(row4, 2, "QR코드", qrCode, labelStyle, valueStyle);
+
+        rowIdx++;
+
+        // ■ 참여현황
+        Row participationHeader = sheet.createRow(rowIdx++);
+        Cell participationCell = participationHeader.createCell(0);
+        participationCell.setCellValue("■  참여현황");
+        participationCell.setCellStyle(headerStyle);
+        sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 0, 3));
+
+        // 설문인원 / 응답자
+        Row row5 = sheet.createRow(rowIdx++);
+        String responseRate = formatPercentage(completedCount, totalParticipants);
+        createLabelValueRow(row5, 0, "설문인원", totalParticipants + "명", labelStyle, valueStyle);
+        createLabelValueRow(row5, 2, "응답자(응답률)", completedCount + "명(" + responseRate + ")", labelStyle, valueStyle);
+
+        // 접속자 / 미응답자
+        Row row6 = sheet.createRow(rowIdx++);
+        String absenteeRate = formatPercentage(absenteesCount, totalParticipants);
+        int totalLurkers = lurkersCount + completedCount; // 접속자 = 응답자 + 접속만 한 사람
+        createLabelValueRow(row6, 0, "설문 접속자수", totalLurkers + "명", labelStyle, valueStyle);
+        createLabelValueRow(row6, 2, "미응답자(미응답률)", absenteesCount + "명(" + absenteeRate + ")", labelStyle, valueStyle);
+
+        rowIdx++;
+
+        // ■ 응답시간
+        Row timeHeader = sheet.createRow(rowIdx++);
+        Cell timeCell = timeHeader.createCell(0);
+        timeCell.setCellValue("■  응답시간");
+        timeCell.setCellStyle(headerStyle);
+        sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 0, 3));
+
+        // 문항수
+        Row row7 = sheet.createRow(rowIdx++);
+        createLabelValueRow(row7, 0, "문항수", questionCount + "개", labelStyle, valueStyle);
+        sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 1, 3));
+    }
+
+    /**
+     * 시트2: 전체_응답결과 (문항별 통계)
+     */
+    private void addSurveyResponsesSheet(SXSSFWorkbook workbook, Integer eventSeq,
+                                          List<SurveyQuestion> questions, List<SurveyItem> allItems) {
+        Sheet sheet = workbook.createSheet("전체_응답결과");
+        sheet.setColumnWidth(0, 256 * 77);
+        sheet.setColumnWidth(1, 256 * 15);
+        sheet.setColumnWidth(2, 256 * 15);
+
+        CellStyle headerStyle = createExcelStyle(workbook, 14, true, 255, 255, 255);
+        CellStyle questionStyle = createExcelStyle(workbook, 10, true, 255, 255, 204); // 노란색
+        CellStyle itemHeaderStyle = createExcelStyle(workbook, 10, true, 204, 255, 204); // 초록색
+        CellStyle normalStyle = createExcelStyle(workbook, 10, false, 255, 255, 255);
+
+        setBorder(questionStyle);
+        setBorder(itemHeaderStyle);
+        setBorder(normalStyle);
+
+        int rowIdx = 1;
+
+        // 제목
+        Row titleRow = sheet.createRow(rowIdx++);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue("■ 문항 별 상세 결과");
+        titleCell.setCellStyle(headerStyle);
+        sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 2));
+
+        rowIdx += 2;
+
+        // 문항별 통계
+        for (SurveyQuestion question : questions) {
+            // 문항 제목
+            Row qRow = sheet.createRow(rowIdx++);
+            String qTypeText = getQuestionTypeText(question.getQuestionType(), question.getQuestionTypeDetail());
+            String qText = "Q" + question.getOrder() + qTypeText + question.getQuestion();
+
+            Cell qCell = qRow.createCell(0);
+            qCell.setCellValue(qText);
+            qCell.setCellStyle(questionStyle);
+            qRow.createCell(1).setCellStyle(questionStyle);
+            qRow.createCell(2).setCellStyle(questionStyle);
+            sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 0, 2));
+
+            int totalAnswers = surveyAnswerMapper.countByQuestionSeq(eventSeq, question.getQuestionSeq());
+
+            if (question.isMultipleChoice()) {
+                // 객관식: 보기별 통계
+                Row headerRow = sheet.createRow(rowIdx++);
+                createCell(headerRow, 0, "보기", itemHeaderStyle);
+                createCell(headerRow, 1, "응답자수(명)", itemHeaderStyle);
+                createCell(headerRow, 2, "응답률(%)", itemHeaderStyle);
+
+                List<SurveyItem> items = allItems.stream()
+                        .filter(item -> item.getQuestionSeq().equals(question.getQuestionSeq()))
+                        .collect(Collectors.toList());
+
+                for (SurveyItem item : items) {
+                    int count;
+                    if (question.isMultiSelect()) {
+                        count = surveyAnswerMapper.countByItemValueMCM(eventSeq, question.getQuestionSeq(), item.getItemValue());
+                    } else {
+                        count = surveyAnswerMapper.countByItemSeq(eventSeq, question.getQuestionSeq(), item.getItemSeq());
+                    }
+
+                    Row itemRow = sheet.createRow(rowIdx++);
+                    createCell(itemRow, 0, item.getItem(), normalStyle);
+                    createCell(itemRow, 1, String.valueOf(count), normalStyle);
+                    createCell(itemRow, 2, formatPercentage(count, totalAnswers), normalStyle);
+                }
+            } else {
+                // 주관식: 응답자수만 표시
+                Row headerRow = sheet.createRow(rowIdx++);
+                createCell(headerRow, 0, "응답자수(명)", itemHeaderStyle);
+
+                Cell countCell = headerRow.createCell(1);
+                countCell.setCellValue(totalAnswers);
+                countCell.setCellStyle(normalStyle);
+                headerRow.createCell(2).setCellStyle(normalStyle);
+                sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 1, 2));
+            }
+
+            rowIdx++; // 문항 사이 빈 줄
+        }
+    }
+
+    /**
+     * 시트3: 개별전체(응답자) - 응답자 행동분석 + 응답
+     */
+    private void addSurveyParticipantsSheet(SXSSFWorkbook workbook, SurveyMaster event,
+                                             List<SurveyQuestion> questions, List<SurveyUser> participants,
+                                             Map<Integer, Map<Integer, String>> userAnswersMap) {
+        Sheet sheet = workbook.createSheet("개별전체(응답자)");
+        sheet.setDefaultColumnWidth(15);
+
+        CellStyle headerStyle = createExcelStyle(workbook, 12, true, 255, 255, 204); // 노란색
+        CellStyle subHeaderStyle = createExcelStyle(workbook, 10, true, 204, 255, 204); // 초록색
+        CellStyle normalStyle = createExcelStyle(workbook, 10, false, 255, 255, 255);
+
+        setBorder(headerStyle);
+        setBorder(subHeaderStyle);
+        setBorder(normalStyle);
+
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        int rowIdx = 0;
+
+        // 헤더 행 1 (카테고리)
+        Row header1 = sheet.createRow(rowIdx++);
+        createCell(header1, 0, "", headerStyle);
+
+        // 응답자 행동 분석 (3칸)
+        createCell(header1, 1, "응답자 행동 분석", headerStyle);
+        createCell(header1, 2, "", headerStyle);
+        createCell(header1, 3, "", headerStyle);
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 1, 3));
+
+        // 응답 결과 분석 (문항 수만큼)
+        int startCol = 4;
+        if (!questions.isEmpty()) {
+            createCell(header1, startCol, "응답 결과 분석", headerStyle);
+            for (int i = 1; i < questions.size(); i++) {
+                createCell(header1, startCol + i, "", headerStyle);
+            }
+            if (questions.size() > 1) {
+                sheet.addMergedRegion(new CellRangeAddress(0, 0, startCol, startCol + questions.size() - 1));
+            }
+        }
+
+        // 헤더 행 2 (세부 항목)
+        Row header2 = sheet.createRow(rowIdx++);
+        createCell(header2, 0, "응답자", subHeaderStyle);
+        createCell(header2, 1, "문자 수신일시", subHeaderStyle);
+        createCell(header2, 2, "접속일시", subHeaderStyle);
+        createCell(header2, 3, "응답일시", subHeaderStyle);
+
+        for (int i = 0; i < questions.size(); i++) {
+            createCell(header2, 4 + i, "Q" + (i + 1), subHeaderStyle);
+        }
+
+        // 데이터 행
+        for (SurveyUser participant : participants) {
+            Row dataRow = sheet.createRow(rowIdx++);
+
+            // 응답자 (전화번호 또는 userKey)
+            String identifier = decryptDataSafe(participant.getResendUserPhone());
+            if (identifier == null || identifier.isEmpty()) {
+                identifier = participant.getUserKey();
+            }
+            createCell(dataRow, 0, identifier != null ? identifier : "", normalStyle);
+
+            // 문자 수신일시 (현재 없으면 -)
+            createCell(dataRow, 1, "-", normalStyle);
+
+            // 접속일시
+            String surveyStartTime = participant.getSurveyStartTime() != null
+                    ? participant.getSurveyStartTime().format(dateTimeFormatter) : "-";
+            createCell(dataRow, 2, surveyStartTime, normalStyle);
+
+            // 응답일시
+            String submissionDate = participant.getSubmissionDate() != null
+                    ? participant.getSubmissionDate().format(dateTimeFormatter) : "-";
+            createCell(dataRow, 3, submissionDate, normalStyle);
+
+            // 문항별 응답
+            Map<Integer, String> userAnswers = userAnswersMap.getOrDefault(participant.getSeq(), new HashMap<>());
+            for (int i = 0; i < questions.size(); i++) {
+                SurveyQuestion question = questions.get(i);
+                String answer = userAnswers.get(question.getQuestionSeq());
+                String displayAnswer = answer != null ? answer.replaceAll("##", " ") : "";
+                createCell(dataRow, 4 + i, displayAnswer, normalStyle);
+            }
+        }
+    }
+
+    /**
+     * 시트4: 개별전체(비응답자) - 미응답자 목록
+     */
+    private void addSurveyAbsenteesSheet(SXSSFWorkbook workbook, List<SurveyUser> absentees) {
+        Sheet sheet = workbook.createSheet("개별전체(비응답자)");
+        sheet.setDefaultColumnWidth(15);
+
+        CellStyle headerStyle = createExcelStyle(workbook, 10, true, 204, 255, 204); // 초록색
+        CellStyle normalStyle = createExcelStyle(workbook, 10, false, 255, 255, 255);
+
+        setBorder(headerStyle);
+        setBorder(normalStyle);
+
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        int rowIdx = 0;
+
+        // 헤더 행 1 (카테고리)
+        Row header1 = sheet.createRow(rowIdx++);
+        createCell(header1, 0, "미응답자", headerStyle);
+        createCell(header1, 1, "진행 일시", headerStyle);
+        createCell(header1, 2, "", headerStyle);
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 1, 2));
+
+        // 헤더 행 2 (세부 항목)
+        Row header2 = sheet.createRow(rowIdx++);
+        createCell(header2, 0, "개인정보", headerStyle);
+        createCell(header2, 1, "문자 수신일시", headerStyle);
+        createCell(header2, 2, "접속일시", headerStyle);
+
+        // 데이터 행
+        for (SurveyUser absentee : absentees) {
+            Row dataRow = sheet.createRow(rowIdx++);
+
+            // 개인정보 (전화번호 또는 userKey)
+            String identifier = decryptDataSafe(absentee.getResendUserPhone());
+            if (identifier == null || identifier.isEmpty()) {
+                identifier = absentee.getUserKey();
+            }
+            createCell(dataRow, 0, identifier != null ? identifier : "", normalStyle);
+
+            // 문자 수신일시 (현재 없으면 -)
+            createCell(dataRow, 1, "-", normalStyle);
+
+            // 접속일시
+            String surveyStartTime = absentee.getSurveyStartTime() != null
+                    ? absentee.getSurveyStartTime().format(dateTimeFormatter) : "-";
+            createCell(dataRow, 2, surveyStartTime, normalStyle);
+        }
+    }
+
+    // ==================== Excel Helper Methods ====================
+
+    /**
+     * Excel 셀 스타일 생성
+     */
+    private CellStyle createExcelStyle(SXSSFWorkbook workbook, int fontSize, boolean bold, int r, int g, int b) {
+        CellStyle style = workbook.createCellStyle();
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+        if (style instanceof XSSFCellStyle) {
+            XSSFCellStyle xssfStyle = (XSSFCellStyle) style;
+            XSSFColor color = new XSSFColor(new java.awt.Color(r, g, b), new DefaultIndexedColorMap());
+            xssfStyle.setFillForegroundColor(color);
+        }
+
+        Font font = workbook.createFont();
+        font.setBold(bold);
+        font.setFontHeightInPoints((short) fontSize);
+        style.setFont(font);
+
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+
+        return style;
+    }
+
+    /**
+     * 셀에 테두리 설정
+     */
+    private void setBorder(CellStyle style) {
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+    }
+
+    /**
+     * 라벨-값 행 생성
+     */
+    private void createLabelValueRow(Row row, int startCol, String label, String value,
+                                      CellStyle labelStyle, CellStyle valueStyle) {
+        Cell labelCell = row.createCell(startCol);
+        labelCell.setCellValue(label);
+        labelCell.setCellStyle(labelStyle);
+
+        Cell valueCell = row.createCell(startCol + 1);
+        valueCell.setCellValue(value);
+        valueCell.setCellStyle(valueStyle);
+    }
+
+    /**
+     * 셀 생성
+     */
+    private void createCell(Row row, int col, String value, CellStyle style) {
+        Cell cell = row.createCell(col);
+        cell.setCellValue(value);
+        cell.setCellStyle(style);
+    }
+
+    /**
+     * 상태 텍스트 변환
+     */
+    private String getStatusText(String status) {
+        if (status == null) return "정보 없음";
+        switch (status) {
+            case "A": return "대기";
+            case "P": return "진행중";
+            case "S": return "중지";
+            case "F": return "종료";
+            default: return "정보 없음";
+        }
+    }
+
+    /**
+     * 인증 방식 텍스트 변환
+     */
+    private String getAuthText(String auth) {
+        if (auth == null) return "정보 없음";
+        switch (auth) {
+            case "UA": return "실명인증";
+            case "PA": return "휴대폰인증";
+            case "GA": return "범용인증";
+            case "NA": return "없음";
+            default: return "정보 없음";
+        }
+    }
+
+    /**
+     * 문항 타입 텍스트 변환
+     */
+    private String getQuestionTypeText(String questionType, String questionTypeDetail) {
+        if ("MC".equals(questionType)) {
+            if ("MCM".equals(questionTypeDetail)) {
+                return ". (객관식/복수선택) ";
+            }
+            return ". (객관식) ";
+        }
+        return ". (주관식) ";
+    }
+
+    /**
+     * 비율 포맷팅
+     */
+    private String formatPercentage(int numerator, int denominator) {
+        if (denominator <= 0) {
+            return "0.0%";
+        }
+        double rate = numerator * 100.0 / denominator;
+        return String.format("%.1f%%", rate);
     }
 
     /**

@@ -20,6 +20,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -148,7 +149,8 @@ class SurveyToEventParticipantIntegrationTest {
                 .status("P")
                 .build();
 
-        when(eventService.createEvent(anyString(), any(EventRequest.class)))
+        when(eventService.createEvent(anyString(), any(EventRequest.class),
+                any(), any(), anyList(), anyList()))
                 .thenReturn(mockResponse);
 
         mockMvc.perform(post("/api/event")

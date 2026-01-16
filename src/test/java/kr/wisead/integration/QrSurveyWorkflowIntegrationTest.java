@@ -459,7 +459,8 @@ class QrSurveyWorkflowIntegrationTest {
                 .qrCodeImgPath("http://localhost:8080/files/qrcode/new-uuid.png")
                 .build();
 
-        when(eventService.updateEvent(eq(TEST_EVENT_SEQ), any(EventRequest.class), anyString()))
+        when(eventService.updateEvent(eq(TEST_EVENT_SEQ), any(EventRequest.class), anyString(),
+                any(), any(), anyList(), anyList()))
                 .thenReturn(mockResponse);
 
         // When & Then
@@ -473,6 +474,7 @@ class QrSurveyWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.authCodeUrl").exists())
                 .andExpect(jsonPath("$.data.qrCodeImgPath").exists());
 
-        verify(eventService, times(1)).updateEvent(eq(TEST_EVENT_SEQ), any(EventRequest.class), anyString());
+        verify(eventService, times(1)).updateEvent(eq(TEST_EVENT_SEQ), any(EventRequest.class), anyString(),
+                any(), any(), anyList(), anyList());
     }
 }

@@ -130,6 +130,7 @@ public class EventService {
                 .eventName(request.getEventName())
                 .eventEmphasisYn(request.getEventEmphasisYn())
                 .eventDesc(request.getEventDesc())
+                .eventDescImg(request.getEventDescImg())
                 .eventType(request.getEventType())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
@@ -142,17 +143,36 @@ public class EventService {
                 .authCodeUrl(authCodeUrl)
                 .qrCodeImgPath(qrCodeImgPath)
                 .endMessage(request.getEndMessage())
+                .eventEndImg(request.getEventEndImg())
                 .regId(userId)
                 .build();
 
         surveyMasterMapper.insert(event);
         log.info("이벤트 생성 완료 - eventSeq: {}, eventCode: {}, qrCode: {}", event.getEventSeq(), eventCode, request.getQrCode());
 
-        // tempId가 있으면 임시 이미지 파일을 이벤트 폴더로 이동
+        // tempId가 있으면 임시 이미지 파일을 이벤트 폴더로 이동하고 경로 업데이트
         if (request.getTempId() != null && !request.getTempId().isBlank()) {
             boolean moved = fileStorageService.moveSurveyTempToEvent(request.getTempId(), event.getEventSeq());
             if (moved) {
                 log.info("설문 임시 이미지 이동 완료 - tempId: {}, eventSeq: {}", request.getTempId(), event.getEventSeq());
+
+                // 이미지 경로를 temp에서 eventSeq 폴더로 업데이트
+                String tempPrefix = "temp_" + request.getTempId();
+                String eventSeqStr = String.valueOf(event.getEventSeq());
+
+                // 설명 이미지 경로 업데이트
+                if (event.getEventDescImg() != null && !event.getEventDescImg().isEmpty()) {
+                    String updatedDescImg = event.getEventDescImg().replace(tempPrefix, eventSeqStr);
+                    surveyMasterMapper.updateDescImg(event.getEventSeq(), updatedDescImg);
+                    log.debug("설명 이미지 경로 업데이트: {} -> {}", event.getEventDescImg(), updatedDescImg);
+                }
+
+                // 종료 이미지 경로 업데이트
+                if (event.getEventEndImg() != null && !event.getEventEndImg().isEmpty()) {
+                    String updatedEndImg = event.getEventEndImg().replace(tempPrefix, eventSeqStr);
+                    surveyMasterMapper.updateEndImg(event.getEventSeq(), updatedEndImg);
+                    log.debug("종료 이미지 경로 업데이트: {} -> {}", event.getEventEndImg(), updatedEndImg);
+                }
             }
         }
 
@@ -185,6 +205,12 @@ public class EventService {
             log.info("QR 코드 생성 - eventSeq: {}, authCodeUrl: {}", eventSeq, authCodeUrl);
         }
 
+        // 이미지 경로: request에 값이 있으면 사용, 없으면 기존 값 유지
+        String eventDescImg = (request.getEventDescImg() != null && !request.getEventDescImg().isEmpty())
+                ? request.getEventDescImg() : event.getEventDescImg();
+        String eventEndImg = (request.getEventEndImg() != null && !request.getEventEndImg().isEmpty())
+                ? request.getEventEndImg() : event.getEventEndImg();
+
         event.update(
                 request.getEventName(),
                 request.getEventEmphasisYn(),
@@ -199,8 +225,8 @@ public class EventService {
                 request.getAuth(),
                 request.getQrCode(),
                 request.getEndMessage(),
-                request.getEventDescImg(),
-                request.getEventEndImg(),
+                eventDescImg,
+                eventEndImg,
                 uptId
         );
 

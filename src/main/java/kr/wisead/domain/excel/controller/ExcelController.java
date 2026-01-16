@@ -14,6 +14,7 @@ import kr.wisead.domain.statistics.service.StatisticsService;
 import kr.wisead.domain.user.entity.User;
 import kr.wisead.mapper.primary.SurveyUserMapper;
 import kr.wisead.mapper.primary.UserMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -139,7 +140,8 @@ public class ExcelController {
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
             @RequestParam(required = false) String userId,
-            @RequestParam(required = false) String reason) {
+            @RequestParam(required = false) String reason,
+            HttpServletRequest httpRequest) {
 
         String currentUserId = userDetails.getUsername();
         User user = userMapper.findByUserId(currentUserId).orElseThrow();
@@ -148,7 +150,7 @@ public class ExcelController {
         log.info("[엑셀 다운로드 시작] 과금 통계 - 사용자: {}, 기간: {} ~ {}", currentUserId, startDate, endDate);
 
         // 활동 로그 기록
-        actionLogService.logDownload(currentUserId, "과금통계 엑셀다운로드", reason);
+        actionLogService.logDownloadAction(currentUserId, user.getPerson(), "과금통계 엑셀다운로드", "R", reason, httpRequest);
 
         // 기본 날짜 설정
         LocalDate now = LocalDate.now();
@@ -273,7 +275,8 @@ public class ExcelController {
             @RequestParam(required = false) String submissionStatus,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
-            @RequestParam(required = false) String reason) {
+            @RequestParam(required = false) String reason,
+            HttpServletRequest request) {
 
         String userId = userDetails.getUsername();
         User user = userMapper.findByUserId(userId).orElseThrow();
@@ -281,7 +284,7 @@ public class ExcelController {
         log.info("[엑셀 다운로드 시작] 설문조사 참여현황 - 사용자: {}", userId);
 
         // 활동 로그 기록
-        actionLogService.logDownload(userId, "설문조사 참여현황 엑셀다운로드", reason);
+        actionLogService.logDownloadAction(userId, user.getPerson(), "설문조사 참여현황 엑셀다운로드", "R", reason, request);
 
         // 검색 조건 설정
         Map<String, Object> params = new HashMap<>();
@@ -355,7 +358,8 @@ public class ExcelController {
             @RequestParam(required = false) String submissionStatus,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
-            @RequestParam(required = false) String reason) {
+            @RequestParam(required = false) String reason,
+            HttpServletRequest request) {
 
         String userId = userDetails.getUsername();
         User user = userMapper.findByUserId(userId).orElseThrow();
@@ -363,7 +367,7 @@ public class ExcelController {
         log.info("[엑셀 다운로드 시작] 개인정보취합 참여현황 - 사용자: {}", userId);
 
         // 활동 로그 기록
-        actionLogService.logDownload(userId, "개인정보취합 참여현황 엑셀다운로드", reason);
+        actionLogService.logDownloadAction(userId, user.getPerson(), "개인정보취합 참여현황 엑셀다운로드", "R", reason, request);
 
         // 검색 조건 설정
         Map<String, Object> params = new HashMap<>();

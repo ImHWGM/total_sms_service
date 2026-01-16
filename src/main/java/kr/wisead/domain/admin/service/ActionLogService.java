@@ -146,8 +146,10 @@ public class ActionLogService {
                 .actionReason(reason)
                 .menuUrl("/api/excel")
                 .code("200")
+                .referer("-")
                 .userId(userId)
-                .userName(userId)
+                .userName(userId != null && userId.length() > 50 ? userId.substring(0, 50) : userId)
+                .ip("-")
                 .build();
 
         actionLogMapper.insertDownloadLog(actionLog);

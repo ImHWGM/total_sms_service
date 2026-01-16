@@ -77,26 +77,36 @@ public class EventController {
 
     /**
      * 이벤트 생성
+     * - 설문 데이터와 이미지를 한번에 전송받아 처리 (레거시 방식)
      */
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<EventResponse> create(
             @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody EventRequest request) {
+            @RequestPart("event") @Valid EventRequest request,
+            @RequestPart(value = "descImageFile", required = false) MultipartFile descImageFile,
+            @RequestPart(value = "endImageFile", required = false) MultipartFile endImageFile,
+            @RequestPart(value = "questionImages", required = false) List<MultipartFile> questionImages,
+            @RequestPart(value = "itemImages", required = false) List<MultipartFile> itemImages) {
         String userId = userDetails.getUsername();
-        EventResponse response = eventService.createEvent(userId, request);
+        EventResponse response = eventService.createEvent(userId, request, descImageFile, endImageFile, questionImages, itemImages);
         return ApiResponse.success(response);
     }
 
     /**
      * 이벤트 수정
+     * - 설문 데이터와 이미지를 한번에 전송받아 처리 (레거시 방식)
      */
-    @PutMapping("/{eventSeq}")
+    @PutMapping(value = "/{eventSeq}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<EventResponse> update(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Integer eventSeq,
-            @Valid @RequestBody EventRequest request) {
+            @RequestPart("event") @Valid EventRequest request,
+            @RequestPart(value = "descImageFile", required = false) MultipartFile descImageFile,
+            @RequestPart(value = "endImageFile", required = false) MultipartFile endImageFile,
+            @RequestPart(value = "questionImages", required = false) List<MultipartFile> questionImages,
+            @RequestPart(value = "itemImages", required = false) List<MultipartFile> itemImages) {
         String uptId = userDetails.getUsername();
-        EventResponse response = eventService.updateEvent(eventSeq, request, uptId);
+        EventResponse response = eventService.updateEvent(eventSeq, request, uptId, descImageFile, endImageFile, questionImages, itemImages);
         return ApiResponse.success(response);
     }
 

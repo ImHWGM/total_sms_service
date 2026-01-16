@@ -103,10 +103,13 @@ public class EventService {
     }
 
     /**
-     * 이벤트 생성
+     * 이벤트 생성 (이미지 파일 포함)
+     * - 설문 데이터와 이미지를 한번에 처리 (레거시 방식)
      */
     @Transactional
-    public EventResponse createEvent(String userId, EventRequest request) {
+    public EventResponse createEvent(String userId, EventRequest request,
+                                      MultipartFile descImageFile, MultipartFile endImageFile,
+                                      List<MultipartFile> questionImages, List<MultipartFile> itemImages) {
         // 사용자 조회하여 userSeq 획득
         Integer userSeq = userMapper.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자를 찾을 수 없습니다."))
@@ -150,45 +153,39 @@ public class EventService {
         surveyMasterMapper.insert(event);
         log.info("이벤트 생성 완료 - eventSeq: {}, eventCode: {}, qrCode: {}", event.getEventSeq(), eventCode, request.getQrCode());
 
-        // tempId가 있으면 임시 이미지 파일을 이벤트 폴더로 이동하고 경로 업데이트
-        if (request.getTempId() != null && !request.getTempId().isBlank()) {
-            boolean moved = fileStorageService.moveSurveyTempToEvent(request.getTempId(), event.getEventSeq());
-            if (moved) {
-                log.info("설문 임시 이미지 이동 완료 - tempId: {}, eventSeq: {}", request.getTempId(), event.getEventSeq());
+        Integer eventSeq = event.getEventSeq();
+        String eventSeqStr = String.valueOf(eventSeq);
 
-                // 이미지 경로를 temp에서 eventSeq 폴더로 업데이트
-                String tempPrefix = "temp_" + request.getTempId();
-                String eventSeqStr = String.valueOf(event.getEventSeq());
-
-                // 설명 이미지 경로 업데이트
-                if (event.getEventDescImg() != null && !event.getEventDescImg().isEmpty()) {
-                    String updatedDescImg = event.getEventDescImg().replace(tempPrefix, eventSeqStr);
-                    surveyMasterMapper.updateDescImg(event.getEventSeq(), updatedDescImg);
-                    log.debug("설명 이미지 경로 업데이트: {} -> {}", event.getEventDescImg(), updatedDescImg);
-                }
-
-                // 종료 이미지 경로 업데이트
-                if (event.getEventEndImg() != null && !event.getEventEndImg().isEmpty()) {
-                    String updatedEndImg = event.getEventEndImg().replace(tempPrefix, eventSeqStr);
-                    surveyMasterMapper.updateEndImg(event.getEventSeq(), updatedEndImg);
-                    log.debug("종료 이미지 경로 업데이트: {} -> {}", event.getEventEndImg(), updatedEndImg);
-                }
-            }
+        // 설명 이미지 저장 (MultipartFile)
+        if (descImageFile != null && !descImageFile.isEmpty()) {
+            String descImgPath = fileStorageService.storeSurveyDescImg(descImageFile, eventSeqStr);
+            surveyMasterMapper.updateDescImg(eventSeq, descImgPath);
+            log.info("설명 이미지 저장 완료 - eventSeq: {}, path: {}", eventSeq, descImgPath);
         }
 
-        // 문항 등록
+        // 종료 이미지 저장 (MultipartFile)
+        if (endImageFile != null && !endImageFile.isEmpty()) {
+            String endImgPath = fileStorageService.storeSurveyEndImg(endImageFile, eventSeqStr);
+            surveyMasterMapper.updateEndImg(eventSeq, endImgPath);
+            log.info("종료 이미지 저장 완료 - eventSeq: {}, path: {}", eventSeq, endImgPath);
+        }
+
+        // 문항 등록 및 이미지 저장
         if (request.getQuestions() != null && !request.getQuestions().isEmpty()) {
-            saveQuestions(event.getEventSeq(), request.getQuestions(), userId);
+            saveQuestionsWithImages(eventSeq, request.getQuestions(), userId, questionImages, itemImages);
         }
 
-        return getEventDetail(event.getEventSeq());
+        return getEventDetail(eventSeq);
     }
 
     /**
-     * 이벤트 수정
+     * 이벤트 수정 (이미지 파일 포함)
+     * - 설문 데이터와 이미지를 한번에 처리 (레거시 방식)
      */
     @Transactional
-    public EventResponse updateEvent(Integer eventSeq, EventRequest request, String uptId) {
+    public EventResponse updateEvent(Integer eventSeq, EventRequest request, String uptId,
+                                       MultipartFile descImageFile, MultipartFile endImageFile,
+                                       List<MultipartFile> questionImages, List<MultipartFile> itemImages) {
         SurveyMaster event = surveyMasterMapper.selectByEventSeq(eventSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
 
@@ -205,11 +202,21 @@ public class EventService {
             log.info("QR 코드 생성 - eventSeq: {}, authCodeUrl: {}", eventSeq, authCodeUrl);
         }
 
-        // 이미지 경로: request에 값이 있으면 사용, 없으면 기존 값 유지
-        String eventDescImg = (request.getEventDescImg() != null && !request.getEventDescImg().isEmpty())
-                ? request.getEventDescImg() : event.getEventDescImg();
-        String eventEndImg = (request.getEventEndImg() != null && !request.getEventEndImg().isEmpty())
-                ? request.getEventEndImg() : event.getEventEndImg();
+        String eventSeqStr = String.valueOf(eventSeq);
+
+        // 설명 이미지: 새 파일이 있으면 저장, 없으면 기존 경로 유지
+        String eventDescImg = event.getEventDescImg();
+        if (descImageFile != null && !descImageFile.isEmpty()) {
+            eventDescImg = fileStorageService.storeSurveyDescImg(descImageFile, eventSeqStr);
+            log.info("설명 이미지 저장 완료 - eventSeq: {}, path: {}", eventSeq, eventDescImg);
+        }
+
+        // 종료 이미지: 새 파일이 있으면 저장, 없으면 기존 경로 유지
+        String eventEndImg = event.getEventEndImg();
+        if (endImageFile != null && !endImageFile.isEmpty()) {
+            eventEndImg = fileStorageService.storeSurveyEndImg(endImageFile, eventSeqStr);
+            log.info("종료 이미지 저장 완료 - eventSeq: {}, path: {}", eventSeq, eventEndImg);
+        }
 
         event.update(
                 request.getEventName(),
@@ -243,7 +250,7 @@ public class EventService {
 
             surveyItemMapper.deleteByEventSeq(eventSeq);
             surveyQuestionMapper.deleteByEventSeq(eventSeq);
-            saveQuestions(eventSeq, request.getQuestions(), uptId);
+            saveQuestionsWithImages(eventSeq, request.getQuestions(), uptId, questionImages, itemImages);
         }
 
         return getEventDetail(eventSeq);
@@ -413,7 +420,113 @@ public class EventService {
     }
 
     /**
-     * 문항 저장
+     * 문항 저장 (이미지 포함)
+     * - 파일명 규칙: questionImages는 "{questionOrder}.{ext}", itemImages는 "{questionOrder}_{itemOrder}.{ext}"
+     */
+    private void saveQuestionsWithImages(Integer eventSeq, List<QuestionRequest> questions, String regId,
+                                          List<MultipartFile> questionImages, List<MultipartFile> itemImages) {
+        String eventSeqStr = String.valueOf(eventSeq);
+
+        // 문항 이미지 맵 구성 (파일명에서 순번 추출)
+        Map<Integer, MultipartFile> questionImageMap = new HashMap<>();
+        if (questionImages != null) {
+            for (MultipartFile file : questionImages) {
+                if (file != null && !file.isEmpty()) {
+                    String fileName = file.getOriginalFilename();
+                    if (fileName != null) {
+                        try {
+                            // 파일명에서 숫자 추출 (예: "1.png" → 1)
+                            String numPart = fileName.replaceAll("[^0-9]", "");
+                            if (!numPart.isEmpty()) {
+                                int questionOrder = Integer.parseInt(numPart);
+                                questionImageMap.put(questionOrder, file);
+                            }
+                        } catch (NumberFormatException e) {
+                            log.warn("문항 이미지 파일명에서 순번 추출 실패: {}", fileName);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 항목 이미지 맵 구성 (파일명: "{questionOrder}_{itemOrder}.{ext}")
+        Map<String, MultipartFile> itemImageMap = new HashMap<>();
+        if (itemImages != null) {
+            for (MultipartFile file : itemImages) {
+                if (file != null && !file.isEmpty()) {
+                    String fileName = file.getOriginalFilename();
+                    if (fileName != null) {
+                        // 확장자 제거 후 파싱
+                        String nameWithoutExt = fileName.contains(".") ?
+                                fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+                        if (nameWithoutExt.contains("_")) {
+                            itemImageMap.put(nameWithoutExt, file);  // "1_1" → file
+                        }
+                    }
+                }
+            }
+        }
+
+        int order = 1;
+        for (QuestionRequest qReq : questions) {
+            int questionOrder = qReq.getOrder() != null ? qReq.getOrder() : order;
+
+            SurveyQuestion question = SurveyQuestion.create(
+                    eventSeq,
+                    qReq.getQuestionType(),
+                    qReq.getQuestionTypeDetail(),
+                    qReq.getQuestion(),
+                    questionOrder,
+                    regId
+            );
+            surveyQuestionMapper.insert(question);
+
+            // 문항 이미지 저장
+            MultipartFile questionImgFile = questionImageMap.get(questionOrder);
+            if (questionImgFile != null) {
+                String questionImgPath = fileStorageService.storeSurveyQuestionImg(questionImgFile, eventSeqStr, questionOrder);
+                surveyQuestionMapper.updateQuestionImg(eventSeq, question.getQuestionSeq(), questionImgPath);
+                log.info("문항 이미지 저장 완료 - eventSeq: {}, questionSeq: {}, path: {}", eventSeq, question.getQuestionSeq(), questionImgPath);
+            }
+
+            // 객관식 항목 저장
+            if (qReq.getItems() != null && !qReq.getItems().isEmpty()) {
+                int itemOrder = 1;
+                for (ItemRequest iReq : qReq.getItems()) {
+                    int currentItemOrder = iReq.getOrder() != null ? iReq.getOrder() : itemOrder;
+
+                    SurveyItem item = SurveyItem.create(
+                            eventSeq,
+                            question.getQuestionSeq(),
+                            iReq.getItem(),
+                            iReq.getItemValue(),
+                            currentItemOrder,
+                            regId
+                    );
+                    if (iReq.getJumpQuestion() != null) {
+                        item.setJumpQuestion(iReq.getJumpQuestion());
+                    }
+                    surveyItemMapper.insert(item);
+
+                    // 항목 이미지 저장
+                    String itemImageKey = questionOrder + "_" + currentItemOrder;
+                    MultipartFile itemImgFile = itemImageMap.get(itemImageKey);
+                    if (itemImgFile != null) {
+                        String itemImgPath = fileStorageService.storeSurveyItemImg(itemImgFile, eventSeqStr, questionOrder, currentItemOrder);
+                        surveyItemMapper.updateItemImg(eventSeq, question.getQuestionSeq(), item.getItemSeq(), itemImgPath);
+                        log.info("항목 이미지 저장 완료 - eventSeq: {}, questionSeq: {}, itemSeq: {}, path: {}",
+                                eventSeq, question.getQuestionSeq(), item.getItemSeq(), itemImgPath);
+                    }
+
+                    itemOrder++;
+                }
+            }
+            order++;
+        }
+    }
+
+    /**
+     * 문항 저장 (이미지 없음)
      */
     private void saveQuestions(Integer eventSeq, List<QuestionRequest> questions, String regId) {
         int order = 1;

@@ -3,6 +3,9 @@ package kr.wisead.domain.file.controller;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.domain.file.dto.FileUploadResponse;
 import kr.wisead.domain.file.service.FileStorageService;
+import kr.wisead.mapper.primary.SurveyMasterMapper;
+import kr.wisead.mapper.primary.SurveyQuestionMapper;
+import kr.wisead.mapper.primary.SurveyItemMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,6 +23,9 @@ import org.springframework.web.multipart.MultipartFile;
 public class FileUploadController {
 
     private final FileStorageService fileStorageService;
+    private final SurveyMasterMapper surveyMasterMapper;
+    private final SurveyQuestionMapper surveyQuestionMapper;
+    private final SurveyItemMapper surveyItemMapper;
 
     /**
      * MMS 이미지 업로드
@@ -53,7 +59,7 @@ public class FileUploadController {
 
     /**
      * 설문 문항 이미지 업로드
-     * - eventSeq가 있으면 해당 이벤트 폴더에 저장
+     * - eventSeq가 있으면 해당 이벤트 폴더에 저장하고 DB 업데이트
      * - eventSeq가 없으면 tempId 폴더에 저장 (신규 이벤트 생성용)
      */
     @PostMapping("/survey/question")
@@ -64,6 +70,13 @@ public class FileUploadController {
             @RequestParam("file") MultipartFile file) {
         String directoryId = resolveDirectoryId(eventSeq, tempId);
         String filePath = fileStorageService.storeSurveyQuestionImg(file, directoryId, questionSeq);
+
+        // eventSeq가 있으면 DB에 경로 업데이트
+        if (eventSeq != null && eventSeq > 0) {
+            surveyQuestionMapper.updateQuestionImg(eventSeq, questionSeq, filePath);
+            log.info("문항 이미지 DB 업데이트 - eventSeq: {}, questionSeq: {}, path: {}", eventSeq, questionSeq, filePath);
+        }
+
         FileUploadResponse response = FileUploadResponse.success(filePath);
         response.setOriginalFileName(file.getOriginalFilename());
         response.setFileSize(file.getSize());
@@ -72,7 +85,7 @@ public class FileUploadController {
 
     /**
      * 설문 항목 이미지 업로드
-     * - eventSeq가 있으면 해당 이벤트 폴더에 저장
+     * - eventSeq가 있으면 해당 이벤트 폴더에 저장하고 DB 업데이트
      * - eventSeq가 없으면 tempId 폴더에 저장 (신규 이벤트 생성용)
      */
     @PostMapping("/survey/item")
@@ -80,10 +93,19 @@ public class FileUploadController {
             @RequestParam(value = "eventSeq", required = false) Integer eventSeq,
             @RequestParam(value = "tempId", required = false) String tempId,
             @RequestParam("questionSeq") int questionSeq,
+            @RequestParam(value = "itemSeq", required = false) Integer itemSeq,
             @RequestParam("order") int order,
             @RequestParam("file") MultipartFile file) {
         String directoryId = resolveDirectoryId(eventSeq, tempId);
         String filePath = fileStorageService.storeSurveyItemImg(file, directoryId, questionSeq, order);
+
+        // eventSeq와 itemSeq가 있으면 DB에 경로 업데이트
+        if (eventSeq != null && eventSeq > 0 && itemSeq != null && itemSeq > 0) {
+            surveyItemMapper.updateItemImg(eventSeq, questionSeq, itemSeq, filePath);
+            log.info("항목 이미지 DB 업데이트 - eventSeq: {}, questionSeq: {}, itemSeq: {}, path: {}",
+                    eventSeq, questionSeq, itemSeq, filePath);
+        }
+
         FileUploadResponse response = FileUploadResponse.success(filePath);
         response.setOriginalFileName(file.getOriginalFilename());
         response.setFileSize(file.getSize());
@@ -92,7 +114,7 @@ public class FileUploadController {
 
     /**
      * 설문 설명 이미지 업로드
-     * - eventSeq가 있으면 해당 이벤트 폴더에 저장
+     * - eventSeq가 있으면 해당 이벤트 폴더에 저장하고 DB 업데이트
      * - eventSeq가 없으면 tempId 폴더에 저장 (신규 이벤트 생성용)
      */
     @PostMapping("/survey/desc")
@@ -102,6 +124,13 @@ public class FileUploadController {
             @RequestParam("file") MultipartFile file) {
         String directoryId = resolveDirectoryId(eventSeq, tempId);
         String filePath = fileStorageService.storeSurveyDescImg(file, directoryId);
+
+        // eventSeq가 있으면 DB에 경로 업데이트
+        if (eventSeq != null && eventSeq > 0) {
+            surveyMasterMapper.updateDescImg(eventSeq, filePath);
+            log.info("설명 이미지 DB 업데이트 - eventSeq: {}, path: {}", eventSeq, filePath);
+        }
+
         FileUploadResponse response = FileUploadResponse.success(filePath);
         response.setOriginalFileName(file.getOriginalFilename());
         response.setFileSize(file.getSize());
@@ -110,7 +139,7 @@ public class FileUploadController {
 
     /**
      * 설문 종료 이미지 업로드
-     * - eventSeq가 있으면 해당 이벤트 폴더에 저장
+     * - eventSeq가 있으면 해당 이벤트 폴더에 저장하고 DB 업데이트
      * - eventSeq가 없으면 tempId 폴더에 저장 (신규 이벤트 생성용)
      */
     @PostMapping("/survey/end")
@@ -120,6 +149,13 @@ public class FileUploadController {
             @RequestParam("file") MultipartFile file) {
         String directoryId = resolveDirectoryId(eventSeq, tempId);
         String filePath = fileStorageService.storeSurveyEndImg(file, directoryId);
+
+        // eventSeq가 있으면 DB에 경로 업데이트
+        if (eventSeq != null && eventSeq > 0) {
+            surveyMasterMapper.updateEndImg(eventSeq, filePath);
+            log.info("종료 이미지 DB 업데이트 - eventSeq: {}, path: {}", eventSeq, filePath);
+        }
+
         FileUploadResponse response = FileUploadResponse.success(filePath);
         response.setOriginalFileName(file.getOriginalFilename());
         response.setFileSize(file.getSize());

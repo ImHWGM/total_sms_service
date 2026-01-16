@@ -5,6 +5,7 @@ import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.excel.dto.ExcelExportRequest;
+import kr.wisead.domain.excel.dto.SurveyExcelDownloadRequest;
 import kr.wisead.domain.excel.service.BillingExcelService;
 import kr.wisead.domain.excel.service.ExcelService;
 import kr.wisead.domain.payment.dto.BillingStatsSearchRequest;
@@ -448,6 +449,191 @@ public class ExcelController {
         } catch (Exception e) {
             log.error("개인정보취합 엑셀 다운로드 실패", e);
             throw new RuntimeException("Excel 파일 생성에 실패했습니다.");
+        }
+    }
+
+    /**
+     * 설문조사/개인정보취합 참여현황 Excel 다운로드 (3가지 모드 지원)
+     * POST /api/excel/participant/download
+     *
+     * downloadType:
+     * - ALL: 전체 데이터 다운로드
+     * - SEARCH: 검색 조건에 맞는 데이터 다운로드
+     * - SELECTED: 선택된 데이터만 다운로드
+     */
+    @PostMapping("/participant/download")
+    public ResponseEntity<byte[]> downloadParticipantExcel(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody SurveyExcelDownloadRequest downloadRequest,
+            HttpServletRequest request) {
+
+        String userId = userDetails.getUsername();
+        User user = userMapper.findByUserId(userId).orElseThrow();
+
+        SurveyExcelDownloadRequest.DownloadType downloadType = downloadRequest.getDownloadType();
+        String eventType = downloadRequest.getEventType();
+        boolean isSurvey = "S".equals(eventType);
+        String menuName = isSurvey ? "설문조사" : "개인정보취합";
+
+        log.info("[엑셀 다운로드 시작] {} 참여현황 - 사용자: {}, 다운로드타입: {}",
+                menuName, userId, downloadType);
+
+        // 활동 로그 기록
+        String logMenuName = String.format("%s 참여현황 엑셀다운로드 (%s)",
+                menuName, getDownloadTypeText(downloadType));
+        actionLogService.logDownloadAction(userId, user.getPerson(), logMenuName, "R",
+                downloadRequest.getReason(), request);
+
+        // 데이터 조회
+        List<Map<String, Object>> dataList = getDataListByDownloadType(
+                downloadType, downloadRequest, user, userId);
+
+        if (dataList.isEmpty()) {
+            throw new RuntimeException("다운로드할 데이터가 없습니다.");
+        }
+
+        // Excel 생성
+        try (SXSSFWorkbook workbook = excelService.createWorkbook()) {
+            String sheetName = menuName + " 참여현황";
+            Sheet sheet = excelService.createSheet(workbook, sheetName);
+            CellStyle headerStyle = excelService.createHeaderStyle(workbook, 11, true, 192, 192, 192);
+
+            if (isSurvey) {
+                // 설문조사 헤더
+                List<String> headers = Arrays.asList(
+                        "번호", "고객사명", "이벤트명", "전화번호", "난수", "최종접속일", "최종완료일"
+                );
+                excelService.createHeaderRow(sheet, 0, headers, headerStyle);
+
+                // 데이터 행 생성
+                int rowNum = 1;
+                for (Map<String, Object> data : dataList) {
+                    String phone = decryptPhone(data.get("resendUserPhone"));
+                    excelService.createDataRow(sheet, rowNum++, Arrays.asList(
+                            data.get("seq"),
+                            data.get("corpName") != null ? data.get("corpName") : "",
+                            removeEmphasis(data.get("eventName")),
+                            phone != null ? phone : "",
+                            data.get("userKey") != null ? data.get("userKey") : "",
+                            formatDateTime(data.get("surveyStartTime")),
+                            formatDateTime(data.get("submissionDate"))
+                    ), null);
+                }
+            } else {
+                // 개인정보취합 헤더
+                boolean includePaymentInfo = user.getCorpName() != null &&
+                        user.getCorpName().contains("모바일이앤엠애드");
+
+                List<String> headers = new ArrayList<>(Arrays.asList(
+                        "번호", "고객사명", "이벤트명", "당첨자명", "전화번호", "주민번호", "주소"
+                ));
+                if (includePaymentInfo) {
+                    headers.addAll(Arrays.asList("입금일자", "입금금액", "출고일자"));
+                }
+                headers.addAll(Arrays.asList("등록일", "제출일"));
+                excelService.createHeaderRow(sheet, 0, headers, headerStyle);
+
+                // 데이터 행 생성
+                int rowNum = 1;
+                for (Map<String, Object> data : dataList) {
+                    String userName = decryptData(data.get("userName"));
+                    String phone = decryptPhone(data.get("userPhone"));
+                    String juminNum = decryptJumin(data.get("juminNum"));
+                    String address = normalizeAddress(data.get("address"), data.get("address2"));
+
+                    List<Object> rowData = new ArrayList<>(Arrays.asList(
+                            data.get("seq"),
+                            data.get("corpName") != null ? data.get("corpName") : "",
+                            removeEmphasis(data.get("eventName")),
+                            userName != null ? userName : "",
+                            phone != null ? phone : "",
+                            juminNum != null ? juminNum : "",
+                            address
+                    ));
+
+                    if (includePaymentInfo) {
+                        rowData.add(formatDate(data.get("depositDate")));
+                        rowData.add(data.get("depositAmount") != null ? data.get("depositAmount") : "");
+                        rowData.add(formatDate(data.get("shipmentDate")));
+                    }
+
+                    rowData.add(formatDateTime(data.get("regDate")));
+                    rowData.add(formatDateTime(data.get("submissionDate")));
+
+                    excelService.createDataRow(sheet, rowNum++, rowData, null);
+                }
+            }
+
+            byte[] content = excelService.toByteArray(workbook);
+
+            String fileName = String.format("%s_참여현황_%s_%s.xlsx",
+                    menuName, getDownloadTypeText(downloadType),
+                    LocalDate.now().format(DATE_FORMATTER));
+            String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8)
+                    .replace("+", "%20");
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFileName + "\"")
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(content);
+        } catch (Exception e) {
+            log.error("{} 엑셀 다운로드 실패", menuName, e);
+            throw new RuntimeException("Excel 파일 생성에 실패했습니다.");
+        }
+    }
+
+    /**
+     * 다운로드 타입에 따른 데이터 조회
+     */
+    private List<Map<String, Object>> getDataListByDownloadType(
+            SurveyExcelDownloadRequest.DownloadType downloadType,
+            SurveyExcelDownloadRequest downloadRequest,
+            User user,
+            String userId) {
+
+        switch (downloadType) {
+            case ALL:
+                // 전체 다운로드 - 검색 조건 무시
+                Map<String, Object> allParams = new HashMap<>();
+                allParams.put("eventType", downloadRequest.getEventType());
+                allParams.put("userLevel", user.getUserLevel());
+                allParams.put("regId", userId);
+                return surveyUserMapper.selectForExcelDownload(allParams);
+
+            case SELECTED:
+                // 선택 다운로드 - 선택된 시퀀스만
+                List<Integer> selectedSeqs = downloadRequest.getSelectedSeqs();
+                if (selectedSeqs == null || selectedSeqs.isEmpty()) {
+                    throw new RuntimeException("선택된 항목이 없습니다.");
+                }
+                return surveyUserMapper.selectBySeqListForExcel(selectedSeqs);
+
+            case SEARCH:
+            default:
+                // 검색 다운로드 - 검색 조건 적용
+                Map<String, Object> searchParams = new HashMap<>();
+                searchParams.put("eventSeq", downloadRequest.getEventSeq());
+                searchParams.put("eventType", downloadRequest.getEventType());
+                searchParams.put("keyword", downloadRequest.getKeyword());
+                searchParams.put("searchType", downloadRequest.getSearchType());
+                searchParams.put("submissionStatus", downloadRequest.getSubmissionStatus());
+                searchParams.put("startDate", downloadRequest.getStartDate());
+                searchParams.put("endDate", downloadRequest.getEndDate());
+                searchParams.put("userLevel", user.getUserLevel());
+                searchParams.put("regId", userId);
+                return surveyUserMapper.selectForExcelDownload(searchParams);
+        }
+    }
+
+    /**
+     * 다운로드 타입 텍스트
+     */
+    private String getDownloadTypeText(SurveyExcelDownloadRequest.DownloadType downloadType) {
+        switch (downloadType) {
+            case ALL: return "전체";
+            case SELECTED: return "선택";
+            case SEARCH:
+            default: return "검색";
         }
     }
 

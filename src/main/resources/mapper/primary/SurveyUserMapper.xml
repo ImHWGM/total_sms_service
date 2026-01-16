@@ -605,4 +605,34 @@
         <include refid="searchCondition"/>
     </select>
 
+    <!-- 선택된 시퀀스 목록으로 엑셀 다운로드용 데이터 조회 -->
+    <select id="selectBySeqListForExcel" resultType="map">
+        SELECT
+            U.SEQ as seq,
+            USR.CORP_NAME as corpName,
+            M.EVENT_NAME as eventName,
+            M.EVENT_TYPE as eventType,
+            U.USER_KEY as userKey,
+            U.USER_NAME as userName,
+            U.USER_PHONE as userPhone,
+            U.RESEND_USER_PHONE as resendUserPhone,
+            U.JUMIN_NUM as juminNum,
+            U.ADDRESS as address,
+            U.ADDRESS2 as address2,
+            U.DEPOSIT_DATE as depositDate,
+            U.SHIPMENT_DATE as shipmentDate,
+            U.SURVEY_START_TIME as surveyStartTime,
+            U.SUBMISSION_DATE as submissionDate,
+            U.REG_DATE as regDate
+        FROM SURVEY_USER U
+        INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
+        LEFT JOIN USER USR ON M.USER_SEQ = USR.SEQ
+        WHERE U.DEL_YN = 'N'
+        AND U.SEQ IN
+        <foreach collection="seqList" item="seq" open="(" separator="," close=")">
+            #{seq}
+        </foreach>
+        ORDER BY U.SEQ DESC
+    </select>
+
 </mapper>

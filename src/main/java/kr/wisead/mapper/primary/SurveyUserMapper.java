@@ -190,4 +190,9 @@ public interface SurveyUserMapper {
      * 검색 조건으로 참여자 수 조회
      */
     int countWithSearch(Map<String, Object> params);
+
+    /**
+     * 선택된 시퀀스 목록으로 엑셀 다운로드용 데이터 조회
+     */
+    List<Map<String, Object>> selectBySeqListForExcel(@Param("seqList") List<Integer> seqList);
 }

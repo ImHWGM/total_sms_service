@@ -231,7 +231,7 @@ public class ExcelController {
             switch (type.toLowerCase()) {
                 case "phone":
                     sheet = excelService.createSheet(workbook, "수신자목록");
-                    headers = Arrays.asList("이름", "휴대폰번호", "변수1", "변수2", "변수3");
+                    headers = Arrays.asList("휴대폰번호", "대치문자1", "대치문자2", "대치문자3");
                     fileName = "수신자목록_템플릿.xlsx";
                     break;
                 case "survey":

@@ -18,6 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
 import java.util.List;
@@ -142,7 +143,8 @@ class QrSurveyWorkflowIntegrationTest {
                 .qrCodeImgPath(TEST_QR_CODE_IMG_PATH)
                 .build();
 
-        when(eventService.createEvent(anyString(), any(EventRequest.class)))
+        when(eventService.createEvent(anyString(), any(EventRequest.class),
+                any(), any(), anyList(), anyList()))
                 .thenReturn(mockResponse);
 
         // When & Then
@@ -158,7 +160,8 @@ class QrSurveyWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.qrCodeImgPath").value(TEST_QR_CODE_IMG_PATH))
                 .andReturn();
 
-        verify(eventService, times(1)).createEvent(anyString(), any(EventRequest.class));
+        verify(eventService, times(1)).createEvent(anyString(), any(EventRequest.class),
+                any(), any(), anyList(), anyList());
 
         // authCodeUrl이 20자리인지 확인
         assertThat(TEST_AUTH_CODE_URL).hasSize(20);
@@ -409,7 +412,8 @@ class QrSurveyWorkflowIntegrationTest {
                 .qrCodeImgPath(null)
                 .build();
 
-        when(eventService.createEvent(anyString(), any(EventRequest.class)))
+        when(eventService.createEvent(anyString(), any(EventRequest.class),
+                any(), any(), anyList(), anyList()))
                 .thenReturn(mockResponse);
 
         // When & Then

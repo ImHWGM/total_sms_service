@@ -20,6 +20,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -123,7 +124,8 @@ class EventParticipantWorkflowIntegrationTest {
                 .status("A")
                 .build();
 
-        when(eventService.createEvent(anyString(), any(EventRequest.class)))
+        when(eventService.createEvent(anyString(), any(EventRequest.class),
+                any(), any(), anyList(), anyList()))
                 .thenReturn(mockResponse);
 
         // When & Then
@@ -135,7 +137,8 @@ class EventParticipantWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.eventSeq").value(TEST_EVENT_SEQ));
 
-        verify(eventService, times(1)).createEvent(anyString(), any(EventRequest.class));
+        verify(eventService, times(1)).createEvent(anyString(), any(EventRequest.class),
+                any(), any(), anyList(), anyList());
     }
 
     @Test

@@ -249,6 +249,7 @@ public class EventService {
     /**
      * 이벤트 수정 (이미지 파일 포함)
      * - 설문 데이터와 이미지를 한번에 처리 (레거시 방식)
+     * - JSON 방식: 임시 경로로 업로드된 이미지를 eventSeq 폴더로 이동 후 경로 업데이트
      */
     @Transactional
     public EventResponse updateEvent(Integer eventSeq, EventRequest request, String uptId,
@@ -272,18 +273,64 @@ public class EventService {
 
         String eventSeqStr = String.valueOf(eventSeq);
 
-        // 설명 이미지: 새 파일이 있으면 저장, 없으면 기존 경로 유지
-        String eventDescImg = event.getEventDescImg();
-        if (descImageFile != null && !descImageFile.isEmpty()) {
-            eventDescImg = fileStorageService.storeSurveyDescImg(descImageFile, eventSeqStr);
-            log.info("설명 이미지 저장 완료 - eventSeq: {}, path: {}", eventSeq, eventDescImg);
+        // JSON 방식: 임시 경로에서 tempId 추출하여 파일 이동
+        String tempId = extractTempIdFromPath(request.getEventDescImg());
+        if (tempId == null) {
+            tempId = extractTempIdFromPath(request.getEventEndImg());
+        }
+        if (tempId == null && request.getQuestions() != null) {
+            // 문항/답항 이미지에서 tempId 추출 시도
+            for (QuestionRequest qReq : request.getQuestions()) {
+                tempId = extractTempIdFromPath(qReq.getQuestionImg());
+                if (tempId != null) break;
+                if (qReq.getItems() != null) {
+                    for (ItemRequest iReq : qReq.getItems()) {
+                        tempId = extractTempIdFromPath(iReq.getItemImg());
+                        if (tempId != null) break;
+                    }
+                    if (tempId != null) break;
+                }
+            }
         }
 
-        // 종료 이미지: 새 파일이 있으면 저장, 없으면 기존 경로 유지
+        // 임시 폴더의 파일들을 eventSeq 폴더로 이동
+        if (tempId != null) {
+            boolean moved = fileStorageService.moveSurveyTempToEvent(tempId, eventSeq);
+            if (moved) {
+                log.info("임시 이미지 폴더 이동 완료 (수정) - tempId: {}, eventSeq: {}", tempId, eventSeq);
+            }
+        }
+
+        // 설명 이미지 처리
+        String eventDescImg = event.getEventDescImg();
+        if (descImageFile != null && !descImageFile.isEmpty()) {
+            // 레거시 방식: MultipartFile 직접 저장
+            eventDescImg = fileStorageService.storeSurveyDescImg(descImageFile, eventSeqStr);
+            log.info("설명 이미지 저장 완료 - eventSeq: {}, path: {}", eventSeq, eventDescImg);
+        } else if (request.getEventDescImg() != null && !request.getEventDescImg().isEmpty()) {
+            // JSON 방식: 임시 경로를 eventSeq 경로로 변환
+            if (request.getEventDescImg().contains("temp_")) {
+                eventDescImg = convertTempPathToEventPath(request.getEventDescImg(), eventSeqStr);
+                log.info("설명 이미지 경로 변환 (수정) - eventSeq: {}, path: {}", eventSeq, eventDescImg);
+            } else {
+                eventDescImg = request.getEventDescImg();
+            }
+        }
+
+        // 종료 이미지 처리
         String eventEndImg = event.getEventEndImg();
         if (endImageFile != null && !endImageFile.isEmpty()) {
+            // 레거시 방식: MultipartFile 직접 저장
             eventEndImg = fileStorageService.storeSurveyEndImg(endImageFile, eventSeqStr);
             log.info("종료 이미지 저장 완료 - eventSeq: {}, path: {}", eventSeq, eventEndImg);
+        } else if (request.getEventEndImg() != null && !request.getEventEndImg().isEmpty()) {
+            // JSON 방식: 임시 경로를 eventSeq 경로로 변환
+            if (request.getEventEndImg().contains("temp_")) {
+                eventEndImg = convertTempPathToEventPath(request.getEventEndImg(), eventSeqStr);
+                log.info("종료 이미지 경로 변환 (수정) - eventSeq: {}, path: {}", eventSeq, eventEndImg);
+            } else {
+                eventEndImg = request.getEventEndImg();
+            }
         }
 
         event.update(
@@ -318,7 +365,8 @@ public class EventService {
 
             surveyItemMapper.deleteByEventSeq(eventSeq);
             surveyQuestionMapper.deleteByEventSeq(eventSeq);
-            saveQuestionsWithImages(eventSeq, request.getQuestions(), uptId, questionImages, itemImages);
+            // JSON 방식 사용 (이미지 경로 변환 처리)
+            saveQuestionsWithImages(eventSeq, request.getQuestions(), uptId, questionImages, itemImages, eventSeqStr);
         }
 
         return getEventDetail(eventSeq);

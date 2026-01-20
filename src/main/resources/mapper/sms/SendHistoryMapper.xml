@@ -3,7 +3,7 @@
 <mapper namespace="kr.wisead.mapper.sms.SendHistoryMapper">
 
     <resultMap id="sendHistoryResultMap" type="kr.wisead.domain.history.entity.SendHistory">
-        <id property="msgKey" column="MSG_KEY"/>
+        <id property="msgKey" column="MSEQ"/>
         <result property="msgType" column="MSG_TYPE"/>
         <result property="dstAddr" column="DST_ADDR"/>
         <result property="callBack" column="CALLBACK"/>
@@ -22,7 +22,7 @@
     </resultMap>
 
     <sql id="selectColumns">
-        MSG_KEY,
+        MSEQ,
         MSG_TYPE,
         DST_ADDR,
         CALLBACK,

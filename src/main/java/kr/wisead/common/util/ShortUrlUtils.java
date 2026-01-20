@@ -102,4 +102,48 @@ public class ShortUrlUtils {
     public static String shortenUrlsInText(String text) {
         return shortenUrlsInText(text, null);
     }
+
+    /**
+     * URL 단축 (urlShortener의 alias)
+     *
+     * @param longUrl 원본 URL
+     * @return 단축된 URL (실패 시 원본 URL 반환)
+     */
+    public static String shortenUrl(String longUrl) {
+        return urlShortener(longUrl);
+    }
+
+    /**
+     * 텍스트 내 QR코드 URL을 모두 단축 URL로 변환
+     * /qrcode/ 패턴 포함 URL을 단축
+     *
+     * @param text 원본 텍스트
+     * @return URL이 단축된 텍스트
+     */
+    public static String shortenQrUrlsInText(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+
+        try {
+            // QR코드 URL 패턴: https://로 시작하고 /qrcode/ 경로가 포함된 URL
+            String regex = "(https?://[^\\s]+/qrcode/[A-Za-z0-9]+(?:/[A-Za-z0-9]+)?)(?![A-Za-z0-9/])";
+            Pattern urlPattern = Pattern.compile(regex);
+            Matcher matcher = urlPattern.matcher(text);
+            StringBuffer sb = new StringBuffer();
+
+            while (matcher.find()) {
+                String longUrl = matcher.group(1);
+                String shortUrl = urlShortener(longUrl);
+                log.debug("QR URL 단축: {} -> {}", longUrl, shortUrl);
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(shortUrl));
+            }
+            matcher.appendTail(sb);
+
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("텍스트 내 QR URL 단축 실패 - error: {}", e.getMessage());
+            return text;
+        }
+    }
 }

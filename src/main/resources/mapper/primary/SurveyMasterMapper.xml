@@ -161,15 +161,9 @@
                 QR_CODE_IMG_PATH = #{qrCodeImgPath},
                 AUTH_CODE_URL = #{authCodeUrl},
             </if>
-            <if test="eventDescImg != null">
-                EVENT_DESC_IMG = #{eventDescImg},
-            </if>
-            <if test="endMessage != null">
-                END_MESSAGE = #{endMessage},
-            </if>
-            <if test="eventEndImg != null">
-                EVENT_END_IMG = #{eventEndImg},
-            </if>
+            EVENT_DESC_IMG = #{eventDescImg},
+            END_MESSAGE = #{endMessage},
+            EVENT_END_IMG = #{eventEndImg},
             UPT_ID = #{uptId},
             UPT_DATE = NOW()
         WHERE EVENT_SEQ = #{eventSeq}

@@ -5,14 +5,14 @@
     <resultMap id="sendHistoryResultMap" type="kr.wisead.domain.history.entity.SendHistory">
         <id property="msgKey" column="MSEQ"/>
         <result property="msgType" column="MSG_TYPE"/>
-        <result property="dstAddr" column="DST_ADDR"/>
+        <result property="dstAddr" column="DSTADDR"/>
         <result property="callBack" column="CALLBACK"/>
         <result property="subject" column="SUBJECT"/>
         <result property="text" column="TEXT"/>
         <result property="stat" column="STAT"/>
         <result property="result" column="RESULT"/>
-        <result property="fileCnt" column="FILE_CNT"/>
-        <result property="fileLoc1" column="FILE_LOC1"/>
+        <result property="fileCnt" column="FILECNT"/>
+        <result property="fileLoc1" column="FILELOC1"/>
         <result property="requestTime" column="REQUEST_TIME"/>
         <result property="sendTime" column="SEND_TIME"/>
         <result property="reportTime" column="REPORT_TIME"/>
@@ -24,14 +24,14 @@
     <sql id="selectColumns">
         MSEQ,
         MSG_TYPE,
-        DST_ADDR,
+        DSTADDR,
         CALLBACK,
         SUBJECT,
         TEXT,
         STAT,
         RESULT,
-        FILE_CNT,
-        FILE_LOC1,
+        FILECNT,
+        FILELOC1,
         REQUEST_TIME,
         SEND_TIME,
         REPORT_TIME,
@@ -73,7 +73,7 @@
                     </when>
                     <!-- B: 수신번호 -->
                     <when test="params.type == 'B' or params.type == 'dstAddr'">
-                        AND DST_ADDR LIKE CONCAT('%', #{params.keyword}, '%')
+                        AND DSTADDR LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
                     <!-- C: 발신번호 -->
                     <when test="params.type == 'C' or params.type == 'callBack'">
@@ -101,7 +101,7 @@
                     </when>
                     <otherwise>
                         AND (
-                            DST_ADDR LIKE CONCAT('%', #{params.keyword}, '%')
+                            DSTADDR LIKE CONCAT('%', #{params.keyword}, '%')
                             OR CALLBACK LIKE CONCAT('%', #{params.keyword}, '%')
                             OR SUBJECT LIKE CONCAT('%', #{params.keyword}, '%')
                         )

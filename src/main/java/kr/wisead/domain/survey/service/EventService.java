@@ -302,7 +302,8 @@ public class EventService {
         }
 
         // 설명 이미지 처리
-        String eventDescImg = event.getEventDescImg();
+        // null이나 빈문자열 → 이미지 삭제, 기존URL → 유지, temp_ 경로 → 새 이미지
+        String eventDescImg = null;
         if (descImageFile != null && !descImageFile.isEmpty()) {
             // 레거시 방식: MultipartFile 직접 저장
             eventDescImg = fileStorageService.storeSurveyDescImg(descImageFile, eventSeqStr);
@@ -315,10 +316,14 @@ public class EventService {
             } else {
                 eventDescImg = request.getEventDescImg();
             }
+        } else {
+            // null이나 빈문자열이 명시적으로 전달된 경우 → 이미지 삭제
+            log.info("설명 이미지 삭제 - eventSeq: {}", eventSeq);
         }
 
         // 종료 이미지 처리
-        String eventEndImg = event.getEventEndImg();
+        // null이나 빈문자열 → 이미지 삭제, 기존URL → 유지, temp_ 경로 → 새 이미지
+        String eventEndImg = null;
         if (endImageFile != null && !endImageFile.isEmpty()) {
             // 레거시 방식: MultipartFile 직접 저장
             eventEndImg = fileStorageService.storeSurveyEndImg(endImageFile, eventSeqStr);
@@ -331,6 +336,9 @@ public class EventService {
             } else {
                 eventEndImg = request.getEventEndImg();
             }
+        } else {
+            // null이나 빈문자열이 명시적으로 전달된 경우 → 이미지 삭제
+            log.info("종료 이미지 삭제 - eventSeq: {}", eventSeq);
         }
 
         event.update(

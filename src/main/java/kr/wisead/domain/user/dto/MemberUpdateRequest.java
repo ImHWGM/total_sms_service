@@ -71,7 +71,7 @@ public class MemberUpdateRequest {
     private String allowIp;
 
     /**
-     * 상태 (미승인/승인/보류/탈퇴)
+     * 상태 (미승인/승인)
      */
     private String status;
 

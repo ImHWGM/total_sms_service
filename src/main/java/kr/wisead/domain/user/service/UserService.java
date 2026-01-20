@@ -236,13 +236,12 @@ public class UserService {
     }
 
     /**
-     * 유효한 상태값인지 확인
+     * 유효한 상태값인지 확인 (승인/미승인)
+     * - 탈퇴는 use_yn으로 관리
      */
     private boolean isValidStatus(String status) {
         return "미승인".equals(status) ||
-                "승인".equals(status) ||
-                "보류".equals(status) ||
-                "탈퇴".equals(status);
+                "승인".equals(status);
     }
 
     /**

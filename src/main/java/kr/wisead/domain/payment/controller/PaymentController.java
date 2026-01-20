@@ -1,14 +1,19 @@
 package kr.wisead.domain.payment.controller;
 
+import jakarta.validation.Valid;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.payment.dto.BalanceResponse;
 import kr.wisead.domain.payment.dto.ChargeRequest;
 import kr.wisead.domain.payment.dto.SmsPriceRequest;
+import kr.wisead.domain.payment.dto.StandardRateResponse;
+import kr.wisead.domain.payment.dto.UserServiceRateRequest;
+import kr.wisead.domain.payment.dto.UserServiceRateResponse;
 import kr.wisead.domain.payment.entity.Payment;
 import org.springframework.security.access.prepost.PreAuthorize;
 import kr.wisead.domain.payment.service.BalanceService;
 import kr.wisead.domain.payment.service.PaymentService;
+import kr.wisead.domain.payment.service.UserServiceRateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,6 +34,7 @@ public class PaymentController {
 
     private final PaymentService paymentService;
     private final BalanceService balanceService;
+    private final UserServiceRateService userServiceRateService;
 
     /**
      * 현재 잔액 조회
@@ -276,5 +282,38 @@ public class PaymentController {
     public ApiResponse<kr.wisead.domain.payment.dto.RefundResult> processRefund(
             @PathVariable String txGroupId) {
         return ApiResponse.success(balanceService.refund(txGroupId));
+    }
+
+    // ==================== 사용자별 서비스 요금 API ====================
+
+    /**
+     * 표준 요금 목록 조회
+     * GET /api/payment/standard-rates
+     */
+    @GetMapping("/standard-rates")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<StandardRateResponse> getStandardRates() {
+        return ApiResponse.success(userServiceRateService.getStandardRates());
+    }
+
+    /**
+     * 사용자별 요금 조회
+     * GET /api/payment/user-rates/{userId}
+     */
+    @GetMapping("/user-rates/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<UserServiceRateResponse> getUserRates(@PathVariable String userId) {
+        return ApiResponse.success(userServiceRateService.getUserRates(userId));
+    }
+
+    /**
+     * 사용자별 요금 설정
+     * PUT /api/payment/user-rates
+     */
+    @PutMapping("/user-rates")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> updateUserRates(@Valid @RequestBody UserServiceRateRequest request) {
+        userServiceRateService.updateUserRates(request);
+        return ApiResponse.success(null);
     }
 }

@@ -111,4 +111,42 @@
         FROM standard_rate
     </select>
 
+    <!-- 영구 요금 중 가장 최근 것 조회 (end_date IS NULL) -->
+    <select id="selectLatestPermanentRate" resultType="kr.wisead.domain.payment.entity.UserServiceRate">
+        SELECT
+            seq,
+            user_id AS userId,
+            service_id AS serviceId,
+            rate,
+            start_date AS startDate,
+            end_date AS endDate,
+            reg_date AS regDate
+        FROM user_service_rate
+        WHERE user_id = #{userId}
+          AND service_id = #{serviceId}
+          AND end_date IS NULL
+        ORDER BY start_date DESC
+        LIMIT 1
+    </select>
+
+    <!-- 기간 특별요금 조회 (오늘 기준) -->
+    <select id="selectPeriodRate" resultType="kr.wisead.domain.payment.entity.UserServiceRate">
+        SELECT
+            seq,
+            user_id AS userId,
+            service_id AS serviceId,
+            rate,
+            start_date AS startDate,
+            end_date AS endDate,
+            reg_date AS regDate
+        FROM user_service_rate
+        WHERE user_id = #{userId}
+          AND service_id = #{serviceId}
+          AND start_date <![CDATA[<=]]> #{today}
+          AND end_date IS NOT NULL
+          AND end_date >= #{today}
+        ORDER BY start_date DESC
+        LIMIT 1
+    </select>
+
 </mapper>

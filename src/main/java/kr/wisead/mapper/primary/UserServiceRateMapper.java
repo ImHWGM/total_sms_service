@@ -70,6 +70,19 @@ public interface UserServiceRateMapper {
     List<ServiceRateEntry> selectAllStandardRates();
 
     /**
+     * 영구 요금 중 가장 최근 것 조회 (end_date IS NULL)
+     */
+    Optional<UserServiceRate> selectLatestPermanentRate(@Param("userId") String userId,
+                                                         @Param("serviceId") String serviceId);
+
+    /**
+     * 기간 특별요금 조회 (오늘 기준으로 유효한 것)
+     */
+    Optional<UserServiceRate> selectPeriodRate(@Param("userId") String userId,
+                                                @Param("serviceId") String serviceId,
+                                                @Param("today") LocalDate today);
+
+    /**
      * 서비스 단가 DTO
      */
     record ServiceRateEntry(String serviceId, java.math.BigDecimal rate) {}

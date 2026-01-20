@@ -36,6 +36,9 @@ public class FileStorageService {
     @Value("${survey.img.dir:./uploads/survey}")
     private String surveyImgFilePath;
 
+    @Value("${survey.img.url:http://localhost:8100/files/survey}")
+    private String surveyImgUrlPrefix;
+
     @Value("${upload.dir.template.img:./uploads/template}")
     private String templateImgPath;
 
@@ -102,6 +105,7 @@ public class FileStorageService {
     /**
      * 설문 문항 이미지 저장
      * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
+     * @return 웹 접근 가능한 URL (예: https://api.example.com/files/survey/181/1.png)
      */
     public String storeSurveyQuestionImg(MultipartFile file, String directoryId, int questionSeq) {
         validateFile(file);
@@ -111,12 +115,14 @@ public class FileStorageService {
         Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = questionSeq + extension;
-        return saveFile(file, targetLocation, fileName);
+        saveFile(file, targetLocation, fileName);
+        return buildSurveyImageUrl(directoryId, fileName);
     }
 
     /**
      * 설문 항목 이미지 저장
      * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
+     * @return 웹 접근 가능한 URL (예: https://api.example.com/files/survey/181/1_1.png)
      */
     public String storeSurveyItemImg(MultipartFile file, String directoryId, int questionSeq, int order) {
         validateFile(file);
@@ -126,12 +132,14 @@ public class FileStorageService {
         Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = questionSeq + "_" + order + extension;
-        return saveFile(file, targetLocation, fileName);
+        saveFile(file, targetLocation, fileName);
+        return buildSurveyImageUrl(directoryId, fileName);
     }
 
     /**
      * 설문 설명 이미지 저장
      * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
+     * @return 웹 접근 가능한 URL (예: https://api.example.com/files/survey/181/Desc.png)
      */
     public String storeSurveyDescImg(MultipartFile file, String directoryId) {
         validateFile(file);
@@ -141,12 +149,14 @@ public class FileStorageService {
         Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = "Desc" + extension;
-        return saveFile(file, targetLocation, fileName);
+        saveFile(file, targetLocation, fileName);
+        return buildSurveyImageUrl(directoryId, fileName);
     }
 
     /**
      * 설문 종료 이미지 저장
      * @param directoryId 이벤트 시퀀스 또는 temp ID (예: "123" 또는 "temp_abc123")
+     * @return 웹 접근 가능한 URL (예: https://api.example.com/files/survey/181/End.png)
      */
     public String storeSurveyEndImg(MultipartFile file, String directoryId) {
         validateFile(file);
@@ -156,7 +166,18 @@ public class FileStorageService {
         Path targetLocation = Paths.get(surveyImgFilePath, directoryId).toAbsolutePath().normalize();
 
         String fileName = "End" + extension;
-        return saveFile(file, targetLocation, fileName);
+        saveFile(file, targetLocation, fileName);
+        return buildSurveyImageUrl(directoryId, fileName);
+    }
+
+    /**
+     * 설문 이미지 웹 URL 생성
+     * @param directoryId 이벤트 시퀀스 또는 temp ID
+     * @param fileName 파일명
+     * @return 웹 접근 가능한 URL
+     */
+    private String buildSurveyImageUrl(String directoryId, String fileName) {
+        return surveyImgUrlPrefix + "/" + directoryId + "/" + fileName;
     }
 
     /**

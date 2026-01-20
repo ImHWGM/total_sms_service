@@ -211,7 +211,7 @@ public class EventService {
 
     /**
      * 임시 경로에서 tempId 추출
-     * 예: "C:upload\wisead_syscuss\survey\temp_f1ce16db\Desc.png" → "f1ce16db"
+     * 예: "https://api.example.com/files/survey/temp_f1ce16db/Desc.png" → "f1ce16db"
      */
     private String extractTempIdFromPath(String path) {
         if (path == null || path.isEmpty()) {
@@ -236,7 +236,7 @@ public class EventService {
 
     /**
      * 임시 경로를 eventSeq 기반 경로로 변환
-     * 예: "C:upload\...\temp_f1ce16db\Desc.png" → "C:upload\...\181\Desc.png"
+     * 예: "https://api.example.com/files/survey/temp_f1ce16db/Desc.png" → "https://api.example.com/files/survey/181/Desc.png"
      */
     private String convertTempPathToEventPath(String tempPath, String eventSeq) {
         if (tempPath == null || tempPath.isEmpty()) {

@@ -109,6 +109,7 @@ public class EventService {
     /**
      * 이벤트 생성 (이미지 파일 포함)
      * - 설문 데이터와 이미지를 한번에 처리 (레거시 방식)
+     * - JSON 방식: 임시 경로로 업로드된 이미지를 eventSeq 폴더로 이동 후 경로 업데이트
      */
     @Transactional
     public EventResponse createEvent(String userId, EventRequest request,
@@ -131,13 +132,20 @@ public class EventService {
             qrCodeImgPath = generateQrCodeImage(authCodeUrl);
         }
 
+        // 임시 경로에서 tempId 추출 (JSON 방식일 경우)
+        String tempId = extractTempIdFromPath(request.getEventDescImg());
+        if (tempId == null) {
+            tempId = extractTempIdFromPath(request.getEventEndImg());
+        }
+
+        // 이벤트 저장 (이미지 경로는 나중에 업데이트)
         SurveyMaster event = SurveyMaster.builder()
                 .userSeq(userSeq)
                 .eventCode(eventCode)
                 .eventName(request.getEventName())
                 .eventEmphasisYn(request.getEventEmphasisYn())
                 .eventDesc(request.getEventDesc())
-                .eventDescImg(request.getEventDescImg())
+                .eventDescImg(null)  // 임시 경로 대신 null로 저장, 이동 후 업데이트
                 .eventType(request.getEventType())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
@@ -150,7 +158,7 @@ public class EventService {
                 .authCodeUrl(authCodeUrl)
                 .qrCodeImgPath(qrCodeImgPath)
                 .endMessage(request.getEndMessage())
-                .eventEndImg(request.getEventEndImg())
+                .eventEndImg(null)  // 임시 경로 대신 null로 저장, 이동 후 업데이트
                 .regId(userId)
                 .build();
 
@@ -160,14 +168,33 @@ public class EventService {
         Integer eventSeq = event.getEventSeq();
         String eventSeqStr = String.valueOf(eventSeq);
 
-        // 설명 이미지 저장 (MultipartFile)
+        // JSON 방식: 임시 폴더의 파일들을 eventSeq 폴더로 이동
+        if (tempId != null) {
+            boolean moved = fileStorageService.moveSurveyTempToEvent(tempId, eventSeq);
+            if (moved) {
+                log.info("임시 이미지 폴더 이동 완료 - tempId: {}, eventSeq: {}", tempId, eventSeq);
+
+                // 이동된 경로로 DB 업데이트
+                if (request.getEventDescImg() != null && !request.getEventDescImg().isEmpty()) {
+                    String newDescImgPath = convertTempPathToEventPath(request.getEventDescImg(), eventSeqStr);
+                    surveyMasterMapper.updateDescImg(eventSeq, newDescImgPath);
+                    log.info("설명 이미지 경로 업데이트 - eventSeq: {}, path: {}", eventSeq, newDescImgPath);
+                }
+                if (request.getEventEndImg() != null && !request.getEventEndImg().isEmpty()) {
+                    String newEndImgPath = convertTempPathToEventPath(request.getEventEndImg(), eventSeqStr);
+                    surveyMasterMapper.updateEndImg(eventSeq, newEndImgPath);
+                    log.info("종료 이미지 경로 업데이트 - eventSeq: {}, path: {}", eventSeq, newEndImgPath);
+                }
+            }
+        }
+
+        // 레거시 방식: MultipartFile로 직접 업로드
         if (descImageFile != null && !descImageFile.isEmpty()) {
             String descImgPath = fileStorageService.storeSurveyDescImg(descImageFile, eventSeqStr);
             surveyMasterMapper.updateDescImg(eventSeq, descImgPath);
             log.info("설명 이미지 저장 완료 - eventSeq: {}, path: {}", eventSeq, descImgPath);
         }
 
-        // 종료 이미지 저장 (MultipartFile)
         if (endImageFile != null && !endImageFile.isEmpty()) {
             String endImgPath = fileStorageService.storeSurveyEndImg(endImageFile, eventSeqStr);
             surveyMasterMapper.updateEndImg(eventSeq, endImgPath);
@@ -176,10 +203,47 @@ public class EventService {
 
         // 문항 등록 및 이미지 저장
         if (request.getQuestions() != null && !request.getQuestions().isEmpty()) {
-            saveQuestionsWithImages(eventSeq, request.getQuestions(), userId, questionImages, itemImages);
+            saveQuestionsWithImages(eventSeq, request.getQuestions(), userId, questionImages, itemImages, eventSeqStr);
         }
 
         return getEventDetail(eventSeq);
+    }
+
+    /**
+     * 임시 경로에서 tempId 추출
+     * 예: "C:\upload\wisead_syscuss\survey\temp_f1ce16db\Desc.png" → "f1ce16db"
+     */
+    private String extractTempIdFromPath(String path) {
+        if (path == null || path.isEmpty()) {
+            return null;
+        }
+        // temp_ 패턴 찾기
+        int tempIndex = path.indexOf("temp_");
+        if (tempIndex == -1) {
+            return null;
+        }
+        // temp_ 이후의 폴더명 추출
+        String afterTemp = path.substring(tempIndex + 5);
+        int separatorIndex = afterTemp.indexOf('/');
+        if (separatorIndex == -1) {
+            separatorIndex = afterTemp.indexOf('\\');
+        }
+        if (separatorIndex == -1) {
+            return afterTemp;
+        }
+        return afterTemp.substring(0, separatorIndex);
+    }
+
+    /**
+     * 임시 경로를 eventSeq 기반 경로로 변환
+     * 예: "C:\upload\...\temp_f1ce16db\Desc.png" → "C:\upload\...\181\Desc.png"
+     */
+    private String convertTempPathToEventPath(String tempPath, String eventSeq) {
+        if (tempPath == null || tempPath.isEmpty()) {
+            return null;
+        }
+        // temp_xxx 부분을 eventSeq로 교체
+        return tempPath.replaceAll("temp_[a-zA-Z0-9]+", eventSeq);
     }
 
     /**
@@ -424,7 +488,71 @@ public class EventService {
     }
 
     /**
-     * 문항 저장 (이미지 포함)
+     * 문항 저장 (JSON 방식 - 이미지 경로 변환)
+     * - 임시 경로를 eventSeq 기반 경로로 변환하여 저장
+     */
+    private void saveQuestionsWithImages(Integer eventSeq, List<QuestionRequest> questions, String regId,
+                                          List<MultipartFile> questionImages, List<MultipartFile> itemImages,
+                                          String eventSeqStr) {
+        int order = 1;
+        for (QuestionRequest qReq : questions) {
+            int questionOrder = qReq.getOrder() != null ? qReq.getOrder() : order;
+
+            SurveyQuestion question = SurveyQuestion.create(
+                    eventSeq,
+                    qReq.getQuestionType(),
+                    qReq.getQuestionTypeDetail(),
+                    qReq.getQuestion(),
+                    questionOrder,
+                    regId
+            );
+
+            // JSON 방식: 문항 이미지 경로 변환 후 저장
+            if (qReq.getQuestionImg() != null && !qReq.getQuestionImg().isEmpty()) {
+                String newQuestionImgPath = convertTempPathToEventPath(qReq.getQuestionImg(), eventSeqStr);
+                question.setQuestionImg(newQuestionImgPath);
+                log.info("문항 이미지 경로 변환 - questionOrder: {}, path: {}", questionOrder, newQuestionImgPath);
+            }
+
+            surveyQuestionMapper.insert(question);
+
+            // 객관식 항목 저장
+            if (qReq.getItems() != null && !qReq.getItems().isEmpty()) {
+                int itemOrder = 1;
+                for (ItemRequest iReq : qReq.getItems()) {
+                    int currentItemOrder = iReq.getOrder() != null ? iReq.getOrder() : itemOrder;
+
+                    SurveyItem item = SurveyItem.create(
+                            eventSeq,
+                            question.getQuestionSeq(),
+                            iReq.getItem(),
+                            iReq.getItemValue(),
+                            currentItemOrder,
+                            regId
+                    );
+
+                    // JSON 방식: 항목 이미지 경로 변환 후 저장
+                    if (iReq.getItemImg() != null && !iReq.getItemImg().isEmpty()) {
+                        String newItemImgPath = convertTempPathToEventPath(iReq.getItemImg(), eventSeqStr);
+                        item.setItemImg(newItemImgPath);
+                        log.info("항목 이미지 경로 변환 - questionOrder: {}, itemOrder: {}, path: {}",
+                                questionOrder, currentItemOrder, newItemImgPath);
+                    }
+
+                    if (iReq.getJumpQuestion() != null) {
+                        item.setJumpQuestion(iReq.getJumpQuestion());
+                    }
+                    surveyItemMapper.insert(item);
+
+                    itemOrder++;
+                }
+            }
+            order++;
+        }
+    }
+
+    /**
+     * 문항 저장 (레거시 방식 - MultipartFile 이미지 포함)
      * - 파일명 규칙: questionImages는 "{questionOrder}.{ext}", itemImages는 "{questionOrder}_{itemOrder}.{ext}"
      */
     private void saveQuestionsWithImages(Integer eventSeq, List<QuestionRequest> questions, String regId,

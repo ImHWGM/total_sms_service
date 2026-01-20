@@ -7,7 +7,6 @@ import kr.wisead.domain.payment.entity.Transaction;
 import kr.wisead.domain.payment.entity.Wallet;
 import kr.wisead.domain.payment.entity.WalletLot;
 import kr.wisead.mapper.primary.TransactionMapper;
-import kr.wisead.mapper.primary.UserServiceRateMapper;
 import kr.wisead.mapper.primary.WalletLotMapper;
 import kr.wisead.mapper.primary.WalletMapper;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +29,7 @@ public class WalletService {
     private final WalletMapper walletMapper;
     private final WalletLotMapper walletLotMapper;
     private final TransactionMapper transactionMapper;
-    private final UserServiceRateMapper userServiceRateMapper;
+    private final UserServiceRateService userServiceRateService;
 
     /**
      * 지갑 요약 조회 (CASH + POINT + BONUS)
@@ -71,28 +70,18 @@ public class WalletService {
     }
 
 
-    private static final BigDecimal VAT_RATE = new BigDecimal("1.1");
-
     /**
-     * 적용 단가 조회 (사용자 단가 우선, 없으면 기준 단가 × VAT)
+     * 적용 단가 조회
+     * 우선순위: 기간 특별요금 → 사용자 기본요금 → 표준요금
      */
     @Transactional(readOnly = true)
     public BigDecimal getAppliedRate(String userId, String serviceId) {
-        // 1. 사용자 단가 조회 (VAT 포함)
-        BigDecimal userRate = userServiceRateMapper.selectUserRate(userId, serviceId, LocalDate.now());
-        if (userRate != null) {
-            return userRate;
-        }
-
-        // 2. 기준 단가 조회 (VAT 미포함)
-        BigDecimal standardRate = userServiceRateMapper.selectStandardRate(serviceId);
-        if (standardRate == null) {
+        BigDecimal rate = userServiceRateService.getEffectiveRate(userId, serviceId);
+        if (rate.compareTo(BigDecimal.ZERO) == 0) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
                     "서비스 단가를 찾을 수 없습니다: " + serviceId);
         }
-
-        // 3. VAT 적용 (×1.1)
-        return standardRate.multiply(VAT_RATE).setScale(2, java.math.RoundingMode.HALF_UP);
+        return rate;
     }
 
     /**

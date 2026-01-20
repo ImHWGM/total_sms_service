@@ -33,7 +33,8 @@ public class BalanceService {
 
     private final WalletService walletService;
     private final TransactionMapper transactionMapper;
-    private final UserServiceRateMapper userServiceRateMapper;
+    private final UserServiceRateService userServiceRateService;
+    private final UserServiceRateMapper userServiceRateMapper; // 레거시 updateSmsPrice용
     private final BalanceMapper balanceMapper; // 레거시 호환용
 
     /**
@@ -317,33 +318,17 @@ public class BalanceService {
 
     // ========== Private Helper Methods ==========
 
-    private static final BigDecimal VAT_RATE = new BigDecimal("1.1");
-
     /**
-     * 모든 서비스 단가를 한 번에 조회 (N+1 최적화)
-     * - 최대 8회 DB 호출 → 최대 2회 DB 호출
+     * 모든 서비스 단가를 한 번에 조회
+     * 우선순위: 기간 특별요금 → 사용자 기본요금 → 표준요금
      */
     private Map<String, BigDecimal> getAllRates(String userId) {
-        Map<String, BigDecimal> result = new HashMap<>();
-        LocalDate today = LocalDate.now();
-
-        // 1. 사용자 단가 조회 (VAT 포함) - 1회 쿼리
-        List<UserServiceRate> userRates = userServiceRateMapper.selectAllActiveRates(userId, today);
-        for (UserServiceRate rate : userRates) {
-            result.put(rate.getServiceId(), rate.getRate());
-        }
-
-        // 2. 기준 단가 조회 (VAT 미포함) - 1회 쿼리
-        List<UserServiceRateMapper.ServiceRateEntry> standardRates = userServiceRateMapper.selectAllStandardRates();
-        for (UserServiceRateMapper.ServiceRateEntry entry : standardRates) {
-            // 사용자 단가가 없는 경우에만 기준 단가 × VAT 적용
-            if (!result.containsKey(entry.serviceId())) {
-                BigDecimal rateWithVat = entry.rate().multiply(VAT_RATE).setScale(2, java.math.RoundingMode.HALF_UP);
-                result.put(entry.serviceId(), rateWithVat);
-            }
-        }
-
-        return result;
+        UserServiceRateResponse response = userServiceRateService.getUserRates(userId);
+        return response.rates().stream()
+                .collect(Collectors.toMap(
+                        UserServiceRateResponse.ServiceRateInfo::serviceId,
+                        UserServiceRateResponse.ServiceRateInfo::userRate
+                ));
     }
 
     private String getServiceIdByMsgType(String msgType) {
@@ -373,18 +358,11 @@ public class BalanceService {
 
     private BigDecimal getRate(String userId, String serviceId, BigDecimal defaultRate) {
         try {
-            // 1. 사용자 단가 조회 (VAT 포함)
-            BigDecimal userRate = userServiceRateMapper.selectUserRate(userId, serviceId, LocalDate.now());
-            if (userRate != null) {
-                return userRate;
+            // 우선순위: 기간 특별요금 → 사용자 기본요금 → 표준요금
+            BigDecimal rate = userServiceRateService.getEffectiveRate(userId, serviceId);
+            if (rate.compareTo(BigDecimal.ZERO) > 0) {
+                return rate;
             }
-
-            // 2. 기준 단가 조회 (VAT 미포함)
-            BigDecimal standardRate = userServiceRateMapper.selectStandardRate(serviceId);
-            if (standardRate != null) {
-                return standardRate.multiply(VAT_RATE).setScale(2, java.math.RoundingMode.HALF_UP);
-            }
-
             return defaultRate;
         } catch (Exception e) {
             return defaultRate;

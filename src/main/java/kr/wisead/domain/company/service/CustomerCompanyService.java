@@ -3,6 +3,7 @@ package kr.wisead.domain.company.service;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.company.dto.CustomerCompanyRequest;
 import kr.wisead.domain.company.dto.CustomerCompanyResponse;
 import kr.wisead.domain.company.dto.CustomerCompanySearchRequest;
@@ -38,9 +39,32 @@ public class CustomerCompanyService {
         }
 
         List<CustomerCompanyResponse> list = customerCompanyMapper.selectCompanyList(request);
+
+        // 암호화된 필드 복호화
+        list.forEach(item -> {
+            item.setPerson(decryptField(item.getPerson()));
+            item.setCorpName(decryptField(item.getCorpName()));
+            item.setPhone(decryptField(item.getPhone()));
+        });
+
         int total = customerCompanyMapper.selectCompanyListCount(request);
 
         return PageResponse.of(list, request.getPageNum(), request.getAmount(), total);
+    }
+
+    /**
+     * 암호화된 필드 복호화 (AES256 + Base64)
+     */
+    private String decryptField(String encryptedValue) {
+        if (encryptedValue == null || encryptedValue.isEmpty()) {
+            return encryptedValue;
+        }
+        try {
+            return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedValue));
+        } catch (Exception e) {
+            log.debug("필드 복호화 실패, 원본 반환: {}", e.getMessage());
+            return encryptedValue;
+        }
     }
 
     /**

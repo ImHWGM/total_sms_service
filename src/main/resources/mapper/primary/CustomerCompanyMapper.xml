@@ -10,7 +10,7 @@
             corp_name,
             upt_date,
             upt_id,
-            checked_yn
+            chked_yn
         ) VALUES (
             #{userId},
             #{selectedUserId},
@@ -29,7 +29,7 @@
             corp_name,
             upt_date,
             upt_id,
-            checked_yn
+            chked_yn
         ) VALUES
         <foreach item="item" collection="list" separator=",">
             (
@@ -100,10 +100,10 @@
             corp_name AS custCompName,
             upt_date AS uptDate,
             upt_id AS uptId,
-            checked_yn AS chkedYn
+            chked_yn AS chkedYn
         FROM customer_company
         WHERE user_id = #{userId}
-          AND checked_yn = 'Y'
+          AND chked_yn = 'Y'
     </select>
 
     <!-- 고객사 선택 여부 확인 -->
@@ -120,7 +120,7 @@
         UPDATE customer_company
         SET upt_date = NOW(),
             upt_id = #{uptId},
-            checked_yn = #{chkedYn}
+            chked_yn = #{chkedYn}
         WHERE user_id = #{userId}
           AND selected_user_id = #{selectedUserId}
           AND corp_name = #{custCompName}
@@ -168,7 +168,7 @@
             corp_name AS custCompName,
             upt_date AS uptDate,
             upt_id AS uptId,
-            checked_yn AS chkedYn
+            chked_yn AS chkedYn
         FROM customer_company
         WHERE seq = #{seq}
     </select>
@@ -178,7 +178,7 @@
         SELECT DISTINCT selected_user_id
         FROM customer_company
         WHERE user_id = #{userId}
-          AND checked_yn = 'Y'
+          AND chked_yn = 'Y'
     </select>
 
 </mapper>

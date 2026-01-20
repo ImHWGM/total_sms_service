@@ -17,46 +17,48 @@ import java.time.LocalDateTime;
 @Builder
 public class SendHistoryResponse {
 
-    private Long msgKey;
-    private String userId;
-    private String msgType;
-    private String dstAddr;         // 수신번호 (마스킹 처리됨)
-    private String callBack;        // 발신번호
-    private String subject;
-    private String text;
-    private Integer stat;
+    private Long seq;               // 메시지 시퀀스 (mseq)
+    private String msgType;         // 메시지 타입
+    private String receiver;        // 수신번호 (마스킹 처리됨)
+    private String callback;        // 발신번호
+    private String subject;         // 제목
+    private String text;            // 내용
+    private Integer stat;           // 상태 코드
     private String statName;        // 상태 명칭
-    private String result;
-    private Integer fileCnt;
-    private LocalDateTime requestTime;
-    private LocalDateTime sendTime;
-    private LocalDateTime reportTime;
-    private String telecom;
-    private String sendType;        // 발송형식 (extCol2)
+    private String result;          // 결과
+    private Integer fileCnt;        // 파일 개수
+    private String fileLoc;         // 파일 경로 (MMS 이미지)
+    private LocalDateTime requestTime;  // 요청 시간
+    private LocalDateTime sendTime;     // 발송 시간
+    private LocalDateTime reportTime;   // 수신 시간
+    private String telecom;         // 통신사
+    private String sendType;        // 발송 형식
+    private String senderId;        // 발신 아이디
 
     public static SendHistoryResponse from(SendHistory entity) {
         if (entity == null) return null;
 
         String statName = translateStatus(entity.getStat());
-        String maskedDstAddr = maskPhoneNumber(entity.getDstAddr());
+        String maskedReceiver = maskPhoneNumber(entity.getDstAddr());
 
         return SendHistoryResponse.builder()
-                .msgKey(entity.getMsgKey())
-                .userId(entity.getExtCol3())
+                .seq(entity.getMsgKey())
                 .msgType(entity.getMsgType())
-                .dstAddr(maskedDstAddr)
-                .callBack(entity.getCallBack())
+                .receiver(maskedReceiver)
+                .callback(entity.getCallBack())
                 .subject(entity.getSubject())
                 .text(entity.getText())
                 .stat(entity.getStat())
                 .statName(statName)
                 .result(entity.getResult())
                 .fileCnt(entity.getFileCnt())
+                .fileLoc(entity.getFileLoc1())
                 .requestTime(entity.getRequestTime())
                 .sendTime(entity.getSendTime())
                 .reportTime(entity.getReportTime())
                 .telecom(entity.getTelecom())
                 .sendType(entity.getExtCol2())
+                .senderId(entity.getExtCol3())
                 .build();
     }
 

@@ -142,8 +142,8 @@ public class SendHistoryController {
         for (SendHistoryResponse history : historyList) {
             Row row = sheet.createRow(rowNum++);
             row.createCell(0).setCellValue(history.getMsgType() != null ? history.getMsgType() : "");
-            row.createCell(1).setCellValue(history.getDstAddr() != null ? history.getDstAddr() : "");
-            row.createCell(2).setCellValue(history.getCallBack() != null ? history.getCallBack() : "");
+            row.createCell(1).setCellValue(history.getReceiver() != null ? history.getReceiver() : "");
+            row.createCell(2).setCellValue(history.getCallback() != null ? history.getCallback() : "");
             row.createCell(3).setCellValue(history.getStatName() != null ? history.getStatName() : "");
             row.createCell(4).setCellValue(history.getResult() != null ? history.getResult() : "");
             row.createCell(5).setCellValue(history.getSubject() != null ? history.getSubject() : "");
@@ -154,7 +154,7 @@ public class SendHistoryController {
             row.createCell(10).setCellValue(history.getReportTime() != null ? history.getReportTime().format(dtf) : "");
             row.createCell(11).setCellValue(history.getTelecom() != null ? history.getTelecom() : "");
             row.createCell(12).setCellValue(history.getSendType() != null ? history.getSendType() : "");
-            row.createCell(13).setCellValue(history.getUserId() != null ? history.getUserId() : "");
+            row.createCell(13).setCellValue(history.getSenderId() != null ? history.getSenderId() : "");
         }
 
         // 파일 다운로드

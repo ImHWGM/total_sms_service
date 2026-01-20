@@ -12,6 +12,7 @@
         <result property="stat" column="STAT"/>
         <result property="result" column="RESULT"/>
         <result property="fileCnt" column="FILE_CNT"/>
+        <result property="fileLoc1" column="FILE_LOC1"/>
         <result property="requestTime" column="REQUEST_TIME"/>
         <result property="sendTime" column="SEND_TIME"/>
         <result property="reportTime" column="REPORT_TIME"/>
@@ -30,6 +31,7 @@
         STAT,
         RESULT,
         FILE_CNT,
+        FILE_LOC1,
         REQUEST_TIME,
         SEND_TIME,
         REPORT_TIME,

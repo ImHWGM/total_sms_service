@@ -26,6 +26,7 @@ public class SendHistory {
     private Integer stat;           // 상태 (0: 대기, 1: 발송중, 2: 발송완료, 3: 실패, 4: 취소)
     private String result;          // 발신결과
     private Integer fileCnt;        // 파일 개수
+    private String fileLoc1;        // 파일 경로1 (MMS 이미지)
     private LocalDateTime requestTime;  // 요청시간
     private LocalDateTime sendTime;     // 발송시간
     private LocalDateTime reportTime;   // 수신시간

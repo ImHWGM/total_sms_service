@@ -40,10 +40,9 @@ public class CustomerCompanyService {
 
         List<CustomerCompanyResponse> list = customerCompanyMapper.selectCompanyList(request);
 
-        // 암호화된 필드 복호화
+        // 암호화된 필드 복호화 (corpName은 평문이므로 제외)
         list.forEach(item -> {
             item.setPerson(decryptField(item.getPerson()));
-            item.setCorpName(decryptField(item.getCorpName()));
             item.setPhone(decryptField(item.getPhone()));
         });
 

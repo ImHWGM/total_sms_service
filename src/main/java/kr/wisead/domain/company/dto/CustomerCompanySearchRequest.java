@@ -18,6 +18,7 @@ public class CustomerCompanySearchRequest {
     private String keyword;         // 검색 키워드
     private int pageNum;            // 페이지 번호 (1부터 시작)
     private int amount;             // 페이지당 개수
+    private Long excludeSeq;        // 제외할 사용자 SEQ (본인 제외용)
 
     public int getSkip() {
         return (pageNum - 1) * amount;

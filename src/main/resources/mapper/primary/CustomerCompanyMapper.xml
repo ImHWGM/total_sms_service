@@ -59,6 +59,9 @@
         FROM USER
         WHERE USE_YN = 'Y'
           AND STATUS = '승인'
+        <if test="excludeSeq != null">
+          AND SEQ != #{excludeSeq}
+        </if>
         <choose>
             <when test="type == 'seqOpt'">
                 AND SEQ LIKE CONCAT('%', #{keyword}, '%')
@@ -80,6 +83,9 @@
         FROM USER
         WHERE USE_YN = 'Y'
           AND STATUS = '승인'
+        <if test="excludeSeq != null">
+          AND SEQ != #{excludeSeq}
+        </if>
         <choose>
             <when test="type == 'seqOpt'">
                 AND SEQ LIKE CONCAT('%', #{keyword}, '%')

@@ -174,10 +174,10 @@ public class FileStorageService {
      * 설문 이미지 웹 URL 생성
      * @param directoryId 이벤트 시퀀스 또는 temp ID
      * @param fileName 파일명
-     * @return 웹 접근 가능한 URL
+     * @return 웹 접근 가능한 상대 경로 (예: /survey/181/Desc.png)
      */
     private String buildSurveyImageUrl(String directoryId, String fileName) {
-        return surveyImgUrlPrefix + "/" + directoryId + "/" + fileName;
+        return "/survey/" + directoryId + "/" + fileName;
     }
 
     /**

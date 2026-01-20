@@ -203,6 +203,55 @@ public class MsgQueue {
                 .build();
     }
 
+    /**
+     * 행사참여자 문자 발송용 빌더 (LMS 전용)
+     * @param dstaddr 수신번호
+     * @param callback 발신번호
+     * @param subject 제목
+     * @param text 내용
+     * @param eventSeq 이벤트 시퀀스
+     * @param participantSeq 행사 참가자 시퀀스
+     * @param surveyUserSeq 설문 사용자 시퀀스
+     * @param txGroupId 결제 거래 그룹 ID (환불용)
+     * @param regId 등록자 아이디
+     */
+    public static MsgQueue createForEvent(String dstaddr, String callback,
+                                           String subject, String text,
+                                           Integer eventSeq, Long participantSeq,
+                                           Integer surveyUserSeq,
+                                           String txGroupId, String regId) {
+        LocalDateTime now = LocalDateTime.now();
+        // extCol1에 participantSeq와 surveyUserSeq를 조합해서 저장 (예: "P123_U456")
+        String extCol1Value = null;
+        if (participantSeq != null || surveyUserSeq != null) {
+            StringBuilder sb = new StringBuilder();
+            if (participantSeq != null) {
+                sb.append("P").append(participantSeq);
+            }
+            if (surveyUserSeq != null) {
+                if (sb.length() > 0) sb.append("_");
+                sb.append("U").append(surveyUserSeq);
+            }
+            extCol1Value = sb.toString();
+        }
+
+        return MsgQueue.builder()
+                .msgType("L")  // LMS 전용
+                .dstaddr(dstaddr)
+                .callback(callback)
+                .stat("0")
+                .subject(subject)
+                .text(text)
+                .insertTime(now)
+                .requestTime(now)
+                .senderCode("301200115")
+                .extCol0(eventSeq)
+                .extCol1(extCol1Value)
+                .extCol2(txGroupId)
+                .extCol3(regId)
+                .build();
+    }
+
     // ========== 일반 문자 발송용 (EXT_COL0=NULL, EXT_COL1=userKey) ==========
 
     /**

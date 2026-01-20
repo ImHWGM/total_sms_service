@@ -668,4 +668,240 @@ public class MessageSendService {
 
         return tables;
     }
+
+    /**
+     * 설문 문자 발송 (다건) - 단축 URL 적용
+     *
+     * @param request 발송 요청
+     * @param regId 등록자 ID
+     * @return 발송 결과
+     */
+    @Transactional("smsTransactionManager")
+    public SurveyMessageResponse sendSurveyMessages(SurveyMessageRequest request, String regId) {
+        log.info("설문 문자 발송 시작 - eventSeq: {}, regId: {}, count: {}",
+                request.getEventSeq(), regId,
+                request.getReceivers() != null ? request.getReceivers().size() : 0);
+
+        if (request.getReceivers() == null || request.getReceivers().isEmpty()) {
+            return SurveyMessageResponse.fail("발송 대상이 없습니다.");
+        }
+
+        List<SurveyMessageRequest.Receiver> receivers = request.getReceivers();
+        int duplicateCount = 0;
+
+        // 중복 번호 제거
+        if (request.isDelDuplicateNum()) {
+            java.util.Map<String, SurveyMessageRequest.Receiver> uniqueMap = new java.util.LinkedHashMap<>();
+            for (SurveyMessageRequest.Receiver r : receivers) {
+                String phone = r.getNormalizedPhone();
+                if (uniqueMap.putIfAbsent(phone, r) != null) {
+                    duplicateCount++;
+                }
+            }
+            receivers = new ArrayList<>(uniqueMap.values());
+            log.info("중복번호 제거 - 원본: {}, 제거: {}, 결과: {}",
+                    request.getReceivers().size(), duplicateCount, receivers.size());
+        }
+
+        String txGroupId = java.util.UUID.randomUUID().toString().replace("-", "");
+        int successCount = 0;
+        int failCount = 0;
+        List<String> failedPhones = new ArrayList<>();
+        List<Integer> mseqList = new ArrayList<>();
+
+        for (SurveyMessageRequest.Receiver receiver : receivers) {
+            try {
+                String phone = receiver.getNormalizedPhone();
+                String text = request.getText();
+
+                // 대치문자 처리
+                if (receiver.getRepChar01() != null && !receiver.getRepChar01().isEmpty()) {
+                    text = text.replace("#대치문자1#", receiver.getRepChar01());
+                }
+                if (receiver.getRepChar02() != null && !receiver.getRepChar02().isEmpty()) {
+                    text = text.replace("#대치문자2#", receiver.getRepChar02());
+                }
+                if (receiver.getRepChar03() != null && !receiver.getRepChar03().isEmpty()) {
+                    text = text.replace("#대치문자3#", receiver.getRepChar03());
+                }
+
+                // #유저키#, #userKey# 치환
+                if (receiver.getUserKey() != null && !receiver.getUserKey().isEmpty()) {
+                    text = text.replace("#유저키#", receiver.getUserKey())
+                               .replace("#userKey#", receiver.getUserKey());
+                }
+
+                // URL 패턴을 찾아서 단축 URL로 변환
+                text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);
+
+                // MSG_QUEUE에 등록 (설문 문자는 LMS 전용)
+                MsgQueue msgQueue = MsgQueue.createForSurvey(
+                        "L",  // LMS 고정
+                        phone,
+                        request.getNormalizedCallback(),
+                        request.getSubject(),
+                        text,
+                        request.getEventSeq(),
+                        receiver.getUserSeq(),
+                        txGroupId,
+                        regId
+                );
+
+                // 예약 발송 시간 설정
+                if (!request.isImmediate() && request.getRequestTime() != null) {
+                    msgQueue = msgQueue.withRequestTime(request.getRequestTime());
+                }
+
+                // LMS로 발송
+                msgQueueMapper.insertLms(msgQueue);
+
+                mseqList.add(msgQueue.getMseq());
+                successCount++;
+
+            } catch (Exception e) {
+                failCount++;
+                failedPhones.add(receiver.getPhone());
+                log.warn("설문 문자 발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+            }
+        }
+
+        log.info("설문 문자 발송 완료 - 성공: {}, 실패: {}, 중복: {}, txGroupId: {}",
+                successCount, failCount, duplicateCount, txGroupId);
+
+        if (failCount == 0 && duplicateCount == 0) {
+            return SurveyMessageResponse.success(successCount, mseqList, txGroupId, LocalDateTime.now());
+        } else {
+            return SurveyMessageResponse.partial(successCount, failCount, duplicateCount,
+                    failedPhones, mseqList, txGroupId);
+        }
+    }
+
+    /**
+     * 행사참여자 문자 발송 (다건) - 단축 URL 적용
+     *
+     * @param request 발송 요청
+     * @param regId 등록자 ID
+     * @return 발송 결과
+     */
+    @Transactional("smsTransactionManager")
+    public EventMessageResponse sendEventMessages(EventMessageRequest request, String regId) {
+        log.info("행사참여자 문자 발송 시작 - eventSeq: {}, regId: {}, sendType: {}, count: {}",
+                request.getEventSeq(), regId, request.getSendType(),
+                request.getReceivers() != null ? request.getReceivers().size() : 0);
+
+        if (request.getReceivers() == null || request.getReceivers().isEmpty()) {
+            return EventMessageResponse.fail("발송 대상이 없습니다.");
+        }
+
+        List<EventMessageRequest.Receiver> receivers = request.getReceivers();
+        int duplicateCount = 0;
+
+        // 중복 번호 제거
+        if (request.isDelDuplicateNum()) {
+            java.util.Map<String, EventMessageRequest.Receiver> uniqueMap = new java.util.LinkedHashMap<>();
+            for (EventMessageRequest.Receiver r : receivers) {
+                String phone = r.getNormalizedPhone();
+                if (uniqueMap.putIfAbsent(phone, r) != null) {
+                    duplicateCount++;
+                }
+            }
+            receivers = new ArrayList<>(uniqueMap.values());
+            log.info("중복번호 제거 - 원본: {}, 제거: {}, 결과: {}",
+                    request.getReceivers().size(), duplicateCount, receivers.size());
+        }
+
+        String txGroupId = java.util.UUID.randomUUID().toString().replace("-", "");
+        int successCount = 0;
+        int failCount = 0;
+        List<String> failedPhones = new ArrayList<>();
+        List<Integer> mseqList = new ArrayList<>();
+
+        for (EventMessageRequest.Receiver receiver : receivers) {
+            try {
+                String phone = receiver.getNormalizedPhone();
+                String text = request.getText();
+
+                // 이벤트 정보 치환
+                if (request.getEventName() != null) {
+                    text = text.replace("#이벤트명#", request.getEventName());
+                }
+                if (request.getEventPeriod() != null) {
+                    text = text.replace("#이벤트기간#", request.getEventPeriod());
+                }
+                if (request.getEventLocation() != null) {
+                    text = text.replace("#이벤트장소#", request.getEventLocation());
+                }
+
+                // 참가자 정보 치환
+                if (receiver.getName() != null) {
+                    text = text.replace("#이름#", receiver.getName());
+                }
+
+                // 대치문자 처리
+                if (receiver.getRepChar01() != null && !receiver.getRepChar01().isEmpty()) {
+                    text = text.replace("#대치문자1#", receiver.getRepChar01());
+                }
+                if (receiver.getRepChar02() != null && !receiver.getRepChar02().isEmpty()) {
+                    text = text.replace("#대치문자2#", receiver.getRepChar02());
+                }
+                if (receiver.getRepChar03() != null && !receiver.getRepChar03().isEmpty()) {
+                    text = text.replace("#대치문자3#", receiver.getRepChar03());
+                }
+
+                // QR링크 치환 (단축 URL 적용)
+                if (receiver.getQrLink() != null && !receiver.getQrLink().isEmpty()) {
+                    String shortenedQrLink = ShortUrlUtils.shortenUrl(receiver.getQrLink());
+                    text = text.replace("#QR링크#", shortenedQrLink);
+                }
+
+                // 접속링크 치환 (단축 URL 적용)
+                if (receiver.getAccessLink() != null && !receiver.getAccessLink().isEmpty()) {
+                    String shortenedAccessLink = ShortUrlUtils.shortenUrl(receiver.getAccessLink());
+                    text = text.replace("#접속링크#", shortenedAccessLink);
+                }
+
+                // /qrcode/ 패턴 URL도 단축 처리
+                text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);
+
+                // MSG_QUEUE에 등록 (LMS 전용)
+                MsgQueue msgQueue = MsgQueue.createForEvent(
+                        phone,
+                        request.getNormalizedCallback(),
+                        request.getSubject(),
+                        text,
+                        request.getEventSeq(),
+                        receiver.getParticipantSeq(),
+                        receiver.getSurveyUserSeq(),
+                        txGroupId,
+                        regId
+                );
+
+                // 예약 발송 시간 설정
+                if (!request.isImmediate() && request.getRequestTime() != null) {
+                    msgQueue = msgQueue.withRequestTime(request.getRequestTime());
+                }
+
+                // LMS로 발송
+                msgQueueMapper.insertLms(msgQueue);
+
+                mseqList.add(msgQueue.getMseq());
+                successCount++;
+
+            } catch (Exception e) {
+                failCount++;
+                failedPhones.add(receiver.getPhone());
+                log.warn("행사참여자 문자 발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+            }
+        }
+
+        log.info("행사참여자 문자 발송 완료 - 성공: {}, 실패: {}, 중복: {}, txGroupId: {}",
+                successCount, failCount, duplicateCount, txGroupId);
+
+        if (failCount == 0 && duplicateCount == 0) {
+            return EventMessageResponse.success(successCount, mseqList, txGroupId, LocalDateTime.now());
+        } else {
+            return EventMessageResponse.partial(successCount, failCount, duplicateCount,
+                    failedPhones, mseqList, txGroupId);
+        }
+    }
 }

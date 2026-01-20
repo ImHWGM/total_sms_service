@@ -180,4 +180,41 @@ public class MessageSendController {
         ResendResponse response = messageSendService.sendNewToDuplicates(request, regId);
         return ApiResponse.success(response);
     }
+
+    /**
+     * 설문 문자 발송
+     * POST /api/message/send/survey
+     *
+     * 설문 문자 발송 (단축 URL 자동 적용)
+     * - #유저키#, #userKey# 치환
+     * - #대치문자1#, #대치문자2#, #대치문자3# 치환
+     * - /auth/ 패턴 URL 자동 단축
+     */
+    @PostMapping("/survey")
+    public ApiResponse<SurveyMessageResponse> sendSurveyMessage(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody SurveyMessageRequest request) {
+        String regId = userDetails.getUsername();
+        SurveyMessageResponse response = messageSendService.sendSurveyMessages(request, regId);
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * 행사참여자 문자 발송
+     * POST /api/message/send/event
+     *
+     * 행사참여자 문자 발송 (LMS 전용, 단축 URL 자동 적용)
+     * - #이벤트명#, #이벤트기간#, #이벤트장소# 치환
+     * - #이름#, #QR링크#, #접속링크# 치환
+     * - #대치문자1#, #대치문자2#, #대치문자3# 치환
+     * - QR/접속 링크 자동 단축
+     */
+    @PostMapping("/event")
+    public ApiResponse<EventMessageResponse> sendEventMessage(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody EventMessageRequest request) {
+        String regId = userDetails.getUsername();
+        EventMessageResponse response = messageSendService.sendEventMessages(request, regId);
+        return ApiResponse.success(response);
+    }
 }

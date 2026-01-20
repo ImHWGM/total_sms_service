@@ -57,7 +57,8 @@
             LAST_LOGIN AS lastLogin,
             STATUS AS status
         FROM USER
-        WHERE 1=1
+        WHERE USE_YN = 'Y'
+          AND STATUS = '승인'
         <choose>
             <when test="type == 'seqOpt'">
                 AND SEQ LIKE CONCAT('%', #{keyword}, '%')
@@ -77,7 +78,8 @@
     <select id="selectCompanyListCount" resultType="int">
         SELECT COUNT(*)
         FROM USER
-        WHERE 1=1
+        WHERE USE_YN = 'Y'
+          AND STATUS = '승인'
         <choose>
             <when test="type == 'seqOpt'">
                 AND SEQ LIKE CONCAT('%', #{keyword}, '%')

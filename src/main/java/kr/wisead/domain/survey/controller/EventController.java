@@ -77,36 +77,28 @@ public class EventController {
 
     /**
      * 이벤트 생성
-     * - 설문 데이터와 이미지를 한번에 전송받아 처리 (레거시 방식)
+     * - JSON으로 이벤트 데이터 전송, 이미지는 /api/file/survey/* API로 별도 업로드
      */
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping
     public ApiResponse<EventResponse> create(
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestPart("event") @Valid EventRequest request,
-            @RequestPart(value = "descImageFile", required = false) MultipartFile descImageFile,
-            @RequestPart(value = "endImageFile", required = false) MultipartFile endImageFile,
-            @RequestPart(value = "questionImages", required = false) List<MultipartFile> questionImages,
-            @RequestPart(value = "itemImages", required = false) List<MultipartFile> itemImages) {
+            @RequestBody @Valid EventRequest request) {
         String userId = userDetails.getUsername();
-        EventResponse response = eventService.createEvent(userId, request, descImageFile, endImageFile, questionImages, itemImages);
+        EventResponse response = eventService.createEvent(userId, request, null, null, null, null);
         return ApiResponse.success(response);
     }
 
     /**
      * 이벤트 수정
-     * - 설문 데이터와 이미지를 한번에 전송받아 처리 (레거시 방식)
+     * - JSON으로 이벤트 데이터 전송, 이미지는 /api/file/survey/* API로 별도 업로드
      */
-    @PutMapping(value = "/{eventSeq}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PutMapping("/{eventSeq}")
     public ApiResponse<EventResponse> update(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Integer eventSeq,
-            @RequestPart("event") @Valid EventRequest request,
-            @RequestPart(value = "descImageFile", required = false) MultipartFile descImageFile,
-            @RequestPart(value = "endImageFile", required = false) MultipartFile endImageFile,
-            @RequestPart(value = "questionImages", required = false) List<MultipartFile> questionImages,
-            @RequestPart(value = "itemImages", required = false) List<MultipartFile> itemImages) {
+            @RequestBody @Valid EventRequest request) {
         String uptId = userDetails.getUsername();
-        EventResponse response = eventService.updateEvent(eventSeq, request, uptId, descImageFile, endImageFile, questionImages, itemImages);
+        EventResponse response = eventService.updateEvent(eventSeq, request, uptId, null, null, null, null);
         return ApiResponse.success(response);
     }
 

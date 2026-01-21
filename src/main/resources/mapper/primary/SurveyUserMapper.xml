@@ -142,9 +142,9 @@
     <insert id="insert" parameterType="kr.wisead.domain.survey.entity.SurveyUser"
             useGeneratedKeys="true" keyProperty="seq" keyColumn="SEQ">
         INSERT INTO SURVEY_USER (
-            EVENT_SEQ, USER_KEY, USER_PHONE, DEL_YN, REG_ID, REG_DATE
+            EVENT_SEQ, USER_KEY, USER_PHONE, RESEND_USER_PHONE, DEL_YN, REG_ID, REG_DATE
         ) VALUES (
-            #{eventSeq}, #{userKey}, #{userPhone}, 'N', #{regId}, NOW()
+            #{eventSeq}, #{userKey}, #{userPhone}, #{resendUserPhone}, 'N', #{regId}, NOW()
         )
     </insert>
 

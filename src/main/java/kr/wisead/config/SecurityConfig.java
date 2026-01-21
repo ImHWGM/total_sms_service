@@ -70,8 +70,13 @@ public class SecurityConfig {
             "/api/payment/kg/**",
             "/api/payment/callback",
 
-            // 파일 다운로드
+            // 파일 다운로드/서빙
             "/files/**",
+            "/survey/**",       // 설문 이미지 (DB 경로 직접 접근)
+            "/mmsfile/**",      // MMS 파일
+            "/template/**",     // 템플릿 이미지
+            "/bizreg/**",       // 사업자등록증
+            "/qrcode/**",       // QR 코드
 
             // Swagger/API 문서
             "/swagger-ui/**",

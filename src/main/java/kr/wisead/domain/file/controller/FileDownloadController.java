@@ -21,7 +21,6 @@ import java.nio.file.Paths;
  */
 @Slf4j
 @RestController
-@RequestMapping("/files")
 public class FileDownloadController {
 
     @Value("${upload.dir.mmsfile:./uploads/mmsfile}")
@@ -74,7 +73,7 @@ public class FileDownloadController {
     /**
      * MMS 파일 다운로드/서빙
      */
-    @GetMapping("/mmsfile/{folder}/{fileName:.+}")
+    @GetMapping({"/files/mmsfile/{folder}/{fileName:.+}", "/mmsfile/{folder}/{fileName:.+}"})
     public ResponseEntity<Resource> serveMmsFile(
             @PathVariable String folder,
             @PathVariable String fileName) throws Exception {
@@ -83,8 +82,10 @@ public class FileDownloadController {
 
     /**
      * 설문 이미지 다운로드/서빙
+     * - /survey/** : DB에 저장된 경로로 직접 접근 (비로그인 허용)
+     * - /files/survey/** : 기존 호환성 유지
      */
-    @GetMapping("/survey/{folder}/{fileName:.+}")
+    @GetMapping({"/survey/{folder}/{fileName:.+}", "/files/survey/{folder}/{fileName:.+}"})
     public ResponseEntity<Resource> serveSurveyFile(
             @PathVariable String folder,
             @PathVariable String fileName) throws Exception {
@@ -94,7 +95,7 @@ public class FileDownloadController {
     /**
      * 템플릿 이미지 다운로드/서빙
      */
-    @GetMapping("/template/{folder}/{fileName:.+}")
+    @GetMapping({"/files/template/{folder}/{fileName:.+}", "/template/{folder}/{fileName:.+}"})
     public ResponseEntity<Resource> serveTemplateFile(
             @PathVariable String folder,
             @PathVariable String fileName) throws Exception {
@@ -104,7 +105,7 @@ public class FileDownloadController {
     /**
      * 사업자등록증 다운로드/서빙
      */
-    @GetMapping("/bizreg/{fileName:.+}")
+    @GetMapping({"/files/bizreg/{fileName:.+}", "/bizreg/{fileName:.+}"})
     public ResponseEntity<Resource> serveBizRegFile(
             @PathVariable String fileName) throws Exception {
         Path filePath = bizRegFileStorageLocation.resolve(fileName).normalize();
@@ -131,20 +132,12 @@ public class FileDownloadController {
 
     /**
      * QR 코드 이미지 서빙
-     * 설문조사 QR 코드 이미지 제공
+     * - /qrcode/** : 직접 접근
+     * - /files/qrcode/** : 기존 호환성 유지
+     * - /survey/qrcode/** : 레거시 호환성
      */
-    @GetMapping("/qrcode/{fileName:.+}")
+    @GetMapping({"/qrcode/{fileName:.+}", "/files/qrcode/{fileName:.+}", "/survey/qrcode/{fileName:.+}"})
     public ResponseEntity<Resource> serveQrCodeFile(
-            @PathVariable String fileName) throws Exception {
-        return serveQrImage(fileName);
-    }
-
-    /**
-     * QR 코드 이미지 서빙 (하위 호환성)
-     * 이전 프로젝트에서 사용하던 경로: /survey/qrcode/{fileName}
-     */
-    @GetMapping("/survey/qrcode/{fileName:.+}")
-    public ResponseEntity<Resource> serveQrCodeFileLegacy(
             @PathVariable String fileName) throws Exception {
         return serveQrImage(fileName);
     }

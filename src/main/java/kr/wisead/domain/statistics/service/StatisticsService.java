@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 import kr.wisead.domain.statistics.dto.*;
 import kr.wisead.mapper.sms.StatisticsMapper;
 import lombok.RequiredArgsConstructor;
@@ -61,11 +60,10 @@ public class StatisticsService {
     List<String> tableNames = getTableNames(request.getStartDate(), request.getEndDate());
     Map<Integer, UserStatsResponse> userStatsMap = new HashMap<>();
 
-    List<String> userIdStrings = null;
-    if (request.getUserIds() != null && !request.getUserIds().isEmpty()) {
-      userIdStrings =
-          request.getUserIds().stream().map(String::valueOf).collect(Collectors.toList());
-    }
+    List<String> userIdStrings =
+        (request.getUserIds() != null && !request.getUserIds().isEmpty())
+            ? request.getUserIds().stream().map(String::valueOf).toList()
+            : null;
 
     for (String tableName : tableNames) {
       try {
@@ -173,7 +171,7 @@ public class StatisticsService {
   private List<String> getTableNames(String startDate, String endDate) {
     List<String> tableNames = new ArrayList<>();
 
-    if (startDate == null || endDate == null) {
+    if (startDate == null || startDate.isBlank() || endDate == null || endDate.isBlank()) {
       // 기본값: 현재 월
       String currentMonth = LocalDate.now().format(YEAR_MONTH_FORMATTER);
       tableNames.add(TABLE_PREFIX + currentMonth);
@@ -262,14 +260,16 @@ public class StatisticsService {
   /** Map에서 int 값 추출 */
   private int getIntValue(Map<String, Object> map, String key) {
     Object value = map.get(key);
-    if (value == null) return 0;
-    if (value instanceof Number) {
-      return ((Number) value).intValue();
+    if (value instanceof Number number) {
+      return number.intValue();
     }
-    try {
-      return Integer.parseInt(value.toString());
-    } catch (NumberFormatException e) {
-      return 0;
+    if (value instanceof String str) {
+      try {
+        return Integer.parseInt(str);
+      } catch (NumberFormatException e) {
+        return 0;
+      }
     }
+    return 0;
   }
 }

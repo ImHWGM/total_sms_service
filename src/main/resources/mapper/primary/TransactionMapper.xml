@@ -2,79 +2,64 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="kr.wisead.mapper.primary.TransactionMapper">
 
+    <!-- 공통 컬럼 (전체) -->
+    <sql id="allColumns">
+        seq,
+        tx_group_id AS txGroupId,
+        user_id AS userId,
+        currency_type AS currencyType,
+        tx_type AS txType,
+        amount,
+        balance_after AS balanceAfter,
+        service_id AS serviceId,
+        unit_price AS unitPrice,
+        quantity,
+        lot_seq AS lotSeq,
+        lot_expire_date AS lotExpireDate,
+        ref_tx_seq AS refTxSeq,
+        comment,
+        reg_date AS regDate
+    </sql>
+
+    <!-- 공통 컬럼 (Lot 정보 포함, refTxSeq 제외) -->
+    <sql id="columnsWithLot">
+        seq,
+        tx_group_id AS txGroupId,
+        user_id AS userId,
+        currency_type AS currencyType,
+        tx_type AS txType,
+        amount,
+        balance_after AS balanceAfter,
+        service_id AS serviceId,
+        unit_price AS unitPrice,
+        quantity,
+        lot_seq AS lotSeq,
+        lot_expire_date AS lotExpireDate,
+        comment,
+        reg_date AS regDate
+    </sql>
+
     <!-- 거래 내역 등록 -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="seq">
         INSERT INTO transaction (
-            tx_group_id,
-            user_id,
-            currency_type,
-            tx_type,
-            amount,
-            balance_after,
-            service_id,
-            unit_price,
-            quantity,
-            lot_seq,
-            lot_expire_date,
-            ref_tx_seq,
-            comment
+            tx_group_id, user_id, currency_type, tx_type, amount, balance_after,
+            service_id, unit_price, quantity, lot_seq, lot_expire_date, ref_tx_seq, comment
         ) VALUES (
-            #{txGroupId},
-            #{userId},
-            #{currencyType},
-            #{txType},
-            #{amount},
-            #{balanceAfter},
-            #{serviceId},
-            #{unitPrice},
-            #{quantity},
-            #{lotSeq},
-            #{lotExpireDate},
-            #{refTxSeq},
-            #{comment}
+            #{txGroupId}, #{userId}, #{currencyType}, #{txType}, #{amount}, #{balanceAfter},
+            #{serviceId}, #{unitPrice}, #{quantity}, #{lotSeq}, #{lotExpireDate}, #{refTxSeq}, #{comment}
         )
     </insert>
 
     <!-- 거래 내역 조회 -->
     <select id="selectBySeq" resultType="kr.wisead.domain.payment.entity.Transaction">
-        SELECT
-            seq,
-            tx_group_id AS txGroupId,
-            user_id AS userId,
-            currency_type AS currencyType,
-            tx_type AS txType,
-            amount,
-            balance_after AS balanceAfter,
-            service_id AS serviceId,
-            unit_price AS unitPrice,
-            quantity,
-            lot_seq AS lotSeq,
-            lot_expire_date AS lotExpireDate,
-            ref_tx_seq AS refTxSeq,
-            comment,
-            reg_date AS regDate
+        SELECT <include refid="allColumns"/>
         FROM transaction
         WHERE seq = #{seq}
     </select>
 
     <!-- 거래 그룹 조회 -->
     <select id="selectByGroupId" resultType="kr.wisead.domain.payment.entity.Transaction">
-        SELECT
-            seq,
-            tx_group_id AS txGroupId,
-            user_id AS userId,
-            currency_type AS currencyType,
-            tx_type AS txType,
-            amount,
-            balance_after AS balanceAfter,
-            service_id AS serviceId,
-            unit_price AS unitPrice,
-            quantity,
-            lot_seq AS lotSeq,
-            lot_expire_date AS lotExpireDate,
-            ref_tx_seq AS refTxSeq,
-            comment,
-            reg_date AS regDate
+        SELECT <include refid="allColumns"/>
         FROM transaction
         WHERE tx_group_id = #{txGroupId}
         ORDER BY seq ASC
@@ -82,22 +67,7 @@
 
     <!-- 사용자 거래 내역 조회 (페이징) -->
     <select id="selectHistory" resultType="kr.wisead.domain.payment.entity.Transaction">
-        SELECT
-            seq,
-            tx_group_id AS txGroupId,
-            user_id AS userId,
-            currency_type AS currencyType,
-            tx_type AS txType,
-            amount,
-            balance_after AS balanceAfter,
-            service_id AS serviceId,
-            unit_price AS unitPrice,
-            quantity,
-            lot_seq AS lotSeq,
-            lot_expire_date AS lotExpireDate,
-            ref_tx_seq AS refTxSeq,
-            comment,
-            reg_date AS regDate
+        SELECT <include refid="allColumns"/>
         FROM transaction
         WHERE user_id = #{userId}
         ORDER BY seq DESC
@@ -113,19 +83,7 @@
 
     <!-- 기간별 거래 내역 조회 -->
     <select id="selectByDateRange" resultType="kr.wisead.domain.payment.entity.Transaction">
-        SELECT
-            seq,
-            tx_group_id AS txGroupId,
-            user_id AS userId,
-            currency_type AS currencyType,
-            tx_type AS txType,
-            amount,
-            balance_after AS balanceAfter,
-            service_id AS serviceId,
-            unit_price AS unitPrice,
-            quantity,
-            comment,
-            reg_date AS regDate
+        SELECT <include refid="allColumns"/>
         FROM transaction
         WHERE user_id = #{userId}
           AND reg_date BETWEEN #{startDate} AND #{endDate}
@@ -134,17 +92,7 @@
 
     <!-- 거래 유형별 조회 -->
     <select id="selectByType" resultType="kr.wisead.domain.payment.entity.Transaction">
-        SELECT
-            seq,
-            tx_group_id AS txGroupId,
-            user_id AS userId,
-            currency_type AS currencyType,
-            tx_type AS txType,
-            amount,
-            balance_after AS balanceAfter,
-            service_id AS serviceId,
-            comment,
-            reg_date AS regDate
+        SELECT <include refid="allColumns"/>
         FROM transaction
         WHERE user_id = #{userId}
           AND tx_type = #{txType}
@@ -154,16 +102,7 @@
 
     <!-- 최근 거래 내역 조회 -->
     <select id="selectRecent" resultType="kr.wisead.domain.payment.entity.Transaction">
-        SELECT
-            seq,
-            tx_group_id AS txGroupId,
-            user_id AS userId,
-            currency_type AS currencyType,
-            tx_type AS txType,
-            amount,
-            balance_after AS balanceAfter,
-            comment,
-            reg_date AS regDate
+        SELECT <include refid="allColumns"/>
         FROM transaction
         <where>
             <if test="txType != null and txType != ''">
@@ -223,8 +162,16 @@
             SUM(amount) AS totalAmount,
             SUM(quantity) AS totalQuantity
         FROM transaction
-        WHERE user_id = #{userId}
-          AND tx_type = 'DEDUCT'
+        WHERE tx_type = 'DEDUCT'
+        <if test="userId != null and userId != ''">
+            AND user_id = #{userId}
+        </if>
+        <if test="userIds != null and userIds.size() > 0">
+            AND user_id IN
+            <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+                #{uid}
+            </foreach>
+        </if>
         <if test="startDate != null and startDate != ''">
             AND DATE(reg_date) >= #{startDate}
         </if>
@@ -245,7 +192,16 @@
             COUNT(CASE WHEN tx_type = 'DEDUCT' THEN 1 END) AS deductCount,
             COUNT(CASE WHEN tx_type = 'REFUND' THEN 1 END) AS refundCount
         FROM transaction
-        WHERE user_id = #{userId}
+        WHERE 1=1
+        <if test="userId != null and userId != ''">
+            AND user_id = #{userId}
+        </if>
+        <if test="userIds != null and userIds.size() > 0">
+            AND user_id IN
+            <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+                #{uid}
+            </foreach>
+        </if>
         <if test="startDate != null and startDate != ''">
             AND DATE(reg_date) >= #{startDate}
         </if>
@@ -256,21 +212,7 @@
 
     <!-- Lot별 거래 내역 조회 -->
     <select id="selectByLotSeq" resultType="kr.wisead.domain.payment.entity.Transaction">
-        SELECT
-            seq,
-            tx_group_id AS txGroupId,
-            user_id AS userId,
-            currency_type AS currencyType,
-            tx_type AS txType,
-            amount,
-            balance_after AS balanceAfter,
-            service_id AS serviceId,
-            unit_price AS unitPrice,
-            quantity,
-            lot_seq AS lotSeq,
-            lot_expire_date AS lotExpireDate,
-            comment,
-            reg_date AS regDate
+        SELECT <include refid="columnsWithLot"/>
         FROM transaction
         WHERE lot_seq = #{lotSeq}
         ORDER BY seq ASC

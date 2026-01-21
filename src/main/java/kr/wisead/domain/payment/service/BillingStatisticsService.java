@@ -4,9 +4,19 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.stream.Collectors;
-import kr.wisead.domain.payment.dto.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import kr.wisead.domain.payment.dto.BillingStatsSearchRequest;
+import kr.wisead.domain.payment.dto.BillingSummaryResponse;
+import kr.wisead.domain.payment.dto.DailyBillingStatsResponse;
+import kr.wisead.domain.payment.dto.MonthlyBillingStatsResponse;
+import kr.wisead.domain.payment.dto.ServiceTypeBillingStatsResponse;
+import kr.wisead.domain.payment.dto.TransactionResponse;
+import kr.wisead.domain.payment.dto.UserBillingStatsResponse;
+import kr.wisead.domain.payment.dto.WalletSummaryResponse;
 import kr.wisead.domain.payment.entity.Transaction;
 import kr.wisead.mapper.primary.TransactionMapper;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +41,7 @@ public class BillingStatisticsService {
     List<Map<String, Object>> rawStats =
         transactionMapper.selectDailyStats(request.getUserId(), dates[0], dates[1]);
 
-    return rawStats.stream().map(this::toDailyBillingStatsResponse).collect(Collectors.toList());
+    return rawStats.stream().map(this::toDailyBillingStatsResponse).toList();
   }
 
   /** 월별 과금 통계 조회 */
@@ -43,7 +53,7 @@ public class BillingStatisticsService {
     List<Map<String, Object>> rawStats =
         transactionMapper.selectMonthlyStats(request.getUserId(), dates[0], dates[1]);
 
-    return rawStats.stream().map(this::toMonthlyBillingStatsResponse).collect(Collectors.toList());
+    return rawStats.stream().map(this::toMonthlyBillingStatsResponse).toList();
   }
 
   /** 서비스 타입별 과금 통계 조회 */
@@ -53,11 +63,10 @@ public class BillingStatisticsService {
     String[] dates = resolveDefaultDates(request.getStartDate(), request.getEndDate());
 
     List<Map<String, Object>> rawStats =
-        transactionMapper.selectStatsByServiceId(request.getUserId(), dates[0], dates[1]);
+        transactionMapper.selectStatsByServiceId(
+            request.getUserId(), request.getUserIds(), dates[0], dates[1]);
 
-    return rawStats.stream()
-        .map(this::toServiceTypeBillingStatsResponse)
-        .collect(Collectors.toList());
+    return rawStats.stream().map(this::toServiceTypeBillingStatsResponse).toList();
   }
 
   /** 사용자별 과금 통계 조회 */
@@ -142,9 +151,11 @@ public class BillingStatisticsService {
   /** 과금 총계 조회 */
   @Transactional(readOnly = true)
   public BillingSummaryResponse getBillingSummary(BillingStatsSearchRequest request) {
+    String[] dates = resolveDefaultDates(request.getStartDate(), request.getEndDate());
+
     Map<String, Object> rawSummary =
         transactionMapper.selectSummary(
-            request.getUserId(), request.getStartDate(), request.getEndDate());
+            request.getUserId(), request.getUserIds(), dates[0], dates[1]);
 
     BigDecimal totalCharge = getBigDecimalValue(rawSummary, "totalCharge");
     BigDecimal totalDeduct = getBigDecimalValue(rawSummary, "totalDeduct");
@@ -183,7 +194,7 @@ public class BillingStatisticsService {
   public List<TransactionResponse> getRecentTransactionsAsResponse(String txType, int limit) {
     return transactionMapper.selectRecent(txType, limit).stream()
         .map(TransactionResponse::from)
-        .collect(Collectors.toList());
+        .toList();
   }
 
   /** 특정 사용자의 과금 요약 조회 */

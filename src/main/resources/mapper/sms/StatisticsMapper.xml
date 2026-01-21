@@ -5,69 +5,69 @@
     <!-- 일별 메시지 통계 조회 -->
     <select id="selectDailyStats" resultType="kr.wisead.domain.statistics.dto.DailyStatsResponse">
         SELECT
-            DATE_FORMAT(rslt_date, '%Y-%m-%d') AS dtStats,
-            msg_type AS serviceType,
+            DATE_FORMAT(SAVE_TIME, '%Y-%m-%d') AS dtStats,
+            MSG_TYPE AS serviceType,
             COUNT(*) AS inCnt,
-            SUM(CASE WHEN rslt_val = '0' OR rslt_val = '1000' THEN 1 ELSE 0 END) AS succCnt,
-            SUM(CASE WHEN rslt_val IN ('9999', '-1') THEN 1 ELSE 0 END) AS errorCnt,
-            SUM(CASE WHEN rslt_val NOT IN ('0', '1000', '9999', '-1', '') AND rslt_val IS NOT NULL THEN 1 ELSE 0 END) AS failCnt,
-            SUM(CASE WHEN rslt_val = '' OR rslt_val IS NULL THEN 1 ELSE 0 END) AS waitCnt,
+            SUM(CASE WHEN RESULT = '0' OR RESULT = '1000' THEN 1 ELSE 0 END) AS succCnt,
+            SUM(CASE WHEN RESULT IN ('9999', '-1') THEN 1 ELSE 0 END) AS errorCnt,
+            SUM(CASE WHEN RESULT NOT IN ('0', '1000', '9999', '-1', '') AND RESULT IS NOT NULL THEN 1 ELSE 0 END) AS failCnt,
+            SUM(CASE WHEN RESULT = '' OR RESULT IS NULL THEN 1 ELSE 0 END) AS waitCnt,
             0 AS ingCnt
         FROM ${tableName}
         WHERE 1=1
         <if test="userId != null and userId != ''">
-            AND user_id = #{userId}
+            AND EXT_COL3 = #{userId}
         </if>
         <if test="serviceType != null and serviceType != ''">
-            AND msg_type = #{serviceType}
+            AND MSG_TYPE = #{serviceType}
         </if>
         <if test="startDate != null and startDate != ''">
-            AND rslt_date >= #{startDate}
+            AND SAVE_TIME >= #{startDate}
         </if>
         <if test="endDate != null and endDate != ''">
-            AND rslt_date <![CDATA[<=]]> #{endDate}
+            AND SAVE_TIME <![CDATA[<=]]> #{endDate}
         </if>
-        GROUP BY DATE_FORMAT(rslt_date, '%Y-%m-%d'), msg_type
+        GROUP BY DATE_FORMAT(SAVE_TIME, '%Y-%m-%d'), MSG_TYPE
         ORDER BY dtStats DESC, serviceType
     </select>
 
     <!-- 사용자별 메시지 통계 조회 -->
     <select id="selectUserStats" resultType="java.util.HashMap">
         SELECT
-            user_id AS userId,
-            msg_type AS serviceType,
+            EXT_COL3 AS userId,
+            MSG_TYPE AS serviceType,
             COUNT(*) AS totalCnt,
-            SUM(CASE WHEN rslt_val = '0' OR rslt_val = '1000' THEN 1 ELSE 0 END) AS succCnt,
-            SUM(CASE WHEN rslt_val NOT IN ('0', '1000') OR rslt_val IS NULL THEN 1 ELSE 0 END) AS failCnt
+            SUM(CASE WHEN RESULT = '0' OR RESULT = '1000' THEN 1 ELSE 0 END) AS succCnt,
+            SUM(CASE WHEN RESULT NOT IN ('0', '1000') OR RESULT IS NULL THEN 1 ELSE 0 END) AS failCnt
         FROM ${tableName}
         WHERE 1=1
         <if test="userIds != null and userIds.size() > 0">
-            AND user_id IN
+            AND EXT_COL3 IN
             <foreach item="userId" collection="userIds" open="(" separator="," close=")">
                 #{userId}
             </foreach>
         </if>
         <if test="startDate != null and startDate != ''">
-            AND rslt_date >= #{startDate}
+            AND SAVE_TIME >= #{startDate}
         </if>
         <if test="endDate != null and endDate != ''">
-            AND rslt_date <![CDATA[<=]]> #{endDate}
+            AND SAVE_TIME <![CDATA[<=]]> #{endDate}
         </if>
-        GROUP BY user_id, msg_type
-        ORDER BY user_id, msg_type
+        GROUP BY EXT_COL3, MSG_TYPE
+        ORDER BY EXT_COL3, MSG_TYPE
     </select>
 
     <!-- 서비스 타입별 사용량 집계 -->
     <select id="selectUsageSummary" resultType="kr.wisead.domain.statistics.dto.UsageSummaryResponse">
         SELECT
-            CASE msg_type
+            CASE MSG_TYPE
                 WHEN 'SMS' THEN 'SMS'
                 WHEN 'LMS' THEN 'LMS'
                 WHEN 'MMS' THEN 'MMS'
                 WHEN 'ATA' THEN '알림톡'
                 WHEN 'FTA' THEN '친구톡'
                 WHEN 'FTI' THEN '친구톡(이미지)'
-                ELSE msg_type
+                ELSE MSG_TYPE
             END AS serviceTypeName,
             '발송' AS category,
             COUNT(*) AS count,
@@ -75,30 +75,30 @@
             NULL AS amount,
             '' AS remarks
         FROM ${tableName}
-        WHERE rslt_val IN ('0', '1000')
+        WHERE RESULT IN ('0', '1000')
         <if test="userId != null and userId != ''">
-            AND user_id = #{userId}
+            AND EXT_COL3 = #{userId}
         </if>
         <if test="startDate != null and startDate != ''">
-            AND rslt_date >= #{startDate}
+            AND SAVE_TIME >= #{startDate}
         </if>
         <if test="endDate != null and endDate != ''">
-            AND rslt_date <![CDATA[<=]]> #{endDate}
+            AND SAVE_TIME <![CDATA[<=]]> #{endDate}
         </if>
-        GROUP BY msg_type
-        ORDER BY msg_type
+        GROUP BY MSG_TYPE
+        ORDER BY MSG_TYPE
     </select>
 
     <!-- 월별 총 건수 조회 -->
     <select id="selectMonthlyTotalCount" resultType="java.util.HashMap">
         SELECT
             COUNT(*) AS totalCnt,
-            SUM(CASE WHEN rslt_val = '0' OR rslt_val = '1000' THEN 1 ELSE 0 END) AS succCnt,
-            SUM(CASE WHEN rslt_val NOT IN ('0', '1000') OR rslt_val IS NULL THEN 1 ELSE 0 END) AS failCnt
+            SUM(CASE WHEN RESULT = '0' OR RESULT = '1000' THEN 1 ELSE 0 END) AS succCnt,
+            SUM(CASE WHEN RESULT NOT IN ('0', '1000') OR RESULT IS NULL THEN 1 ELSE 0 END) AS failCnt
         FROM ${tableName}
         <where>
             <if test="userId != null and userId != ''">
-                user_id = #{userId}
+                EXT_COL3 = #{userId}
             </if>
         </where>
     </select>

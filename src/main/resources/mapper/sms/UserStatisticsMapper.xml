@@ -17,57 +17,43 @@
                 SELECT
                     <choose>
                         <when test="tbl == 'msg_queue'">
-                            ext_col3 AS userId,
-                            msg_type AS msgType,
+                            EXT_COL3 AS userId,
+                            MSG_TYPE AS msgType,
                             0 AS isSucc
                         </when>
                         <otherwise>
-                            user_id AS userId,
-                            msg_type AS msgType,
-                            CASE WHEN rslt_val = '0' OR rslt_val = '1000' THEN 1 ELSE 0 END AS isSucc
+                            EXT_COL3 AS userId,
+                            MSG_TYPE AS msgType,
+                            CASE WHEN RESULT = '0' OR RESULT = '1000' THEN 1 ELSE 0 END AS isSucc
                         </otherwise>
                     </choose>
                 FROM ${tbl}
-                WHERE (ext_col0 IS NULL OR ext_col0 = '')
+                WHERE (EXT_COL0 IS NULL OR EXT_COL0 = '')
                 <if test="startDate != null and startDate != ''">
                     <choose>
                         <when test="tbl == 'msg_queue'">
-                            AND request_time <![CDATA[>=]]> #{startDate}
+                            AND REQUEST_TIME <![CDATA[>=]]> #{startDate}
                         </when>
                         <otherwise>
-                            AND rslt_date <![CDATA[>=]]> #{startDate}
+                            AND SAVE_TIME <![CDATA[>=]]> #{startDate}
                         </otherwise>
                     </choose>
                 </if>
                 <if test="endDate != null and endDate != ''">
                     <choose>
                         <when test="tbl == 'msg_queue'">
-                            AND request_time <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+                            AND REQUEST_TIME <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
                         </when>
                         <otherwise>
-                            AND rslt_date <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+                            AND SAVE_TIME <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
                         </otherwise>
                     </choose>
                 </if>
                 <if test="userId != null and userId != ''">
-                    <choose>
-                        <when test="tbl == 'msg_queue'">
-                            AND ext_col3 = #{userId}
-                        </when>
-                        <otherwise>
-                            AND user_id = #{userId}
-                        </otherwise>
-                    </choose>
+                    AND EXT_COL3 = #{userId}
                 </if>
                 <if test="userIds != null and userIds.size() > 0">
-                    <choose>
-                        <when test="tbl == 'msg_queue'">
-                            AND ext_col3 IN
-                        </when>
-                        <otherwise>
-                            AND user_id IN
-                        </otherwise>
-                    </choose>
+                    AND EXT_COL3 IN
                     <foreach collection="userIds" item="uid" open="(" separator="," close=")">
                         #{uid}
                     </foreach>
@@ -89,55 +75,41 @@
                 SELECT
                     <choose>
                         <when test="tbl == 'msg_queue'">
-                            ext_col3 AS userId,
+                            EXT_COL3 AS userId,
                             0 AS isSucc
                         </when>
                         <otherwise>
-                            user_id AS userId,
-                            CASE WHEN rslt_val = '0' OR rslt_val = '1000' THEN 1 ELSE 0 END AS isSucc
+                            EXT_COL3 AS userId,
+                            CASE WHEN RESULT = '0' OR RESULT = '1000' THEN 1 ELSE 0 END AS isSucc
                         </otherwise>
                     </choose>
                 FROM ${tbl}
-                WHERE ext_col0 IS NOT NULL AND ext_col0 != ''
+                WHERE EXT_COL0 IS NOT NULL AND EXT_COL0 != ''
                 <if test="startDate != null and startDate != ''">
                     <choose>
                         <when test="tbl == 'msg_queue'">
-                            AND request_time <![CDATA[>=]]> #{startDate}
+                            AND REQUEST_TIME <![CDATA[>=]]> #{startDate}
                         </when>
                         <otherwise>
-                            AND rslt_date <![CDATA[>=]]> #{startDate}
+                            AND SAVE_TIME <![CDATA[>=]]> #{startDate}
                         </otherwise>
                     </choose>
                 </if>
                 <if test="endDate != null and endDate != ''">
                     <choose>
                         <when test="tbl == 'msg_queue'">
-                            AND request_time <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+                            AND REQUEST_TIME <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
                         </when>
                         <otherwise>
-                            AND rslt_date <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+                            AND SAVE_TIME <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
                         </otherwise>
                     </choose>
                 </if>
                 <if test="userId != null and userId != ''">
-                    <choose>
-                        <when test="tbl == 'msg_queue'">
-                            AND ext_col3 = #{userId}
-                        </when>
-                        <otherwise>
-                            AND user_id = #{userId}
-                        </otherwise>
-                    </choose>
+                    AND EXT_COL3 = #{userId}
                 </if>
                 <if test="userIds != null and userIds.size() > 0">
-                    <choose>
-                        <when test="tbl == 'msg_queue'">
-                            AND ext_col3 IN
-                        </when>
-                        <otherwise>
-                            AND user_id IN
-                        </otherwise>
-                    </choose>
+                    AND EXT_COL3 IN
                     <foreach collection="userIds" item="uid" open="(" separator="," close=")">
                         #{uid}
                     </foreach>

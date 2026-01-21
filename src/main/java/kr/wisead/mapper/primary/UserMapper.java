@@ -87,7 +87,7 @@ public interface UserMapper {
   int deleteBySeq(@Param("seq") Integer seq);
 
   /** 회원 일괄 삭제 (USE_YN = 'N' 처리) */
-  int deleteBySeqList(@Param("seqList") java.util.List<Long> seqList);
+  int deleteBySeqList(@Param("seqList") java.util.List<Integer> seqList);
 
   /** 회원 정보 수정 (기업 정보) */
   int updateMemberInfo(User user);

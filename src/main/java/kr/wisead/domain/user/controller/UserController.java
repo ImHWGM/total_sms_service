@@ -138,8 +138,10 @@ public class UserController {
   @PutMapping("/me/password/expired")
   public ApiResponse<Void> changeExpiredPassword(
       @AuthenticationPrincipal UserDetails userDetails, @RequestBody Map<String, String> request) {
+    Integer seq = Integer.parseInt(userDetails.getUsername());
+    String userId = userService.getUserIdBySeq(seq);
     String newPassword = request.get("newPassword");
-    userService.changeExpiredPassword(userDetails.getUsername(), newPassword);
+    userService.changeExpiredPassword(userId, newPassword);
     return ApiResponse.success("비밀번호가 변경되었습니다.");
   }
 
@@ -177,8 +179,8 @@ public class UserController {
   /** 회원 삭제 (일괄) - 관리자 전용 DELETE /api/users */
   @DeleteMapping
   @PreAuthorize("hasRole('ADMIN')")
-  public ApiResponse<Void> deleteUsers(@RequestBody Map<String, List<Long>> request) {
-    List<Long> seqList = request.get("seqList");
+  public ApiResponse<Void> deleteUsers(@RequestBody Map<String, List<Integer>> request) {
+    List<Integer> seqList = request.get("seqList");
     userService.deleteUsers(seqList);
     return ApiResponse.success("회원들이 삭제되었습니다.");
   }

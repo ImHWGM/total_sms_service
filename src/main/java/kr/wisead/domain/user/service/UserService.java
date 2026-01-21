@@ -468,7 +468,7 @@ public class UserService {
    * @param seqList 삭제할 회원 시퀀스 목록
    */
   @Transactional
-  public void deleteUsers(List<Long> seqList) {
+  public void deleteUsers(List<Integer> seqList) {
     if (seqList == null || seqList.isEmpty()) {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "삭제할 회원 목록이 비어있습니다.");
     }

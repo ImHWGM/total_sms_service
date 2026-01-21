@@ -47,7 +47,7 @@ public class CryptoUtils {
     }
   }
 
-  /** AES 128 복호화 */
+  /** AES 128 복호화 (실패 시 원본 데이터 반환) */
   public static String decryptAES128(String str) {
     if (CommonUtils.isNullOrEmpty(str)) {
       return "";
@@ -62,8 +62,8 @@ public class CryptoUtils {
       byte[] decrypted = cipher.doFinal(decoded);
       return new String(decrypted, StandardCharsets.UTF_8);
     } catch (Exception e) {
-      log.error("AES128 복호화 실패", e);
-      return "";
+      log.warn("AES128 복호화 실패, 원본 데이터 반환: {}", e.getMessage());
+      return str;
     }
   }
 
@@ -90,7 +90,7 @@ public class CryptoUtils {
     }
   }
 
-  /** AES 256 복호화 */
+  /** AES 256 복호화 (실패 시 원본 데이터 반환) */
   public static String decryptAES256(String str) {
     if (CommonUtils.isNullOrEmpty(str)) {
       return "";
@@ -109,8 +109,8 @@ public class CryptoUtils {
       byte[] decrypted = cipher.doFinal(decoded);
       return new String(decrypted, StandardCharsets.UTF_8);
     } catch (Exception e) {
-      log.error("AES256 복호화 실패", e);
-      return "";
+      log.warn("AES256 복호화 실패, 원본 데이터 반환: {}", e.getMessage());
+      return str;
     }
   }
 
@@ -156,7 +156,7 @@ public class CryptoUtils {
     }
   }
 
-  /** Base64 디코딩 */
+  /** Base64 디코딩 (실패 시 원본 데이터 반환) */
   public static String decodeBase64(String str) {
     if (CommonUtils.isNullOrEmpty(str)) {
       return "";
@@ -164,7 +164,8 @@ public class CryptoUtils {
     try {
       return new String(Base64.getDecoder().decode(str), StandardCharsets.UTF_8);
     } catch (Exception e) {
-      return "";
+      log.debug("Base64 디코딩 실패, 원본 데이터 반환: {}", e.getMessage());
+      return str;
     }
   }
 

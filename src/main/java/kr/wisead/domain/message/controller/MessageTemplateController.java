@@ -2,14 +2,11 @@ package kr.wisead.domain.message.controller;
 
 import jakarta.validation.Valid;
 import java.util.List;
-import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ApiResponse;
-import kr.wisead.common.response.ErrorCode;
 import kr.wisead.domain.file.service.FileStorageService;
 import kr.wisead.domain.message.dto.MessageTemplateRequest;
 import kr.wisead.domain.message.dto.MessageTemplateResponse;
 import kr.wisead.domain.message.service.MessageTemplateService;
-import kr.wisead.mapper.primary.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,7 +23,6 @@ public class MessageTemplateController {
 
   private final MessageTemplateService messageTemplateService;
   private final FileStorageService fileStorageService;
-  private final UserMapper userMapper;
 
   /** 템플릿 생성 */
   @PostMapping
@@ -164,10 +160,6 @@ public class MessageTemplateController {
 
   /** UserDetails에서 userSeq 추출 */
   private Integer getUserSeq(UserDetails userDetails) {
-    String userId = userDetails.getUsername();
-    return userMapper
-        .findByUserId(userId)
-        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자를 찾을 수 없습니다."))
-        .getSeq();
+    return Integer.parseInt(userDetails.getUsername());
   }
 }

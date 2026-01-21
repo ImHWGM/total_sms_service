@@ -125,11 +125,7 @@ public class EventParticipantService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    EventParticipantResponse response = EventParticipantResponse.from(participant);
-    if (participant.getUserPhone() != null) {
-      response.setUserPhone(decryptPhone(participant.getUserPhone()));
-    }
-    return response.withQrCodeUrl(wiseadUrl);
+    return buildParticipantResponse(participant);
   }
 
   /** 체크코드로 참가자 조회 */
@@ -141,6 +137,11 @@ public class EventParticipantService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
+    return buildParticipantResponse(participant);
+  }
+
+  /** 참가자 응답 객체 생성 (공통 로직) */
+  private EventParticipantResponse buildParticipantResponse(EventParticipant participant) {
     EventParticipantResponse response = EventParticipantResponse.from(participant);
     if (participant.getUserPhone() != null) {
       response.setUserPhone(decryptPhone(participant.getUserPhone()));

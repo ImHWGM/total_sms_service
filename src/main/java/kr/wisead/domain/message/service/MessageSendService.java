@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
@@ -215,31 +214,30 @@ public class MessageSendService {
   @Transactional(value = "smsTransactionManager", readOnly = true)
   public PageResponse<MsgResultResponse> getSendHistory(SendHistorySearchRequest request) {
     List<String> tables = request.getTableNames();
+    String regId = request.getRegId();
+    var startDate = request.getSrhDateStart();
+    var endDate = request.getSrhDateEnd();
+    String type = request.getType();
+    String keyword = request.getKeyword();
+    String sendFailure = request.getSendFailure();
 
     int total =
         msgResultMapper.countSendHistory(
-            request.getRegId(),
-            tables,
-            request.getSrhDateStart(),
-            request.getSrhDateEnd(),
-            request.getType(),
-            request.getKeyword(),
-            request.getSendFailure());
+            regId, tables, startDate, endDate, type, keyword, sendFailure);
 
     List<MsgResult> results =
         msgResultMapper.selectSendHistory(
-            request.getRegId(),
+            regId,
             tables,
-            request.getSrhDateStart(),
-            request.getSrhDateEnd(),
-            request.getType(),
-            request.getKeyword(),
-            request.getSendFailure(),
+            startDate,
+            endDate,
+            type,
+            keyword,
+            sendFailure,
             request.getSkip(),
             request.getAmount());
 
-    List<MsgResultResponse> content =
-        results.stream().map(MsgResultResponse::from).collect(Collectors.toList());
+    List<MsgResultResponse> content = results.stream().map(MsgResultResponse::from).toList();
 
     return PageResponse.of(content, request.getPageNum(), request.getAmount(), total);
   }
@@ -406,8 +404,7 @@ public class MessageSendService {
     int offset = (page - 1) * size;
     List<MsgQueue> results = msgQueueMapper.findPendingByRegIdPaging(regId, offset, size);
 
-    List<MsgQueueResponse> content =
-        results.stream().map(MsgQueueResponse::from).collect(Collectors.toList());
+    List<MsgQueueResponse> content = results.stream().map(MsgQueueResponse::from).toList();
 
     return PageResponse.of(content, page, size, total);
   }

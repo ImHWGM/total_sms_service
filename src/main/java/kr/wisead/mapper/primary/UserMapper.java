@@ -11,7 +11,7 @@ import org.apache.ibatis.annotations.Param;
 public interface UserMapper {
 
   /** 회원 조회 (by SEQ) */
-  Optional<User> findBySeq(@Param("seq") Long seq);
+  Optional<User> findBySeq(@Param("seq") Integer seq);
 
   /** 회원 조회 (by USER_ID) */
   Optional<User> findByUserId(@Param("userId") String userId);

@@ -1,5 +1,7 @@
 package kr.wisead.domain.admin.service;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
@@ -20,309 +22,292 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-
-/**
- * 관리자 서비스 (리팩토링 버전)
- * - WalletService 사용
- */
+/** 관리자 서비스 (리팩토링 버전) - WalletService 사용 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminService {
 
-    private final UserMapper userMapper;
-    private final WalletService walletService;
-    private final UserServiceRateMapper userServiceRateMapper;
-    private final StandardRateService standardRateService;
-    private final PasswordHintMapper passwordHintMapper;
-    private final CustomerCompanyMapper customerCompanyMapper;
-    private final PasswordEncoder passwordEncoder;
+  private final UserMapper userMapper;
+  private final WalletService walletService;
+  private final UserServiceRateMapper userServiceRateMapper;
+  private final StandardRateService standardRateService;
+  private final PasswordHintMapper passwordHintMapper;
+  private final CustomerCompanyMapper customerCompanyMapper;
+  private final PasswordEncoder passwordEncoder;
 
-    /**
-     * 관리자 계정 생성
-     * - 회원 등록
-     * - 지갑 초기화
-     * - 서비스 단가 등록
-     */
-    @Transactional
-    public UserResponse createAdminAccount(AdminAccountRequest request, String creatorId) {
-        // 비밀번호 확인
-        if (!request.getUserPass().equals(request.getUserPassChk())) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "비밀번호와 비밀번호 확인이 동일하지 않습니다.");
-        }
-
-        // 아이디 중복 확인
-        if (userMapper.existsByUserId(request.getUserId())) {
-            throw new BusinessException(ErrorCode.DUPLICATE_USER_ID);
-        }
-
-        // 비밀번호 암호화
-        String encodedPassword = passwordEncoder.encode(request.getUserPass());
-
-        // 개인정보 암호화 처리 (person, phone, email)
-        String encryptedPerson = null;
-        String encryptedPhone = null;
-        String encryptedEmail = null;
-
-        try {
-            if (request.getPerson() != null && !request.getPerson().isBlank()) {
-                encryptedPerson = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(request.getPerson()));
-            }
-            if (request.getPhone() != null && !request.getPhone().isBlank()) {
-                String phone = request.getPhone().replace("-", "");
-                encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(phone));
-            }
-            if (request.getEmail() != null && !request.getEmail().isBlank()) {
-                encryptedEmail = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(request.getEmail()));
-            }
-        } catch (Exception e) {
-            log.error("개인정보 암호화 실패: {}", e.getMessage());
-            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "개인정보 암호화에 실패했습니다.");
-        }
-
-        // 회원 정보 생성
-        User user = User.builder()
-                .userId(request.getUserId())
-                .userPass(encodedPassword)
-                .corpName(request.getCorpName())
-                .corpAddr(request.getCorpAddr())
-                .bizNum(request.getBizNum())
-                .bizTel(request.getBizTel())
-                .person(encryptedPerson)
-                .phone(encryptedPhone)
-                .email(encryptedEmail)
-                .userLevel(request.getUserLevel())
-                .useYn("Y")
-                .allowIpYn("Y")
-                .status("승인")  // 관리자 계정은 자동 승인
-                .regId(creatorId)
-                .loginFailureCnt(0)
-                .build();
-
-        // 회원 등록
-        userMapper.insert(user);
-        log.info("관리자 계정 생성: userId={}, level={}", request.getUserId(), request.getUserLevel());
-
-        // 지갑 초기화
-        walletService.initializeWallet(request.getUserId());
-        log.info("지갑 초기화 완료: userId={}", request.getUserId());
-
-        // 서비스 단가 등록 (standard_rate 기준)
-        initializeUserServiceRates(request.getUserId());
-        log.info("서비스 단가 등록 완료: userId={}", request.getUserId());
-
-        // 비밀번호 힌트 등록
-        registerPasswordHint(user.getSeq(), request.getHintQuestion(), request.getHintAnswer());
-
-        return getUserResponse(user);
+  /** 관리자 계정 생성 - 회원 등록 - 지갑 초기화 - 서비스 단가 등록 */
+  @Transactional
+  public UserResponse createAdminAccount(AdminAccountRequest request, String creatorId) {
+    // 비밀번호 확인
+    if (!request.getUserPass().equals(request.getUserPassChk())) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "비밀번호와 비밀번호 확인이 동일하지 않습니다.");
     }
 
-    /**
-     * 관리자 권한 확인
-     */
-    public boolean isAdmin(String userId) {
-        return userMapper.findByUserId(userId)
-                .map(User::isAdmin)
-                .orElse(false);
+    // 아이디 중복 확인
+    if (userMapper.existsByUserId(request.getUserId())) {
+      throw new BusinessException(ErrorCode.DUPLICATE_USER_ID);
     }
 
-    /**
-     * 최고 관리자 권한 확인 (레벨 99)
-     */
-    public boolean isSuperAdmin(String userId) {
-        return userMapper.findByUserId(userId)
-                .map(user -> user.getUserLevel() != null && user.getUserLevel() >= 99)
-                .orElse(false);
+    // 비밀번호 암호화
+    String encodedPassword = passwordEncoder.encode(request.getUserPass());
+
+    // 개인정보 암호화 처리 (person, phone, email)
+    String encryptedPerson = null;
+    String encryptedPhone = null;
+    String encryptedEmail = null;
+
+    try {
+      if (request.getPerson() != null && !request.getPerson().isBlank()) {
+        encryptedPerson = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(request.getPerson()));
+      }
+      if (request.getPhone() != null && !request.getPhone().isBlank()) {
+        String phone = request.getPhone().replace("-", "");
+        encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(phone));
+      }
+      if (request.getEmail() != null && !request.getEmail().isBlank()) {
+        encryptedEmail = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(request.getEmail()));
+      }
+    } catch (Exception e) {
+      log.error("개인정보 암호화 실패: {}", e.getMessage());
+      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "개인정보 암호화에 실패했습니다.");
     }
 
-    /**
-     * 사용자 권한 레벨 조회
-     */
-    public Integer getUserLevel(String userId) {
-        return userMapper.findByUserId(userId)
-                .map(User::getUserLevel)
-                .orElse(0);
+    // 회원 정보 생성
+    User user =
+        User.builder()
+            .userId(request.getUserId())
+            .userPass(encodedPassword)
+            .corpName(request.getCorpName())
+            .corpAddr(request.getCorpAddr())
+            .bizNum(request.getBizNum())
+            .bizTel(request.getBizTel())
+            .person(encryptedPerson)
+            .phone(encryptedPhone)
+            .email(encryptedEmail)
+            .userLevel(request.getUserLevel())
+            .useYn("Y")
+            .allowIpYn("Y")
+            .status("승인") // 관리자 계정은 자동 승인
+            .regId(creatorId)
+            .loginFailureCnt(0)
+            .build();
+
+    // 회원 등록
+    userMapper.insert(user);
+    log.info("관리자 계정 생성: userId={}, level={}", request.getUserId(), request.getUserLevel());
+
+    // 지갑 초기화
+    walletService.initializeWallet(request.getUserId());
+    log.info("지갑 초기화 완료: userId={}", request.getUserId());
+
+    // 서비스 단가 등록 (standard_rate 기준)
+    initializeUserServiceRates(request.getUserId());
+    log.info("서비스 단가 등록 완료: userId={}", request.getUserId());
+
+    // 비밀번호 힌트 등록
+    registerPasswordHint(user.getSeq(), request.getHintQuestion(), request.getHintAnswer());
+
+    return getUserResponse(user);
+  }
+
+  /** 관리자 권한 확인 */
+  public boolean isAdmin(String userId) {
+    return userMapper.findByUserId(userId).map(User::isAdmin).orElse(false);
+  }
+
+  /** 최고 관리자 권한 확인 (레벨 99) */
+  public boolean isSuperAdmin(String userId) {
+    return userMapper
+        .findByUserId(userId)
+        .map(user -> user.getUserLevel() != null && user.getUserLevel() >= 99)
+        .orElse(false);
+  }
+
+  /**
+   * 사용자 권한 레벨 조회
+   *
+   * @param userSeq JWT에서 추출한 값 (seq)
+   */
+  public Integer getUserLevel(String userSeq) {
+    // 숫자인 경우 seq로 조회, 아닌 경우 userId로 조회
+    try {
+      Integer seq = Integer.parseInt(userSeq);
+      return userMapper.findBySeq(seq).map(User::getUserLevel).orElse(0);
+    } catch (NumberFormatException e) {
+      return userMapper.findByUserId(userSeq).map(User::getUserLevel).orElse(0);
+    }
+  }
+
+  /** 권한 레벨 명칭 조회 */
+  public String getUserLevelName(Integer level) {
+    if (level == null) return "알 수 없음";
+
+    return switch (level) {
+      case 10 -> "기업관리자";
+      case 50 -> "운영관리자(B)";
+      case 60 -> "운영관리자(A)";
+      case 90 -> "최고관리자(B)";
+      case 99 -> "최고관리자(A)";
+      default -> "일반사용자";
+    };
+  }
+
+  /**
+   * A 레벨 여부 확인 (전체 쓰기 권한) - 99: 최고관리자(A) - 전체 데이터 수정/삭제 가능 - 60: 운영관리자(A) - 관리 범위 내 데이터 수정/삭제 가능
+   */
+  public boolean isLevelA(Integer userLevel) {
+    return userLevel != null && (userLevel == 99 || userLevel == 60);
+  }
+
+  /**
+   * B 레벨 여부 확인 (본인 데이터만 쓰기 권한) - 90: 최고관리자(B) - 전체 조회 가능, 본인 데이터만 수정/삭제 - 50: 운영관리자(B) - 관리 범위 조회
+   * 가능, 본인 데이터만 수정/삭제 - 10: 기업관리자 - 본인 데이터만 조회/수정/삭제
+   */
+  public boolean isLevelB(Integer userLevel) {
+    return userLevel != null && (userLevel == 90 || userLevel == 50 || userLevel == 10);
+  }
+
+  /**
+   * 대상 데이터에 대한 수정/삭제 권한 확인
+   *
+   * @param currentUserId 현재 로그인한 사용자 ID
+   * @param currentLevel 현재 사용자 권한 레벨
+   * @param targetOwnerId 대상 데이터 소유자 ID
+   * @return 수정/삭제 가능 여부
+   */
+  public boolean canModify(String currentUserId, Integer currentLevel, String targetOwnerId) {
+    if (currentUserId == null || currentLevel == null || targetOwnerId == null) {
+      return false;
     }
 
-    /**
-     * 권한 레벨 명칭 조회
-     */
-    public String getUserLevelName(Integer level) {
-        if (level == null) return "알 수 없음";
-
-        return switch (level) {
-            case 10 -> "기업관리자";
-            case 50 -> "운영관리자(B)";
-            case 60 -> "운영관리자(A)";
-            case 90 -> "최고관리자(B)";
-            case 99 -> "최고관리자(A)";
-            default -> "일반사용자";
-        };
+    // 본인 데이터는 항상 수정 가능
+    if (currentUserId.equals(targetOwnerId)) {
+      return true;
     }
 
-    /**
-     * A 레벨 여부 확인 (전체 쓰기 권한)
-     * - 99: 최고관리자(A) - 전체 데이터 수정/삭제 가능
-     * - 60: 운영관리자(A) - 관리 범위 내 데이터 수정/삭제 가능
-     */
-    public boolean isLevelA(Integer userLevel) {
-        return userLevel != null && (userLevel == 99 || userLevel == 60);
+    // A 레벨은 조회 가능 범위 내 데이터 수정 가능
+    if (isLevelA(currentLevel)) {
+      // 최고관리자(A) - 전체 수정 가능
+      if (currentLevel == 99) {
+        return true;
+      }
+      // 운영관리자(A) - 관리 계정 데이터만 수정 가능
+      if (currentLevel == 60) {
+        java.util.List<String> managedUserIds =
+            customerCompanyMapper.selectManagedUserIds(currentUserId);
+        return managedUserIds != null && managedUserIds.contains(targetOwnerId);
+      }
     }
 
-    /**
-     * B 레벨 여부 확인 (본인 데이터만 쓰기 권한)
-     * - 90: 최고관리자(B) - 전체 조회 가능, 본인 데이터만 수정/삭제
-     * - 50: 운영관리자(B) - 관리 범위 조회 가능, 본인 데이터만 수정/삭제
-     * - 10: 기업관리자 - 본인 데이터만 조회/수정/삭제
-     */
-    public boolean isLevelB(Integer userLevel) {
-        return userLevel != null && (userLevel == 90 || userLevel == 50 || userLevel == 10);
+    // B 레벨은 본인 데이터만 수정 가능 (위에서 이미 체크됨)
+    return false;
+  }
+
+  /** 수정/삭제 권한 검증 (권한 없으면 예외 발생) */
+  public void validateModifyPermission(
+      String currentUserId, Integer currentLevel, String targetOwnerId) {
+    if (!canModify(currentUserId, currentLevel, targetOwnerId)) {
+      throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 데이터를 수정/삭제할 권한이 없습니다.");
+    }
+  }
+
+  /**
+   * 권한별 조회 대상 사용자 ID 결정 - 레벨 90 이상: "ALL" (전체 조회) - 레벨 50-89: 본인 + 관리하는 계정들 (콤마 구분) - 레벨 50 미만: 본인만
+   *
+   * @param userId 현재 로그인한 사용자 ID
+   * @param userLevel 사용자 권한 레벨
+   * @return 조회 대상 사용자 ID (단일 ID, 콤마 구분 목록, 또는 "ALL")
+   */
+  public String determineQueryUserIds(String userId, Integer userLevel) {
+    if (userLevel == null) return userId;
+
+    if (userLevel >= 90) {
+      // 90 이상: 모든 데이터 조회
+      log.info("권한 레벨 {}로 모든 데이터 조회 허용: userId={}", userLevel, userId);
+      return "ALL";
+    } else if (userLevel >= 50) {
+      // 50-89: 관리하는 계정들 조회
+      java.util.List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(userId);
+
+      if (managedUserIds == null || managedUserIds.isEmpty()) {
+        log.info("권한 레벨 {} - 관리 계정 없음, 본인만 조회: {}", userLevel, userId);
+        return userId;
+      }
+
+      // 본인 ID 추가
+      if (!managedUserIds.contains(userId)) {
+        managedUserIds.add(userId);
+      }
+
+      String result = String.join(",", managedUserIds);
+      log.info("권한 레벨 {} - 관리 계정 조회: userId={}, 조회대상={}", userLevel, userId, result);
+      return result;
+    } else {
+      // 50 미만: 본인만
+      log.info("권한 레벨 {}로 본인만 조회: {}", userLevel, userId);
+      return userId;
+    }
+  }
+
+  // ==================== Private Methods ====================
+
+  /** 비밀번호 힌트 등록 */
+  private void registerPasswordHint(Integer seq, String hintQuestion, String hintAnswer) {
+    if (hintQuestion == null
+        || hintQuestion.isBlank()
+        || hintAnswer == null
+        || hintAnswer.isBlank()) {
+      log.debug("비밀번호 힌트 미입력: seq={}", seq);
+      return;
     }
 
-    /**
-     * 대상 데이터에 대한 수정/삭제 권한 확인
-     *
-     * @param currentUserId  현재 로그인한 사용자 ID
-     * @param currentLevel   현재 사용자 권한 레벨
-     * @param targetOwnerId  대상 데이터 소유자 ID
-     * @return 수정/삭제 가능 여부
-     */
-    public boolean canModify(String currentUserId, Integer currentLevel, String targetOwnerId) {
-        if (currentUserId == null || currentLevel == null || targetOwnerId == null) {
-            return false;
-        }
+    PasswordHint passwordHint =
+        PasswordHint.builder()
+            .userSeq(seq)
+            .hintQuestion(hintQuestion)
+            .hintAnswer(hintAnswer)
+            .build();
 
-        // 본인 데이터는 항상 수정 가능
-        if (currentUserId.equals(targetOwnerId)) {
-            return true;
-        }
+    passwordHintMapper.insert(passwordHint);
+    log.info("비밀번호 힌트 등록 완료: seq={}", seq);
+  }
 
-        // A 레벨은 조회 가능 범위 내 데이터 수정 가능
-        if (isLevelA(currentLevel)) {
-            // 최고관리자(A) - 전체 수정 가능
-            if (currentLevel == 99) {
-                return true;
-            }
-            // 운영관리자(A) - 관리 계정 데이터만 수정 가능
-            if (currentLevel == 60) {
-                java.util.List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(currentUserId);
-                return managedUserIds != null && managedUserIds.contains(targetOwnerId);
-            }
-        }
+  private void initializeUserServiceRates(String userId) {
+    LocalDate today = LocalDate.now();
 
-        // B 레벨은 본인 데이터만 수정 가능 (위에서 이미 체크됨)
-        return false;
-    }
+    BigDecimal surveyRate = standardRateService.getStandardRateWithVat("survey");
+    BigDecimal smsRate = standardRateService.getStandardRateWithVat("msg_sms");
+    BigDecimal lmsRate = standardRateService.getStandardRateWithVat("msg_lms");
+    BigDecimal mmsRate = standardRateService.getStandardRateWithVat("msg_mms");
+    BigDecimal qrRate = standardRateService.getStandardRateWithVat("qr_code");
 
-    /**
-     * 수정/삭제 권한 검증 (권한 없으면 예외 발생)
-     */
-    public void validateModifyPermission(String currentUserId, Integer currentLevel, String targetOwnerId) {
-        if (!canModify(currentUserId, currentLevel, targetOwnerId)) {
-            throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 데이터를 수정/삭제할 권한이 없습니다.");
-        }
-    }
+    userServiceRateMapper.insert(UserServiceRate.create(userId, "survey", surveyRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_sms", smsRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_lms", lmsRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_mms", mmsRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userId, "qr_code", qrRate, today));
+  }
 
-    /**
-     * 권한별 조회 대상 사용자 ID 결정
-     * - 레벨 90 이상: "ALL" (전체 조회)
-     * - 레벨 50-89: 본인 + 관리하는 계정들 (콤마 구분)
-     * - 레벨 50 미만: 본인만
-     *
-     * @param userId    현재 로그인한 사용자 ID
-     * @param userLevel 사용자 권한 레벨
-     * @return 조회 대상 사용자 ID (단일 ID, 콤마 구분 목록, 또는 "ALL")
-     */
-    public String determineQueryUserIds(String userId, Integer userLevel) {
-        if (userLevel == null) return userId;
-
-        if (userLevel >= 90) {
-            // 90 이상: 모든 데이터 조회
-            log.info("권한 레벨 {}로 모든 데이터 조회 허용: userId={}", userLevel, userId);
-            return "ALL";
-        } else if (userLevel >= 50) {
-            // 50-89: 관리하는 계정들 조회
-            java.util.List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(userId);
-
-            if (managedUserIds == null || managedUserIds.isEmpty()) {
-                log.info("권한 레벨 {} - 관리 계정 없음, 본인만 조회: {}", userLevel, userId);
-                return userId;
-            }
-
-            // 본인 ID 추가
-            if (!managedUserIds.contains(userId)) {
-                managedUserIds.add(userId);
-            }
-
-            String result = String.join(",", managedUserIds);
-            log.info("권한 레벨 {} - 관리 계정 조회: userId={}, 조회대상={}", userLevel, userId, result);
-            return result;
-        } else {
-            // 50 미만: 본인만
-            log.info("권한 레벨 {}로 본인만 조회: {}", userLevel, userId);
-            return userId;
-        }
-    }
-
-    // ==================== Private Methods ====================
-
-    /**
-     * 비밀번호 힌트 등록
-     */
-    private void registerPasswordHint(Long mngSeq, String hintQuestion, String hintAnswer) {
-        if (hintQuestion == null || hintQuestion.isBlank() ||
-            hintAnswer == null || hintAnswer.isBlank()) {
-            log.debug("비밀번호 힌트 미입력: mngSeq={}", mngSeq);
-            return;
-        }
-
-        PasswordHint passwordHint = PasswordHint.builder()
-                .mngSeq(mngSeq)
-                .hintQuestion(hintQuestion)
-                .hintAnswer(hintAnswer)
-                .build();
-
-        passwordHintMapper.insert(passwordHint);
-        log.info("비밀번호 힌트 등록 완료: mngSeq={}", mngSeq);
-    }
-
-    private void initializeUserServiceRates(String userId) {
-        LocalDate today = LocalDate.now();
-
-        BigDecimal surveyRate = standardRateService.getStandardRateWithVat("survey");
-        BigDecimal smsRate = standardRateService.getStandardRateWithVat("msg_sms");
-        BigDecimal lmsRate = standardRateService.getStandardRateWithVat("msg_lms");
-        BigDecimal mmsRate = standardRateService.getStandardRateWithVat("msg_mms");
-        BigDecimal qrRate = standardRateService.getStandardRateWithVat("qr_code");
-
-        userServiceRateMapper.insert(UserServiceRate.create(userId, "survey", surveyRate, today));
-        userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_sms", smsRate, today));
-        userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_lms", lmsRate, today));
-        userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_mms", mmsRate, today));
-        userServiceRateMapper.insert(UserServiceRate.create(userId, "qr_code", qrRate, today));
-    }
-
-    private UserResponse getUserResponse(User user) {
-        // UserResponse.from()을 사용하여 개인정보 복호화 포함
-        UserResponse response = UserResponse.from(user);
-        // userLevelName 추가를 위해 builder 재구성
-        return UserResponse.builder()
-                .seq(response.getSeq())
-                .userId(response.getUserId())
-                .corpName(response.getCorpName())
-                .corpAddr(response.getCorpAddr())
-                .bizNum(response.getBizNum())
-                .bizTel(response.getBizTel())
-                .person(response.getPerson())
-                .phone(response.getPhone())
-                .email(response.getEmail())
-                .userLevel(response.getUserLevel())
-                .userLevelName(getUserLevelName(user.getUserLevel()))
-                .useYn(response.getUseYn())
-                .status(response.getStatus())
-                .regDate(response.getRegDate())
-                .build();
-    }
+  private UserResponse getUserResponse(User user) {
+    // UserResponse.from()을 사용하여 개인정보 복호화 포함
+    UserResponse response = UserResponse.from(user);
+    // userLevelName 추가를 위해 builder 재구성
+    return UserResponse.builder()
+        .seq(response.getSeq())
+        .userId(response.getUserId())
+        .corpName(response.getCorpName())
+        .corpAddr(response.getCorpAddr())
+        .bizNum(response.getBizNum())
+        .bizTel(response.getBizTel())
+        .person(response.getPerson())
+        .phone(response.getPhone())
+        .email(response.getEmail())
+        .userLevel(response.getUserLevel())
+        .userLevelName(getUserLevelName(user.getUserLevel()))
+        .useYn(response.getUseYn())
+        .status(response.getStatus())
+        .regDate(response.getRegDate())
+        .build();
+  }
 }

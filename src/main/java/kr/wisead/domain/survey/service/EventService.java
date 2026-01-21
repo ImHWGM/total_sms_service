@@ -12,6 +12,7 @@ import kr.wisead.common.util.QrCodeUtils;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.excel.service.ExcelService;
 import kr.wisead.domain.file.service.FileStorageService;
+import kr.wisead.domain.payment.service.BillingService;
 import kr.wisead.domain.survey.dto.*;
 import kr.wisead.domain.survey.entity.*;
 import kr.wisead.mapper.primary.*;
@@ -44,6 +45,7 @@ public class EventService {
   private final ExcelService excelService;
   private final AdminService adminService;
   private final FileStorageService fileStorageService;
+  private final BillingService billingService;
 
   @Value("${upload.dir:./uploads}")
   private String uploadDir;
@@ -126,10 +128,12 @@ public class EventService {
     // 이벤트 코드 생성
     String eventCode = generateEventCode();
 
-    // QR 간편인증 사용 시 authCodeUrl과 QR 이미지 생성
+    // QR 간편인증 사용 시 비용 차감 후 authCodeUrl과 QR 이미지 생성
     String authCodeUrl = null;
     String qrCodeImgPath = null;
     if ("Y".equals(request.getQrCode())) {
+      // QR 코드 신청 비용 차감 (잔액 부족 시 예외 발생)
+      billingService.deductInitialQrFee(userId, "설문 생성 - QR 코드 신청");
       authCodeUrl = CommonUtils.randomCode(20);
       qrCodeImgPath = generateQrCodeImage(authCodeUrl);
     }
@@ -277,9 +281,11 @@ public class EventService {
     Integer userLevel = adminService.getUserLevel(uptId);
     adminService.validateModifyPermission(uptId, userLevel, event.getRegId());
 
-    // QR 간편인증 사용으로 변경되었고, 기존에 authCodeUrl이 없으면 새로 생성
+    // QR 간편인증 사용으로 변경되었고, 기존에 authCodeUrl이 없으면 새로 생성 (비용 차감 후)
     if ("Y".equals(request.getQrCode())
         && (event.getAuthCodeUrl() == null || event.getAuthCodeUrl().isEmpty())) {
+      // QR 코드 신청 비용 차감 (잔액 부족 시 예외 발생)
+      billingService.deductInitialQrFee(uptId, "설문 수정 - QR 코드 신청");
       String authCodeUrl = CommonUtils.randomCode(20);
       String qrCodeImgPath = generateQrCodeImage(authCodeUrl);
       event.setQrCodeInfo(qrCodeImgPath, authCodeUrl);

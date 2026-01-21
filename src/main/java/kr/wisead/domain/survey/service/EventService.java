@@ -1466,36 +1466,30 @@ public class EventService {
 
   /** 상태 텍스트 변환 */
   private String getStatusText(String status) {
-    if (status == null) return "정보 없음";
-    switch (status) {
-      case "A":
-        return "대기";
-      case "P":
-        return "진행중";
-      case "S":
-        return "중지";
-      case "F":
-        return "종료";
-      default:
-        return "정보 없음";
+    if (status == null) {
+      return "정보 없음";
     }
+    return switch (status) {
+      case "A" -> "대기";
+      case "P" -> "진행중";
+      case "S" -> "중지";
+      case "F" -> "종료";
+      default -> "정보 없음";
+    };
   }
 
   /** 인증 방식 텍스트 변환 */
   private String getAuthText(String auth) {
-    if (auth == null) return "정보 없음";
-    switch (auth) {
-      case "UA":
-        return "실명인증";
-      case "PA":
-        return "휴대폰인증";
-      case "GA":
-        return "범용인증";
-      case "NA":
-        return "없음";
-      default:
-        return "정보 없음";
+    if (auth == null) {
+      return "정보 없음";
     }
+    return switch (auth) {
+      case "UA" -> "실명인증";
+      case "PA" -> "휴대폰인증";
+      case "GA" -> "범용인증";
+      case "NA" -> "없음";
+      default -> "정보 없음";
+    };
   }
 
   /** 문항 타입 텍스트 변환 */

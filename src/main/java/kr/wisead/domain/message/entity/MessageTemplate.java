@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 public class MessageTemplate {
 
     private Long templateSeq;
-    private Long userSeq;
+    private Integer userSeq;
     private Integer templateOrder;
     private String sendingForm;      // 발송 형태 (I: 즉시, R: 예약)
     private String msgType;          // 메시지 타입 (SMS, LMS, MMS)
@@ -25,7 +25,7 @@ public class MessageTemplate {
     private String imagePath;        // MMS 이미지 경로
 
     @Builder
-    public MessageTemplate(Long templateSeq, Long userSeq, Integer templateOrder,
+    public MessageTemplate(Long templateSeq, Integer userSeq, Integer templateOrder,
                            String sendingForm, String msgType, String subject,
                            String text, LocalDateTime insertTime, String imagePath) {
         this.templateSeq = templateSeq;

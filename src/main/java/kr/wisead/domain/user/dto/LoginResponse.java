@@ -22,7 +22,7 @@ public class LoginResponse {
     @Getter
     @Builder
     public static class UserInfo {
-        private Long seq;
+        private Integer seq;
         private String userId;
         private String corpName;
         private String person;

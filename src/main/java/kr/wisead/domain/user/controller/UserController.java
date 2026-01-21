@@ -31,7 +31,7 @@ public class UserController {
   /** 내 정보 조회 */
   @GetMapping("/me")
   public ApiResponse<UserResponse> getMyInfo(@AuthenticationPrincipal UserDetails userDetails) {
-    Long seq = Long.parseLong(userDetails.getUsername());
+    Integer seq = Integer.parseInt(userDetails.getUsername());
     UserResponse response = userService.getUserBySeq(seq);
     return ApiResponse.success(response);
   }
@@ -39,7 +39,7 @@ public class UserController {
   /** 회원 정보 조회 (by SEQ) - 관리자 전용 */
   @GetMapping("/{seq}")
   @PreAuthorize("hasRole('ADMIN')")
-  public ApiResponse<UserResponse> getUserBySeq(@PathVariable Long seq) {
+  public ApiResponse<UserResponse> getUserBySeq(@PathVariable Integer seq) {
     UserResponse response = userService.getUserBySeq(seq);
     return ApiResponse.success(response);
   }
@@ -175,7 +175,7 @@ public class UserController {
   @PutMapping("/{seq}/info")
   @PreAuthorize("hasRole('ADMIN')")
   public ApiResponse<Void> updateMemberInfo(
-      @PathVariable Long seq,
+      @PathVariable Integer seq,
       @AuthenticationPrincipal UserDetails userDetails,
       @Valid @RequestBody MemberUpdateRequest request) {
     request.setSeq(seq);

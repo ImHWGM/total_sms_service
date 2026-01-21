@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @Builder
 public class UserResponse {
 
-    private Long seq;
+    private Integer seq;
     private String userId;
     private String corpName;
     private String corpAddr;

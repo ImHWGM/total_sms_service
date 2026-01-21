@@ -17,12 +17,12 @@ public class PasswordHint {
     /**
      * 힌트 시퀀스
      */
-    private Long seq;
+    private Integer seq;
 
     /**
      * 사용자 시퀀스 (user.SEQ)
      */
-    private Long mngSeq;
+    private Integer userSeq;
 
     /**
      * 힌트 질문

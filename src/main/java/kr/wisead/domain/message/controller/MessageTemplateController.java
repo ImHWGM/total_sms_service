@@ -33,7 +33,7 @@ public class MessageTemplateController {
   public ApiResponse<MessageTemplateResponse> create(
       @AuthenticationPrincipal UserDetails userDetails,
       @Valid @RequestBody MessageTemplateRequest request) {
-    Long userSeq = getUserSeq(userDetails);
+    Integer userSeq = getUserSeq(userDetails);
     MessageTemplateResponse response = messageTemplateService.create(userSeq, request);
     return ApiResponse.success(response);
   }
@@ -48,7 +48,7 @@ public class MessageTemplateController {
       @RequestParam(value = "sendingForm", required = false, defaultValue = "d") String sendingForm,
       @RequestParam(value = "image", required = false) MultipartFile image) {
 
-    Long userSeq = getUserSeq(userDetails);
+    Integer userSeq = getUserSeq(userDetails);
     String imagePath = null;
 
     // MMS이고 이미지가 있을 때만 처리
@@ -78,7 +78,7 @@ public class MessageTemplateController {
   public ApiResponse<List<MessageTemplateResponse>> getList(
       @AuthenticationPrincipal UserDetails userDetails,
       @RequestParam(required = false) String type) {
-    Long userSeq = getUserSeq(userDetails);
+    Integer userSeq = getUserSeq(userDetails);
     List<MessageTemplateResponse> list;
     if (type != null && !type.isEmpty()) {
       list = messageTemplateService.getListBySendingForm(userSeq, type);
@@ -92,7 +92,7 @@ public class MessageTemplateController {
   @GetMapping("/survey")
   public ApiResponse<List<MessageTemplateResponse>> getSurveyList(
       @AuthenticationPrincipal UserDetails userDetails) {
-    Long userSeq = getUserSeq(userDetails);
+    Integer userSeq = getUserSeq(userDetails);
     List<MessageTemplateResponse> list = messageTemplateService.getListBySendingForm(userSeq, "s");
     return ApiResponse.success(list);
   }
@@ -101,7 +101,7 @@ public class MessageTemplateController {
   @GetMapping("/direct")
   public ApiResponse<List<MessageTemplateResponse>> getDirectList(
       @AuthenticationPrincipal UserDetails userDetails) {
-    Long userSeq = getUserSeq(userDetails);
+    Integer userSeq = getUserSeq(userDetails);
     List<MessageTemplateResponse> list = messageTemplateService.getListBySendingForm(userSeq, "d");
     return ApiResponse.success(list);
   }
@@ -110,7 +110,7 @@ public class MessageTemplateController {
   @GetMapping("/{templateSeq}")
   public ApiResponse<MessageTemplateResponse> getOne(
       @AuthenticationPrincipal UserDetails userDetails, @PathVariable Long templateSeq) {
-    Long userSeq = getUserSeq(userDetails);
+    Integer userSeq = getUserSeq(userDetails);
     MessageTemplateResponse response = messageTemplateService.getOne(templateSeq, userSeq);
     return ApiResponse.success(response);
   }
@@ -121,7 +121,7 @@ public class MessageTemplateController {
       @AuthenticationPrincipal UserDetails userDetails,
       @PathVariable Long templateSeq,
       @Valid @RequestBody MessageTemplateRequest request) {
-    Long userSeq = getUserSeq(userDetails);
+    Integer userSeq = getUserSeq(userDetails);
     MessageTemplateResponse response = messageTemplateService.update(templateSeq, userSeq, request);
     return ApiResponse.success(response);
   }
@@ -130,7 +130,7 @@ public class MessageTemplateController {
   @DeleteMapping("/{templateSeq}")
   public ApiResponse<Void> delete(
       @AuthenticationPrincipal UserDetails userDetails, @PathVariable Long templateSeq) {
-    Long userSeq = getUserSeq(userDetails);
+    Integer userSeq = getUserSeq(userDetails);
     messageTemplateService.delete(templateSeq, userSeq);
     return ApiResponse.success(null);
   }
@@ -139,7 +139,7 @@ public class MessageTemplateController {
   @PutMapping("/reorder")
   public ApiResponse<Void> reorder(
       @AuthenticationPrincipal UserDetails userDetails, @RequestBody List<Long> templateSeqList) {
-    Long userSeq = getUserSeq(userDetails);
+    Integer userSeq = getUserSeq(userDetails);
     messageTemplateService.reorder(userSeq, templateSeqList);
     return ApiResponse.success(null);
   }
@@ -148,7 +148,7 @@ public class MessageTemplateController {
   @PutMapping("/survey/reorder")
   public ApiResponse<Void> reorderSurvey(
       @AuthenticationPrincipal UserDetails userDetails, @RequestBody List<Long> templateSeqList) {
-    Long userSeq = getUserSeq(userDetails);
+    Integer userSeq = getUserSeq(userDetails);
     messageTemplateService.reorderBySendingForm(userSeq, templateSeqList, "s");
     return ApiResponse.success(null);
   }
@@ -157,13 +157,13 @@ public class MessageTemplateController {
   @PutMapping("/direct/reorder")
   public ApiResponse<Void> reorderDirect(
       @AuthenticationPrincipal UserDetails userDetails, @RequestBody List<Long> templateSeqList) {
-    Long userSeq = getUserSeq(userDetails);
+    Integer userSeq = getUserSeq(userDetails);
     messageTemplateService.reorderBySendingForm(userSeq, templateSeqList, "d");
     return ApiResponse.success(null);
   }
 
   /** UserDetails에서 userSeq 추출 */
-  private Long getUserSeq(UserDetails userDetails) {
+  private Integer getUserSeq(UserDetails userDetails) {
     String userId = userDetails.getUsername();
     return userMapper
         .findByUserId(userId)

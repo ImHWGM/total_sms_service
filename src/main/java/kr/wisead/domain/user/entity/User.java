@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
-    private Long seq;
+    private Integer seq;
     private String userId;
     private String userPass;
     private String corpName;
@@ -43,7 +43,7 @@ public class User {
     private Integer blockedSeq;
 
     @Builder
-    public User(Long seq, String userId, String userPass, String corpName, String corpAddr,
+    public User(Integer seq, String userId, String userPass, String corpName, String corpAddr,
                 String bizNum, String bizTel, String person, String phone, String email,
                 Integer userLevel, String useYn, String allowIpYn, String allowIp,
                 LocalDateTime lastLogin, Integer loginFailureCnt, LocalDateTime regDate,

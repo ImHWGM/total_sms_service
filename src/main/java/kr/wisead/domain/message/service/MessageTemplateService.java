@@ -33,7 +33,7 @@ public class MessageTemplateService {
      * 템플릿 생성
      */
     @Transactional
-    public MessageTemplateResponse create(Long userSeq, MessageTemplateRequest request) {
+    public MessageTemplateResponse create(Integer userSeq, MessageTemplateRequest request) {
         String sendingForm = request.getSendingForm();
 
         // 다음 순서 번호 조회 (발송 형태별로 분리)
@@ -66,7 +66,7 @@ public class MessageTemplateService {
      * 템플릿 목록 조회
      */
     @Transactional(readOnly = true)
-    public List<MessageTemplateResponse> getList(Long userSeq) {
+    public List<MessageTemplateResponse> getList(Integer userSeq) {
         return messageTemplateMapper.findByUserSeq(userSeq).stream()
                 .map(MessageTemplateResponse::from)
                 .collect(Collectors.toList());
@@ -78,7 +78,7 @@ public class MessageTemplateService {
      * @param sendingForm 발송 형태 (s: 설문용, d: 직접발송용)
      */
     @Transactional(readOnly = true)
-    public List<MessageTemplateResponse> getListBySendingForm(Long userSeq, String sendingForm) {
+    public List<MessageTemplateResponse> getListBySendingForm(Integer userSeq, String sendingForm) {
         return messageTemplateMapper.findByUserSeqAndSendingForm(userSeq, sendingForm).stream()
                 .map(MessageTemplateResponse::from)
                 .collect(Collectors.toList());
@@ -88,7 +88,7 @@ public class MessageTemplateService {
      * 템플릿 상세 조회 (소유자 검증 포함)
      */
     @Transactional(readOnly = true)
-    public MessageTemplateResponse getOne(Long templateSeq, Long userSeq) {
+    public MessageTemplateResponse getOne(Long templateSeq, Integer userSeq) {
         MessageTemplate template = messageTemplateMapper.findBySeq(templateSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "템플릿을 찾을 수 없습니다."));
 
@@ -104,7 +104,7 @@ public class MessageTemplateService {
      * 템플릿 수정
      */
     @Transactional
-    public MessageTemplateResponse update(Long templateSeq, Long userSeq, MessageTemplateRequest request, String currentUserId) {
+    public MessageTemplateResponse update(Long templateSeq, Integer userSeq, MessageTemplateRequest request, String currentUserId) {
         MessageTemplate template = messageTemplateMapper.findBySeq(templateSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "템플릿을 찾을 수 없습니다."));
 
@@ -134,7 +134,7 @@ public class MessageTemplateService {
      * 템플릿 수정 (하위 호환)
      */
     @Transactional
-    public MessageTemplateResponse update(Long templateSeq, Long userSeq, MessageTemplateRequest request) {
+    public MessageTemplateResponse update(Long templateSeq, Integer userSeq, MessageTemplateRequest request) {
         return update(templateSeq, userSeq, request, null);
     }
 
@@ -142,7 +142,7 @@ public class MessageTemplateService {
      * 템플릿 삭제
      */
     @Transactional
-    public void delete(Long templateSeq, Long userSeq, String currentUserId) {
+    public void delete(Long templateSeq, Integer userSeq, String currentUserId) {
         MessageTemplate template = messageTemplateMapper.findBySeq(templateSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "템플릿을 찾을 수 없습니다."));
 
@@ -166,7 +166,7 @@ public class MessageTemplateService {
      * 템플릿 삭제 (하위 호환)
      */
     @Transactional
-    public void delete(Long templateSeq, Long userSeq) {
+    public void delete(Long templateSeq, Integer userSeq) {
         delete(templateSeq, userSeq, null);
     }
 
@@ -174,7 +174,7 @@ public class MessageTemplateService {
      * 템플릿 순서 변경
      */
     @Transactional
-    public void reorder(Long userSeq, List<Long> templateSeqList) {
+    public void reorder(Integer userSeq, List<Long> templateSeqList) {
         AtomicInteger order = new AtomicInteger(1);
         templateSeqList.forEach(seq ->
                 messageTemplateMapper.updateOrder(seq, order.getAndIncrement())
@@ -185,7 +185,7 @@ public class MessageTemplateService {
     /**
      * 순서 재정렬 (삭제 후 사용)
      */
-    private void recompactOrder(Long userSeq) {
+    private void recompactOrder(Integer userSeq) {
         AtomicInteger order = new AtomicInteger(1);
         messageTemplateMapper.findByUserSeq(userSeq).forEach(t ->
                 messageTemplateMapper.updateOrder(t.getTemplateSeq(), order.getAndIncrement())
@@ -199,7 +199,7 @@ public class MessageTemplateService {
      * @param sendingForm 발송 형태 (s: 설문용, d: 직접발송용)
      */
     @Transactional
-    public void reorderBySendingForm(Long userSeq, List<Long> templateSeqList, String sendingForm) {
+    public void reorderBySendingForm(Integer userSeq, List<Long> templateSeqList, String sendingForm) {
         AtomicInteger order = new AtomicInteger(1);
         templateSeqList.forEach(seq ->
                 messageTemplateMapper.updateOrder(seq, order.getAndIncrement())

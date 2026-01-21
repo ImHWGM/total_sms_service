@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 public class MessageTemplateResponse {
 
     private Long templateSeq;
-    private Long userSeq;
+    private Integer userSeq;
     private Integer templateOrder;
     private String sendingForm;
     private String msgType;
@@ -26,7 +26,7 @@ public class MessageTemplateResponse {
     private String imagePath;
 
     @Builder
-    public MessageTemplateResponse(Long templateSeq, Long userSeq, Integer templateOrder,
+    public MessageTemplateResponse(Long templateSeq, Integer userSeq, Integer templateOrder,
                                    String sendingForm, String msgType, String subject,
                                    String text, LocalDateTime insertTime, String imagePath) {
         this.templateSeq = templateSeq;

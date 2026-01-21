@@ -15,7 +15,7 @@ public interface PasswordHintMapper {
     /**
      * 사용자 시퀀스로 비밀번호 힌트 조회
      */
-    Optional<PasswordHint> findByMngSeq(@Param("mngSeq") Long mngSeq);
+    Optional<PasswordHint> findByUserSeq(@Param("userSeq") Integer userSeq);
 
     /**
      * 비밀번호 힌트 등록
@@ -30,7 +30,7 @@ public interface PasswordHintMapper {
     /**
      * 비밀번호 힌트 검증 (질문과 답변이 일치하는지 확인)
      */
-    int verifyHint(@Param("mngSeq") Long mngSeq,
+    int verifyHint(@Param("userSeq") Integer userSeq,
                    @Param("hintQuestion") String hintQuestion,
                    @Param("hintAnswer") String hintAnswer);
 }

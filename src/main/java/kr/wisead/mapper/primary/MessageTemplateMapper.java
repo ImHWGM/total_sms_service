@@ -21,37 +21,37 @@ public interface MessageTemplateMapper {
     /**
      * 사용자별 템플릿 목록 조회
      */
-    List<MessageTemplate> findByUserSeq(@Param("userSeq") Long userSeq);
+    List<MessageTemplate> findByUserSeq(@Param("userSeq") Integer userSeq);
 
     /**
      * 사용자별 템플릿 목록 조회 (발송 형태별)
      * @param userSeq 사용자 SEQ
      * @param sendingForm 발송 형태 (s: 설문용, d: 직접발송용)
      */
-    List<MessageTemplate> findByUserSeqAndSendingForm(@Param("userSeq") Long userSeq,
+    List<MessageTemplate> findByUserSeqAndSendingForm(@Param("userSeq") Integer userSeq,
                                                        @Param("sendingForm") String sendingForm);
 
     /**
      * 사용자별 템플릿 목록 조회 (페이징)
      */
-    List<MessageTemplate> findByUserSeqWithPaging(@Param("userSeq") Long userSeq,
+    List<MessageTemplate> findByUserSeqWithPaging(@Param("userSeq") Integer userSeq,
                                                    @Param("offset") int offset,
                                                    @Param("limit") int limit);
 
     /**
      * 사용자별 템플릿 개수 조회
      */
-    long countByUserSeq(@Param("userSeq") Long userSeq);
+    long countByUserSeq(@Param("userSeq") Integer userSeq);
 
     /**
      * 사용자별 최대 순서 조회
      */
-    Integer findMaxOrderByUserSeq(@Param("userSeq") Long userSeq);
+    Integer findMaxOrderByUserSeq(@Param("userSeq") Integer userSeq);
 
     /**
      * 사용자별 발송형태별 최대 순서 조회
      */
-    Integer findMaxOrderByUserSeqAndSendingForm(@Param("userSeq") Long userSeq,
+    Integer findMaxOrderByUserSeqAndSendingForm(@Param("userSeq") Integer userSeq,
                                                   @Param("sendingForm") String sendingForm);
 
     /**
@@ -72,7 +72,7 @@ public interface MessageTemplateMapper {
     /**
      * 사용자별 템플릿 전체 삭제
      */
-    int deleteByUserSeq(@Param("userSeq") Long userSeq);
+    int deleteByUserSeq(@Param("userSeq") Integer userSeq);
 
     /**
      * 템플릿 순서 변경

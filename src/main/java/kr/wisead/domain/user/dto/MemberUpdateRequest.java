@@ -18,7 +18,7 @@ public class MemberUpdateRequest {
      * 회원 시퀀스
      */
     @NotNull(message = "회원 시퀀스가 필요합니다.")
-    private Long seq;
+    private Integer seq;
 
     /**
      * 기업명

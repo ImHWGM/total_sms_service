@@ -56,7 +56,7 @@ public class UserService {
 
   /** 회원 정보 조회 (by SEQ) */
   @Transactional(readOnly = true)
-  public UserResponse getUserBySeq(Long seq) {
+  public UserResponse getUserBySeq(Integer seq) {
     User user =
         userMapper
             .findBySeq(seq)

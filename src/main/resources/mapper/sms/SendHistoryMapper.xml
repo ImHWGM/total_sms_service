@@ -54,7 +54,7 @@
             </if>
             <if test="params.userId != null and params.userId != '' and params.userId != 'ALL'">
                 <choose>
-                    <when test="params.userId.contains(',')">
+                    <when test="params.userId.indexOf(',') >= 0">
                         AND EXT_COL3 IN
                         <foreach item="id" collection="params.userId.split(',')" open="(" separator="," close=")">
                             #{id}

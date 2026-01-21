@@ -6,6 +6,7 @@ import kr.wisead.domain.statistics.dto.*;
 import kr.wisead.domain.statistics.service.PeriodStatisticsService;
 import kr.wisead.domain.statistics.service.StatisticsService;
 import kr.wisead.domain.statistics.service.UserStatisticsService;
+import kr.wisead.mapper.primary.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,6 +23,16 @@ public class StatisticsController {
   private final StatisticsService statisticsService;
   private final PeriodStatisticsService periodStatisticsService;
   private final UserStatisticsService userStatisticsService;
+  private final UserMapper userMapper;
+
+  /** UserDetails에서 userId 추출 (null-safe) */
+  private String extractUserId(UserDetails userDetails) {
+    if (userDetails == null) {
+      return null;
+    }
+    Integer userSeq = Integer.parseInt(userDetails.getUsername());
+    return userMapper.findUserIdBySeq(userSeq);
+  }
 
   /** 일별 통계 조회 GET /api/statistics/daily?startDate=2025-01-01&endDate=2025-01-31&serviceType=SMS */
   @GetMapping("/daily")
@@ -31,11 +42,11 @@ public class StatisticsController {
       @RequestParam(required = false) String endDate,
       @RequestParam(required = false) String serviceType) {
 
-    Integer userSeq = Integer.parseInt(userDetails.getUsername());
+    String userId = extractUserId(userDetails);
 
     StatsSearchRequest request =
         StatsSearchRequest.builder()
-            .userId(userSeq)
+            .userId(userId)
             .startDate(startDate)
             .endDate(endDate)
             .serviceType(serviceType)
@@ -50,7 +61,7 @@ public class StatisticsController {
   public ApiResponse<List<UserStatsResponse>> getUserStats(
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
-      @RequestParam(required = false) List<Integer> userIds) {
+      @RequestParam(required = false) List<String> userIds) {
 
     StatsSearchRequest request =
         StatsSearchRequest.builder().userIds(userIds).startDate(startDate).endDate(endDate).build();
@@ -66,10 +77,10 @@ public class StatisticsController {
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate) {
 
-    Integer userSeq = Integer.parseInt(userDetails.getUsername());
+    String userId = extractUserId(userDetails);
 
     StatsSearchRequest request =
-        StatsSearchRequest.builder().userId(userSeq).startDate(startDate).endDate(endDate).build();
+        StatsSearchRequest.builder().userId(userId).startDate(startDate).endDate(endDate).build();
 
     List<UsageSummaryResponse> summary = statisticsService.getUsageSummary(request);
     return ApiResponse.success(summary);
@@ -83,11 +94,11 @@ public class StatisticsController {
       @RequestParam(required = false) String endDate,
       @RequestParam(required = false) String serviceType) {
 
-    Integer userSeq = Integer.parseInt(userDetails.getUsername());
+    String userId = extractUserId(userDetails);
 
     StatsSearchRequest request =
         StatsSearchRequest.builder()
-            .userId(userSeq)
+            .userId(userId)
             .startDate(startDate)
             .endDate(endDate)
             .serviceType(serviceType)
@@ -131,11 +142,11 @@ public class StatisticsController {
       @RequestParam(required = false) String msgType,
       @RequestParam(required = false) String serviceType) {
 
-    Integer userSeq = userDetails != null ? Integer.parseInt(userDetails.getUsername()) : null;
+    String userId = extractUserId(userDetails);
 
     StatsSearchRequest request =
         StatsSearchRequest.builder()
-            .userId(userSeq)
+            .userId(userId)
             .startDate(startDate)
             .endDate(endDate)
             .msgType(msgType)
@@ -154,8 +165,8 @@ public class StatisticsController {
   public ApiResponse<List<DailyStatsResponse>> getPeriodDailyStatsAdmin(
       @RequestParam String startDate,
       @RequestParam String endDate,
-      @RequestParam(required = false) Integer userId,
-      @RequestParam(required = false) List<Integer> userIds,
+      @RequestParam(required = false) String userId,
+      @RequestParam(required = false) List<String> userIds,
       @RequestParam(required = false) String msgType,
       @RequestParam(required = false) String serviceType) {
 
@@ -181,11 +192,11 @@ public class StatisticsController {
       @RequestParam(required = false) String msgType,
       @RequestParam(required = false) String serviceType) {
 
-    Integer userSeq = userDetails != null ? Integer.parseInt(userDetails.getUsername()) : null;
+    String userId = extractUserId(userDetails);
 
     StatsSearchRequest request =
         StatsSearchRequest.builder()
-            .userId(userSeq)
+            .userId(userId)
             .msgType(msgType)
             .serviceType(serviceType)
             .build();
@@ -203,11 +214,11 @@ public class StatisticsController {
       @RequestParam(required = false) String msgType,
       @RequestParam(required = false) String serviceType) {
 
-    Integer userSeq = userDetails != null ? Integer.parseInt(userDetails.getUsername()) : null;
+    String userId = extractUserId(userDetails);
 
     StatsSearchRequest request =
         StatsSearchRequest.builder()
-            .userId(userSeq)
+            .userId(userId)
             .startDate(startDate)
             .endDate(endDate)
             .msgType(msgType)
@@ -226,8 +237,8 @@ public class StatisticsController {
   public ApiResponse<DailyStatsResponse> getPeriodTotalStatsAdmin(
       @RequestParam String startDate,
       @RequestParam String endDate,
-      @RequestParam(required = false) Integer userId,
-      @RequestParam(required = false) List<Integer> userIds,
+      @RequestParam(required = false) String userId,
+      @RequestParam(required = false) List<String> userIds,
       @RequestParam(required = false) String msgType,
       @RequestParam(required = false) String serviceType) {
 
@@ -257,7 +268,7 @@ public class StatisticsController {
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
       @RequestParam(required = false, defaultValue = "M") String serviceType,
-      @RequestParam(required = false) List<Integer> userIds) {
+      @RequestParam(required = false) List<String> userIds) {
 
     StatsSearchRequest request =
         StatsSearchRequest.builder()
@@ -279,8 +290,8 @@ public class StatisticsController {
   public ApiResponse<List<UserMsgStatsResponse>> getUserMsgStats(
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
-      @RequestParam(required = false) Integer userId,
-      @RequestParam(required = false) List<Integer> userIds) {
+      @RequestParam(required = false) String userId,
+      @RequestParam(required = false) List<String> userIds) {
 
     StatsSearchRequest request =
         StatsSearchRequest.builder()
@@ -299,8 +310,8 @@ public class StatisticsController {
   public ApiResponse<List<UserSurveyStatsResponse>> getUserSurveyStats(
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
-      @RequestParam(required = false) Integer userId,
-      @RequestParam(required = false) List<Integer> userIds) {
+      @RequestParam(required = false) String userId,
+      @RequestParam(required = false) List<String> userIds) {
 
     StatsSearchRequest request =
         StatsSearchRequest.builder()
@@ -319,8 +330,8 @@ public class StatisticsController {
   public ApiResponse<List<UserQrStatsResponse>> getUserQrStats(
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
-      @RequestParam(required = false) Integer userId,
-      @RequestParam(required = false) List<Integer> userIds) {
+      @RequestParam(required = false) String userId,
+      @RequestParam(required = false) List<String> userIds) {
 
     StatsSearchRequest request =
         StatsSearchRequest.builder()

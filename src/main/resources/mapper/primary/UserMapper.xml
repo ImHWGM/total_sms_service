@@ -56,6 +56,13 @@
         WHERE USER_ID = #{userId}
     </select>
 
+    <!-- SEQ로 USER_ID 조회 -->
+    <select id="findUserIdBySeq" resultType="string">
+        SELECT USER_ID
+        FROM user
+        WHERE SEQ = #{seq}
+    </select>
+
     <!-- 회원 조회 (by EMAIL) -->
     <select id="findByEmail" resultMap="UserResultMap">
         SELECT <include refid="userColumns"/>

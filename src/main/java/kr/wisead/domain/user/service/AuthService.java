@@ -335,12 +335,13 @@ public class AuthService {
     return userMapper.existsByEmail(email);
   }
 
-  /** Authentication 객체 생성 */
+  /** Authentication 객체 생성 - JWT subject로 seq 사용 */
   private Authentication createAuthentication(User user) {
     List<SimpleGrantedAuthority> authorities =
         Collections.singletonList(
             new SimpleGrantedAuthority(user.isAdmin() ? "ROLE_ADMIN" : "ROLE_USER"));
-    return new UsernamePasswordAuthenticationToken(user.getUserId(), null, authorities);
+    return new UsernamePasswordAuthenticationToken(
+        String.valueOf(user.getSeq()), null, authorities);
   }
 
   /** 암호화된 필드 복호화 (AES256 + Base64). 복호화 실패 시 원본 값 반환 */

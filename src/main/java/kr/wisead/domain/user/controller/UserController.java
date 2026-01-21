@@ -18,7 +18,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /** 회원 API 컨트롤러 */
 @RestController
@@ -57,9 +65,11 @@ public class UserController {
   @PutMapping("/me/password")
   public ApiResponse<Void> changePassword(
       @AuthenticationPrincipal UserDetails userDetails, @RequestBody Map<String, String> request) {
+    Integer seq = Integer.parseInt(userDetails.getUsername());
+    String userId = userService.getUserIdBySeq(seq);
     String currentPassword = request.get("currentPassword");
     String newPassword = request.get("newPassword");
-    userService.changePassword(userDetails.getUsername(), currentPassword, newPassword);
+    userService.changePassword(userId, currentPassword, newPassword);
     return ApiResponse.success("비밀번호가 변경되었습니다.");
   }
 
@@ -118,7 +128,9 @@ public class UserController {
   /** 비밀번호 만료일 연장 (본인용) PUT /api/users/me/password/extend */
   @PutMapping("/me/password/extend")
   public ApiResponse<Void> extendPasswordExpiry(@AuthenticationPrincipal UserDetails userDetails) {
-    userService.extendPasswordExpiry(userDetails.getUsername());
+    Integer seq = Integer.parseInt(userDetails.getUsername());
+    String userId = userService.getUserIdBySeq(seq);
+    userService.extendPasswordExpiry(userId);
     return ApiResponse.success("비밀번호 만료일이 180일 연장되었습니다.");
   }
 
@@ -157,7 +169,7 @@ public class UserController {
   /** 회원 삭제 (단건) - 관리자 전용 DELETE /api/users/{seq} */
   @DeleteMapping("/{seq}")
   @PreAuthorize("hasRole('ADMIN')")
-  public ApiResponse<Void> deleteUser(@PathVariable Long seq) {
+  public ApiResponse<Void> deleteUser(@PathVariable Integer seq) {
     userService.deleteUser(seq);
     return ApiResponse.success("회원이 삭제되었습니다.");
   }

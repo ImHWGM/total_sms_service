@@ -84,7 +84,7 @@ public interface UserMapper {
       @Param("phone") String phone);
 
   /** 회원 삭제 (USE_YN = 'N' 처리) */
-  int deleteBySeq(@Param("seq") Long seq);
+  int deleteBySeq(@Param("seq") Integer seq);
 
   /** 회원 일괄 삭제 (USE_YN = 'N' 처리) */
   int deleteBySeqList(@Param("seqList") java.util.List<Long> seqList);

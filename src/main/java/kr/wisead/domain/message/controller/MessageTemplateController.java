@@ -53,7 +53,7 @@ public class MessageTemplateController {
 
     // MMS이고 이미지가 있을 때만 처리
     if ("MMS".equals(msgType) && image != null && !image.isEmpty()) {
-      imagePath = fileStorageService.storeTemplateImage(image, userSeq.intValue());
+      imagePath = fileStorageService.storeTemplateImage(image, userSeq);
     }
 
     MessageTemplateRequest request =

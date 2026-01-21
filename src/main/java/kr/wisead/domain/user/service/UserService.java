@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
@@ -74,6 +73,16 @@ public class UserService {
     return UserResponse.from(user);
   }
 
+  /** SEQ로 USER_ID 조회 (JWT subject → userId 변환용) */
+  @Transactional(readOnly = true)
+  public String getUserIdBySeq(Integer seq) {
+    String userId = userMapper.findUserIdBySeq(seq);
+    if (userId == null) {
+      throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+    }
+    return userId;
+  }
+
   /** 회원 목록 조회 (페이징) */
   @Transactional(readOnly = true)
   public PageResponse<UserResponse> getUsers(int page, int size) {
@@ -81,8 +90,7 @@ public class UserService {
     List<User> users = userMapper.findAll(offset, size);
     long total = userMapper.count();
 
-    List<UserResponse> content =
-        users.stream().map(UserResponse::from).collect(Collectors.toList());
+    List<UserResponse> content = users.stream().map(UserResponse::from).toList();
 
     return PageResponse.of(content, page, size, total);
   }
@@ -446,7 +454,7 @@ public class UserService {
    * @param seq 삭제할 회원 시퀀스
    */
   @Transactional
-  public void deleteUser(Long seq) {
+  public void deleteUser(Integer seq) {
     int result = userMapper.deleteBySeq(seq);
     if (result == 0) {
       throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);

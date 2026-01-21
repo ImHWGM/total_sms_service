@@ -1,5 +1,10 @@
 package kr.wisead.domain.message.service;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
@@ -21,887 +26,939 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
-
-/**
- * 메시지 발송 Service (SMS DB)
- */
+/** 메시지 발송 Service (SMS DB) */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class MessageSendService {
 
-    private final MsgQueueMapper msgQueueMapper;
-    private final MsgResultMapper msgResultMapper;
-    private final SurveyUserMapper surveyUserMapper;
-    private final SurveyMasterMapper surveyMasterMapper;
-    private final WalletService walletService;
+  private final MsgQueueMapper msgQueueMapper;
+  private final MsgResultMapper msgResultMapper;
+  private final SurveyUserMapper surveyUserMapper;
+  private final SurveyMasterMapper surveyMasterMapper;
+  private final WalletService walletService;
 
-    @Value("${wisead.url:https://wisead.kr}")
-    private String wiseadUrl;
+  @Value("${wisead.url:https://wisead.kr}")
+  private String wiseadUrl;
 
-    /**
-     * 일반 문자 발송 (SMS/LMS/MMS)
-     * MSG_QUEUE 테이블에 등록하면 외부 에이전트가 발송 처리
-     *
-     * @param request 발송 요청
-     * @param regId 등록자 ID (userId)
-     */
-    @Transactional("smsTransactionManager")
-    public SmsSendResponse sendMessage(SmsSendRequest request, String regId) {
-        int messageCount = request.getReceivers().size();
-        String serviceId = getServiceIdFromMsgType(request.getMsgType());
+  /**
+   * 일반 문자 발송 (SMS/LMS/MMS) MSG_QUEUE 테이블에 등록하면 외부 에이전트가 발송 처리
+   *
+   * @param request 발송 요청
+   * @param regId 등록자 ID (userId)
+   */
+  @Transactional("smsTransactionManager")
+  public SmsSendResponse sendMessage(SmsSendRequest request, String regId) {
+    int messageCount = request.getReceivers().size();
+    String serviceId = getServiceIdFromMsgType(request.getMsgType());
 
-        // 1. 잔액 확인 및 차감
-        String txGroupId = deductForMessage(regId, serviceId, messageCount, request.getMsgType());
+    // 1. 잔액 확인 및 차감
+    String txGroupId = deductForMessage(regId, serviceId, messageCount, request.getMsgType());
 
-        // 2. 메시지 발송 등록
-        String userKey = MsgQueue.generateUserKey();
-        List<Integer> mseqList = new ArrayList<>();
+    // 2. 메시지 발송 등록
+    String userKey = MsgQueue.generateUserKey();
+    List<Integer> mseqList = new ArrayList<>();
 
-        for (String receiver : request.getReceivers()) {
-            String normalizedReceiver = normalizePhoneNumber(receiver);
+    for (String receiver : request.getReceivers()) {
+      String normalizedReceiver = normalizePhoneNumber(receiver);
 
-            MsgQueue msgQueue;
-            switch (request.getMsgType()) {
-                case "S" -> msgQueue = MsgQueue.createSms(
-                        normalizedReceiver,
-                        request.getNormalizedCallback(),
-                        request.getSubject(),
-                        request.getText(),
-                        userKey,
-                        txGroupId,
-                        regId
-                );
-                case "L" -> msgQueue = MsgQueue.createLms(
-                        normalizedReceiver,
-                        request.getNormalizedCallback(),
-                        request.getSubject(),
-                        request.getText(),
-                        userKey,
-                        txGroupId,
-                        regId
-                );
-                case "M" -> msgQueue = MsgQueue.createMms(
-                        normalizedReceiver,
-                        request.getNormalizedCallback(),
-                        request.getSubject(),
-                        request.getText(),
-                        request.getFileCnt() != null ? request.getFileCnt() : 0,
-                        request.getFileloc1(),
-                        request.getFileloc2(),
-                        request.getFileloc3(),
-                        userKey,
-                        txGroupId,
-                        regId
-                );
-                default -> throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 메시지 타입입니다.");
-            }
+      MsgQueue msgQueue;
+      switch (request.getMsgType()) {
+        case "S" ->
+            msgQueue =
+                MsgQueue.createSms(
+                    normalizedReceiver,
+                    request.getNormalizedCallback(),
+                    request.getSubject(),
+                    request.getText(),
+                    userKey,
+                    txGroupId,
+                    regId);
+        case "L" ->
+            msgQueue =
+                MsgQueue.createLms(
+                    normalizedReceiver,
+                    request.getNormalizedCallback(),
+                    request.getSubject(),
+                    request.getText(),
+                    userKey,
+                    txGroupId,
+                    regId);
+        case "M" ->
+            msgQueue =
+                MsgQueue.createMms(
+                    normalizedReceiver,
+                    request.getNormalizedCallback(),
+                    request.getSubject(),
+                    request.getText(),
+                    request.getFileCnt() != null ? request.getFileCnt() : 0,
+                    request.getFileloc1(),
+                    request.getFileloc2(),
+                    request.getFileloc3(),
+                    userKey,
+                    txGroupId,
+                    regId);
+        default -> throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 메시지 타입입니다.");
+      }
 
-            // 예약 발송 시간 설정
-            if (request.getRequestTime() != null && !request.isImmediate()) {
-                msgQueue = msgQueue.withRequestTime(request.getRequestTime());
-            }
+      // 예약 발송 시간 설정
+      if (request.getRequestTime() != null && !request.isImmediate()) {
+        msgQueue = msgQueue.withRequestTime(request.getRequestTime());
+      }
 
-            // MSG_QUEUE에 등록
-            insertMsgQueue(request.getMsgType(), msgQueue);
-            mseqList.add(msgQueue.getMseq());
-        }
-
-        log.info("문자 발송 등록 완료 - userKey: {}, count: {}, msgType: {}, txGroupId: {}",
-                userKey, mseqList.size(), request.getMsgType(), txGroupId);
-
-        return SmsSendResponse.success(mseqList, LocalDateTime.now(), request.isImmediate(), txGroupId);
+      // MSG_QUEUE에 등록
+      insertMsgQueue(request.getMsgType(), msgQueue);
+      mseqList.add(msgQueue.getMseq());
     }
 
-    /**
-     * 메시지 발송을 위한 잔액 차감
-     *
-     * @param userId 사용자 ID
-     * @param serviceId 서비스 ID (msg_sms, msg_lms, msg_mms)
-     * @param quantity 발송 건수
-     * @param msgType 메시지 타입 (로깅용)
-     * @return txGroupId (환불 시 사용)
-     */
-    private String deductForMessage(String userId, String serviceId, int quantity, String msgType) {
-        BigDecimal qty = BigDecimal.valueOf(quantity);
-        BigDecimal unitPrice = walletService.getAppliedRate(userId, serviceId);
-        BigDecimal totalAmount = unitPrice.multiply(qty);
+    log.info(
+        "문자 발송 등록 완료 - userKey: {}, count: {}, msgType: {}, txGroupId: {}",
+        userKey,
+        mseqList.size(),
+        request.getMsgType(),
+        txGroupId);
 
-        // 잔액 확인
-        if (!walletService.hasEnoughBalance(userId, totalAmount)) {
-            log.warn("잔액 부족 - userId: {}, 필요금액: {}, msgType: {}", userId, totalAmount, msgType);
-            throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE,
-                    String.format("잔액이 부족합니다. 필요 금액: %s원", totalAmount.setScale(0)));
-        }
+    return SmsSendResponse.success(mseqList, LocalDateTime.now(), request.isImmediate(), txGroupId);
+  }
 
-        // 잔액 차감
-        String txGroupId = walletService.deductWithPriority(
-                userId, serviceId, qty,
-                String.format("%s 발송 %d건", getMsgTypeName(msgType), quantity)
-        );
+  /**
+   * 메시지 발송을 위한 잔액 차감
+   *
+   * @param userId 사용자 ID
+   * @param serviceId 서비스 ID (msg_sms, msg_lms, msg_mms)
+   * @param quantity 발송 건수
+   * @param msgType 메시지 타입 (로깅용)
+   * @return txGroupId (환불 시 사용)
+   */
+  private String deductForMessage(String userId, String serviceId, int quantity, String msgType) {
+    BigDecimal qty = BigDecimal.valueOf(quantity);
+    BigDecimal unitPrice = walletService.getAppliedRate(userId, serviceId);
+    BigDecimal totalAmount = unitPrice.multiply(qty);
 
-        log.info("메시지 발송 비용 차감 - userId: {}, serviceId: {}, quantity: {}, totalAmount: {}, txGroupId: {}",
-                userId, serviceId, quantity, totalAmount, txGroupId);
-
-        return txGroupId;
+    // 잔액 확인
+    if (!walletService.hasEnoughBalance(userId, totalAmount)) {
+      log.warn("잔액 부족 - userId: {}, 필요금액: {}, msgType: {}", userId, totalAmount, msgType);
+      throw new BusinessException(
+          ErrorCode.INSUFFICIENT_BALANCE,
+          String.format("잔액이 부족합니다. 필요 금액: %s원", totalAmount.setScale(0)));
     }
 
-    /**
-     * 메시지 타입을 서비스 ID로 변환
-     */
-    private String getServiceIdFromMsgType(String msgType) {
-        return switch (msgType) {
-            case "S" -> "msg_sms";
-            case "L" -> "msg_lms";
-            case "M" -> "msg_mms";
-            default -> throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 메시지 타입입니다.");
-        };
+    // 잔액 차감
+    String txGroupId =
+        walletService.deductWithPriority(
+            userId, serviceId, qty, String.format("%s 발송 %d건", getMsgTypeName(msgType), quantity));
+
+    log.info(
+        "메시지 발송 비용 차감 - userId: {}, serviceId: {}, quantity: {}, totalAmount: {}, txGroupId: {}",
+        userId,
+        serviceId,
+        quantity,
+        totalAmount,
+        txGroupId);
+
+    return txGroupId;
+  }
+
+  /** 메시지 타입을 서비스 ID로 변환 */
+  private String getServiceIdFromMsgType(String msgType) {
+    return switch (msgType) {
+      case "S" -> "msg_sms";
+      case "L" -> "msg_lms";
+      case "M" -> "msg_mms";
+      default -> throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 메시지 타입입니다.");
+    };
+  }
+
+  /** 메시지 타입명 반환 */
+  private String getMsgTypeName(String msgType) {
+    return switch (msgType) {
+      case "S" -> "SMS";
+      case "L" -> "LMS";
+      case "M" -> "MMS";
+      default -> "문자";
+    };
+  }
+
+  /**
+   * 설문 문자 발송
+   *
+   * @param txGroupId 결제 거래 그룹 ID (환불 추적용, 결제 없으면 null)
+   */
+  @Transactional("smsTransactionManager")
+  public int sendSurveyMessage(
+      String msgType,
+      String dstaddr,
+      String callback,
+      String subject,
+      String text,
+      Integer eventSeq,
+      Integer userSeq,
+      String txGroupId,
+      String regId,
+      LocalDateTime requestTime) {
+    MsgQueue msgQueue =
+        MsgQueue.createForSurvey(
+            msgType, dstaddr, callback, subject, text, eventSeq, userSeq, txGroupId, regId);
+
+    if (requestTime != null) {
+      msgQueue = msgQueue.withRequestTime(requestTime);
     }
 
-    /**
-     * 메시지 타입명 반환
-     */
-    private String getMsgTypeName(String msgType) {
-        return switch (msgType) {
-            case "S" -> "SMS";
-            case "L" -> "LMS";
-            case "M" -> "MMS";
-            default -> "문자";
-        };
+    msgQueueMapper.insertForSurvey(msgQueue);
+    log.info(
+        "설문 문자 발송 등록 - eventSeq: {}, userSeq: {}, mseq: {}", eventSeq, userSeq, msgQueue.getMseq());
+
+    return msgQueue.getMseq();
+  }
+
+  /** 발송 이력 조회 (페이징) */
+  @Transactional(value = "smsTransactionManager", readOnly = true)
+  public PageResponse<MsgResultResponse> getSendHistory(SendHistorySearchRequest request) {
+    List<String> tables = request.getTableNames();
+
+    int total =
+        msgResultMapper.countSendHistory(
+            request.getRegId(),
+            tables,
+            request.getSrhDateStart(),
+            request.getSrhDateEnd(),
+            request.getType(),
+            request.getKeyword(),
+            request.getSendFailure());
+
+    List<MsgResult> results =
+        msgResultMapper.selectSendHistory(
+            request.getRegId(),
+            tables,
+            request.getSrhDateStart(),
+            request.getSrhDateEnd(),
+            request.getType(),
+            request.getKeyword(),
+            request.getSendFailure(),
+            request.getSkip(),
+            request.getAmount());
+
+    List<MsgResultResponse> content =
+        results.stream().map(MsgResultResponse::from).collect(Collectors.toList());
+
+    return PageResponse.of(content, request.getPageNum(), request.getAmount(), total);
+  }
+
+  /** 예약 발송 취소 (소유자 검증 + 환불 포함) - 단건 취소: 부분 환불 (취소 건수 × 단가) */
+  public int cancelScheduledMessage(Integer mseq, String regId) {
+    // 1. 메시지 조회 및 검증 (SMS DB)
+    MsgQueue msgQueue =
+        msgQueueMapper
+            .findByMseq(mseq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "발송 정보를 찾을 수 없습니다."));
+
+    // 소유자 검증 (extCol3 = regId)
+    if (!regId.equals(msgQueue.getExtCol3())) {
+      log.warn("발송 취소 권한 없음 - mseq: {}, 요청자: {}, 소유자: {}", mseq, regId, msgQueue.getExtCol3());
+      throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 발송을 취소할 권한이 없습니다.");
     }
 
-    /**
-     * 설문 문자 발송
-     *
-     * @param txGroupId 결제 거래 그룹 ID (환불 추적용, 결제 없으면 null)
-     */
-    @Transactional("smsTransactionManager")
-    public int sendSurveyMessage(String msgType, String dstaddr, String callback,
-                                  String subject, String text,
-                                  Integer eventSeq, Integer userSeq,
-                                  String txGroupId, String regId,
-                                  LocalDateTime requestTime) {
-        MsgQueue msgQueue = MsgQueue.createForSurvey(
-                msgType, dstaddr, callback, subject, text,
-                eventSeq, userSeq, txGroupId, regId
-        );
-
-        if (requestTime != null) {
-            msgQueue = msgQueue.withRequestTime(requestTime);
-        }
-
-        msgQueueMapper.insertForSurvey(msgQueue);
-        log.info("설문 문자 발송 등록 - eventSeq: {}, userSeq: {}, mseq: {}",
-                eventSeq, userSeq, msgQueue.getMseq());
-
-        return msgQueue.getMseq();
+    if (!msgQueue.isPending()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "대기 중인 발송만 취소할 수 있습니다.");
     }
 
-    /**
-     * 발송 이력 조회 (페이징)
-     */
-    @Transactional(value = "smsTransactionManager", readOnly = true)
-    public PageResponse<MsgResultResponse> getSendHistory(SendHistorySearchRequest request) {
-        List<String> tables = request.getTableNames();
+    String msgType = msgQueue.getMsgType();
+    String txGroupId = msgQueue.getTxGroupId();
 
-        int total = msgResultMapper.countSendHistory(
-                request.getRegId(),
-                tables,
-                request.getSrhDateStart(),
-                request.getSrhDateEnd(),
-                request.getType(),
-                request.getKeyword(),
-                request.getSendFailure()
-        );
+    // 2. 메시지 삭제 (SMS DB)
+    int deleted = deleteMsgQueue(mseq);
 
-        List<MsgResult> results = msgResultMapper.selectSendHistory(
-                request.getRegId(),
-                tables,
-                request.getSrhDateStart(),
-                request.getSrhDateEnd(),
-                request.getType(),
-                request.getKeyword(),
-                request.getSendFailure(),
-                request.getSkip(),
-                request.getAmount()
-        );
-
-        List<MsgResultResponse> content = results.stream()
-                .map(MsgResultResponse::from)
-                .collect(Collectors.toList());
-
-        return PageResponse.of(content, request.getPageNum(), request.getAmount(), total);
+    // 3. 환불 처리 (Primary DB) - 단건은 부분 환불
+    if (deleted > 0 && txGroupId != null) {
+      refundPartial(regId, msgType, 1, txGroupId);
     }
 
-    /**
-     * 예약 발송 취소 (소유자 검증 + 환불 포함)
-     * - 단건 취소: 부분 환불 (취소 건수 × 단가)
-     */
-    public int cancelScheduledMessage(Integer mseq, String regId) {
-        // 1. 메시지 조회 및 검증 (SMS DB)
-        MsgQueue msgQueue = msgQueueMapper.findByMseq(mseq)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "발송 정보를 찾을 수 없습니다."));
+    log.info(
+        "예약 발송 취소 완료 - mseq: {}, regId: {}, msgType: {}, txGroupId: {}",
+        mseq,
+        regId,
+        msgType,
+        txGroupId);
+    return deleted;
+  }
 
-        // 소유자 검증 (extCol3 = regId)
-        if (!regId.equals(msgQueue.getExtCol3())) {
-            log.warn("발송 취소 권한 없음 - mseq: {}, 요청자: {}, 소유자: {}", mseq, regId, msgQueue.getExtCol3());
-            throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 발송을 취소할 권한이 없습니다.");
-        }
-
-        if (!msgQueue.isPending()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "대기 중인 발송만 취소할 수 있습니다.");
-        }
-
-        String msgType = msgQueue.getMsgType();
-        String txGroupId = msgQueue.getTxGroupId();
-
-        // 2. 메시지 삭제 (SMS DB)
-        int deleted = deleteMsgQueue(mseq);
-
-        // 3. 환불 처리 (Primary DB) - 단건은 부분 환불
-        if (deleted > 0 && txGroupId != null) {
-            refundPartial(regId, msgType, 1, txGroupId);
-        }
-
-        log.info("예약 발송 취소 완료 - mseq: {}, regId: {}, msgType: {}, txGroupId: {}", mseq, regId, msgType, txGroupId);
-        return deleted;
+  /** 배치 전체 예약 취소 (소유자 검증 + 환불 포함) - 전체 취소: txGroupId 기반 전체 환불 */
+  public int cancelScheduledBatch(String userKey, String regId) {
+    // 1. 배치 조회 및 검증 (SMS DB)
+    List<MsgQueue> messages = msgQueueMapper.findByUserKey(userKey);
+    if (messages.isEmpty()) {
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "발송 정보를 찾을 수 없습니다.");
     }
 
-    /**
-     * 배치 전체 예약 취소 (소유자 검증 + 환불 포함)
-     * - 전체 취소: txGroupId 기반 전체 환불
-     */
-    public int cancelScheduledBatch(String userKey, String regId) {
-        // 1. 배치 조회 및 검증 (SMS DB)
-        List<MsgQueue> messages = msgQueueMapper.findByUserKey(userKey);
-        if (messages.isEmpty()) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "발송 정보를 찾을 수 없습니다.");
-        }
-
-        // 소유자 검증
-        MsgQueue firstMsg = messages.get(0);
-        if (!regId.equals(firstMsg.getExtCol3())) {
-            log.warn("배치 취소 권한 없음 - userKey: {}, 요청자: {}, 소유자: {}", userKey, regId, firstMsg.getExtCol3());
-            throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 발송을 취소할 권한이 없습니다.");
-        }
-
-        // 대기 중인 메시지만 필터링
-        List<MsgQueue> pendingMessages = messages.stream()
-                .filter(MsgQueue::isPending)
-                .toList();
-
-        if (pendingMessages.isEmpty()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "취소 가능한 대기 중인 발송이 없습니다.");
-        }
-
-        String msgType = firstMsg.getMsgType();
-        String txGroupId = firstMsg.getTxGroupId();
-        int totalCount = messages.size();
-        int pendingCount = pendingMessages.size();
-
-        // 2. 메시지 삭제 (SMS DB)
-        int deleted = deleteMsgQueueByUserKey(userKey);
-
-        // 3. 환불 처리 (Primary DB)
-        if (deleted > 0 && txGroupId != null) {
-            if (deleted == totalCount) {
-                // 전체 취소: txGroupId 기반 전체 환불
-                refundByTxGroupId(txGroupId);
-            } else {
-                // 부분 취소: 취소 건수만큼 부분 환불
-                refundPartial(regId, msgType, deleted, txGroupId);
-            }
-        }
-
-        log.info("배치 예약 발송 취소 완료 - userKey: {}, count: {}, regId: {}, msgType: {}, txGroupId: {}",
-                userKey, deleted, regId, msgType, txGroupId);
-        return deleted;
+    // 소유자 검증
+    MsgQueue firstMsg = messages.get(0);
+    if (!regId.equals(firstMsg.getExtCol3())) {
+      log.warn(
+          "배치 취소 권한 없음 - userKey: {}, 요청자: {}, 소유자: {}", userKey, regId, firstMsg.getExtCol3());
+      throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 발송을 취소할 권한이 없습니다.");
     }
 
-    /**
-     * 메시지 삭제 (SMS DB 트랜잭션)
-     */
-    @Transactional("smsTransactionManager")
-    public int deleteMsgQueue(Integer mseq) {
-        return msgQueueMapper.delete(mseq);
+    // 대기 중인 메시지만 필터링
+    List<MsgQueue> pendingMessages = messages.stream().filter(MsgQueue::isPending).toList();
+
+    if (pendingMessages.isEmpty()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "취소 가능한 대기 중인 발송이 없습니다.");
     }
 
-    /**
-     * 메시지 배치 삭제 (SMS DB 트랜잭션)
-     */
-    @Transactional("smsTransactionManager")
-    public int deleteMsgQueueByUserKey(String userKey) {
-        return msgQueueMapper.deleteByUserKey(userKey);
+    String msgType = firstMsg.getMsgType();
+    String txGroupId = firstMsg.getTxGroupId();
+    int totalCount = messages.size();
+    int pendingCount = pendingMessages.size();
+
+    // 2. 메시지 삭제 (SMS DB)
+    int deleted = deleteMsgQueueByUserKey(userKey);
+
+    // 3. 환불 처리 (Primary DB)
+    if (deleted > 0 && txGroupId != null) {
+      if (deleted == totalCount) {
+        // 전체 취소: txGroupId 기반 전체 환불
+        refundByTxGroupId(txGroupId);
+      } else {
+        // 부분 취소: 취소 건수만큼 부분 환불
+        refundPartial(regId, msgType, deleted, txGroupId);
+      }
     }
 
-    /**
-     * txGroupId 기반 전체 환불 (원래 결제 화폐로 환불)
-     */
-    private void refundByTxGroupId(String txGroupId) {
-        try {
-            var result = walletService.refundByGroup(txGroupId);
-            log.info("txGroupId 기반 환불 완료 - txGroupId: {}, refundedAmount: {}, expiredAmount: {}",
-                    txGroupId, result.getRefundedAmount(), result.getExpiredAmount());
-        } catch (Exception e) {
-            log.error("txGroupId 기반 환불 실패 - txGroupId: {}, error: {}", txGroupId, e.getMessage(), e);
-        }
+    log.info(
+        "배치 예약 발송 취소 완료 - userKey: {}, count: {}, regId: {}, msgType: {}, txGroupId: {}",
+        userKey,
+        deleted,
+        regId,
+        msgType,
+        txGroupId);
+    return deleted;
+  }
+
+  /** 메시지 삭제 (SMS DB 트랜잭션) */
+  @Transactional("smsTransactionManager")
+  public int deleteMsgQueue(Integer mseq) {
+    return msgQueueMapper.delete(mseq);
+  }
+
+  /** 메시지 배치 삭제 (SMS DB 트랜잭션) */
+  @Transactional("smsTransactionManager")
+  public int deleteMsgQueueByUserKey(String userKey) {
+    return msgQueueMapper.deleteByUserKey(userKey);
+  }
+
+  /** txGroupId 기반 전체 환불 (원래 결제 화폐로 환불) */
+  private void refundByTxGroupId(String txGroupId) {
+    try {
+      var result = walletService.refundByGroup(txGroupId);
+      log.info(
+          "txGroupId 기반 환불 완료 - txGroupId: {}, refundedAmount: {}, expiredAmount: {}",
+          txGroupId,
+          result.getRefundedAmount(),
+          result.getExpiredAmount());
+    } catch (Exception e) {
+      log.error("txGroupId 기반 환불 실패 - txGroupId: {}, error: {}", txGroupId, e.getMessage(), e);
+    }
+  }
+
+  /** 부분 환불 (취소 건수 × 단가로 CASH 환불) - 원래 화폐 추적이 어려우므로 CASH로 환불 */
+  private void refundPartial(String userId, String msgType, int count, String txGroupId) {
+    try {
+      String serviceId = getServiceIdFromMsgType(msgType);
+      BigDecimal unitPrice = walletService.getAppliedRate(userId, serviceId);
+      BigDecimal refundAmount = unitPrice.multiply(BigDecimal.valueOf(count));
+
+      String comment =
+          String.format(
+              "%s 발송 취소 환불 %d건 (txGroupId: %s)", getMsgTypeName(msgType), count, txGroupId);
+      walletService.refundToCash(userId, refundAmount, comment);
+
+      log.info(
+          "부분 환불 완료 - userId: {}, msgType: {}, count: {}, refundAmount: {}, txGroupId: {}",
+          userId,
+          msgType,
+          count,
+          refundAmount,
+          txGroupId);
+    } catch (Exception e) {
+      log.error(
+          "부분 환불 실패 - userId: {}, msgType: {}, count: {}, txGroupId: {}, error: {}",
+          userId,
+          msgType,
+          count,
+          txGroupId,
+          e.getMessage(),
+          e);
+    }
+  }
+
+  /** 대기 중인 발송 목록 조회 */
+  @Transactional(value = "smsTransactionManager", readOnly = true)
+  public List<MsgQueue> getPendingMessages(String regId) {
+    return msgQueueMapper.findPendingByRegId(regId);
+  }
+
+  /** 대기 중인 발송 목록 조회 (페이징) */
+  @Transactional(value = "smsTransactionManager", readOnly = true)
+  public PageResponse<MsgQueueResponse> getPendingMessages(String regId, int page, int size) {
+    long total = msgQueueMapper.countPendingByRegId(regId);
+
+    int offset = (page - 1) * size;
+    List<MsgQueue> results = msgQueueMapper.findPendingByRegIdPaging(regId, offset, size);
+
+    List<MsgQueueResponse> content =
+        results.stream().map(MsgQueueResponse::from).collect(Collectors.toList());
+
+    return PageResponse.of(content, page, size, total);
+  }
+
+  /** 메시지 타입별 INSERT 분기 */
+  private void insertMsgQueue(String msgType, MsgQueue msgQueue) {
+    switch (msgType) {
+      case "S" -> msgQueueMapper.insertSms(msgQueue);
+      case "L" -> msgQueueMapper.insertLms(msgQueue);
+      case "M" -> msgQueueMapper.insertMms(msgQueue);
+      default -> throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 메시지 타입입니다.");
+    }
+  }
+
+  /** 전화번호 정규화 (하이픈 제거) */
+  private String normalizePhoneNumber(String phone) {
+    return phone != null ? phone.replaceAll("-", "") : null;
+  }
+
+  /**
+   * 설문 문자 재발송 (단건)
+   *
+   * @param userSeq 사용자 시퀀스
+   * @param subject 제목 (useOriginal=false일 때 사용)
+   * @param text 내용 (useOriginal=false일 때 사용, #유저키# 치환됨)
+   * @param callback 발신번호
+   * @param useOriginal true: 이전 발송 내용 그대로, false: 새 내용으로 발송
+   * @param regId 등록자 ID
+   * @return mseq
+   */
+  @Transactional("smsTransactionManager")
+  public int resendSurveyMessage(
+      Integer userSeq,
+      String subject,
+      String text,
+      String callback,
+      boolean useOriginal,
+      String regId) {
+    // SURVEY_USER에서 사용자 정보 조회
+    SurveyUser surveyUser =
+        surveyUserMapper
+            .selectBySeq(userSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "설문 참여자 정보를 찾을 수 없습니다."));
+
+    Integer eventSeq = surveyUser.getEventSeq();
+    String userKey = surveyUser.getUserKey();
+    String encryptedPhone = surveyUser.getResendUserPhone();
+
+    if (encryptedPhone == null || encryptedPhone.isEmpty()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "수신번호가 존재하지 않습니다.");
     }
 
-    /**
-     * 부분 환불 (취소 건수 × 단가로 CASH 환불)
-     * - 원래 화폐 추적이 어려우므로 CASH로 환불
-     */
-    private void refundPartial(String userId, String msgType, int count, String txGroupId) {
-        try {
-            String serviceId = getServiceIdFromMsgType(msgType);
-            BigDecimal unitPrice = walletService.getAppliedRate(userId, serviceId);
-            BigDecimal refundAmount = unitPrice.multiply(BigDecimal.valueOf(count));
-
-            String comment = String.format("%s 발송 취소 환불 %d건 (txGroupId: %s)", getMsgTypeName(msgType), count, txGroupId);
-            walletService.refundToCash(userId, refundAmount, comment);
-
-            log.info("부분 환불 완료 - userId: {}, msgType: {}, count: {}, refundAmount: {}, txGroupId: {}",
-                    userId, msgType, count, refundAmount, txGroupId);
-        } catch (Exception e) {
-            log.error("부분 환불 실패 - userId: {}, msgType: {}, count: {}, txGroupId: {}, error: {}",
-                    userId, msgType, count, txGroupId, e.getMessage(), e);
-        }
+    // 수신번호 복호화
+    String dstaddr;
+    try {
+      dstaddr = CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedPhone));
+    } catch (Exception e) {
+      log.error("수신번호 복호화 실패 - userSeq: {}", userSeq, e);
+      throw new BusinessException(ErrorCode.INTERNAL_ERROR, "수신번호 복호화 실패");
     }
 
-    /**
-     * 대기 중인 발송 목록 조회
-     */
-    @Transactional(value = "smsTransactionManager", readOnly = true)
-    public List<MsgQueue> getPendingMessages(String regId) {
-        return msgQueueMapper.findPendingByRegId(regId);
+    String finalSubject;
+    String finalText;
+    String finalCallback;
+
+    if (useOriginal) {
+      // 이전 발송 내용 조회 (msg_result_yyyyMM 테이블에서)
+      List<String> tables = getResultTableNames(eventSeq);
+      MsgResult previous = msgResultMapper.selectPreviousSend(tables, eventSeq, userSeq);
+
+      if (previous == null) {
+        throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이전 발송 내역을 찾을 수 없습니다.");
+      }
+
+      finalSubject = previous.getSubject();
+      finalText = previous.getText();
+      finalCallback = callback != null ? callback : previous.getCallback();
+      log.info("이전 발송 내용으로 재발송 - userSeq: {}, subject: {}", userSeq, finalSubject);
+    } else {
+      // 새 내용으로 발송 (설문 링크 생성)
+      if (userKey == null || userKey.isEmpty()) {
+        throw new BusinessException(ErrorCode.INVALID_INPUT, "userKey가 존재하지 않습니다.");
+      }
+
+      // #유저키#, #userKey#를 userKey 값만으로 치환 (전체 URL이 아닌 userKey만)
+      finalText = text.replace("#유저키#", userKey).replace("#userKey#", userKey);
+
+      // URL 패턴을 찾아서 단축 URL로 변환
+      finalText = ShortUrlUtils.shortenUrlsInText(finalText, wiseadUrl);
+
+      finalSubject = subject;
+      finalCallback = callback;
+      log.info("새 내용으로 재발송 - userSeq: {}, userKey: {}", userSeq, userKey);
     }
 
-    /**
-     * 대기 중인 발송 목록 조회 (페이징)
-     */
-    @Transactional(value = "smsTransactionManager", readOnly = true)
-    public PageResponse<MsgQueueResponse> getPendingMessages(String regId, int page, int size) {
-        long total = msgQueueMapper.countPendingByRegId(regId);
+    // MSG_QUEUE에 등록 (재발송은 별도 결제 없이 진행되므로 txGroupId = null)
+    MsgQueue msgQueue =
+        MsgQueue.createForSurvey(
+            "L", // LMS로 발송
+            normalizePhoneNumber(dstaddr),
+            finalCallback,
+            finalSubject,
+            finalText,
+            eventSeq,
+            userSeq,
+            null, // txGroupId: 재발송은 별도 결제 없음
+            regId);
 
-        int offset = (page - 1) * size;
-        List<MsgQueue> results = msgQueueMapper.findPendingByRegIdPaging(regId, offset, size);
+    msgQueueMapper.insertLms(msgQueue);
+    log.info("설문 재발송 완료 - userSeq: {}, mseq: {}", userSeq, msgQueue.getMseq());
 
-        List<MsgQueueResponse> content = results.stream()
-                .map(MsgQueueResponse::from)
-                .collect(Collectors.toList());
+    return msgQueue.getMseq();
+  }
 
-        return PageResponse.of(content, page, size, total);
+  /** 설문 문자 재발송 (다건) */
+  @Transactional("smsTransactionManager")
+  public ResendResponse resendSurveyMessageBatch(
+      List<Integer> userSeqList,
+      String subject,
+      String text,
+      String callback,
+      boolean useOriginal,
+      String regId) {
+    int successCount = 0;
+    int failCount = 0;
+    List<String> failedUserSeqs = new ArrayList<>();
+
+    for (Integer userSeq : userSeqList) {
+      try {
+        resendSurveyMessage(userSeq, subject, text, callback, useOriginal, regId);
+        successCount++;
+      } catch (Exception e) {
+        failCount++;
+        log.warn("다건 재발송 중 실패 - userSeq: {}, error: {}", userSeq, e.getMessage());
+        failedUserSeqs.add(String.valueOf(userSeq));
+      }
     }
 
-    /**
-     * 메시지 타입별 INSERT 분기
-     */
-    private void insertMsgQueue(String msgType, MsgQueue msgQueue) {
-        switch (msgType) {
-            case "S" -> msgQueueMapper.insertSms(msgQueue);
-            case "L" -> msgQueueMapper.insertLms(msgQueue);
-            case "M" -> msgQueueMapper.insertMms(msgQueue);
-            default -> throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 메시지 타입입니다.");
-        }
+    log.info("다건 재발송 완료 - 성공: {}/{}", successCount, userSeqList.size());
+
+    if (failCount == 0) {
+      return ResendResponse.success(successCount);
+    } else {
+      return ResendResponse.partial(successCount, failCount, failedUserSeqs);
+    }
+  }
+
+  /**
+   * 중복 번호 재발송 (설문) 설문 발송 시 중복으로 실패한 번호들에게 재발송
+   *
+   * @param request 재발송 요청 (중복 수신자 목록 포함)
+   * @param regId 등록자 ID
+   * @return 재발송 결과
+   */
+  @Transactional("smsTransactionManager")
+  public ResendResponse resendToDuplicates(ResendRequest request, String regId) {
+    log.info("중복 번호 재발송 시작 - eventSeq: {}, regId: {}", request.getEventSeq(), regId);
+
+    List<ResendRequest.DuplicateReceiver> receivers = request.getDuplicateReceivers();
+    if (receivers == null || receivers.isEmpty()) {
+      log.warn("중복 수신자 목록이 비어있음");
+      return ResendResponse.fail("재발송할 수신자가 없습니다.");
     }
 
-    /**
-     * 전화번호 정규화 (하이픈 제거)
-     */
-    private String normalizePhoneNumber(String phone) {
-        return phone != null ? phone.replaceAll("-", "") : null;
+    // 이벤트 코드 조회
+    String eventCode = request.getEventCode();
+    if (eventCode == null || eventCode.isEmpty()) {
+      eventCode =
+          surveyMasterMapper
+              .selectByEventSeq(request.getEventSeq())
+              .map(SurveyMaster::getEventCode)
+              .orElse(null);
     }
 
-    /**
-     * 설문 문자 재발송 (단건)
-     *
-     * @param userSeq 사용자 시퀀스
-     * @param subject 제목 (useOriginal=false일 때 사용)
-     * @param text 내용 (useOriginal=false일 때 사용, #유저키# 치환됨)
-     * @param callback 발신번호
-     * @param useOriginal true: 이전 발송 내용 그대로, false: 새 내용으로 발송
-     * @param regId 등록자 ID
-     * @return mseq
-     */
-    @Transactional("smsTransactionManager")
-    public int resendSurveyMessage(Integer userSeq, String subject, String text,
-                                    String callback, boolean useOriginal, String regId) {
-        // SURVEY_USER에서 사용자 정보 조회
-        SurveyUser surveyUser = surveyUserMapper.selectBySeq(userSeq)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "설문 참여자 정보를 찾을 수 없습니다."));
+    if (eventCode == null || eventCode.isEmpty()) {
+      log.error("이벤트 코드를 찾을 수 없음 - eventSeq: {}", request.getEventSeq());
+      return ResendResponse.fail("이벤트 정보를 찾을 수 없습니다.");
+    }
 
-        Integer eventSeq = surveyUser.getEventSeq();
-        String userKey = surveyUser.getUserKey();
-        String encryptedPhone = surveyUser.getResendUserPhone();
+    int successCount = 0;
+    int failCount = 0;
+    List<String> failedList = new ArrayList<>();
 
-        if (encryptedPhone == null || encryptedPhone.isEmpty()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "수신번호가 존재하지 않습니다.");
-        }
+    for (ResendRequest.DuplicateReceiver receiver : receivers) {
+      try {
+        String phone = normalizePhoneNumber(receiver.getPhone());
+        String text = request.getText();
 
-        // 수신번호 복호화
-        String dstaddr;
-        try {
-            dstaddr = CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedPhone));
-        } catch (Exception e) {
-            log.error("수신번호 복호화 실패 - userSeq: {}", userSeq, e);
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "수신번호 복호화 실패");
-        }
+        // 대치문자 및 유저키 처리
+        text =
+            applyReplaceChars(
+                text, receiver.getRepChar01(), receiver.getRepChar02(), receiver.getRepChar03());
+        text = applyUserKey(text, receiver.getUserKey());
 
-        String finalSubject;
-        String finalText;
-        String finalCallback;
+        // URL 패턴을 찾아서 단축 URL로 변환
+        text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);
 
-        if (useOriginal) {
-            // 이전 발송 내용 조회 (msg_result_yyyyMM 테이블에서)
-            List<String> tables = getResultTableNames(eventSeq);
-            MsgResult previous = msgResultMapper.selectPreviousSend(tables, eventSeq, userSeq);
+        log.debug("설문 문자 준비 완료 - eventCode: {}, userKey: {}", eventCode, receiver.getUserKey());
 
-            if (previous == null) {
-                throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이전 발송 내역을 찾을 수 없습니다.");
-            }
-
-            finalSubject = previous.getSubject();
-            finalText = previous.getText();
-            finalCallback = callback != null ? callback : previous.getCallback();
-            log.info("이전 발송 내용으로 재발송 - userSeq: {}, subject: {}", userSeq, finalSubject);
-        } else {
-            // 새 내용으로 발송 (설문 링크 생성)
-            if (userKey == null || userKey.isEmpty()) {
-                throw new BusinessException(ErrorCode.INVALID_INPUT, "userKey가 존재하지 않습니다.");
-            }
-
-            // #유저키#, #userKey#를 userKey 값만으로 치환 (전체 URL이 아닌 userKey만)
-            finalText = text.replace("#유저키#", userKey).replace("#userKey#", userKey);
-
-            // URL 패턴을 찾아서 단축 URL로 변환
-            finalText = ShortUrlUtils.shortenUrlsInText(finalText, wiseadUrl);
-
-            finalSubject = subject;
-            finalCallback = callback;
-            log.info("새 내용으로 재발송 - userSeq: {}, userKey: {}", userSeq, userKey);
-        }
-
-        // MSG_QUEUE에 등록 (재발송은 별도 결제 없이 진행되므로 txGroupId = null)
-        MsgQueue msgQueue = MsgQueue.createForSurvey(
+        // MSG_QUEUE에 등록 (중복 번호 재발송은 별도 결제 없이 진행되므로 txGroupId = null)
+        MsgQueue msgQueue =
+            MsgQueue.createForSurvey(
                 "L", // LMS로 발송
-                normalizePhoneNumber(dstaddr),
-                finalCallback,
-                finalSubject,
-                finalText,
-                eventSeq,
-                userSeq,
+                phone,
+                request.getCallback(),
+                request.getSubject(),
+                text,
+                request.getEventSeq(),
+                receiver.getUserSeq(),
                 null, // txGroupId: 재발송은 별도 결제 없음
-                regId
-        );
+                regId);
 
         msgQueueMapper.insertLms(msgQueue);
-        log.info("설문 재발송 완료 - userSeq: {}, mseq: {}", userSeq, msgQueue.getMseq());
+        successCount++;
 
-        return msgQueue.getMseq();
+      } catch (Exception e) {
+        failCount++;
+        failedList.add(receiver.getPhone());
+        log.warn("중복 번호 재발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+      }
     }
 
-    /**
-     * 설문 문자 재발송 (다건)
-     */
-    @Transactional("smsTransactionManager")
-    public ResendResponse resendSurveyMessageBatch(List<Integer> userSeqList, String subject,
-                                                    String text, String callback,
-                                                    boolean useOriginal, String regId) {
-        int successCount = 0;
-        int failCount = 0;
-        List<String> failedUserSeqs = new ArrayList<>();
+    log.info("중복 번호 재발송 완료 - 성공: {}, 실패: {}", successCount, failCount);
 
-        for (Integer userSeq : userSeqList) {
-            try {
-                resendSurveyMessage(userSeq, subject, text, callback, useOriginal, regId);
-                successCount++;
-            } catch (Exception e) {
-                failCount++;
-                log.warn("다건 재발송 중 실패 - userSeq: {}, error: {}", userSeq, e.getMessage());
-                failedUserSeqs.add(String.valueOf(userSeq));
-            }
-        }
+    if (failCount == 0) {
+      return ResendResponse.success(successCount);
+    } else {
+      return ResendResponse.partial(successCount, failCount, failedList);
+    }
+  }
 
-        log.info("다건 재발송 완료 - 성공: {}/{}", successCount, userSeqList.size());
+  /** 설문 링크 생성 형식: {wisead.url}/auth/{eventCode}/{userKey} */
+  private String generateSurveyLink(String eventCode, String userKey) {
+    return String.format("%s/auth/%s/%s", wiseadUrl, eventCode, userKey);
+  }
 
-        if (failCount == 0) {
-            return ResendResponse.success(successCount);
-        } else {
-            return ResendResponse.partial(successCount, failCount, failedUserSeqs);
-        }
+  /**
+   * 중복 번호에 새로운 내용으로 발송
+   *
+   * @param request 발송 요청 (새 내용 포함)
+   * @param regId 등록자 ID
+   * @return 발송 결과
+   */
+  @Transactional("smsTransactionManager")
+  public ResendResponse sendNewToDuplicates(ResendRequest request, String regId) {
+    log.info("중복 번호 신규 발송 시작 - eventSeq: {}, regId: {}", request.getEventSeq(), regId);
+
+    // resendToDuplicates와 동일한 로직 사용
+    // 차이점: useOriginalContent = false, 새로운 text 사용
+    return resendToDuplicates(request, regId);
+  }
+
+  /** 이벤트 시퀀스 기반으로 조회할 msg_result 테이블명 목록 생성 현재 월부터 1개월 전까지 */
+  private List<String> getResultTableNames(Integer eventSeq) {
+    List<String> tables = new ArrayList<>();
+    java.time.LocalDate now = java.time.LocalDate.now();
+
+    // 현재 월
+    tables.add("msg_result_" + now.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM")));
+    // 1개월 전
+    tables.add(
+        "msg_result_"
+            + now.minusMonths(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM")));
+
+    return tables;
+  }
+
+  /**
+   * 설문 문자 발송 (다건) - 단축 URL 적용
+   *
+   * @param request 발송 요청
+   * @param regId 등록자 ID
+   * @return 발송 결과
+   */
+  @Transactional("smsTransactionManager")
+  public SurveyMessageResponse sendSurveyMessages(SurveyMessageRequest request, String regId) {
+    log.info(
+        "설문 문자 발송 시작 - eventSeq: {}, regId: {}, count: {}",
+        request.getEventSeq(),
+        regId,
+        request.getReceivers() != null ? request.getReceivers().size() : 0);
+
+    if (request.getReceivers() == null || request.getReceivers().isEmpty()) {
+      return SurveyMessageResponse.fail("발송 대상이 없습니다.");
     }
 
-    /**
-     * 중복 번호 재발송 (설문)
-     * 설문 발송 시 중복으로 실패한 번호들에게 재발송
-     *
-     * @param request 재발송 요청 (중복 수신자 목록 포함)
-     * @param regId 등록자 ID
-     * @return 재발송 결과
-     */
-    @Transactional("smsTransactionManager")
-    public ResendResponse resendToDuplicates(ResendRequest request, String regId) {
-        log.info("중복 번호 재발송 시작 - eventSeq: {}, regId: {}", request.getEventSeq(), regId);
+    List<SurveyMessageRequest.Receiver> receivers = request.getReceivers();
+    int duplicateCount = 0;
 
-        List<ResendRequest.DuplicateReceiver> receivers = request.getDuplicateReceivers();
-        if (receivers == null || receivers.isEmpty()) {
-            log.warn("중복 수신자 목록이 비어있음");
-            return ResendResponse.fail("재발송할 수신자가 없습니다.");
+    // 중복 번호 제거
+    if (request.isDelDuplicateNum()) {
+      java.util.Map<String, SurveyMessageRequest.Receiver> uniqueMap =
+          new java.util.LinkedHashMap<>();
+      for (SurveyMessageRequest.Receiver r : receivers) {
+        String phone = r.getNormalizedPhone();
+        if (uniqueMap.putIfAbsent(phone, r) != null) {
+          duplicateCount++;
         }
-
-        // 이벤트 코드 조회
-        String eventCode = request.getEventCode();
-        if (eventCode == null || eventCode.isEmpty()) {
-            eventCode = surveyMasterMapper.selectByEventSeq(request.getEventSeq())
-                    .map(SurveyMaster::getEventCode)
-                    .orElse(null);
-        }
-
-        if (eventCode == null || eventCode.isEmpty()) {
-            log.error("이벤트 코드를 찾을 수 없음 - eventSeq: {}", request.getEventSeq());
-            return ResendResponse.fail("이벤트 정보를 찾을 수 없습니다.");
-        }
-
-        int successCount = 0;
-        int failCount = 0;
-        List<String> failedList = new ArrayList<>();
-
-        for (ResendRequest.DuplicateReceiver receiver : receivers) {
-            try {
-                String phone = normalizePhoneNumber(receiver.getPhone());
-                String text = request.getText();
-
-                // 대치문자 처리
-                if (receiver.getRepChar01() != null && !receiver.getRepChar01().isEmpty()) {
-                    text = text.replace("#대치문자1#", receiver.getRepChar01());
-                }
-                if (receiver.getRepChar02() != null && !receiver.getRepChar02().isEmpty()) {
-                    text = text.replace("#대치문자2#", receiver.getRepChar02());
-                }
-                if (receiver.getRepChar03() != null && !receiver.getRepChar03().isEmpty()) {
-                    text = text.replace("#대치문자3#", receiver.getRepChar03());
-                }
-
-                // #유저키#, #userKey#를 userKey 값만으로 치환 (전체 URL이 아닌 userKey만)
-                text = text.replace("#유저키#", receiver.getUserKey()).replace("#userKey#", receiver.getUserKey());
-
-                // URL 패턴을 찾아서 단축 URL로 변환
-                text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);
-
-                log.debug("설문 문자 준비 완료 - eventCode: {}, userKey: {}",
-                        eventCode, receiver.getUserKey());
-
-                // MSG_QUEUE에 등록 (중복 번호 재발송은 별도 결제 없이 진행되므로 txGroupId = null)
-                MsgQueue msgQueue = MsgQueue.createForSurvey(
-                        "L", // LMS로 발송
-                        phone,
-                        request.getCallback(),
-                        request.getSubject(),
-                        text,
-                        request.getEventSeq(),
-                        receiver.getUserSeq(),
-                        null, // txGroupId: 재발송은 별도 결제 없음
-                        regId
-                );
-
-                msgQueueMapper.insertLms(msgQueue);
-                successCount++;
-
-            } catch (Exception e) {
-                failCount++;
-                failedList.add(receiver.getPhone());
-                log.warn("중복 번호 재발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
-            }
-        }
-
-        log.info("중복 번호 재발송 완료 - 성공: {}, 실패: {}", successCount, failCount);
-
-        if (failCount == 0) {
-            return ResendResponse.success(successCount);
-        } else {
-            return ResendResponse.partial(successCount, failCount, failedList);
-        }
+      }
+      receivers = new ArrayList<>(uniqueMap.values());
+      log.info(
+          "중복번호 제거 - 원본: {}, 제거: {}, 결과: {}",
+          request.getReceivers().size(),
+          duplicateCount,
+          receivers.size());
     }
 
-    /**
-     * 설문 링크 생성
-     * 형식: {wisead.url}/auth/{eventCode}/{userKey}
-     */
-    private String generateSurveyLink(String eventCode, String userKey) {
-        return String.format("%s/auth/%s/%s", wiseadUrl, eventCode, userKey);
+    String txGroupId = java.util.UUID.randomUUID().toString().replace("-", "");
+    int successCount = 0;
+    int failCount = 0;
+    List<String> failedPhones = new ArrayList<>();
+    List<Integer> mseqList = new ArrayList<>();
+
+    for (SurveyMessageRequest.Receiver receiver : receivers) {
+      try {
+        String phone = receiver.getNormalizedPhone();
+        String text = request.getText();
+
+        // 대치문자 처리
+        if (receiver.getRepChar01() != null && !receiver.getRepChar01().isEmpty()) {
+          text = text.replace("#대치문자1#", receiver.getRepChar01());
+        }
+        if (receiver.getRepChar02() != null && !receiver.getRepChar02().isEmpty()) {
+          text = text.replace("#대치문자2#", receiver.getRepChar02());
+        }
+        if (receiver.getRepChar03() != null && !receiver.getRepChar03().isEmpty()) {
+          text = text.replace("#대치문자3#", receiver.getRepChar03());
+        }
+
+        // #유저키#, #userKey# 치환
+        if (receiver.getUserKey() != null && !receiver.getUserKey().isEmpty()) {
+          text =
+              text.replace("#유저키#", receiver.getUserKey())
+                  .replace("#userKey#", receiver.getUserKey());
+        }
+
+        // URL 패턴을 찾아서 단축 URL로 변환
+        text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);
+
+        // MSG_QUEUE에 등록 (설문 문자는 LMS 전용)
+        MsgQueue msgQueue =
+            MsgQueue.createForSurvey(
+                "L", // LMS 고정
+                phone,
+                request.getNormalizedCallback(),
+                request.getSubject(),
+                text,
+                request.getEventSeq(),
+                receiver.getUserSeq(),
+                txGroupId,
+                regId);
+
+        // 예약 발송 시간 설정
+        if (!request.isImmediate() && request.getRequestTime() != null) {
+          msgQueue = msgQueue.withRequestTime(request.getRequestTime());
+        }
+
+        // LMS로 발송
+        msgQueueMapper.insertLms(msgQueue);
+
+        mseqList.add(msgQueue.getMseq());
+        successCount++;
+
+      } catch (Exception e) {
+        failCount++;
+        failedPhones.add(receiver.getPhone());
+        log.warn("설문 문자 발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+      }
     }
 
-    /**
-     * 중복 번호에 새로운 내용으로 발송
-     *
-     * @param request 발송 요청 (새 내용 포함)
-     * @param regId 등록자 ID
-     * @return 발송 결과
-     */
-    @Transactional("smsTransactionManager")
-    public ResendResponse sendNewToDuplicates(ResendRequest request, String regId) {
-        log.info("중복 번호 신규 발송 시작 - eventSeq: {}, regId: {}", request.getEventSeq(), regId);
+    log.info(
+        "설문 문자 발송 완료 - 성공: {}, 실패: {}, 중복: {}, txGroupId: {}",
+        successCount,
+        failCount,
+        duplicateCount,
+        txGroupId);
 
-        // resendToDuplicates와 동일한 로직 사용
-        // 차이점: useOriginalContent = false, 새로운 text 사용
-        return resendToDuplicates(request, regId);
+    if (failCount == 0 && duplicateCount == 0) {
+      return SurveyMessageResponse.success(successCount, mseqList, txGroupId, LocalDateTime.now());
+    } else {
+      return SurveyMessageResponse.partial(
+          successCount, failCount, duplicateCount, failedPhones, mseqList, txGroupId);
+    }
+  }
+
+  /**
+   * 행사참여자 문자 발송 (다건) - 단축 URL 적용
+   *
+   * @param request 발송 요청
+   * @param regId 등록자 ID
+   * @return 발송 결과
+   */
+  @Transactional("smsTransactionManager")
+  public EventMessageResponse sendEventMessages(EventMessageRequest request, String regId) {
+    log.info(
+        "행사참여자 문자 발송 시작 - eventSeq: {}, regId: {}, sendType: {}, count: {}",
+        request.getEventSeq(),
+        regId,
+        request.getSendType(),
+        request.getReceivers() != null ? request.getReceivers().size() : 0);
+
+    if (request.getReceivers() == null || request.getReceivers().isEmpty()) {
+      return EventMessageResponse.fail("발송 대상이 없습니다.");
     }
 
-    /**
-     * 이벤트 시퀀스 기반으로 조회할 msg_result 테이블명 목록 생성
-     * 현재 월부터 1개월 전까지
-     */
-    private List<String> getResultTableNames(Integer eventSeq) {
-        List<String> tables = new ArrayList<>();
-        java.time.LocalDate now = java.time.LocalDate.now();
+    List<EventMessageRequest.Receiver> receivers = request.getReceivers();
+    int duplicateCount = 0;
 
-        // 현재 월
-        tables.add("msg_result_" + now.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM")));
-        // 1개월 전
-        tables.add("msg_result_" + now.minusMonths(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM")));
-
-        return tables;
+    // 중복 번호 제거
+    if (request.isDelDuplicateNum()) {
+      java.util.Map<String, EventMessageRequest.Receiver> uniqueMap =
+          new java.util.LinkedHashMap<>();
+      for (EventMessageRequest.Receiver r : receivers) {
+        String phone = r.getNormalizedPhone();
+        if (uniqueMap.putIfAbsent(phone, r) != null) {
+          duplicateCount++;
+        }
+      }
+      receivers = new ArrayList<>(uniqueMap.values());
+      log.info(
+          "중복번호 제거 - 원본: {}, 제거: {}, 결과: {}",
+          request.getReceivers().size(),
+          duplicateCount,
+          receivers.size());
     }
 
-    /**
-     * 설문 문자 발송 (다건) - 단축 URL 적용
-     *
-     * @param request 발송 요청
-     * @param regId 등록자 ID
-     * @return 발송 결과
-     */
-    @Transactional("smsTransactionManager")
-    public SurveyMessageResponse sendSurveyMessages(SurveyMessageRequest request, String regId) {
-        log.info("설문 문자 발송 시작 - eventSeq: {}, regId: {}, count: {}",
-                request.getEventSeq(), regId,
-                request.getReceivers() != null ? request.getReceivers().size() : 0);
+    String txGroupId = java.util.UUID.randomUUID().toString().replace("-", "");
+    int successCount = 0;
+    int failCount = 0;
+    List<String> failedPhones = new ArrayList<>();
+    List<Integer> mseqList = new ArrayList<>();
 
-        if (request.getReceivers() == null || request.getReceivers().isEmpty()) {
-            return SurveyMessageResponse.fail("발송 대상이 없습니다.");
+    for (EventMessageRequest.Receiver receiver : receivers) {
+      try {
+        String phone = receiver.getNormalizedPhone();
+        String text = request.getText();
+
+        // 이벤트 정보 치환
+        if (request.getEventName() != null) {
+          text = text.replace("#이벤트명#", request.getEventName());
+        }
+        if (request.getEventPeriod() != null) {
+          text = text.replace("#이벤트기간#", request.getEventPeriod());
+        }
+        if (request.getEventLocation() != null) {
+          text = text.replace("#이벤트장소#", request.getEventLocation());
         }
 
-        List<SurveyMessageRequest.Receiver> receivers = request.getReceivers();
-        int duplicateCount = 0;
-
-        // 중복 번호 제거
-        if (request.isDelDuplicateNum()) {
-            java.util.Map<String, SurveyMessageRequest.Receiver> uniqueMap = new java.util.LinkedHashMap<>();
-            for (SurveyMessageRequest.Receiver r : receivers) {
-                String phone = r.getNormalizedPhone();
-                if (uniqueMap.putIfAbsent(phone, r) != null) {
-                    duplicateCount++;
-                }
-            }
-            receivers = new ArrayList<>(uniqueMap.values());
-            log.info("중복번호 제거 - 원본: {}, 제거: {}, 결과: {}",
-                    request.getReceivers().size(), duplicateCount, receivers.size());
+        // 참가자 정보 치환
+        if (receiver.getName() != null) {
+          text = text.replace("#이름#", receiver.getName());
         }
 
-        String txGroupId = java.util.UUID.randomUUID().toString().replace("-", "");
-        int successCount = 0;
-        int failCount = 0;
-        List<String> failedPhones = new ArrayList<>();
-        List<Integer> mseqList = new ArrayList<>();
-
-        for (SurveyMessageRequest.Receiver receiver : receivers) {
-            try {
-                String phone = receiver.getNormalizedPhone();
-                String text = request.getText();
-
-                // 대치문자 처리
-                if (receiver.getRepChar01() != null && !receiver.getRepChar01().isEmpty()) {
-                    text = text.replace("#대치문자1#", receiver.getRepChar01());
-                }
-                if (receiver.getRepChar02() != null && !receiver.getRepChar02().isEmpty()) {
-                    text = text.replace("#대치문자2#", receiver.getRepChar02());
-                }
-                if (receiver.getRepChar03() != null && !receiver.getRepChar03().isEmpty()) {
-                    text = text.replace("#대치문자3#", receiver.getRepChar03());
-                }
-
-                // #유저키#, #userKey# 치환
-                if (receiver.getUserKey() != null && !receiver.getUserKey().isEmpty()) {
-                    text = text.replace("#유저키#", receiver.getUserKey())
-                               .replace("#userKey#", receiver.getUserKey());
-                }
-
-                // URL 패턴을 찾아서 단축 URL로 변환
-                text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);
-
-                // MSG_QUEUE에 등록 (설문 문자는 LMS 전용)
-                MsgQueue msgQueue = MsgQueue.createForSurvey(
-                        "L",  // LMS 고정
-                        phone,
-                        request.getNormalizedCallback(),
-                        request.getSubject(),
-                        text,
-                        request.getEventSeq(),
-                        receiver.getUserSeq(),
-                        txGroupId,
-                        regId
-                );
-
-                // 예약 발송 시간 설정
-                if (!request.isImmediate() && request.getRequestTime() != null) {
-                    msgQueue = msgQueue.withRequestTime(request.getRequestTime());
-                }
-
-                // LMS로 발송
-                msgQueueMapper.insertLms(msgQueue);
-
-                mseqList.add(msgQueue.getMseq());
-                successCount++;
-
-            } catch (Exception e) {
-                failCount++;
-                failedPhones.add(receiver.getPhone());
-                log.warn("설문 문자 발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
-            }
+        // 대치문자 처리
+        if (receiver.getRepChar01() != null && !receiver.getRepChar01().isEmpty()) {
+          text = text.replace("#대치문자1#", receiver.getRepChar01());
+        }
+        if (receiver.getRepChar02() != null && !receiver.getRepChar02().isEmpty()) {
+          text = text.replace("#대치문자2#", receiver.getRepChar02());
+        }
+        if (receiver.getRepChar03() != null && !receiver.getRepChar03().isEmpty()) {
+          text = text.replace("#대치문자3#", receiver.getRepChar03());
         }
 
-        log.info("설문 문자 발송 완료 - 성공: {}, 실패: {}, 중복: {}, txGroupId: {}",
-                successCount, failCount, duplicateCount, txGroupId);
-
-        if (failCount == 0 && duplicateCount == 0) {
-            return SurveyMessageResponse.success(successCount, mseqList, txGroupId, LocalDateTime.now());
-        } else {
-            return SurveyMessageResponse.partial(successCount, failCount, duplicateCount,
-                    failedPhones, mseqList, txGroupId);
+        // QR링크 치환 (단축 URL 적용)
+        if (receiver.getQrLink() != null && !receiver.getQrLink().isEmpty()) {
+          String shortenedQrLink = ShortUrlUtils.shortenUrl(receiver.getQrLink());
+          text = text.replace("#QR링크#", shortenedQrLink);
         }
+
+        // 접속링크 치환 (단축 URL 적용)
+        if (receiver.getAccessLink() != null && !receiver.getAccessLink().isEmpty()) {
+          String shortenedAccessLink = ShortUrlUtils.shortenUrl(receiver.getAccessLink());
+          text = text.replace("#접속링크#", shortenedAccessLink);
+        }
+
+        // /qrcode/ 패턴 URL도 단축 처리
+        text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);
+
+        // MSG_QUEUE에 등록 (LMS 전용)
+        MsgQueue msgQueue =
+            MsgQueue.createForEvent(
+                phone,
+                request.getNormalizedCallback(),
+                request.getSubject(),
+                text,
+                request.getEventSeq(),
+                receiver.getParticipantSeq(),
+                receiver.getSurveyUserSeq(),
+                txGroupId,
+                regId);
+
+        // 예약 발송 시간 설정
+        if (!request.isImmediate() && request.getRequestTime() != null) {
+          msgQueue = msgQueue.withRequestTime(request.getRequestTime());
+        }
+
+        // LMS로 발송
+        msgQueueMapper.insertLms(msgQueue);
+
+        mseqList.add(msgQueue.getMseq());
+        successCount++;
+
+      } catch (Exception e) {
+        failCount++;
+        failedPhones.add(receiver.getPhone());
+        log.warn("행사참여자 문자 발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+      }
     }
 
-    /**
-     * 행사참여자 문자 발송 (다건) - 단축 URL 적용
-     *
-     * @param request 발송 요청
-     * @param regId 등록자 ID
-     * @return 발송 결과
-     */
-    @Transactional("smsTransactionManager")
-    public EventMessageResponse sendEventMessages(EventMessageRequest request, String regId) {
-        log.info("행사참여자 문자 발송 시작 - eventSeq: {}, regId: {}, sendType: {}, count: {}",
-                request.getEventSeq(), regId, request.getSendType(),
-                request.getReceivers() != null ? request.getReceivers().size() : 0);
+    log.info(
+        "행사참여자 문자 발송 완료 - 성공: {}, 실패: {}, 중복: {}, txGroupId: {}",
+        successCount,
+        failCount,
+        duplicateCount,
+        txGroupId);
 
-        if (request.getReceivers() == null || request.getReceivers().isEmpty()) {
-            return EventMessageResponse.fail("발송 대상이 없습니다.");
-        }
-
-        List<EventMessageRequest.Receiver> receivers = request.getReceivers();
-        int duplicateCount = 0;
-
-        // 중복 번호 제거
-        if (request.isDelDuplicateNum()) {
-            java.util.Map<String, EventMessageRequest.Receiver> uniqueMap = new java.util.LinkedHashMap<>();
-            for (EventMessageRequest.Receiver r : receivers) {
-                String phone = r.getNormalizedPhone();
-                if (uniqueMap.putIfAbsent(phone, r) != null) {
-                    duplicateCount++;
-                }
-            }
-            receivers = new ArrayList<>(uniqueMap.values());
-            log.info("중복번호 제거 - 원본: {}, 제거: {}, 결과: {}",
-                    request.getReceivers().size(), duplicateCount, receivers.size());
-        }
-
-        String txGroupId = java.util.UUID.randomUUID().toString().replace("-", "");
-        int successCount = 0;
-        int failCount = 0;
-        List<String> failedPhones = new ArrayList<>();
-        List<Integer> mseqList = new ArrayList<>();
-
-        for (EventMessageRequest.Receiver receiver : receivers) {
-            try {
-                String phone = receiver.getNormalizedPhone();
-                String text = request.getText();
-
-                // 이벤트 정보 치환
-                if (request.getEventName() != null) {
-                    text = text.replace("#이벤트명#", request.getEventName());
-                }
-                if (request.getEventPeriod() != null) {
-                    text = text.replace("#이벤트기간#", request.getEventPeriod());
-                }
-                if (request.getEventLocation() != null) {
-                    text = text.replace("#이벤트장소#", request.getEventLocation());
-                }
-
-                // 참가자 정보 치환
-                if (receiver.getName() != null) {
-                    text = text.replace("#이름#", receiver.getName());
-                }
-
-                // 대치문자 처리
-                if (receiver.getRepChar01() != null && !receiver.getRepChar01().isEmpty()) {
-                    text = text.replace("#대치문자1#", receiver.getRepChar01());
-                }
-                if (receiver.getRepChar02() != null && !receiver.getRepChar02().isEmpty()) {
-                    text = text.replace("#대치문자2#", receiver.getRepChar02());
-                }
-                if (receiver.getRepChar03() != null && !receiver.getRepChar03().isEmpty()) {
-                    text = text.replace("#대치문자3#", receiver.getRepChar03());
-                }
-
-                // QR링크 치환 (단축 URL 적용)
-                if (receiver.getQrLink() != null && !receiver.getQrLink().isEmpty()) {
-                    String shortenedQrLink = ShortUrlUtils.shortenUrl(receiver.getQrLink());
-                    text = text.replace("#QR링크#", shortenedQrLink);
-                }
-
-                // 접속링크 치환 (단축 URL 적용)
-                if (receiver.getAccessLink() != null && !receiver.getAccessLink().isEmpty()) {
-                    String shortenedAccessLink = ShortUrlUtils.shortenUrl(receiver.getAccessLink());
-                    text = text.replace("#접속링크#", shortenedAccessLink);
-                }
-
-                // /qrcode/ 패턴 URL도 단축 처리
-                text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);
-
-                // MSG_QUEUE에 등록 (LMS 전용)
-                MsgQueue msgQueue = MsgQueue.createForEvent(
-                        phone,
-                        request.getNormalizedCallback(),
-                        request.getSubject(),
-                        text,
-                        request.getEventSeq(),
-                        receiver.getParticipantSeq(),
-                        receiver.getSurveyUserSeq(),
-                        txGroupId,
-                        regId
-                );
-
-                // 예약 발송 시간 설정
-                if (!request.isImmediate() && request.getRequestTime() != null) {
-                    msgQueue = msgQueue.withRequestTime(request.getRequestTime());
-                }
-
-                // LMS로 발송
-                msgQueueMapper.insertLms(msgQueue);
-
-                mseqList.add(msgQueue.getMseq());
-                successCount++;
-
-            } catch (Exception e) {
-                failCount++;
-                failedPhones.add(receiver.getPhone());
-                log.warn("행사참여자 문자 발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
-            }
-        }
-
-        log.info("행사참여자 문자 발송 완료 - 성공: {}, 실패: {}, 중복: {}, txGroupId: {}",
-                successCount, failCount, duplicateCount, txGroupId);
-
-        if (failCount == 0 && duplicateCount == 0) {
-            return EventMessageResponse.success(successCount, mseqList, txGroupId, LocalDateTime.now());
-        } else {
-            return EventMessageResponse.partial(successCount, failCount, duplicateCount,
-                    failedPhones, mseqList, txGroupId);
-        }
+    if (failCount == 0 && duplicateCount == 0) {
+      return EventMessageResponse.success(successCount, mseqList, txGroupId, LocalDateTime.now());
+    } else {
+      return EventMessageResponse.partial(
+          successCount, failCount, duplicateCount, failedPhones, mseqList, txGroupId);
     }
+  }
+
+  // ==================== Private Helper Methods ====================
+
+  /** 대치문자 처리 (#대치문자1#, #대치문자2#, #대치문자3# 치환) */
+  private String applyReplaceChars(
+      String text, String repChar01, String repChar02, String repChar03) {
+    if (text == null) {
+      return null;
+    }
+    if (repChar01 != null && !repChar01.isEmpty()) {
+      text = text.replace("#대치문자1#", repChar01);
+    }
+    if (repChar02 != null && !repChar02.isEmpty()) {
+      text = text.replace("#대치문자2#", repChar02);
+    }
+    if (repChar03 != null && !repChar03.isEmpty()) {
+      text = text.replace("#대치문자3#", repChar03);
+    }
+    return text;
+  }
+
+  /** 유저키 치환 (#유저키#, #userKey# -> userKey) */
+  private String applyUserKey(String text, String userKey) {
+    if (text == null || userKey == null || userKey.isEmpty()) {
+      return text;
+    }
+    return text.replace("#유저키#", userKey).replace("#userKey#", userKey);
+  }
 }

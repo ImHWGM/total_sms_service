@@ -259,13 +259,49 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
     return new String(content, StandardCharsets.UTF_8);
   }
 
-  /** 응답 Body 추출 */
+  /** 로깅 제외 Content-Type (바이너리 파일) */
+  private static final Set<String> BINARY_CONTENT_TYPES =
+      Set.of(
+          "application/octet-stream",
+          "application/pdf",
+          "application/zip",
+          "application/vnd.ms-excel",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          "image/png",
+          "image/jpeg",
+          "image/gif",
+          "image/webp",
+          "audio/",
+          "video/");
+
+  /** 응답 Body 추출 (바이너리 제외) */
   private String getResponseBody(ContentCachingResponseWrapper response) {
+    // 바이너리 Content-Type은 로깅 제외
+    String contentType = response.getContentType();
+    if (contentType != null && isBinaryContentType(contentType)) {
+      return "[Binary content - "
+          + contentType
+          + ", size: "
+          + response.getContentSize()
+          + " bytes]";
+    }
+
     byte[] content = response.getContentAsByteArray();
     if (content.length == 0) {
       return "";
     }
     return new String(content, StandardCharsets.UTF_8);
+  }
+
+  /** 바이너리 Content-Type 여부 확인 */
+  private boolean isBinaryContentType(String contentType) {
+    if (contentType == null) {
+      return false;
+    }
+    String lowerType = contentType.toLowerCase();
+    return BINARY_CONTENT_TYPES.stream().anyMatch(lowerType::startsWith);
   }
 
   /** 검색조건 / 다운로드 사유 추출 */

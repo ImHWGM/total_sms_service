@@ -487,9 +487,10 @@ public class UserService {
     Integer userLevel = adminService.getUserLevel(operatorId);
     adminService.validateModifyPermission(operatorId, userLevel, existingUser.getUserId());
 
-    // 연락처 및 담당자명 암호화 처리
+    // 연락처, 담당자명, 이메일 암호화 처리
     String encryptedPhone = encryptIfNeeded(user.getPhone(), 13, "연락처");
     String encryptedPerson = encryptIfNeeded(user.getPerson(), Integer.MAX_VALUE, "담당자명");
+    String encryptedEmail = encryptIfNeeded(user.getEmail(), Integer.MAX_VALUE, "이메일");
 
     // 수정용 User 객체 생성 - null인 필드는 기존 값 유지
     User updateUser =
@@ -501,7 +502,7 @@ public class UserService {
             .bizTel(user.getBizTel() != null ? user.getBizTel() : existingUser.getBizTel())
             .person(encryptedPerson != null ? encryptedPerson : existingUser.getPerson())
             .phone(encryptedPhone != null ? encryptedPhone : existingUser.getPhone())
-            .email(user.getEmail() != null ? user.getEmail() : existingUser.getEmail())
+            .email(encryptedEmail != null ? encryptedEmail : existingUser.getEmail())
             .userLevel(
                 user.getUserLevel() != null ? user.getUserLevel() : existingUser.getUserLevel())
             .allowIpYn(

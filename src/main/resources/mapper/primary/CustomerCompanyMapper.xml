@@ -4,13 +4,13 @@
 
     <!-- 고객사 선택 등록 -->
     <insert id="insertCustomerCompany" useGeneratedKeys="true" keyProperty="seq">
-        INSERT INTO customer_company (
-            user_id,
-            selected_user_id,
-            corp_name,
-            upt_date,
-            upt_id,
-            chked_yn
+        INSERT INTO cust_comp (
+            USER_ID,
+            SELECTED_USER_ID,
+            CUST_COMP_NAME,
+            UPT_DATE,
+            UPT_ID,
+            CHKED_YN
         ) VALUES (
             #{userId},
             #{selectedUserId},
@@ -23,13 +23,13 @@
 
     <!-- 고객사 일괄 등록 (List<CustomerCompany> 사용) -->
     <insert id="insertCustomerCompanyBatch">
-        INSERT INTO customer_company (
-            user_id,
-            selected_user_id,
-            corp_name,
-            upt_date,
-            upt_id,
-            chked_yn
+        INSERT INTO cust_comp (
+            USER_ID,
+            SELECTED_USER_ID,
+            CUST_COMP_NAME,
+            UPT_DATE,
+            UPT_ID,
+            CHKED_YN
         ) VALUES
         <foreach item="item" collection="list" separator=",">
             (
@@ -102,43 +102,43 @@
     <!-- 사용자의 선택된 고객사 목록 조회 -->
     <select id="selectSelectedCompanies" resultType="kr.wisead.domain.company.entity.CustomerCompany">
         SELECT
-            seq AS seq,
-            user_id AS userId,
-            selected_user_id AS selectedUserId,
-            corp_name AS custCompName,
-            upt_date AS uptDate,
-            upt_id AS uptId,
-            chked_yn AS chkedYn
-        FROM customer_company
-        WHERE user_id = #{userId}
-          AND chked_yn = 'Y'
+            SEQ AS seq,
+            USER_ID AS userId,
+            SELECTED_USER_ID AS selectedUserId,
+            CUST_COMP_NAME AS custCompName,
+            UPT_DATE AS uptDate,
+            UPT_ID AS uptId,
+            CHKED_YN AS chkedYn
+        FROM cust_comp
+        WHERE USER_ID = #{userId}
+          AND CHKED_YN = 'Y'
     </select>
 
     <!-- 고객사 선택 여부 확인 -->
     <select id="selectCompanyExists" resultType="string">
-        SELECT selected_user_id
-        FROM customer_company
-        WHERE user_id = #{userId}
-          AND selected_user_id = #{selectedUserId}
-          AND corp_name = #{custCompName}
+        SELECT SELECTED_USER_ID
+        FROM cust_comp
+        WHERE USER_ID = #{userId}
+          AND SELECTED_USER_ID = #{selectedUserId}
+          AND CUST_COMP_NAME = #{custCompName}
     </select>
 
     <!-- 고객사 선택 상태 수정 -->
     <update id="updateCompanyChecked">
-        UPDATE customer_company
-        SET upt_date = NOW(),
-            upt_id = #{uptId},
-            chked_yn = #{chkedYn}
-        WHERE user_id = #{userId}
-          AND selected_user_id = #{selectedUserId}
-          AND corp_name = #{custCompName}
+        UPDATE cust_comp
+        SET UPT_DATE = NOW(),
+            UPT_ID = #{uptId},
+            CHKED_YN = #{chkedYn}
+        WHERE USER_ID = #{userId}
+          AND SELECTED_USER_ID = #{selectedUserId}
+          AND CUST_COMP_NAME = #{custCompName}
     </update>
 
     <!-- 고객사명 일괄 수정 -->
     <update id="updateCompanyName">
-        UPDATE customer_company
-        SET corp_name = #{newName}
-        WHERE corp_name = #{oldName}
+        UPDATE cust_comp
+        SET CUST_COMP_NAME = #{newName}
+        WHERE CUST_COMP_NAME = #{oldName}
     </update>
 
     <!-- 담당자명 조회 -->
@@ -157,36 +157,36 @@
 
     <!-- 고객사 정보 수정 -->
     <update id="updateCustomerCompany">
-        UPDATE customer_company
+        UPDATE cust_comp
         SET
             <if test="custCompName != null">
-                corp_name = #{custCompName},
+                CUST_COMP_NAME = #{custCompName},
             </if>
-            upt_date = NOW(),
-            upt_id = #{uptId}
-        WHERE seq = #{seq}
+            UPT_DATE = NOW(),
+            UPT_ID = #{uptId}
+        WHERE SEQ = #{seq}
     </update>
 
     <!-- 고객사 시퀀스로 조회 -->
     <select id="selectBySeq" resultType="kr.wisead.domain.company.entity.CustomerCompany">
         SELECT
-            seq AS seq,
-            user_id AS userId,
-            selected_user_id AS selectedUserId,
-            corp_name AS custCompName,
-            upt_date AS uptDate,
-            upt_id AS uptId,
-            chked_yn AS chkedYn
-        FROM customer_company
-        WHERE seq = #{seq}
+            SEQ AS seq,
+            USER_ID AS userId,
+            SELECTED_USER_ID AS selectedUserId,
+            CUST_COMP_NAME AS custCompName,
+            UPT_DATE AS uptDate,
+            UPT_ID AS uptId,
+            CHKED_YN AS chkedYn
+        FROM cust_comp
+        WHERE SEQ = #{seq}
     </select>
 
     <!-- 관리 계정 사용자 ID 목록 조회 (level 50-89 관리자용) -->
     <select id="selectManagedUserIds" resultType="string">
-        SELECT DISTINCT selected_user_id
-        FROM customer_company
-        WHERE user_id = #{userId}
-          AND chked_yn = 'Y'
+        SELECT DISTINCT SELECTED_USER_ID
+        FROM cust_comp
+        WHERE USER_ID = #{userId}
+          AND CHKED_YN = 'Y'
     </select>
 
 </mapper>

@@ -6,6 +6,8 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.response.ErrorCode;
 import kr.wisead.domain.message.dto.MultiMessageRequest;
 import kr.wisead.domain.message.dto.MultiMessageResponse;
 import kr.wisead.domain.message.entity.MsgQueue;
@@ -167,11 +169,11 @@ public class MultiMessageService {
     return MultiMessageResponse.error("발송 등록에 실패하였습니다.");
   }
 
-  /** 야간 전송제한 시간 체크 (20:00 ~ 09:00) */
+  /** 야간 전송제한 시간 체크 (20:00 ~ 09:00) - AdMessageService와 동일한 로직 */
   private boolean isNightTime() {
     LocalTime now = LocalTime.now();
     // 20:00 이후이거나 09:00 이전이면 야간
-    return !now.isBefore(NIGHT_START) || now.isBefore(NIGHT_END);
+    return now.isAfter(NIGHT_START) || now.isBefore(NIGHT_END);
   }
 
   /** 사용자의 storeCode 조회 */
@@ -281,7 +283,7 @@ public class MultiMessageService {
     return phone != null ? phone.replaceAll("-", "") : null;
   }
 
-  /** 예약 시간 파싱 */
+  /** 예약 시간 파싱 - 파싱 실패 시 예외 발생 (예약이 즉시 발송으로 변환되는 것을 방지) */
   private LocalDateTime parseRequestTime(String reqDate) {
     try {
       DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -291,8 +293,8 @@ public class MultiMessageService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
         return LocalDateTime.parse(reqDate, formatter);
       } catch (Exception ex) {
-        log.warn("예약 시간 파싱 실패: {}", reqDate);
-        return LocalDateTime.now();
+        log.error("예약 시간 파싱 실패: {}", reqDate);
+        throw new BusinessException(ErrorCode.INVALID_INPUT, "예약 시간 형식이 올바르지 않습니다: " + reqDate);
       }
     }
   }

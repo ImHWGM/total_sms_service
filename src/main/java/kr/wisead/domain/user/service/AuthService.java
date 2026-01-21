@@ -167,6 +167,7 @@ public class AuthService {
   }
 
   /** 로그인 이메일 인증 코드 재발송 - ID/PW 검증 후 이메일 인증 코드 재발송 */
+  @Transactional(readOnly = true)
   public LoginResponse resendLoginEmailCode(LoginRequest request) {
     // 1. 사용자 조회
     User user =

@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.domain.ars.service.BlockedNumberService;
+import kr.wisead.domain.file.service.FileStorageService;
 import kr.wisead.domain.message.dto.AdMessageRequest;
 import kr.wisead.domain.message.dto.AdMessageResponse;
 import kr.wisead.domain.message.entity.MsgQueue;
@@ -32,6 +33,7 @@ public class AdMessageService {
   private final UserMapper userMapper;
   private final BalanceService balanceService;
   private final BlockedNumberService blockedNumberService;
+  private final FileStorageService fileStorageService;
 
   /** 야간 전송제한 시간 (20:00 ~ 09:00) */
   private static final LocalTime NIGHT_START = LocalTime.of(20, 0);
@@ -257,9 +259,9 @@ public class AdMessageService {
               subject,
               text,
               fileCnt != null ? fileCnt : 0,
-              fileloc1,
-              fileloc2,
-              fileloc3,
+              fileStorageService.normalizeMmsFileUrl(fileloc1),
+              fileStorageService.normalizeMmsFileUrl(fileloc2),
+              fileStorageService.normalizeMmsFileUrl(fileloc3),
               userKey,
               txGroupId,
               regId);

@@ -8,6 +8,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.domain.file.service.FileStorageService;
 import kr.wisead.domain.message.dto.MultiMessageRequest;
 import kr.wisead.domain.message.dto.MultiMessageResponse;
 import kr.wisead.domain.message.entity.MsgQueue;
@@ -31,6 +32,7 @@ public class MultiMessageService {
   private final BalanceService balanceService;
   private final BlockedSenderMapper blockedSenderMapper;
   private final UserMapper userMapper;
+  private final FileStorageService fileStorageService;
 
   // 야간 전송제한 시간 (20:00 ~ 09:00)
   private static final LocalTime NIGHT_START = LocalTime.of(20, 0);
@@ -254,9 +256,9 @@ public class MultiMessageService {
               request.getSubject(),
               text,
               request.getFileCnt() != null ? request.getFileCnt() : 0,
-              request.getFileLoc1(),
-              request.getFileLoc2(),
-              request.getFileLoc3(),
+              fileStorageService.normalizeMmsFileUrl(request.getFileLoc1()),
+              fileStorageService.normalizeMmsFileUrl(request.getFileLoc2()),
+              fileStorageService.normalizeMmsFileUrl(request.getFileLoc3()),
               batchId,
               txGroupId,
               regId);

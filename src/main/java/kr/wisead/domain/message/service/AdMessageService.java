@@ -8,6 +8,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.ars.service.BlockedNumberService;
 import kr.wisead.domain.file.service.FileStorageService;
 import kr.wisead.domain.message.dto.AdMessageRequest;
@@ -34,6 +35,7 @@ public class AdMessageService {
   private final BalanceService balanceService;
   private final BlockedNumberService blockedNumberService;
   private final FileStorageService fileStorageService;
+  private final UserIdResolver userIdResolver;
 
   /** 야간 전송제한 시간 (20:00 ~ 09:00) */
   private static final LocalTime NIGHT_START = LocalTime.of(20, 0);
@@ -77,6 +79,7 @@ public class AdMessageService {
     } catch (NumberFormatException e) {
       log.warn("잘못된 사용자 식별자 - userId: {}", userId);
     }
+    String realUserId = userIdResolver.resolveUserId(userId);
     if (storeCode == null || storeCode.isBlank()) {
       log.warn("상점코드 없음 - userId: {}", userId);
       storeCode = "DEFAULT";
@@ -168,7 +171,7 @@ public class AdMessageService {
                 request.getFileloc3(),
                 batchId,
                 txGroupId,
-                userId);
+                realUserId);
 
         // 예약 발송 시간 설정
         if (!request.isImmediate() && request.getReqDate() != null) {

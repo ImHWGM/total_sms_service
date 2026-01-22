@@ -8,6 +8,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.file.service.FileStorageService;
 import kr.wisead.domain.message.dto.MultiMessageRequest;
 import kr.wisead.domain.message.dto.MultiMessageResponse;
@@ -33,6 +34,7 @@ public class MultiMessageService {
   private final BlockedSenderMapper blockedSenderMapper;
   private final UserMapper userMapper;
   private final FileStorageService fileStorageService;
+  private final UserIdResolver userIdResolver;
 
   // 야간 전송제한 시간 (20:00 ~ 09:00)
   private static final LocalTime NIGHT_START = LocalTime.of(20, 0);
@@ -57,6 +59,7 @@ public class MultiMessageService {
       log.warn("잘못된 사용자 식별자 - regId: {}", regId);
       return MultiMessageResponse.error("사용자 정보를 찾을 수 없습니다.");
     }
+    String realUserId = userIdResolver.resolveUserId(regId);
 
     // 1. 잔액 조회
     var balanceResponse = balanceService.getCurrentBalance(userSeq);
@@ -136,7 +139,7 @@ public class MultiMessageService {
         String phone = normalizePhoneNumber(receiver.getPhone());
         String text = applyReplaceChars(request.getText(), receiver);
 
-        MsgQueue msgQueue = createMsgQueue(request, phone, text, batchId, txGroupId, regId);
+        MsgQueue msgQueue = createMsgQueue(request, phone, text, batchId, txGroupId, realUserId);
 
         // 예약 발송 설정
         if (!request.isImmediate() && request.getReqDate() != null) {

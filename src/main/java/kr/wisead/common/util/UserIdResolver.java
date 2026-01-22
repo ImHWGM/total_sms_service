@@ -43,4 +43,23 @@ public class UserIdResolver {
     }
     return Integer.parseInt(jwtUsername);
   }
+
+  /**
+   * JWT subject(userSeq 문자열)를 실제 userId로 변환 (null-safe)
+   *
+   * @param jwtSubject JWT subject (userSeq를 문자열로 저장)
+   * @return 실제 userId, 변환 실패 시 원래 값 반환
+   */
+  public String resolveUserId(String jwtSubject) {
+    if (jwtSubject == null || jwtSubject.isBlank()) {
+      return jwtSubject;
+    }
+    try {
+      Integer userSeq = Integer.parseInt(jwtSubject);
+      String userId = toUserId(userSeq);
+      return userId != null ? userId : jwtSubject;
+    } catch (NumberFormatException e) {
+      return jwtSubject;
+    }
+  }
 }

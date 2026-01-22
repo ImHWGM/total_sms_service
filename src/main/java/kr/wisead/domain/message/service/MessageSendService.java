@@ -9,6 +9,7 @@ import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.ShortUrlUtils;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.message.dto.*;
 import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.message.entity.MsgResult;
@@ -36,7 +37,7 @@ public class MessageSendService {
   private final SurveyUserMapper surveyUserMapper;
   private final SurveyMasterMapper surveyMasterMapper;
   private final WalletService walletService;
-  private final kr.wisead.mapper.primary.UserMapper userMapper;
+  private final UserIdResolver userIdResolver;
 
   @Value("${wisead.url:https://wisead.kr}")
   private String wiseadUrl;
@@ -58,6 +59,7 @@ public class MessageSendService {
     // 2. 메시지 발송 등록
     String userKey = MsgQueue.generateUserKey();
     List<Integer> mseqList = new ArrayList<>();
+    String realUserId = userIdResolver.resolveUserId(regId);
 
     for (String receiver : request.getReceivers()) {
       String normalizedReceiver = normalizePhoneNumber(receiver);
@@ -73,7 +75,7 @@ public class MessageSendService {
                     request.getText(),
                     userKey,
                     txGroupId,
-                    regId);
+                    realUserId);
         case "L" ->
             msgQueue =
                 MsgQueue.createLms(
@@ -83,7 +85,7 @@ public class MessageSendService {
                     request.getText(),
                     userKey,
                     txGroupId,
-                    regId);
+                    realUserId);
         case "M" ->
             msgQueue =
                 MsgQueue.createMms(
@@ -97,7 +99,7 @@ public class MessageSendService {
                     request.getFileloc3(),
                     userKey,
                     txGroupId,
-                    regId);
+                    realUserId);
         default -> throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 메시지 타입입니다.");
       }
 
@@ -212,9 +214,10 @@ public class MessageSendService {
       String txGroupId,
       String regId,
       LocalDateTime requestTime) {
+    String realUserId = userIdResolver.resolveUserId(regId);
     MsgQueue msgQueue =
         MsgQueue.createForSurvey(
-            msgType, dstaddr, callback, subject, text, eventSeq, userSeq, txGroupId, regId);
+            msgType, dstaddr, callback, subject, text, eventSeq, userSeq, txGroupId, realUserId);
 
     if (requestTime != null) {
       msgQueue = msgQueue.withRequestTime(requestTime);
@@ -530,6 +533,7 @@ public class MessageSendService {
     }
 
     // MSG_QUEUE에 등록 (재발송은 별도 결제 없이 진행되므로 txGroupId = null)
+    String realUserId = userIdResolver.resolveUserId(regId);
     MsgQueue msgQueue =
         MsgQueue.createForSurvey(
             "L", // LMS로 발송
@@ -540,7 +544,7 @@ public class MessageSendService {
             eventSeq,
             userSeq,
             null, // txGroupId: 재발송은 별도 결제 없음
-            regId);
+            realUserId);
 
     msgQueueMapper.insertLms(msgQueue);
     log.info("설문 재발송 완료 - userSeq: {}, mseq: {}", userSeq, msgQueue.getMseq());
@@ -616,6 +620,7 @@ public class MessageSendService {
     int successCount = 0;
     int failCount = 0;
     List<String> failedList = new ArrayList<>();
+    String realUserId = userIdResolver.resolveUserId(regId);
 
     for (ResendRequest.DuplicateReceiver receiver : receivers) {
       try {
@@ -644,7 +649,7 @@ public class MessageSendService {
                 request.getEventSeq(),
                 receiver.getUserSeq(),
                 null, // txGroupId: 재발송은 별도 결제 없음
-                regId);
+                realUserId);
 
         msgQueueMapper.insertLms(msgQueue);
         successCount++;
@@ -746,6 +751,7 @@ public class MessageSendService {
     int failCount = 0;
     List<String> failedPhones = new ArrayList<>();
     List<Integer> mseqList = new ArrayList<>();
+    String realUserId = userIdResolver.resolveUserId(regId);
 
     for (SurveyMessageRequest.Receiver receiver : receivers) {
       try {
@@ -784,7 +790,7 @@ public class MessageSendService {
                 request.getEventSeq(),
                 receiver.getUserSeq(),
                 txGroupId,
-                regId);
+                realUserId);
 
         // 예약 발송 시간 설정
         if (!request.isImmediate() && request.getRequestTime() != null) {
@@ -865,6 +871,7 @@ public class MessageSendService {
     int failCount = 0;
     List<String> failedPhones = new ArrayList<>();
     List<Integer> mseqList = new ArrayList<>();
+    String realUserId = userIdResolver.resolveUserId(regId);
 
     for (EventMessageRequest.Receiver receiver : receivers) {
       try {
@@ -924,7 +931,7 @@ public class MessageSendService {
                 receiver.getParticipantSeq(),
                 receiver.getSurveyUserSeq(),
                 txGroupId,
-                regId);
+                realUserId);
 
         // 예약 발송 시간 설정
         if (!request.isImmediate() && request.getRequestTime() != null) {

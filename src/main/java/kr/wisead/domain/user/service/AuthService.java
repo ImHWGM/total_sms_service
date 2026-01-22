@@ -82,7 +82,7 @@ public class AuthService {
       // 5-1. 이메일 코드가 없는 경우: 이메일 인증 필요 여부 판단
       if (!isLoggedInToday(user)) {
         // 오늘 로그인한 적이 없으면 이메일 인증 필요
-        String email = user.getEmail();
+        String email = decryptField(user.getEmail());
         if (!StringUtils.hasText(email)) {
           throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다. 관리자에게 문의하세요.");
         }
@@ -109,7 +109,7 @@ public class AuthService {
       // 오늘 이미 로그인한 경우: 이메일 인증 불필요, 바로 로그인 성공
     } else {
       // 5-2. 이메일 코드가 있는 경우: 코드 검증
-      String email = user.getEmail();
+      String email = decryptField(user.getEmail());
       if (!emailAuthService.verifyCode(email, emailCode)) {
         throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드가 일치하지 않습니다.");
       }
@@ -193,7 +193,7 @@ public class AuthService {
     }
 
     // 5. 이메일 확인
-    String email = user.getEmail();
+    String email = decryptField(user.getEmail());
     if (!StringUtils.hasText(email)) {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다. 관리자에게 문의하세요.");
     }

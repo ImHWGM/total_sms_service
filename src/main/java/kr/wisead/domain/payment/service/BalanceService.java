@@ -8,11 +8,11 @@ import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.payment.dto.*;
 import kr.wisead.domain.payment.entity.Transaction;
 import kr.wisead.domain.payment.entity.UserServiceRate;
 import kr.wisead.mapper.primary.TransactionMapper;
-import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.mapper.primary.UserServiceRateMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +29,7 @@ public class BalanceService {
   private final TransactionMapper transactionMapper;
   private final UserServiceRateService userServiceRateService;
   private final UserServiceRateMapper userServiceRateMapper; // 레거시 updateSmsPrice용
-  private final UserMapper userMapper;
+  private final UserIdResolver userIdResolver;
 
   /** 현재 잔액 조회 - N+1 최적화: 4개 단가 조회를 한 번에 처리 (최대 8회 → 최대 2회) */
   public BalanceResponse getCurrentBalance(Integer userSeq) {
@@ -361,47 +361,48 @@ public class BalanceService {
 
   /** 현재 잔액 조회 (userId 기반) */
   public BalanceResponse getCurrentBalance(String userId) {
-    return getCurrentBalance(toUserSeq(userId));
+    return getCurrentBalance(userIdResolver.toUserSeq(userId));
   }
 
   /** 확장된 잔액 조회 (userId 기반) */
   public WalletSummaryResponse getWalletSummary(String userId) {
-    return getWalletSummary(toUserSeq(userId));
+    return getWalletSummary(userIdResolver.toUserSeq(userId));
   }
 
   /** 활성 Lot 목록 조회 (userId 기반) */
   public List<WalletLotResponse> getActiveLots(String userId) {
-    return getActiveLots(toUserSeq(userId));
+    return getActiveLots(userIdResolver.toUserSeq(userId));
   }
 
   /** 잔액 내역 조회 (userId 기반) */
   public PageResponse<TransactionResponse> getTransactionHistory(
       String userId, int page, int size) {
-    return getTransactionHistory(toUserSeq(userId), page, size);
+    return getTransactionHistory(userIdResolver.toUserSeq(userId), page, size);
   }
 
   /** 잔액 내역 조회 - 레거시 (userId 기반) */
   public PageResponse<BalanceResponse> getBalanceHistory(String userId, int page, int size) {
-    return getBalanceHistory(toUserSeq(userId), page, size);
+    return getBalanceHistory(userIdResolver.toUserSeq(userId), page, size);
   }
 
   /** 차감 (userId 기반) */
   @Transactional
   public BalanceResponse deduct(
       String userId, BigDecimal amount, String comment, String operatorId) {
-    return deduct(toUserSeq(userId), amount, comment, operatorId);
+    return deduct(userIdResolver.toUserSeq(userId), amount, comment, operatorId);
   }
 
   /** 잔액 충분 여부 확인 (userId 기반) */
   public boolean hasEnoughBalance(String userId, BigDecimal requiredAmount) {
-    return hasEnoughBalance(toUserSeq(userId), requiredAmount);
+    return hasEnoughBalance(userIdResolver.toUserSeq(userId), requiredAmount);
   }
 
   /** 차감 + txGroupId 지정 (userId 기반) */
   @Transactional
   public BalanceResponse deductWithTxGroupId(
       String userId, BigDecimal amount, String comment, String operatorId, String txGroupId) {
-    return deductWithTxGroupId(toUserSeq(userId), amount, comment, operatorId, txGroupId);
+    return deductWithTxGroupId(
+        userIdResolver.toUserSeq(userId), amount, comment, operatorId, txGroupId);
   }
 
   // ========== Private Helper Methods ==========
@@ -438,14 +439,6 @@ public class BalanceService {
     // 새 단가 등록
     UserServiceRate newRate = UserServiceRate.create(userSeq, serviceId, rate, startDate);
     userServiceRateMapper.insert(newRate);
-  }
-
-  /** userId → userSeq 변환 */
-  private Integer toUserSeq(String userId) {
-    if (userId == null) {
-      return null;
-    }
-    return userMapper.findSeqByUserId(userId);
   }
 
   private BalanceResponse convertToBalanceResponse(Transaction tx) {

@@ -3,8 +3,8 @@ package kr.wisead.domain.payment.service;
 import java.math.BigDecimal;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.mapper.primary.QrVisitLogMapper;
-import kr.wisead.mapper.primary.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,7 +18,7 @@ public class BillingService {
 
   private final WalletService walletService;
   private final QrVisitLogMapper qrVisitLogMapper;
-  private final UserMapper userMapper;
+  private final UserIdResolver userIdResolver;
 
   // QR 코드 무료 제공 방문 수
   private static final long QR_FREE_VISITS = 3000L;
@@ -188,19 +188,11 @@ public class BillingService {
   /** QR 코드 신청 비용 차감 (userId 기반) */
   @Transactional
   public void deductInitialQrFee(String userId, String comment) {
-    deductInitialQrFee(toUserSeq(userId), comment);
+    deductInitialQrFee(userIdResolver.toUserSeq(userId), comment);
   }
 
   /** QR 코드 과금 가능 여부 확인 (userId 기반) */
   public boolean canChargeQr(String userId) {
-    return canChargeQr(toUserSeq(userId));
-  }
-
-  /** userId → userSeq 변환 */
-  private Integer toUserSeq(String userId) {
-    if (userId == null) {
-      return null;
-    }
-    return userMapper.findSeqByUserId(userId);
+    return canChargeQr(userIdResolver.toUserSeq(userId));
   }
 }

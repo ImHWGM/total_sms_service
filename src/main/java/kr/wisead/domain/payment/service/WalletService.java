@@ -5,12 +5,12 @@ import java.time.LocalDate;
 import java.util.*;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.payment.dto.*;
 import kr.wisead.domain.payment.entity.Transaction;
 import kr.wisead.domain.payment.entity.Wallet;
 import kr.wisead.domain.payment.entity.WalletLot;
 import kr.wisead.mapper.primary.TransactionMapper;
-import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.mapper.primary.WalletLotMapper;
 import kr.wisead.mapper.primary.WalletMapper;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ public class WalletService {
   private final WalletLotMapper walletLotMapper;
   private final TransactionMapper transactionMapper;
   private final UserServiceRateService userServiceRateService;
-  private final UserMapper userMapper;
+  private final UserIdResolver userIdResolver;
 
   /** 지갑 요약 조회 (CASH + POINT + BONUS) - 최적화: DB 호출 3회 → 2회 (POINT/BONUS 합쳐서 조회) */
   @Transactional(readOnly = true)
@@ -38,7 +38,7 @@ public class WalletService {
     // CASH 조회
     BigDecimal cash =
         walletMapper
-            .selectByUserId(userSeq, "CASH")
+            .selectByUserSeq(userSeq, "CASH")
             .map(Wallet::getBalance)
             .orElse(BigDecimal.ZERO);
 
@@ -469,7 +469,7 @@ public class WalletService {
       if (Transaction.CURRENCY_CASH.equals(tx.getCurrencyType())) {
         // CASH는 무조건 환불
         walletMapper.addBalance(tx.getUserSeq(), "CASH", tx.getAmount());
-        Wallet wallet = walletMapper.selectByUserId(tx.getUserSeq(), "CASH").orElseThrow();
+        Wallet wallet = walletMapper.selectByUserSeq(tx.getUserSeq(), "CASH").orElseThrow();
 
         Transaction refundTx =
             Transaction.createRefund(
@@ -665,21 +665,13 @@ public class WalletService {
   /** CASH 충전 (userId 기반) */
   @Transactional
   public TransactionResponse charge(String userId, BigDecimal amount, String comment) {
-    return charge(toUserSeq(userId), amount, comment);
+    return charge(userIdResolver.toUserSeq(userId), amount, comment);
   }
 
   /** 포인트 적립 (userId 기반) */
   @Transactional
   public WalletLotResponse grantPoint(
       String userId, BigDecimal amount, LocalDate expireDate, String source) {
-    return grantPoint(toUserSeq(userId), amount, expireDate, source);
-  }
-
-  /** userId → userSeq 변환 */
-  private Integer toUserSeq(String userId) {
-    if (userId == null) {
-      return null;
-    }
-    return userMapper.findSeqByUserId(userId);
+    return grantPoint(userIdResolver.toUserSeq(userId), amount, expireDate, source);
   }
 }

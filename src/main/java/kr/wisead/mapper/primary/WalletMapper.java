@@ -18,7 +18,7 @@ public interface WalletMapper {
   int insertIgnore(Wallet wallet);
 
   /** 사용자 지갑 조회 */
-  Optional<Wallet> selectByUserId(
+  Optional<Wallet> selectByUserSeq(
       @Param("userSeq") Integer userSeq, @Param("currencyType") String currencyType);
 
   /** 사용자 지갑 조회 (FOR UPDATE - 동시성 제어) */

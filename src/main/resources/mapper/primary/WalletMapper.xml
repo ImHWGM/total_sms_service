@@ -29,7 +29,7 @@
     </insert>
 
     <!-- 사용자 지갑 조회 -->
-    <select id="selectByUserId" resultType="kr.wisead.domain.payment.entity.Wallet">
+    <select id="selectByUserSeq" resultType="kr.wisead.domain.payment.entity.Wallet">
         SELECT
             user_seq AS userSeq,
             currency_type AS currencyType,
@@ -79,7 +79,7 @@
     </update>
 
     <!-- 다중 사용자 지갑 조회 -->
-    <select id="selectByUserIds" resultType="kr.wisead.domain.payment.entity.Wallet">
+    <select id="selectByUserSeqs" resultType="kr.wisead.domain.payment.entity.Wallet">
         SELECT
             user_seq AS userSeq,
             currency_type AS currencyType,
@@ -96,7 +96,7 @@
     </select>
 
     <!-- 지갑 존재 여부 확인 -->
-    <select id="existsByUserId" resultType="boolean">
+    <select id="existsByUserSeq" resultType="boolean">
         SELECT EXISTS(
             SELECT 1 FROM wallet
             WHERE user_seq = #{userSeq}

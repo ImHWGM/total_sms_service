@@ -9,6 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.excel.dto.SurveyExcelDownloadRequest;
@@ -46,6 +47,7 @@ public class ExcelController {
   private final StatisticsService statisticsService;
   private final SurveyUserMapper surveyUserMapper;
   private final UserMapper userMapper;
+  private final UserIdResolver userIdResolver;
   private final ActionLogService actionLogService;
   private final AdminService adminService;
 
@@ -53,10 +55,13 @@ public class ExcelController {
   private static final DateTimeFormatter DATETIME_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-  /** UserDetails에서 userId 추출 */
+  /** UserDetails에서 userId 추출 (null-safe) */
   private String extractUserId(UserDetails userDetails) {
-    Integer userSeq = Integer.parseInt(userDetails.getUsername());
-    return userMapper.findUserIdBySeq(userSeq);
+    if (userDetails == null) {
+      return null;
+    }
+    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
+    return userIdResolver.toUserId(userSeq);
   }
 
   /** 통계 Excel 다운로드 GET /api/excel/statistics/download?startDate=2025-01-01&endDate=2025-01-31 */

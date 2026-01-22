@@ -2,11 +2,11 @@ package kr.wisead.domain.statistics.controller;
 
 import java.util.List;
 import kr.wisead.common.response.ApiResponse;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.statistics.dto.*;
 import kr.wisead.domain.statistics.service.PeriodStatisticsService;
 import kr.wisead.domain.statistics.service.StatisticsService;
 import kr.wisead.domain.statistics.service.UserStatisticsService;
-import kr.wisead.mapper.primary.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,15 +23,15 @@ public class StatisticsController {
   private final StatisticsService statisticsService;
   private final PeriodStatisticsService periodStatisticsService;
   private final UserStatisticsService userStatisticsService;
-  private final UserMapper userMapper;
+  private final UserIdResolver userIdResolver;
 
   /** UserDetails에서 userId 추출 (null-safe) */
   private String extractUserId(UserDetails userDetails) {
     if (userDetails == null) {
       return null;
     }
-    Integer userSeq = Integer.parseInt(userDetails.getUsername());
-    return userMapper.findUserIdBySeq(userSeq);
+    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
+    return userIdResolver.toUserId(userSeq);
   }
 
   /** 일별 통계 조회 GET /api/statistics/daily?startDate=2025-01-01&endDate=2025-01-31&serviceType=SMS */

@@ -20,6 +20,14 @@ public class UserIdResolver {
     return userMapper.findSeqByUserId(userId);
   }
 
+  /** userSeq → userId 변환 (null-safe) */
+  public String toUserId(Integer userSeq) {
+    if (userSeq == null) {
+      return null;
+    }
+    return userMapper.findUserIdBySeq(userSeq);
+  }
+
   /** 여러 userId → userSeq 변환 (null 제외) */
   public List<Integer> toUserSeqs(List<String> userIds) {
     if (userIds == null || userIds.isEmpty()) {

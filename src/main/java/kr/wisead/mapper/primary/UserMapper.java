@@ -19,6 +19,9 @@ public interface UserMapper {
   /** SEQ로 USER_ID 조회 */
   String findUserIdBySeq(@Param("seq") Integer seq);
 
+  /** USER_ID로 SEQ 조회 */
+  Integer findSeqByUserId(@Param("userId") String userId);
+
   /** 회원 조회 (by EMAIL) */
   Optional<User> findByEmail(@Param("email") String email);
 

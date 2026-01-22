@@ -251,18 +251,18 @@ public class PaymentController {
     return ApiResponse.success(userServiceRateService.getStandardRates());
   }
 
-  /** 사용자별 요금 조회 GET /api/payment/user-rates/{userId} */
-  @GetMapping("/user-rates/{userId}")
+  /** 사용자별 요금 조회 GET /api/payment/user-rates/{userSeq} */
+  @GetMapping("/user-rates/{userSeq}")
   @PreAuthorize("hasRole('ADMIN')")
-  public ApiResponse<UserServiceRateResponse> getUserRates(@PathVariable String userId) {
-    return ApiResponse.success(userServiceRateService.getUserRates(userId));
+  public ApiResponse<UserServiceRateResponse> getUserRates(@PathVariable Integer userSeq) {
+    return ApiResponse.success(userServiceRateService.getUserRates(userSeq));
   }
 
   /** 사용자별 요금 설정 PUT /api/payment/user-rates */
   @PutMapping("/user-rates")
   @PreAuthorize("hasRole('ADMIN')")
   public ApiResponse<Void> updateUserRates(@Valid @RequestBody UserServiceRateRequest request) {
-    userServiceRateService.updateUserRates(request);
+    userServiceRateService.updateUserRates(request.userSeq(), request);
     return ApiResponse.success(null);
   }
 }

@@ -9,7 +9,7 @@ import lombok.Getter;
 @Builder
 public class WalletSummaryResponse {
 
-  private String userId;
+  private Integer userSeq;
   private BigDecimal cash; // 캐시 잔액
   private BigDecimal point; // 포인트 잔액 (유효한 것만)
   private BigDecimal bonus; // 보너스 잔액 (유효한 것만)
@@ -17,13 +17,13 @@ public class WalletSummaryResponse {
 
   /** 총 잔액 계산 */
   public static WalletSummaryResponse of(
-      String userId, BigDecimal cash, BigDecimal point, BigDecimal bonus) {
+      Integer userSeq, BigDecimal cash, BigDecimal point, BigDecimal bonus) {
     BigDecimal safeCash = cash != null ? cash : BigDecimal.ZERO;
     BigDecimal safePoint = point != null ? point : BigDecimal.ZERO;
     BigDecimal safeBonus = bonus != null ? bonus : BigDecimal.ZERO;
 
     return WalletSummaryResponse.builder()
-        .userId(userId)
+        .userSeq(userSeq)
         .cash(safeCash)
         .point(safePoint)
         .bonus(safeBonus)

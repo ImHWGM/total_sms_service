@@ -23,20 +23,20 @@ public interface TransactionMapper {
 
   /** 사용자 거래 내역 조회 (페이징) */
   List<Transaction> selectHistory(
-      @Param("userId") String userId, @Param("offset") int offset, @Param("limit") int limit);
+      @Param("userSeq") Integer userSeq, @Param("offset") int offset, @Param("limit") int limit);
 
   /** 사용자 거래 내역 총 개수 */
-  int selectHistoryCount(@Param("userId") String userId);
+  int selectHistoryCount(@Param("userSeq") Integer userSeq);
 
   /** 기간별 거래 내역 조회 */
   List<Transaction> selectByDateRange(
-      @Param("userId") String userId,
+      @Param("userSeq") Integer userSeq,
       @Param("startDate") LocalDateTime startDate,
       @Param("endDate") LocalDateTime endDate);
 
   /** 거래 유형별 조회 */
   List<Transaction> selectByType(
-      @Param("userId") String userId,
+      @Param("userSeq") Integer userSeq,
       @Param("txType") String txType,
       @Param("offset") int offset,
       @Param("limit") int limit);
@@ -46,27 +46,27 @@ public interface TransactionMapper {
 
   /** 일별 과금 통계 */
   List<Map<String, Object>> selectDailyStats(
-      @Param("userId") String userId,
+      @Param("userSeq") Integer userSeq,
       @Param("startDate") String startDate,
       @Param("endDate") String endDate);
 
   /** 월별 과금 통계 */
   List<Map<String, Object>> selectMonthlyStats(
-      @Param("userId") String userId,
+      @Param("userSeq") Integer userSeq,
       @Param("startDate") String startDate,
       @Param("endDate") String endDate);
 
   /** 서비스별 과금 통계 */
   List<Map<String, Object>> selectStatsByServiceId(
-      @Param("userId") String userId,
-      @Param("userIds") List<String> userIds,
+      @Param("userSeq") Integer userSeq,
+      @Param("userSeqs") List<Integer> userSeqs,
       @Param("startDate") String startDate,
       @Param("endDate") String endDate);
 
   /** 기간별 총계 */
   Map<String, Object> selectSummary(
-      @Param("userId") String userId,
-      @Param("userIds") List<String> userIds,
+      @Param("userSeq") Integer userSeq,
+      @Param("userSeqs") List<Integer> userSeqs,
       @Param("startDate") String startDate,
       @Param("endDate") String endDate);
 
@@ -75,13 +75,13 @@ public interface TransactionMapper {
 
   /** 사용자별 과금 통계 */
   List<Map<String, Object>> selectStatsByUsers(
-      @Param("userIds") List<String> userIds,
+      @Param("userSeqs") List<Integer> userSeqs,
       @Param("startDate") String startDate,
       @Param("endDate") String endDate);
 
   /** 사용자별 현재 잔액 및 마지막 거래일 조회 */
-  List<Map<String, Object>> selectUserBalanceSummary(@Param("userIds") List<String> userIds);
+  List<Map<String, Object>> selectUserBalanceSummary(@Param("userSeqs") List<Integer> userSeqs);
 
   /** 최근 거래일 조회 */
-  LocalDateTime selectLastTransactionDate(@Param("userId") String userId);
+  LocalDateTime selectLastTransactionDate(@Param("userSeq") Integer userSeq);
 }

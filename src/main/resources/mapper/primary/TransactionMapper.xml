@@ -6,7 +6,7 @@
     <sql id="allColumns">
         seq,
         tx_group_id AS txGroupId,
-        user_id AS userId,
+        user_seq AS userSeq,
         currency_type AS currencyType,
         tx_type AS txType,
         amount,
@@ -25,7 +25,7 @@
     <sql id="columnsWithLot">
         seq,
         tx_group_id AS txGroupId,
-        user_id AS userId,
+        user_seq AS userSeq,
         currency_type AS currencyType,
         tx_type AS txType,
         amount,
@@ -42,10 +42,10 @@
     <!-- 거래 내역 등록 -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="seq">
         INSERT INTO transaction (
-            tx_group_id, user_id, currency_type, tx_type, amount, balance_after,
+            tx_group_id, user_seq, currency_type, tx_type, amount, balance_after,
             service_id, unit_price, quantity, lot_seq, lot_expire_date, ref_tx_seq, comment
         ) VALUES (
-            #{txGroupId}, #{userId}, #{currencyType}, #{txType}, #{amount}, #{balanceAfter},
+            #{txGroupId}, #{userSeq}, #{currencyType}, #{txType}, #{amount}, #{balanceAfter},
             #{serviceId}, #{unitPrice}, #{quantity}, #{lotSeq}, #{lotExpireDate}, #{refTxSeq}, #{comment}
         )
     </insert>
@@ -69,7 +69,7 @@
     <select id="selectHistory" resultType="kr.wisead.domain.payment.entity.Transaction">
         SELECT <include refid="allColumns"/>
         FROM transaction
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
         ORDER BY seq DESC
         LIMIT #{offset}, #{limit}
     </select>
@@ -78,14 +78,14 @@
     <select id="selectHistoryCount" resultType="int">
         SELECT COUNT(*)
         FROM transaction
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
     </select>
 
     <!-- 기간별 거래 내역 조회 -->
     <select id="selectByDateRange" resultType="kr.wisead.domain.payment.entity.Transaction">
         SELECT <include refid="allColumns"/>
         FROM transaction
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND reg_date BETWEEN #{startDate} AND #{endDate}
         ORDER BY seq DESC
     </select>
@@ -94,7 +94,7 @@
     <select id="selectByType" resultType="kr.wisead.domain.payment.entity.Transaction">
         SELECT <include refid="allColumns"/>
         FROM transaction
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND tx_type = #{txType}
         ORDER BY seq DESC
         LIMIT #{offset}, #{limit}
@@ -122,7 +122,7 @@
             COUNT(*) AS transactionCount,
             SUM(amount) AS totalAmount
         FROM transaction
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
         <if test="startDate != null and startDate != ''">
             AND DATE(reg_date) >= #{startDate}
         </if>
@@ -142,7 +142,7 @@
             COUNT(*) AS transactionCount,
             SUM(amount) AS totalAmount
         FROM transaction
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
         <if test="startDate != null and startDate != ''">
             AND DATE(reg_date) >= #{startDate}
         </if>
@@ -163,12 +163,12 @@
             SUM(quantity) AS totalQuantity
         FROM transaction
         WHERE tx_type = 'DEDUCT'
-        <if test="userId != null and userId != ''">
-            AND user_id = #{userId}
+        <if test="userSeq != null">
+            AND user_seq = #{userSeq}
         </if>
-        <if test="userIds != null and userIds.size() > 0">
-            AND user_id IN
-            <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+        <if test="userSeqs != null and userSeqs.size() > 0">
+            AND user_seq IN
+            <foreach collection="userSeqs" item="uid" open="(" separator="," close=")">
                 #{uid}
             </foreach>
         </if>
@@ -193,12 +193,12 @@
             COUNT(CASE WHEN tx_type = 'REFUND' THEN 1 END) AS refundCount
         FROM transaction
         WHERE 1=1
-        <if test="userId != null and userId != ''">
-            AND user_id = #{userId}
+        <if test="userSeq != null">
+            AND user_seq = #{userSeq}
         </if>
-        <if test="userIds != null and userIds.size() > 0">
-            AND user_id IN
-            <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+        <if test="userSeqs != null and userSeqs.size() > 0">
+            AND user_seq IN
+            <foreach collection="userSeqs" item="uid" open="(" separator="," close=")">
                 #{uid}
             </foreach>
         </if>
@@ -221,14 +221,14 @@
     <!-- 사용자별 과금 통계 -->
     <select id="selectStatsByUsers" resultType="java.util.Map">
         SELECT
-            user_id AS userId,
+            user_seq AS userSeq,
             tx_type AS txType,
             COUNT(*) AS transactionCount,
             SUM(amount) AS totalAmount
         FROM transaction
-        WHERE user_id IN
-        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
-            #{userId}
+        WHERE user_seq IN
+        <foreach collection="userSeqs" item="userSeq" open="(" separator="," close=")">
+            #{userSeq}
         </foreach>
         <if test="startDate != null and startDate != ''">
             AND DATE(reg_date) >= #{startDate}
@@ -236,29 +236,29 @@
         <if test="endDate != null and endDate != ''">
             AND DATE(reg_date) <![CDATA[<=]]> #{endDate}
         </if>
-        GROUP BY user_id, tx_type
-        ORDER BY user_id, tx_type
+        GROUP BY user_seq, tx_type
+        ORDER BY user_seq, tx_type
     </select>
 
     <!-- 사용자별 현재 잔액 및 마지막 거래일 조회 -->
     <select id="selectUserBalanceSummary" resultType="java.util.Map">
         SELECT
-            t.user_id AS userId,
-            (SELECT COALESCE(SUM(w.balance), 0) FROM wallet w WHERE w.user_id = t.user_id) AS currentBalance,
+            t.user_seq AS userSeq,
+            (SELECT COALESCE(SUM(w.balance), 0) FROM wallet w WHERE w.user_seq = t.user_seq) AS currentBalance,
             MAX(t.reg_date) AS lastTransactionDate
         FROM transaction t
-        WHERE t.user_id IN
-        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
-            #{userId}
+        WHERE t.user_seq IN
+        <foreach collection="userSeqs" item="userSeq" open="(" separator="," close=")">
+            #{userSeq}
         </foreach>
-        GROUP BY t.user_id
+        GROUP BY t.user_seq
     </select>
 
     <!-- 최근 거래일 조회 -->
     <select id="selectLastTransactionDate" resultType="java.time.LocalDateTime">
         SELECT MAX(reg_date)
         FROM transaction
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
     </select>
 
 </mapper>

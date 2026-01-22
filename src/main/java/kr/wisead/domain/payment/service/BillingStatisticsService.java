@@ -19,12 +19,16 @@ import kr.wisead.domain.payment.dto.UserBillingStatsResponse;
 import kr.wisead.domain.payment.dto.WalletSummaryResponse;
 import kr.wisead.domain.payment.entity.Transaction;
 import kr.wisead.mapper.primary.TransactionMapper;
+import kr.wisead.mapper.primary.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 과금 통계 서비스 (리팩토링 버전) - TransactionMapper 사용 - WalletService 연동 */
+/**
+ * 과금 통계 서비스 (리팩토링 버전) - TransactionMapper 사용 - WalletService 연동 - 외부 API 호환: userId(String) → 내부:
+ * userSeq(Integer) 변환
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,14 +36,16 @@ public class BillingStatisticsService {
 
   private final TransactionMapper transactionMapper;
   private final WalletService walletService;
+  private final UserMapper userMapper;
 
   /** 일별 과금 통계 조회 */
   @Transactional(readOnly = true)
   public List<DailyBillingStatsResponse> getDailyBillingStats(BillingStatsSearchRequest request) {
     String[] dates = resolveDefaultDates(request.getStartDate(), request.getEndDate());
+    Integer userSeq = toUserSeq(request.getUserId());
 
     List<Map<String, Object>> rawStats =
-        transactionMapper.selectDailyStats(request.getUserId(), dates[0], dates[1]);
+        transactionMapper.selectDailyStats(userSeq, dates[0], dates[1]);
 
     return rawStats.stream().map(this::toDailyBillingStatsResponse).toList();
   }
@@ -49,9 +55,10 @@ public class BillingStatisticsService {
   public List<MonthlyBillingStatsResponse> getMonthlyBillingStats(
       BillingStatsSearchRequest request) {
     String[] dates = resolveDefaultDates(request.getStartDate(), request.getEndDate());
+    Integer userSeq = toUserSeq(request.getUserId());
 
     List<Map<String, Object>> rawStats =
-        transactionMapper.selectMonthlyStats(request.getUserId(), dates[0], dates[1]);
+        transactionMapper.selectMonthlyStats(userSeq, dates[0], dates[1]);
 
     return rawStats.stream().map(this::toMonthlyBillingStatsResponse).toList();
   }
@@ -61,10 +68,11 @@ public class BillingStatisticsService {
   public List<ServiceTypeBillingStatsResponse> getBillingStatsByServiceType(
       BillingStatsSearchRequest request) {
     String[] dates = resolveDefaultDates(request.getStartDate(), request.getEndDate());
+    Integer userSeq = toUserSeq(request.getUserId());
+    List<Integer> userSeqs = toUserSeqs(request.getUserIds());
 
     List<Map<String, Object>> rawStats =
-        transactionMapper.selectStatsByServiceId(
-            request.getUserId(), request.getUserIds(), dates[0], dates[1]);
+        transactionMapper.selectStatsByServiceId(userSeq, userSeqs, dates[0], dates[1]);
 
     return rawStats.stream().map(this::toServiceTypeBillingStatsResponse).toList();
   }
@@ -77,14 +85,32 @@ public class BillingStatisticsService {
       return Collections.emptyList();
     }
 
-    List<Map<String, Object>> rawStats =
-        transactionMapper.selectStatsByUsers(userIds, request.getStartDate(), request.getEndDate());
+    // userId → userSeq 변환 및 매핑 유지
+    Map<Integer, String> seqToUserIdMap = new LinkedHashMap<>();
+    for (String userId : userIds) {
+      Integer userSeq = toUserSeq(userId);
+      if (userSeq != null) {
+        seqToUserIdMap.put(userSeq, userId);
+      }
+    }
+    List<Integer> userSeqs = new ArrayList<>(seqToUserIdMap.keySet());
 
-    // 사용자별로 그룹핑
+    if (userSeqs.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<Map<String, Object>> rawStats =
+        transactionMapper.selectStatsByUsers(
+            userSeqs, request.getStartDate(), request.getEndDate());
+
+    // 사용자별로 그룹핑 (userSeq → userId 변환하여 응답)
     Map<String, UserBillingStatsResponse> userStatsMap = new LinkedHashMap<>();
 
     for (Map<String, Object> stat : rawStats) {
-      String userId = (String) stat.get("userId");
+      Integer userSeq = getIntValue(stat, "userSeq");
+      String userId = seqToUserIdMap.get(userSeq);
+      if (userId == null) continue;
+
       String txType = (String) stat.get("txType");
       int transactionCount = getIntValue(stat, "transactionCount");
       BigDecimal totalAmount = getBigDecimalValue(stat, "totalAmount");
@@ -118,9 +144,12 @@ public class BillingStatisticsService {
 
     // 현재 잔액 정보 추가
     if (!userStatsMap.isEmpty()) {
-      List<Map<String, Object>> balances = transactionMapper.selectUserBalanceSummary(userIds);
+      List<Map<String, Object>> balances = transactionMapper.selectUserBalanceSummary(userSeqs);
       for (Map<String, Object> balance : balances) {
-        String userId = (String) balance.get("userId");
+        Integer userSeq = getIntValue(balance, "userSeq");
+        String userId = seqToUserIdMap.get(userSeq);
+        if (userId == null) continue;
+
         UserBillingStatsResponse userStats = userStatsMap.get(userId);
         if (userStats != null) {
           userStats.setCurrentBalance(getBigDecimalValue(balance, "currentBalance"));
@@ -132,11 +161,13 @@ public class BillingStatisticsService {
       }
 
       // 잔액 정보가 없는 사용자 처리 (새 wallet 기반)
-      for (String userId : userIds) {
+      for (Map.Entry<Integer, String> entry : seqToUserIdMap.entrySet()) {
+        String userId = entry.getValue();
+        Integer userSeq = entry.getKey();
         UserBillingStatsResponse userStats = userStatsMap.get(userId);
         if (userStats != null && userStats.getCurrentBalance() == null) {
           try {
-            WalletSummaryResponse summary = walletService.getWalletSummary(userId);
+            WalletSummaryResponse summary = walletService.getWalletSummary(userSeq);
             userStats.setCurrentBalance(summary.getTotal());
           } catch (Exception e) {
             userStats.setCurrentBalance(BigDecimal.ZERO);
@@ -152,10 +183,11 @@ public class BillingStatisticsService {
   @Transactional(readOnly = true)
   public BillingSummaryResponse getBillingSummary(BillingStatsSearchRequest request) {
     String[] dates = resolveDefaultDates(request.getStartDate(), request.getEndDate());
+    Integer userSeq = toUserSeq(request.getUserId());
+    List<Integer> userSeqs = toUserSeqs(request.getUserIds());
 
     Map<String, Object> rawSummary =
-        transactionMapper.selectSummary(
-            request.getUserId(), request.getUserIds(), dates[0], dates[1]);
+        transactionMapper.selectSummary(userSeq, userSeqs, dates[0], dates[1]);
 
     BigDecimal totalCharge = getBigDecimalValue(rawSummary, "totalCharge");
     BigDecimal totalDeduct = getBigDecimalValue(rawSummary, "totalDeduct");
@@ -211,8 +243,9 @@ public class BillingStatisticsService {
     List<UserBillingStatsResponse> stats = getBillingStatsByUser(request);
     if (stats.isEmpty()) {
       // 해당 기간 거래가 없어도 현재 잔액은 조회
-      WalletSummaryResponse summary = walletService.getWalletSummary(userId);
-      LocalDateTime lastTxDate = transactionMapper.selectLastTransactionDate(userId);
+      Integer userSeq = toUserSeq(userId);
+      WalletSummaryResponse summary = walletService.getWalletSummary(userSeq);
+      LocalDateTime lastTxDate = transactionMapper.selectLastTransactionDate(userSeq);
 
       return UserBillingStatsResponse.builder()
           .userId(userId)
@@ -291,10 +324,27 @@ public class BillingStatisticsService {
   /** 통화 유형별 잔액 조회 (신규) */
   @Transactional(readOnly = true)
   public WalletSummaryResponse getWalletSummary(String userId) {
-    return walletService.getWalletSummary(userId);
+    Integer userSeq = toUserSeq(userId);
+    return walletService.getWalletSummary(userSeq);
   }
 
   // ==================== Private Methods ====================
+
+  /** userId → userSeq 변환 */
+  private Integer toUserSeq(String userId) {
+    if (userId == null || userId.isBlank()) {
+      return null;
+    }
+    return userMapper.findSeqByUserId(userId);
+  }
+
+  /** userIds → userSeqs 변환 */
+  private List<Integer> toUserSeqs(List<String> userIds) {
+    if (userIds == null || userIds.isEmpty()) {
+      return Collections.emptyList();
+    }
+    return userIds.stream().map(userMapper::findSeqByUserId).filter(seq -> seq != null).toList();
+  }
 
   /** 날짜 기본값 처리 (null이면 현재 월 1일 ~ 오늘) */
   private String[] resolveDefaultDates(String startDate, String endDate) {

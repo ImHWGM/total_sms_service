@@ -5,11 +5,11 @@
     <!-- 지갑 생성 -->
     <insert id="insert">
         INSERT INTO wallet (
-            user_id,
+            user_seq,
             currency_type,
             balance
         ) VALUES (
-            #{userId},
+            #{userSeq},
             #{currencyType},
             #{balance}
         )
@@ -18,11 +18,11 @@
     <!-- 지갑 생성 (중복 무시) -->
     <insert id="insertIgnore">
         INSERT IGNORE INTO wallet (
-            user_id,
+            user_seq,
             currency_type,
             balance
         ) VALUES (
-            #{userId},
+            #{userSeq},
             #{currencyType},
             #{balance}
         )
@@ -31,24 +31,24 @@
     <!-- 사용자 지갑 조회 -->
     <select id="selectByUserId" resultType="kr.wisead.domain.payment.entity.Wallet">
         SELECT
-            user_id AS userId,
+            user_seq AS userSeq,
             currency_type AS currencyType,
             balance,
             upt_date AS uptDate
         FROM wallet
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND currency_type = #{currencyType}
     </select>
 
     <!-- 사용자 지갑 조회 (FOR UPDATE) -->
     <select id="selectForUpdate" resultType="kr.wisead.domain.payment.entity.Wallet">
         SELECT
-            user_id AS userId,
+            user_seq AS userSeq,
             currency_type AS currencyType,
             balance,
             upt_date AS uptDate
         FROM wallet
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND currency_type = #{currencyType}
         FOR UPDATE
     </select>
@@ -57,7 +57,7 @@
     <update id="updateBalance">
         UPDATE wallet
         SET balance = #{balance}
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND currency_type = #{currencyType}
     </update>
 
@@ -65,7 +65,7 @@
     <update id="addBalance">
         UPDATE wallet
         SET balance = balance + #{amount}
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND currency_type = #{currencyType}
     </update>
 
@@ -73,7 +73,7 @@
     <update id="subtractBalance">
         UPDATE wallet
         SET balance = balance - #{amount}
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND currency_type = #{currencyType}
           AND balance >= #{amount}
     </update>
@@ -81,15 +81,15 @@
     <!-- 다중 사용자 지갑 조회 -->
     <select id="selectByUserIds" resultType="kr.wisead.domain.payment.entity.Wallet">
         SELECT
-            user_id AS userId,
+            user_seq AS userSeq,
             currency_type AS currencyType,
             balance,
             upt_date AS uptDate
         FROM wallet
         WHERE currency_type = #{currencyType}
-        <if test="userIds != null and userIds.size() > 0">
-            AND user_id IN
-            <foreach collection="userIds" item="id" open="(" separator="," close=")">
+        <if test="userSeqs != null and userSeqs.size() > 0">
+            AND user_seq IN
+            <foreach collection="userSeqs" item="id" open="(" separator="," close=")">
                 #{id}
             </foreach>
         </if>
@@ -99,7 +99,7 @@
     <select id="existsByUserId" resultType="boolean">
         SELECT EXISTS(
             SELECT 1 FROM wallet
-            WHERE user_id = #{userId}
+            WHERE user_seq = #{userSeq}
               AND currency_type = #{currencyType}
         )
     </select>

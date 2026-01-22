@@ -5,7 +5,7 @@
     <!-- 잔액 내역 등록 -->
     <insert id="insertBalance" useGeneratedKeys="true" keyProperty="seq">
         INSERT INTO BALANCE (
-            USER_ID,
+            USER_SEQ,
             BALANCE,
             TOTAL_BALANCE,
             OPERATION,
@@ -18,7 +18,7 @@
             REG_DATE,
             REG_ID
         ) VALUES (
-            #{userId},
+            #{userSeq},
             #{balance},
             #{totalBalance},
             #{operation},
@@ -37,7 +37,7 @@
     <select id="selectLatestBalance" resultType="kr.wisead.domain.payment.entity.Balance">
         SELECT
             SEQ AS seq,
-            USER_ID AS userId,
+            USER_SEQ AS userSeq,
             BALANCE AS balance,
             TOTAL_BALANCE AS totalBalance,
             OPERATION AS operation,
@@ -50,7 +50,7 @@
             REG_DATE AS regDate,
             REG_ID AS regId
         FROM BALANCE
-        WHERE USER_ID = #{userId}
+        WHERE USER_SEQ = #{userSeq}
         ORDER BY SEQ DESC
         LIMIT 1
     </select>
@@ -59,7 +59,7 @@
     <select id="selectBalanceHistory" resultType="kr.wisead.domain.payment.entity.Balance">
         SELECT
             SEQ AS seq,
-            USER_ID AS userId,
+            USER_SEQ AS userSeq,
             BALANCE AS balance,
             TOTAL_BALANCE AS totalBalance,
             OPERATION AS operation,
@@ -72,7 +72,7 @@
             REG_DATE AS regDate,
             REG_ID AS regId
         FROM BALANCE
-        WHERE USER_ID = #{userId}
+        WHERE USER_SEQ = #{userSeq}
         ORDER BY SEQ DESC
         LIMIT #{offset}, #{limit}
     </select>
@@ -81,21 +81,21 @@
     <select id="selectBalanceHistoryCount" resultType="int">
         SELECT COUNT(*)
         FROM BALANCE
-        WHERE USER_ID = #{userId}
+        WHERE USER_SEQ = #{userSeq}
     </select>
 
     <!-- 충전 내역 조회 -->
     <select id="selectChargeHistory" resultType="kr.wisead.domain.payment.entity.Balance">
         SELECT
             SEQ AS seq,
-            USER_ID AS userId,
+            USER_SEQ AS userSeq,
             BALANCE AS balance,
             TOTAL_BALANCE AS totalBalance,
             OPERATION AS operation,
             COMMENT AS comment,
             REG_DATE AS regDate
         FROM BALANCE
-        WHERE USER_ID = #{userId}
+        WHERE USER_SEQ = #{userSeq}
           AND OPERATION = 'P'
         <if test="startDate != null and startDate != ''">
             AND DATE(REG_DATE) >= #{startDate}
@@ -115,8 +115,8 @@
             SUM(BALANCE) AS totalAmount
         FROM BALANCE
         WHERE 1=1
-        <if test="userId != null and userId != ''">
-            AND USER_ID = #{userId}
+        <if test="userSeq != null and userSeq != ''">
+            AND USER_SEQ = #{userSeq}
         </if>
         <if test="startDate != null and startDate != ''">
             AND DATE(REG_DATE) >= #{startDate}
@@ -137,8 +137,8 @@
             SUM(BALANCE) AS totalAmount
         FROM BALANCE
         WHERE 1=1
-        <if test="userId != null and userId != ''">
-            AND USER_ID = #{userId}
+        <if test="userSeq != null and userSeq != ''">
+            AND USER_SEQ = #{userSeq}
         </if>
         <if test="startDate != null and startDate != ''">
             AND DATE(REG_DATE) >= #{startDate}
@@ -168,8 +168,8 @@
             SUM(BALANCE) AS totalAmount
         FROM BALANCE
         WHERE 1=1
-        <if test="userId != null and userId != ''">
-            AND USER_ID = #{userId}
+        <if test="userSeq != null and userSeq != ''">
+            AND USER_SEQ = #{userSeq}
         </if>
         <if test="startDate != null and startDate != ''">
             AND DATE(REG_DATE) >= #{startDate}
@@ -184,15 +184,15 @@
     <!-- 사용자별 과금 통계 -->
     <select id="selectBillingStatsByUser" resultType="java.util.Map">
         SELECT
-            USER_ID AS userId,
+            USER_SEQ AS userSeq,
             OPERATION AS operation,
             COUNT(*) AS transactionCount,
             SUM(BALANCE) AS totalAmount
         FROM BALANCE
         WHERE 1=1
-        <if test="userIds != null and userIds.size() > 0">
-            AND USER_ID IN
-            <foreach collection="userIds" item="id" open="(" separator="," close=")">
+        <if test="userSeqs != null and userSeqs.size() > 0">
+            AND USER_SEQ IN
+            <foreach collection="userSeqs" item="id" open="(" separator="," close=")">
                 #{id}
             </foreach>
         </if>
@@ -202,8 +202,8 @@
         <if test="endDate != null and endDate != ''">
             AND DATE(REG_DATE) <![CDATA[<=]]> #{endDate}
         </if>
-        GROUP BY USER_ID, OPERATION
-        ORDER BY USER_ID, OPERATION
+        GROUP BY USER_SEQ, OPERATION
+        ORDER BY USER_SEQ, OPERATION
     </select>
 
     <!-- 기간별 총계 조회 -->
@@ -217,8 +217,8 @@
             COUNT(CASE WHEN OPERATION = 'R' THEN 1 END) AS refundCount
         FROM BALANCE
         WHERE 1=1
-        <if test="userId != null and userId != ''">
-            AND USER_ID = #{userId}
+        <if test="userSeq != null and userSeq != ''">
+            AND USER_SEQ = #{userSeq}
         </if>
         <if test="startDate != null and startDate != ''">
             AND DATE(REG_DATE) >= #{startDate}
@@ -232,7 +232,7 @@
     <select id="selectRecentTransactions" resultType="kr.wisead.domain.payment.entity.Balance">
         SELECT
             SEQ AS seq,
-            USER_ID AS userId,
+            USER_SEQ AS userSeq,
             BALANCE AS balance,
             TOTAL_BALANCE AS totalBalance,
             OPERATION AS operation,
@@ -251,21 +251,21 @@
     <!-- 사용자별 현재 잔액 목록 조회 -->
     <select id="selectCurrentBalanceByUsers" resultType="java.util.Map">
         SELECT
-            b.USER_ID AS userId,
+            b.USER_SEQ AS userSeq,
             b.TOTAL_BALANCE AS currentBalance,
             b.REG_DATE AS lastTransactionDate
         FROM BALANCE b
         INNER JOIN (
-            SELECT USER_ID, MAX(SEQ) AS maxSeq
+            SELECT USER_SEQ, MAX(SEQ) AS maxSeq
             FROM BALANCE
-            <if test="userIds != null and userIds.size() > 0">
-                WHERE USER_ID IN
-                <foreach collection="userIds" item="id" open="(" separator="," close=")">
+            <if test="userSeqs != null and userSeqs.size() > 0">
+                WHERE USER_SEQ IN
+                <foreach collection="userSeqs" item="id" open="(" separator="," close=")">
                     #{id}
                 </foreach>
             </if>
-            GROUP BY USER_ID
-        ) latest ON b.USER_ID = latest.USER_ID AND b.SEQ = latest.maxSeq
+            GROUP BY USER_SEQ
+        ) latest ON b.USER_SEQ = latest.USER_SEQ AND b.SEQ = latest.maxSeq
         ORDER BY b.TOTAL_BALANCE DESC
     </select>
 

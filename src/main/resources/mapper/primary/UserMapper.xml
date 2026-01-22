@@ -63,6 +63,13 @@
         WHERE SEQ = #{seq}
     </select>
 
+    <!-- USER_ID로 SEQ 조회 -->
+    <select id="findSeqByUserId" resultType="int">
+        SELECT SEQ
+        FROM user
+        WHERE USER_ID = #{userId}
+    </select>
+
     <!-- 회원 조회 (by EMAIL) -->
     <select id="findByEmail" resultMap="UserResultMap">
         SELECT <include refid="userColumns"/>

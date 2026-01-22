@@ -5,7 +5,7 @@
     <!-- Lot 생성 -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="lotSeq">
         INSERT INTO wallet_lot (
-            user_id,
+            user_seq,
             currency_type,
             amount,
             remaining,
@@ -13,7 +13,7 @@
             status,
             source
         ) VALUES (
-            #{userId},
+            #{userSeq},
             #{currencyType},
             #{amount},
             #{remaining},
@@ -27,7 +27,7 @@
     <select id="selectBySeq" resultType="kr.wisead.domain.payment.entity.WalletLot">
         SELECT
             lot_seq AS lotSeq,
-            user_id AS userId,
+            user_seq AS userSeq,
             currency_type AS currencyType,
             amount,
             remaining,
@@ -43,7 +43,7 @@
     <select id="selectActiveByType" resultType="kr.wisead.domain.payment.entity.WalletLot">
         SELECT
             lot_seq AS lotSeq,
-            user_id AS userId,
+            user_seq AS userSeq,
             currency_type AS currencyType,
             amount,
             remaining,
@@ -52,7 +52,7 @@
             source,
             reg_date AS regDate
         FROM wallet_lot
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND currency_type = #{currencyType}
           AND status = 'ACTIVE'
           AND expire_date >= #{today}
@@ -64,7 +64,7 @@
     <select id="selectActiveByTypeForUpdate" resultType="kr.wisead.domain.payment.entity.WalletLot">
         SELECT
             lot_seq AS lotSeq,
-            user_id AS userId,
+            user_seq AS userSeq,
             currency_type AS currencyType,
             amount,
             remaining,
@@ -73,7 +73,7 @@
             source,
             reg_date AS regDate
         FROM wallet_lot
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND currency_type = #{currencyType}
           AND status = 'ACTIVE'
           AND expire_date >= #{today}
@@ -86,7 +86,7 @@
     <select id="selectSumRemaining" resultType="java.math.BigDecimal">
         SELECT COALESCE(SUM(remaining), 0)
         FROM wallet_lot
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND currency_type = #{currencyType}
           AND status = 'ACTIVE'
           AND expire_date >= #{today}
@@ -98,7 +98,7 @@
             currency_type AS currencyType,
             COALESCE(SUM(remaining), 0) AS balance
         FROM wallet_lot
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND status = 'ACTIVE'
           AND expire_date >= #{today}
         GROUP BY currency_type
@@ -147,14 +147,14 @@
     <!-- 합산 대상 그룹 조회 -->
     <select id="selectDuplicateLotGroups" resultType="kr.wisead.mapper.primary.WalletLotMapper$LotGroup">
         SELECT
-            user_id AS userId,
+            user_seq AS userSeq,
             currency_type AS currencyType,
             expire_date AS expireDate,
             COUNT(*) AS count
         FROM wallet_lot
         WHERE status = 'ACTIVE'
           AND remaining > 0
-        GROUP BY user_id, currency_type, expire_date
+        GROUP BY user_seq, currency_type, expire_date
         HAVING COUNT(*) > 1
     </select>
 
@@ -162,7 +162,7 @@
     <select id="selectByGroup" resultType="kr.wisead.domain.payment.entity.WalletLot">
         SELECT
             lot_seq AS lotSeq,
-            user_id AS userId,
+            user_seq AS userSeq,
             currency_type AS currencyType,
             amount,
             remaining,
@@ -171,7 +171,7 @@
             source,
             reg_date AS regDate
         FROM wallet_lot
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND currency_type = #{currencyType}
           AND expire_date = #{expireDate}
           AND status = 'ACTIVE'
@@ -197,7 +197,7 @@
     <select id="selectAllActiveByUserId" resultType="kr.wisead.domain.payment.entity.WalletLot">
         SELECT
             lot_seq AS lotSeq,
-            user_id AS userId,
+            user_seq AS userSeq,
             currency_type AS currencyType,
             amount,
             remaining,
@@ -206,7 +206,7 @@
             source,
             reg_date AS regDate
         FROM wallet_lot
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND status = 'ACTIVE'
           AND expire_date >= #{today}
           AND remaining > 0

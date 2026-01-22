@@ -253,12 +253,12 @@ public class AuthService {
 
     userMapper.insert(user);
 
-    // 6. 지갑 초기화
-    walletService.initializeWallet(request.getUserId());
+    // 6. 지갑 초기화 (INSERT 후 user.seq에 자동 생성된 키가 주입됨)
+    Integer userSeq = user.getSeq();
+    walletService.initializeWallet(userSeq);
 
     // 7. 사용자별 서비스 단가 초기화 (standard_rate 기준, VAT 포함)
     LocalDate today = LocalDate.now();
-    String userId = request.getUserId();
 
     BigDecimal surveyRate = standardRateService.getStandardRateWithVat("survey");
     BigDecimal smsRate = standardRateService.getStandardRateWithVat("msg_sms");
@@ -266,15 +266,15 @@ public class AuthService {
     BigDecimal mmsRate = standardRateService.getStandardRateWithVat("msg_mms");
     BigDecimal qrRate = standardRateService.getStandardRateWithVat("qr_code");
 
-    userServiceRateMapper.insert(UserServiceRate.create(userId, "survey", surveyRate, today));
-    userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_sms", smsRate, today));
-    userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_lms", lmsRate, today));
-    userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_mms", mmsRate, today));
-    userServiceRateMapper.insert(UserServiceRate.create(userId, "qr_code", qrRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userSeq, "survey", surveyRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userSeq, "msg_sms", smsRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userSeq, "msg_lms", lmsRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userSeq, "msg_mms", mmsRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userSeq, "qr_code", qrRate, today));
 
     log.info(
-        "회원가입 완료: userId={}, 설문단가={}, SMS단가={}, LMS단가={}, MMS단가={}, QR단가={}",
-        userId,
+        "회원가입 완료: userSeq={}, 설문단가={}, SMS단가={}, LMS단가={}, MMS단가={}, QR단가={}",
+        userSeq,
         surveyRate,
         smsRate,
         lmsRate,

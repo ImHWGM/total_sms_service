@@ -36,6 +36,7 @@ public class MessageSendService {
   private final SurveyUserMapper surveyUserMapper;
   private final SurveyMasterMapper surveyMasterMapper;
   private final WalletService walletService;
+  private final kr.wisead.mapper.primary.UserMapper userMapper;
 
   @Value("${wisead.url:https://wisead.kr}")
   private String wiseadUrl;
@@ -130,13 +131,25 @@ public class MessageSendService {
    * @return txGroupId (환불 시 사용)
    */
   private String deductForMessage(String userId, String serviceId, int quantity, String msgType) {
+    // userId로 userSeq 조회
+    Integer userSeq = userMapper.findSeqByUserId(userId);
+    if (userSeq == null) {
+      log.error("사용자를 찾을 수 없음 - userId: {}", userId);
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
+    }
+
     BigDecimal qty = BigDecimal.valueOf(quantity);
-    BigDecimal unitPrice = walletService.getAppliedRate(userId, serviceId);
+    BigDecimal unitPrice = walletService.getAppliedRate(userSeq, serviceId);
     BigDecimal totalAmount = unitPrice.multiply(qty);
 
     // 잔액 확인
-    if (!walletService.hasEnoughBalance(userId, totalAmount)) {
-      log.warn("잔액 부족 - userId: {}, 필요금액: {}, msgType: {}", userId, totalAmount, msgType);
+    if (!walletService.hasEnoughBalance(userSeq, totalAmount)) {
+      log.warn(
+          "잔액 부족 - userId: {}, userSeq: {}, 필요금액: {}, msgType: {}",
+          userId,
+          userSeq,
+          totalAmount,
+          msgType);
       throw new BusinessException(
           ErrorCode.INSUFFICIENT_BALANCE,
           String.format("잔액이 부족합니다. 필요 금액: %s원", totalAmount.setScale(0)));
@@ -145,11 +158,13 @@ public class MessageSendService {
     // 잔액 차감
     String txGroupId =
         walletService.deductWithPriority(
-            userId, serviceId, qty, String.format("%s 발송 %d건", getMsgTypeName(msgType), quantity));
+            userSeq, serviceId, qty, String.format("%s 발송 %d건", getMsgTypeName(msgType), quantity));
 
     log.info(
-        "메시지 발송 비용 차감 - userId: {}, serviceId: {}, quantity: {}, totalAmount: {}, txGroupId: {}",
+        "메시지 발송 비용 차감 - userId: {}, userSeq: {}, serviceId: {}, quantity: {}, totalAmount: {},"
+            + " txGroupId: {}",
         userId,
+        userSeq,
         serviceId,
         quantity,
         totalAmount,
@@ -362,18 +377,27 @@ public class MessageSendService {
   /** 부분 환불 (취소 건수 × 단가로 CASH 환불) - 원래 화폐 추적이 어려우므로 CASH로 환불 */
   private void refundPartial(String userId, String msgType, int count, String txGroupId) {
     try {
+      // userId로 userSeq 조회
+      Integer userSeq = userMapper.findSeqByUserId(userId);
+      if (userSeq == null) {
+        log.error("환불 처리 실패 - 사용자를 찾을 수 없음: userId={}", userId);
+        return;
+      }
+
       String serviceId = getServiceIdFromMsgType(msgType);
-      BigDecimal unitPrice = walletService.getAppliedRate(userId, serviceId);
+      BigDecimal unitPrice = walletService.getAppliedRate(userSeq, serviceId);
       BigDecimal refundAmount = unitPrice.multiply(BigDecimal.valueOf(count));
 
       String comment =
           String.format(
               "%s 발송 취소 환불 %d건 (txGroupId: %s)", getMsgTypeName(msgType), count, txGroupId);
-      walletService.refundToCash(userId, refundAmount, comment);
+      walletService.refundToCash(userSeq, refundAmount, comment);
 
       log.info(
-          "부분 환불 완료 - userId: {}, msgType: {}, count: {}, refundAmount: {}, txGroupId: {}",
+          "부분 환불 완료 - userId: {}, userSeq: {}, msgType: {}, count: {}, refundAmount: {}, txGroupId:"
+              + " {}",
           userId,
+          userSeq,
           msgType,
           count,
           refundAmount,

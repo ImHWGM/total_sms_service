@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 public class WalletLotResponse {
 
     private Long lotSeq;
-    private String userId;
+    private Integer userSeq;
     private String currencyType;
     private BigDecimal amount;
     private BigDecimal remaining;
@@ -35,7 +35,7 @@ public class WalletLotResponse {
 
         return WalletLotResponse.builder()
                 .lotSeq(lot.getLotSeq())
-                .userId(lot.getUserId())
+                .userSeq(lot.getUserSeq())
                 .currencyType(lot.getCurrencyType())
                 .amount(lot.getAmount())
                 .remaining(lot.getRemaining())

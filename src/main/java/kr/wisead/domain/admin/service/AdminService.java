@@ -93,17 +93,22 @@ public class AdminService {
             .loginFailureCnt(0)
             .build();
 
-    // 회원 등록
+    // 회원 등록 (INSERT 후 user.seq에 자동 생성된 키가 주입됨)
     userMapper.insert(user);
-    log.info("관리자 계정 생성: userId={}, level={}", request.getUserId(), request.getUserLevel());
+    Integer userSeq = user.getSeq();
+    log.info(
+        "관리자 계정 생성: userId={}, userSeq={}, level={}",
+        request.getUserId(),
+        userSeq,
+        request.getUserLevel());
 
-    // 지갑 초기화
-    walletService.initializeWallet(request.getUserId());
-    log.info("지갑 초기화 완료: userId={}", request.getUserId());
+    // 지갑 초기화 (userSeq 사용)
+    walletService.initializeWallet(userSeq);
+    log.info("지갑 초기화 완료: userSeq={}", userSeq);
 
-    // 서비스 단가 등록 (standard_rate 기준)
-    initializeUserServiceRates(request.getUserId());
-    log.info("서비스 단가 등록 완료: userId={}", request.getUserId());
+    // 서비스 단가 등록 (standard_rate 기준, userSeq 사용)
+    initializeUserServiceRates(userSeq);
+    log.info("서비스 단가 등록 완료: userSeq={}", userSeq);
 
     // 비밀번호 힌트 등록
     registerPasswordHint(user.getSeq(), request.getHintQuestion(), request.getHintAnswer());
@@ -273,7 +278,7 @@ public class AdminService {
     log.info("비밀번호 힌트 등록 완료: seq={}", seq);
   }
 
-  private void initializeUserServiceRates(String userId) {
+  private void initializeUserServiceRates(Integer userSeq) {
     LocalDate today = LocalDate.now();
 
     BigDecimal surveyRate = standardRateService.getStandardRateWithVat("survey");
@@ -282,11 +287,11 @@ public class AdminService {
     BigDecimal mmsRate = standardRateService.getStandardRateWithVat("msg_mms");
     BigDecimal qrRate = standardRateService.getStandardRateWithVat("qr_code");
 
-    userServiceRateMapper.insert(UserServiceRate.create(userId, "survey", surveyRate, today));
-    userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_sms", smsRate, today));
-    userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_lms", lmsRate, today));
-    userServiceRateMapper.insert(UserServiceRate.create(userId, "msg_mms", mmsRate, today));
-    userServiceRateMapper.insert(UserServiceRate.create(userId, "qr_code", qrRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userSeq, "survey", surveyRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userSeq, "msg_sms", smsRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userSeq, "msg_lms", lmsRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userSeq, "msg_mms", mmsRate, today));
+    userServiceRateMapper.insert(UserServiceRate.create(userSeq, "qr_code", qrRate, today));
   }
 
   private UserResponse getUserResponse(User user) {

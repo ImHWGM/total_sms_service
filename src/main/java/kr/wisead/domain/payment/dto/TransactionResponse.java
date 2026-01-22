@@ -17,7 +17,7 @@ public class TransactionResponse {
 
     private Long seq;
     private String txGroupId;
-    private String userId;
+    private Integer userSeq;
     private String currencyType;
     private String txType;
     private BigDecimal amount;
@@ -37,7 +37,7 @@ public class TransactionResponse {
         return TransactionResponse.builder()
                 .seq(tx.getSeq())
                 .txGroupId(tx.getTxGroupId())
-                .userId(tx.getUserId())
+                .userSeq(tx.getUserSeq())
                 .currencyType(tx.getCurrencyType())
                 .txType(tx.getTxType())
                 .amount(tx.getAmount())

@@ -5,13 +5,13 @@
     <!-- 단가 등록 -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="seq">
         INSERT INTO user_service_rate (
-            user_id,
+            user_seq,
             service_id,
             rate,
             start_date,
             end_date
         ) VALUES (
-            #{userId},
+            #{userSeq},
             #{serviceId},
             #{rate},
             #{startDate},
@@ -23,14 +23,14 @@
     <select id="selectActiveRate" resultType="kr.wisead.domain.payment.entity.UserServiceRate">
         SELECT
             seq,
-            user_id AS userId,
+            user_seq AS userSeq,
             service_id AS serviceId,
             rate,
             start_date AS startDate,
             end_date AS endDate,
             reg_date AS regDate
         FROM user_service_rate
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND service_id = #{serviceId}
           AND start_date <![CDATA[<=]]> #{today}
           AND (end_date IS NULL OR end_date >= #{today})
@@ -42,14 +42,14 @@
     <select id="selectAllActiveRates" resultType="kr.wisead.domain.payment.entity.UserServiceRate">
         SELECT
             seq,
-            user_id AS userId,
+            user_seq AS userSeq,
             service_id AS serviceId,
             rate,
             start_date AS startDate,
             end_date AS endDate,
             reg_date AS regDate
         FROM user_service_rate
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND start_date <![CDATA[<=]]> #{today}
           AND (end_date IS NULL OR end_date >= #{today})
         ORDER BY service_id, start_date DESC
@@ -59,14 +59,14 @@
     <select id="selectHistory" resultType="kr.wisead.domain.payment.entity.UserServiceRate">
         SELECT
             seq,
-            user_id AS userId,
+            user_seq AS userSeq,
             service_id AS serviceId,
             rate,
             start_date AS startDate,
             end_date AS endDate,
             reg_date AS regDate
         FROM user_service_rate
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND service_id = #{serviceId}
         ORDER BY start_date DESC
     </select>
@@ -88,7 +88,7 @@
     <select id="selectUserRate" resultType="java.math.BigDecimal">
         SELECT rate
         FROM user_service_rate
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND service_id = #{serviceId}
           AND start_date <![CDATA[<=]]> #{today}
           AND (end_date IS NULL OR end_date >= #{today})
@@ -115,14 +115,14 @@
     <select id="selectLatestPermanentRate" resultType="kr.wisead.domain.payment.entity.UserServiceRate">
         SELECT
             seq,
-            user_id AS userId,
+            user_seq AS userSeq,
             service_id AS serviceId,
             rate,
             start_date AS startDate,
             end_date AS endDate,
             reg_date AS regDate
         FROM user_service_rate
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND service_id = #{serviceId}
           AND end_date IS NULL
         ORDER BY start_date DESC
@@ -133,14 +133,14 @@
     <select id="selectPeriodRate" resultType="kr.wisead.domain.payment.entity.UserServiceRate">
         SELECT
             seq,
-            user_id AS userId,
+            user_seq AS userSeq,
             service_id AS serviceId,
             rate,
             start_date AS startDate,
             end_date AS endDate,
             reg_date AS regDate
         FROM user_service_rate
-        WHERE user_id = #{userId}
+        WHERE user_seq = #{userSeq}
           AND service_id = #{serviceId}
           AND start_date <![CDATA[<=]]> #{today}
           AND end_date IS NOT NULL

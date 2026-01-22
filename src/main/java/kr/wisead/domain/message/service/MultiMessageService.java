@@ -47,8 +47,15 @@ public class MultiMessageService {
       return MultiMessageResponse.error("야간 전송제한 시간입니다. (20:00 ~ 09:00)\n해당 시간에는 예약발송만 가능합니다.");
     }
 
+    // 0-1. regId(userId)를 userSeq로 변환 (BalanceService 호출용)
+    Integer userSeq = userMapper.findSeqByUserId(regId);
+    if (userSeq == null) {
+      log.warn("사용자를 찾을 수 없음 - regId: {}", regId);
+      return MultiMessageResponse.error("사용자 정보를 찾을 수 없습니다.");
+    }
+
     // 1. 잔액 조회
-    var balanceResponse = balanceService.getCurrentBalance(regId);
+    var balanceResponse = balanceService.getCurrentBalance(userSeq);
     if (balanceResponse == null) {
       log.warn("잔액 정보 없음 - regId: {}", regId);
       return MultiMessageResponse.insufficientBalance();
@@ -112,7 +119,7 @@ public class MultiMessageService {
     BigDecimal unitPrice = getUnitPrice(balanceResponse, request.getMessageType());
     BigDecimal totalCharge = unitPrice.multiply(BigDecimal.valueOf(receivers.size()));
 
-    if (!balanceService.hasEnoughBalance(regId, totalCharge)) {
+    if (!balanceService.hasEnoughBalance(userSeq, totalCharge)) {
       log.warn("잔액 부족 - 필요: {}, 보유: {}", totalCharge, balanceResponse.getTotalBalance());
       return MultiMessageResponse.insufficientBalance();
     }
@@ -152,7 +159,7 @@ public class MultiMessageService {
       String comment = "문자발송 : " + msgType + "  " + successCount + "건";
 
       balanceService.deductMessageChargeWithTxGroupId(
-          regId, successCount, msgType, comment, txGroupId);
+          userSeq, successCount, msgType, comment, txGroupId);
 
       log.info(
           "Multi 메시지 발송 완료 - 성공: {}, 중복: {}, 수신거부: {}, 차감: {}, txGroupId: {}",

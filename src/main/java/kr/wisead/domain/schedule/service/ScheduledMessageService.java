@@ -12,6 +12,7 @@ import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.schedule.dto.ScheduledMessageResponse;
 import kr.wisead.domain.schedule.dto.ScheduledMessageSearchRequest;
 import kr.wisead.domain.schedule.entity.ScheduledMessage;
+import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.mapper.sms.ScheduledMessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ public class ScheduledMessageService {
   private final ScheduledMessageMapper scheduledMessageMapper;
   private final BalanceService balanceService;
   private final WalletService walletService;
+  private final UserMapper userMapper;
 
   /** 예약 메시지 목록 조회 */
   @Transactional(readOnly = true)
@@ -77,16 +79,28 @@ public class ScheduledMessageService {
   /** 예약 취소 (환불 포함) */
   @Transactional
   public void cancelMessageGroup(String userId, String msgType, LocalDateTime insertTime) {
-    // 1. 삭제 대상 메시지 건수 조회
+    // 0. userId로 userSeq 조회 (지갑 관련 처리용)
+    Integer userSeq = userMapper.findSeqByUserId(userId);
+    if (userSeq == null) {
+      log.error("예약 취소 - 사용자를 찾을 수 없습니다: userId={}", userId);
+      throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
+    }
+
+    // 1. 삭제 대상 메시지 건수 조회 (SMS DB - userId 사용)
     int messageCount =
         scheduledMessageMapper.countMessagesForCancellation(userId, msgType, insertTime);
-    log.info("예약 취소 - 사용자: {}, 메시지 타입: {}, 개수: {}", userId, msgType, messageCount);
+    log.info(
+        "예약 취소 - userId: {}, userSeq: {}, 메시지 타입: {}, 개수: {}",
+        userId,
+        userSeq,
+        msgType,
+        messageCount);
 
     if (messageCount > 0) {
-      // 2. 현재 잔액 정보 조회
-      BalanceResponse currentBalance = balanceService.getCurrentBalance(userId);
+      // 2. 현재 잔액 정보 조회 (Primary DB - userSeq 사용)
+      BalanceResponse currentBalance = balanceService.getCurrentBalance(userSeq);
       if (currentBalance == null) {
-        log.error("예약 취소 - 사용자 잔액 정보를 찾을 수 없습니다: {}", userId);
+        log.error("예약 취소 - 사용자 잔액 정보를 찾을 수 없습니다: userSeq={}", userSeq);
         throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자 잔액 정보를 찾을 수 없습니다.");
       }
 
@@ -94,15 +108,15 @@ public class ScheduledMessageService {
       BigDecimal refundAmount = calculateRefundAmount(msgType, messageCount, currentBalance);
       log.info("예약 취소 - 환불 금액: {}", refundAmount);
 
-      // 4. 환불 처리 (WalletService.refundToCash 사용 - 환불 전용 메서드)
+      // 4. 환불 처리 (Primary DB - userSeq 사용)
       if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
         String comment = "예약문자 취소 환불: " + getTypeLabel(msgType) + " " + messageCount + "건";
-        walletService.refundToCash(userId, refundAmount, comment);
+        walletService.refundToCash(userSeq, refundAmount, comment);
         log.info("예약 취소 - 환불 완료: {} 원", refundAmount);
       }
     }
 
-    // 5. 예약 메시지 삭제
+    // 5. 예약 메시지 삭제 (SMS DB - userId 사용)
     int deleted = scheduledMessageMapper.deleteScheduledMessageGroup(userId, msgType, insertTime);
     log.info("예약 취소 - 메시지 삭제 완료: {}건", deleted);
   }

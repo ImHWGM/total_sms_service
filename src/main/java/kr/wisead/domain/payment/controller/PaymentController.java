@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.Map;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.payment.dto.BalanceResponse;
 import kr.wisead.domain.payment.dto.ChargeRequest;
 import kr.wisead.domain.payment.dto.SmsPriceRequest;
@@ -34,13 +35,14 @@ public class PaymentController {
   private final BalanceService balanceService;
   private final BillingService billingService;
   private final UserServiceRateService userServiceRateService;
+  private final UserIdResolver userIdResolver;
 
   /** 현재 잔액 조회 GET /api/payment/balance */
   @GetMapping("/balance")
   public ApiResponse<BalanceResponse> getCurrentBalance(
       @AuthenticationPrincipal UserDetails userDetails) {
-    String userId = userDetails.getUsername();
-    BalanceResponse response = balanceService.getCurrentBalance(userId);
+    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
+    BalanceResponse response = balanceService.getCurrentBalance(userSeq);
     return ApiResponse.success(response);
   }
 
@@ -50,8 +52,8 @@ public class PaymentController {
       @AuthenticationPrincipal UserDetails userDetails,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
-    String userId = userDetails.getUsername();
-    PageResponse<BalanceResponse> response = balanceService.getBalanceHistory(userId, page, size);
+    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
+    PageResponse<BalanceResponse> response = balanceService.getBalanceHistory(userSeq, page, size);
     return ApiResponse.success(response);
   }
 
@@ -81,16 +83,16 @@ public class PaymentController {
   @GetMapping("/balance/check")
   public ApiResponse<Boolean> checkBalance(
       @AuthenticationPrincipal UserDetails userDetails, @RequestParam BigDecimal amount) {
-    String userId = userDetails.getUsername();
-    boolean hasEnough = balanceService.hasEnoughBalance(userId, amount);
+    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
+    boolean hasEnough = balanceService.hasEnoughBalance(userSeq, amount);
     return ApiResponse.success(hasEnough);
   }
 
   /** QR 코드 신청 비용 잔액 충분 여부 확인 GET /api/payment/balance/check-qr */
   @GetMapping("/balance/check-qr")
   public ApiResponse<Boolean> checkQrBalance(@AuthenticationPrincipal UserDetails userDetails) {
-    String userId = userDetails.getUsername();
-    boolean canCharge = billingService.canChargeQr(userId);
+    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
+    boolean canCharge = billingService.canChargeQr(userSeq);
     return ApiResponse.success(canCharge);
   }
 
@@ -132,14 +134,14 @@ public class PaymentController {
     }
   }
 
-  /** 결제 내역 조회 GET /api/payment/history?page=1&size=10 */
+  /** 결제 내역 조회 GET /api/payment/history?page=1&size=10 (미사용 - KG_PAYMENT 테이블 없음) */
   @GetMapping("/history")
   public ApiResponse<PageResponse<Payment>> getPaymentHistory(
       @AuthenticationPrincipal UserDetails userDetails,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
-    String userId = userDetails.getUsername();
-    PageResponse<Payment> response = paymentService.getPaymentHistory(userId, page, size);
+    String userSeqStr = userDetails.getUsername();
+    PageResponse<Payment> response = paymentService.getPaymentHistory(userSeqStr, page, size);
     return ApiResponse.success(response);
   }
 

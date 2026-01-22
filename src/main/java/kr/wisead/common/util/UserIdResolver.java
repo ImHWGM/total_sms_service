@@ -27,4 +27,12 @@ public class UserIdResolver {
     }
     return userIds.stream().map(this::toUserSeq).filter(seq -> seq != null).toList();
   }
+
+  /** JWT username에서 userSeq 추출 (JWT subject는 userSeq를 문자열로 저장) */
+  public Integer fromJwtUsername(String jwtUsername) {
+    if (jwtUsername == null || jwtUsername.isBlank()) {
+      return null;
+    }
+    return Integer.parseInt(jwtUsername);
+  }
 }

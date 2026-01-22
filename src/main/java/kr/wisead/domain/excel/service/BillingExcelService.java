@@ -13,7 +13,6 @@ import kr.wisead.domain.statistics.dto.UserMsgStatsResponse;
 import kr.wisead.domain.statistics.dto.UserSurveyStatsResponse;
 import kr.wisead.domain.statistics.service.UserStatisticsService;
 import kr.wisead.mapper.primary.TransactionMapper;
-import kr.wisead.mapper.primary.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -30,7 +29,6 @@ public class BillingExcelService {
   private final UserStatisticsService userStatisticsService;
   private final TransactionMapper transactionMapper;
   private final ExcelService excelService;
-  private final UserMapper userMapper;
 
   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
   private static final DateTimeFormatter DATETIME_FORMATTER =
@@ -254,10 +252,12 @@ public class BillingExcelService {
     LocalDateTime endDateTime = LocalDate.parse(request.getEndDate()).atTime(23, 59, 59);
 
     for (String userId : targetUserIds) {
-      // userId를 userSeq로 변환
-      Integer userSeq = userMapper.findSeqByUserId(userId);
-      if (userSeq == null) {
-        log.warn("사용자를 찾을 수 없어 스킵: userId={}", userId);
+      // userId는 실제로 userSeq임 (JWT subject로 seq 사용)
+      Integer userSeq;
+      try {
+        userSeq = Integer.parseInt(userId);
+      } catch (NumberFormatException e) {
+        log.warn("잘못된 사용자 식별자로 스킵: userId={}", userId);
         continue;
       }
 

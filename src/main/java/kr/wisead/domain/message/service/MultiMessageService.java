@@ -47,10 +47,12 @@ public class MultiMessageService {
       return MultiMessageResponse.error("야간 전송제한 시간입니다. (20:00 ~ 09:00)\n해당 시간에는 예약발송만 가능합니다.");
     }
 
-    // 0-1. regId(userId)를 userSeq로 변환 (BalanceService 호출용)
-    Integer userSeq = userMapper.findSeqByUserId(regId);
-    if (userSeq == null) {
-      log.warn("사용자를 찾을 수 없음 - regId: {}", regId);
+    // 0-1. regId는 이미 userSeq임 (JWT subject로 seq 사용)
+    Integer userSeq;
+    try {
+      userSeq = Integer.parseInt(regId);
+    } catch (NumberFormatException e) {
+      log.warn("잘못된 사용자 식별자 - regId: {}", regId);
       return MultiMessageResponse.error("사용자 정보를 찾을 수 없습니다.");
     }
 
@@ -180,9 +182,14 @@ public class MultiMessageService {
     return now.isAfter(NIGHT_START) || now.isBefore(NIGHT_END);
   }
 
-  /** 사용자의 storeCode 조회 */
-  private String getStoreCode(String userId) {
-    return userMapper.findByUserId(userId).map(User::getStoreCode).orElse(null);
+  /** 사용자의 storeCode 조회 (regId는 userSeq임) */
+  private String getStoreCode(String regId) {
+    try {
+      Integer userSeq = Integer.parseInt(regId);
+      return userMapper.findBySeq(userSeq).map(User::getStoreCode).orElse(null);
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   /** 메시지 타입별 단가 조회 (BalanceResponse 사용) */

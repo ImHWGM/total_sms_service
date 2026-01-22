@@ -12,7 +12,6 @@ import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.schedule.dto.ScheduledMessageResponse;
 import kr.wisead.domain.schedule.dto.ScheduledMessageSearchRequest;
 import kr.wisead.domain.schedule.entity.ScheduledMessage;
-import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.mapper.sms.ScheduledMessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +27,6 @@ public class ScheduledMessageService {
   private final ScheduledMessageMapper scheduledMessageMapper;
   private final BalanceService balanceService;
   private final WalletService walletService;
-  private final UserMapper userMapper;
 
   /** 예약 메시지 목록 조회 */
   @Transactional(readOnly = true)
@@ -79,10 +77,12 @@ public class ScheduledMessageService {
   /** 예약 취소 (환불 포함) */
   @Transactional
   public void cancelMessageGroup(String userId, String msgType, LocalDateTime insertTime) {
-    // 0. userId로 userSeq 조회 (지갑 관련 처리용)
-    Integer userSeq = userMapper.findSeqByUserId(userId);
-    if (userSeq == null) {
-      log.error("예약 취소 - 사용자를 찾을 수 없습니다: userId={}", userId);
+    // 0. userId는 실제로 userSeq임 (JWT subject로 seq 사용)
+    Integer userSeq;
+    try {
+      userSeq = Integer.parseInt(userId);
+    } catch (NumberFormatException e) {
+      log.error("예약 취소 - 잘못된 사용자 식별자: userId={}", userId);
       throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
     }
 

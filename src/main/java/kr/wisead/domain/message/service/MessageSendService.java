@@ -131,10 +131,12 @@ public class MessageSendService {
    * @return txGroupId (환불 시 사용)
    */
   private String deductForMessage(String userId, String serviceId, int quantity, String msgType) {
-    // userId로 userSeq 조회
-    Integer userSeq = userMapper.findSeqByUserId(userId);
-    if (userSeq == null) {
-      log.error("사용자를 찾을 수 없음 - userId: {}", userId);
+    // userId는 실제로 userSeq임 (JWT subject로 seq 사용)
+    Integer userSeq;
+    try {
+      userSeq = Integer.parseInt(userId);
+    } catch (NumberFormatException e) {
+      log.error("잘못된 사용자 식별자 - userId: {}", userId);
       throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
     }
 
@@ -377,10 +379,12 @@ public class MessageSendService {
   /** 부분 환불 (취소 건수 × 단가로 CASH 환불) - 원래 화폐 추적이 어려우므로 CASH로 환불 */
   private void refundPartial(String userId, String msgType, int count, String txGroupId) {
     try {
-      // userId로 userSeq 조회
-      Integer userSeq = userMapper.findSeqByUserId(userId);
-      if (userSeq == null) {
-        log.error("환불 처리 실패 - 사용자를 찾을 수 없음: userId={}", userId);
+      // userId는 실제로 userSeq임 (JWT subject로 seq 사용)
+      Integer userSeq;
+      try {
+        userSeq = Integer.parseInt(userId);
+      } catch (NumberFormatException e) {
+        log.error("환불 처리 실패 - 잘못된 사용자 식별자: userId={}", userId);
         return;
       }
 

@@ -45,6 +45,8 @@ public class AuthService {
   /** 로그인 - 이메일 인증 필요 여부: 오늘 로그인한 적이 없으면 이메일 인증 필요 - 이메일 인증 필요시 서버가 자동으로 이메일 발송 */
   @Transactional
   public LoginResponse login(LoginRequest request) {
+    log.info("[로그인 시도] userId={}", request.getUserId());
+
     // 1. 사용자 조회
     User user =
         userMapper
@@ -83,6 +85,8 @@ public class AuthService {
       if (!isLoggedInToday(user)) {
         // 오늘 로그인한 적이 없으면 이메일 인증 필요
         String email = decryptField(user.getEmail());
+        log.info("[이메일 인증 필요] userId={}, email={}", user.getUserId(), maskEmail(email));
+
         if (!StringUtils.hasText(email)) {
           throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다. 관리자에게 문의하세요.");
         }
@@ -91,29 +95,34 @@ public class AuthService {
         var verificationStatus = emailAuthService.getVerificationStatus(email);
         if (!verificationStatus.codeSent()) {
           // 인증 코드가 발송되지 않은 경우에만 발송
+          log.info("[인증 코드 발송 시도] userId={}, email={}", user.getUserId(), maskEmail(email));
           try {
             emailAuthService.sendVerificationCode(email);
-            log.info("이메일 인증 코드 발송: userId={}, email={}", user.getUserId(), maskEmail(email));
+            log.info("[인증 코드 발송 성공] userId={}, email={}", user.getUserId(), maskEmail(email));
           } catch (BusinessException e) {
-            log.warn("이메일 인증 코드 발송 실패: {}", e.getMessage());
+            log.warn(
+                "[인증 코드 발송 실패] userId={}, email={}, 사유={}",
+                user.getUserId(),
+                maskEmail(email),
+                e.getMessage());
             throw e;
           }
         } else {
-          log.info(
-              "이메일 인증 코드 이미 발송됨 (재사용): userId={}, email={}", user.getUserId(), maskEmail(email));
+          log.info("[인증 코드 이미 발송됨 (재사용)] userId={}, email={}", user.getUserId(), maskEmail(email));
         }
 
         // 이메일 인증 필요 응답 반환
         return LoginResponse.builder().emailRequired(true).maskedEmail(maskEmail(email)).build();
       }
       // 오늘 이미 로그인한 경우: 이메일 인증 불필요, 바로 로그인 성공
+      log.info("[이메일 인증 스킵] userId={}, 오늘 이미 로그인함", user.getUserId());
     } else {
       // 5-2. 이메일 코드가 있는 경우: 코드 검증
       String email = decryptField(user.getEmail());
       if (!emailAuthService.verifyCode(email, emailCode)) {
         throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드가 일치하지 않습니다.");
       }
-      log.info("이메일 인증 성공: userId={}", user.getUserId());
+      log.info("[이메일 인증 성공] userId={}", user.getUserId());
     }
 
     // 6. 로그인 성공 처리
@@ -124,7 +133,7 @@ public class AuthService {
     String accessToken = jwtTokenProvider.createAccessToken(authentication, user.getPerson());
     String refreshToken = jwtTokenProvider.createRefreshToken(authentication, user.getPerson());
 
-    log.info("로그인 성공: userId={}", user.getUserId());
+    log.info("[로그인 성공] userId={}", user.getUserId());
 
     return LoginResponse.builder()
         .accessToken(accessToken)

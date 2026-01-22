@@ -1,4 +1,6 @@
-sms_fail_log.md
+*.md
+nul
+
 
 ### Maven ###
 target/

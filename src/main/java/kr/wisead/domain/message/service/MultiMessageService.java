@@ -104,10 +104,7 @@ public class MultiMessageService {
           }
         }
         receivers = filteredReceivers;
-
-        if (!blockedNumbers.isEmpty()) {
-          log.info("수신거부 번호 {} 건 필터링 완료 - regId: {}", blockedCount, regId);
-        }
+        log.info("수신거부 번호 {} 건 필터링 완료 - regId: {}", blockedCount, regId);
       }
     }
 

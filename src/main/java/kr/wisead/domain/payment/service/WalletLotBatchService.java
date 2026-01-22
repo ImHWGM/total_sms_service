@@ -28,7 +28,7 @@ public class WalletLotBatchService {
     log.info("[배치] 만료된 Lot {} 건 처리 완료", updated);
   }
 
-  /** Lot 합산 배치 (매일 새벽 3시) 같은 user_id + currency_type + expire_date의 Lot을 하나로 합산 */
+  /** Lot 합산 배치 (매일 새벽 3시) 같은 user_seq + currency_type + expire_date의 Lot을 하나로 합산 */
   @Scheduled(cron = "0 0 3 * * *")
   @Transactional
   public void consolidateLots() {

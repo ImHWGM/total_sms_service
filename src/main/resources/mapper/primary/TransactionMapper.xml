@@ -190,7 +190,10 @@
             COALESCE(SUM(CASE WHEN tx_type = 'REFUND' THEN amount ELSE 0 END), 0) AS totalRefund,
             COUNT(CASE WHEN tx_type = 'CHARGE' THEN 1 END) AS chargeCount,
             COUNT(CASE WHEN tx_type = 'DEDUCT' THEN 1 END) AS deductCount,
-            COUNT(CASE WHEN tx_type = 'REFUND' THEN 1 END) AS refundCount
+            COUNT(CASE WHEN tx_type = 'REFUND' THEN 1 END) AS refundCount,
+            COALESCE(SUM(CASE WHEN tx_type = 'DEDUCT' AND currency_type = 'CASH' THEN amount ELSE 0 END), 0) AS deductCash,
+            COALESCE(SUM(CASE WHEN tx_type = 'DEDUCT' AND currency_type = 'POINT' THEN amount ELSE 0 END), 0) AS deductPoint,
+            COALESCE(SUM(CASE WHEN tx_type = 'DEDUCT' AND currency_type = 'BONUS' THEN amount ELSE 0 END), 0) AS deductBonus
         FROM transaction
         WHERE 1=1
         <if test="userSeq != null">

@@ -196,6 +196,11 @@ public class BillingStatisticsService {
     int deductCount = getIntValue(rawSummary, "deductCount");
     int refundCount = getIntValue(rawSummary, "refundCount");
 
+    // currency_type별 차감 금액
+    BigDecimal deductCash = getBigDecimalValue(rawSummary, "deductCash");
+    BigDecimal deductPoint = getBigDecimalValue(rawSummary, "deductPoint");
+    BigDecimal deductBonus = getBigDecimalValue(rawSummary, "deductBonus");
+
     BillingSummaryResponse response =
         BillingSummaryResponse.builder()
             .userId(request.getUserId())
@@ -205,6 +210,9 @@ public class BillingStatisticsService {
             .chargeCount(chargeCount)
             .totalDeduct(totalDeduct)
             .deductCount(deductCount)
+            .deductCash(deductCash)
+            .deductPoint(deductPoint)
+            .deductBonus(deductBonus)
             .totalRefund(totalRefund)
             .refundCount(refundCount)
             .build();

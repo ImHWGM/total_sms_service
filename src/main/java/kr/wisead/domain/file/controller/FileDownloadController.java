@@ -13,7 +13,9 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
 
 /** 파일 다운로드/서빙 Controller */
 @Slf4j
@@ -94,7 +96,7 @@ public class FileDownloadController {
   /** 사업자등록증 다운로드/서빙 */
   @GetMapping({"/files/bizreg/{fileName:.+}", "/bizreg/{fileName:.+}"})
   public ResponseEntity<Resource> serveBizRegFile(@PathVariable String fileName) throws Exception {
-    Path filePath = bizRegFileStorageLocation.resolve(fileName).normalize();
+    Path filePath = validateAndResolvePath(bizRegFileStorageLocation, fileName);
     return buildFileResponse(filePath, fileName, "attachment", DEFAULT_CONTENT_TYPE);
   }
 
@@ -107,17 +109,36 @@ public class FileDownloadController {
     "/survey/qrcode/{fileName:.+}"
   })
   public ResponseEntity<Resource> serveQrCodeFile(@PathVariable String fileName) throws Exception {
-    Path filePath = qrFileStorageLocation.resolve(Paths.get("qrcode", fileName)).normalize();
+    Path filePath = validateAndResolvePath(qrFileStorageLocation, "qrcode", fileName);
     return buildFileResponse(filePath, fileName, "inline", DEFAULT_IMAGE_TYPE);
   }
 
   /** 공통 파일 서빙 메서드 (폴더 포함) */
   private ResponseEntity<Resource> serveFile(Path storageLocation, String folder, String fileName)
       throws Exception {
-    Path filePath = storageLocation.resolve(Paths.get(folder, fileName)).normalize();
+    Path filePath = validateAndResolvePath(storageLocation, folder, fileName);
     String contentType = getContentType(filePath, DEFAULT_CONTENT_TYPE);
     String disposition = contentType.startsWith("image/") ? "inline" : "attachment";
-    return buildFileResponse(filePath, fileName, disposition, DEFAULT_CONTENT_TYPE);
+    return buildFileResponse(filePath, fileName, disposition, contentType);
+  }
+
+  /**
+   * 경로가 허용된 디렉토리 내에 있는지 검증 (Path Traversal 공격 방지)
+   *
+   * @param baseLocation 허용된 기본 디렉토리
+   * @param pathSegments 경로 세그먼트들 (folder, fileName 등)
+   * @return 검증된 절대 경로
+   * @throws SecurityException 경로가 기본 디렉토리를 벗어나는 경우
+   */
+  private Path validateAndResolvePath(Path baseLocation, String... pathSegments) {
+    Path resolvedPath = baseLocation.resolve(Paths.get("", pathSegments)).normalize();
+
+    if (!resolvedPath.startsWith(baseLocation)) {
+      log.warn("Path Traversal 시도 감지: baseLocation={}, segments={}", baseLocation, pathSegments);
+      throw new SecurityException("잘못된 파일 경로: 허용되지 않은 접근");
+    }
+
+    return resolvedPath;
   }
 
   /** 파일 응답 빌드 공통 메서드 */

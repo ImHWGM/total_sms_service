@@ -9,6 +9,7 @@ import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.QrCodeUtils;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.excel.service.ExcelService;
 import kr.wisead.domain.file.service.FileStorageService;
@@ -46,6 +47,7 @@ public class EventService {
   private final AdminService adminService;
   private final FileStorageService fileStorageService;
   private final BillingService billingService;
+  private final UserIdResolver userIdResolver;
 
   @Value("${upload.dir:./uploads}")
   private String uploadDir;
@@ -117,13 +119,11 @@ public class EventService {
       MultipartFile endImageFile,
       List<MultipartFile> questionImages,
       List<MultipartFile> itemImages) {
-    // 사용자 조회하여 userSeq 획득
-    Integer userSeq =
-        userMapper
-            .findByUserId(userId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자를 찾을 수 없습니다."))
-            .getSeq()
-            .intValue();
+    // JWT username은 userSeq이므로 직접 파싱
+    Integer userSeq = userIdResolver.fromJwtUsername(userId);
+    if (userSeq == null) {
+      throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자를 찾을 수 없습니다.");
+    }
 
     // 이벤트 코드 생성
     String eventCode = generateEventCode();

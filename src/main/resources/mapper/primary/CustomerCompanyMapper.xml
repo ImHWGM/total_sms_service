@@ -4,7 +4,7 @@
 
     <!-- 고객사 선택 등록 -->
     <insert id="insertCustomerCompany" useGeneratedKeys="true" keyProperty="seq">
-        INSERT INTO cust_comp (
+        INSERT INTO customer_company (
             USER_ID,
             SELECTED_USER_ID,
             CUST_COMP_NAME,
@@ -23,7 +23,7 @@
 
     <!-- 고객사 일괄 등록 (List<CustomerCompany> 사용) -->
     <insert id="insertCustomerCompanyBatch">
-        INSERT INTO cust_comp (
+        INSERT INTO customer_company (
             USER_ID,
             SELECTED_USER_ID,
             CUST_COMP_NAME,
@@ -109,7 +109,7 @@
             UPT_DATE AS uptDate,
             UPT_ID AS uptId,
             CHKED_YN AS chkedYn
-        FROM cust_comp
+        FROM customer_company
         WHERE USER_ID = #{userId}
           AND CHKED_YN = 'Y'
     </select>
@@ -117,7 +117,7 @@
     <!-- 고객사 선택 여부 확인 -->
     <select id="selectCompanyExists" resultType="string">
         SELECT SELECTED_USER_ID
-        FROM cust_comp
+        FROM customer_company
         WHERE USER_ID = #{userId}
           AND SELECTED_USER_ID = #{selectedUserId}
           AND CUST_COMP_NAME = #{custCompName}
@@ -125,7 +125,7 @@
 
     <!-- 고객사 선택 상태 수정 -->
     <update id="updateCompanyChecked">
-        UPDATE cust_comp
+        UPDATE customer_company
         SET UPT_DATE = NOW(),
             UPT_ID = #{uptId},
             CHKED_YN = #{chkedYn}
@@ -136,7 +136,7 @@
 
     <!-- 고객사명 일괄 수정 -->
     <update id="updateCompanyName">
-        UPDATE cust_comp
+        UPDATE customer_company
         SET CUST_COMP_NAME = #{newName}
         WHERE CUST_COMP_NAME = #{oldName}
     </update>
@@ -157,7 +157,7 @@
 
     <!-- 고객사 정보 수정 -->
     <update id="updateCustomerCompany">
-        UPDATE cust_comp
+        UPDATE customer_company
         SET
             <if test="custCompName != null">
                 CUST_COMP_NAME = #{custCompName},
@@ -177,14 +177,14 @@
             UPT_DATE AS uptDate,
             UPT_ID AS uptId,
             CHKED_YN AS chkedYn
-        FROM cust_comp
+        FROM customer_company
         WHERE SEQ = #{seq}
     </select>
 
     <!-- 관리 계정 사용자 ID 목록 조회 (level 50-89 관리자용) -->
     <select id="selectManagedUserIds" resultType="string">
         SELECT DISTINCT SELECTED_USER_ID
-        FROM cust_comp
+        FROM customer_company
         WHERE USER_ID = #{userId}
           AND CHKED_YN = 'Y'
     </select>

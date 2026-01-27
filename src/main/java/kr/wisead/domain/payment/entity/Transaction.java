@@ -34,6 +34,7 @@ public class Transaction {
 
   private String comment; // 비고
   private LocalDateTime regDate; // 등록일시
+  private String regId; // 요청자 ID
 
   // 거래 유형 상수
   public static final String TX_TYPE_CHARGE = "CHARGE";

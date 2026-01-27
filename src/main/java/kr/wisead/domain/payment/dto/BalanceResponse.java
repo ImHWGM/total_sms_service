@@ -27,6 +27,7 @@ public class BalanceResponse {
   private BigDecimal lmsPrice;
   private BigDecimal mmsPrice;
   private LocalDateTime regDate;
+  private String regId; // 요청자 ID
 
   public static BalanceResponse from(Balance entity) {
     String opName =

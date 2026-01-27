@@ -467,6 +467,7 @@ public class BalanceService {
         .operationName(opName)
         .comment(tx.getComment())
         .regDate(tx.getRegDate())
+        .regId(tx.getRegId())
         .build();
   }
 }

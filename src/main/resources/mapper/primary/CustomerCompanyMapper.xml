@@ -2,15 +2,46 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="kr.wisead.mapper.primary.CustomerCompanyMapper">
 
+    <!-- customer_company 엔티티 SELECT 컬럼 -->
+    <sql id="customerCompanyColumns">
+            SEQ AS seq,
+            USER_ID AS userId,
+            SELECTED_USER_ID AS selectedUserId,
+            CORP_NAME AS custCompName,
+            UPT_DATE AS uptDate,
+            UPT_ID AS uptId,
+            CHECKED_YN AS chkedYn
+    </sql>
+
+    <!-- USER 테이블 검색 조건 (고객사 목록 조회용) -->
+    <sql id="companyListWhereClause">
+        WHERE USE_YN = 'Y'
+          AND STATUS = '승인'
+        <if test="excludeSeq != null">
+          AND SEQ != #{excludeSeq}
+        </if>
+        <choose>
+            <when test="type == 'seqOpt'">
+                AND SEQ LIKE CONCAT('%', #{keyword}, '%')
+            </when>
+            <when test="type == 'custCompNameOpt'">
+                AND CORP_NAME LIKE CONCAT('%', #{keyword}, '%')
+            </when>
+            <when test="type == 'custCompBizCodeOpt'">
+                AND BIZ_NUM LIKE CONCAT('%', #{keyword}, '%')
+            </when>
+        </choose>
+    </sql>
+
     <!-- 고객사 선택 등록 -->
     <insert id="insertCustomerCompany" useGeneratedKeys="true" keyProperty="seq">
         INSERT INTO customer_company (
             USER_ID,
             SELECTED_USER_ID,
-            CUST_COMP_NAME,
+            CORP_NAME,
             UPT_DATE,
             UPT_ID,
-            CHKED_YN
+            CHECKED_YN
         ) VALUES (
             #{userId},
             #{selectedUserId},
@@ -26,10 +57,10 @@
         INSERT INTO customer_company (
             USER_ID,
             SELECTED_USER_ID,
-            CUST_COMP_NAME,
+            CORP_NAME,
             UPT_DATE,
             UPT_ID,
-            CHKED_YN
+            CHECKED_YN
         ) VALUES
         <foreach item="item" collection="list" separator=",">
             (
@@ -57,22 +88,7 @@
             LAST_LOGIN AS lastLogin,
             STATUS AS status
         FROM USER
-        WHERE USE_YN = 'Y'
-          AND STATUS = '승인'
-        <if test="excludeSeq != null">
-          AND SEQ != #{excludeSeq}
-        </if>
-        <choose>
-            <when test="type == 'seqOpt'">
-                AND SEQ LIKE CONCAT('%', #{keyword}, '%')
-            </when>
-            <when test="type == 'custCompNameOpt'">
-                AND CORP_NAME LIKE CONCAT('%', #{keyword}, '%')
-            </when>
-            <when test="type == 'custCompBizCodeOpt'">
-                AND BIZ_NUM LIKE CONCAT('%', #{keyword}, '%')
-            </when>
-        </choose>
+        <include refid="companyListWhereClause"/>
         ORDER BY SEQ DESC
         LIMIT #{skip}, #{amount}
     </select>
@@ -81,37 +97,16 @@
     <select id="selectCompanyListCount" resultType="int">
         SELECT COUNT(*)
         FROM USER
-        WHERE USE_YN = 'Y'
-          AND STATUS = '승인'
-        <if test="excludeSeq != null">
-          AND SEQ != #{excludeSeq}
-        </if>
-        <choose>
-            <when test="type == 'seqOpt'">
-                AND SEQ LIKE CONCAT('%', #{keyword}, '%')
-            </when>
-            <when test="type == 'custCompNameOpt'">
-                AND CORP_NAME LIKE CONCAT('%', #{keyword}, '%')
-            </when>
-            <when test="type == 'custCompBizCodeOpt'">
-                AND BIZ_NUM LIKE CONCAT('%', #{keyword}, '%')
-            </when>
-        </choose>
+        <include refid="companyListWhereClause"/>
     </select>
 
     <!-- 사용자의 선택된 고객사 목록 조회 -->
     <select id="selectSelectedCompanies" resultType="kr.wisead.domain.company.entity.CustomerCompany">
         SELECT
-            SEQ AS seq,
-            USER_ID AS userId,
-            SELECTED_USER_ID AS selectedUserId,
-            CUST_COMP_NAME AS custCompName,
-            UPT_DATE AS uptDate,
-            UPT_ID AS uptId,
-            CHKED_YN AS chkedYn
+        <include refid="customerCompanyColumns"/>
         FROM customer_company
         WHERE USER_ID = #{userId}
-          AND CHKED_YN = 'Y'
+          AND CHECKED_YN = 'Y'
     </select>
 
     <!-- 고객사 선택 여부 확인 -->
@@ -120,7 +115,7 @@
         FROM customer_company
         WHERE USER_ID = #{userId}
           AND SELECTED_USER_ID = #{selectedUserId}
-          AND CUST_COMP_NAME = #{custCompName}
+          AND CORP_NAME = #{custCompName}
     </select>
 
     <!-- 고객사 선택 상태 수정 -->
@@ -128,17 +123,17 @@
         UPDATE customer_company
         SET UPT_DATE = NOW(),
             UPT_ID = #{uptId},
-            CHKED_YN = #{chkedYn}
+            CHECKED_YN = #{chkedYn}
         WHERE USER_ID = #{userId}
           AND SELECTED_USER_ID = #{selectedUserId}
-          AND CUST_COMP_NAME = #{custCompName}
+          AND CORP_NAME = #{custCompName}
     </update>
 
     <!-- 고객사명 일괄 수정 -->
     <update id="updateCompanyName">
         UPDATE customer_company
-        SET CUST_COMP_NAME = #{newName}
-        WHERE CUST_COMP_NAME = #{oldName}
+        SET CORP_NAME = #{newName}
+        WHERE CORP_NAME = #{oldName}
     </update>
 
     <!-- 담당자명 조회 -->
@@ -160,7 +155,7 @@
         UPDATE customer_company
         SET
             <if test="custCompName != null">
-                CUST_COMP_NAME = #{custCompName},
+                CORP_NAME = #{custCompName},
             </if>
             UPT_DATE = NOW(),
             UPT_ID = #{uptId}
@@ -170,13 +165,7 @@
     <!-- 고객사 시퀀스로 조회 -->
     <select id="selectBySeq" resultType="kr.wisead.domain.company.entity.CustomerCompany">
         SELECT
-            SEQ AS seq,
-            USER_ID AS userId,
-            SELECTED_USER_ID AS selectedUserId,
-            CUST_COMP_NAME AS custCompName,
-            UPT_DATE AS uptDate,
-            UPT_ID AS uptId,
-            CHKED_YN AS chkedYn
+        <include refid="customerCompanyColumns"/>
         FROM customer_company
         WHERE SEQ = #{seq}
     </select>
@@ -186,7 +175,7 @@
         SELECT DISTINCT SELECTED_USER_ID
         FROM customer_company
         WHERE USER_ID = #{userId}
-          AND CHKED_YN = 'Y'
+          AND CHECKED_YN = 'Y'
     </select>
 
 </mapper>

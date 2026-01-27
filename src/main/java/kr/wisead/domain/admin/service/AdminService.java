@@ -297,6 +297,10 @@ public class AdminService {
   private UserResponse getUserResponse(User user) {
     // UserResponse.from()을 사용하여 개인정보 복호화 포함
     UserResponse response = UserResponse.from(user);
+
+    // 사용 가능 금액 조회
+    BigDecimal availableBalance = walletService.getWalletSummary(user.getSeq()).getTotal();
+
     // userLevelName 추가를 위해 builder 재구성
     return UserResponse.builder()
         .seq(response.getSeq())
@@ -313,6 +317,7 @@ public class AdminService {
         .useYn(response.getUseYn())
         .status(response.getStatus())
         .regDate(response.getRegDate())
+        .availableBalance(availableBalance)
         .build();
   }
 }

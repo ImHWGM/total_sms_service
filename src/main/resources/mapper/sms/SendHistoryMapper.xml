@@ -47,7 +47,7 @@
                 AND REQUEST_TIME &gt;= #{params.startDate}
             </if>
             <if test="params.endDate != null and params.endDate != ''">
-                AND REQUEST_TIME &lt;= #{params.endDate}
+                AND REQUEST_TIME &lt;= CONCAT(#{params.endDate}, ' 23:59:59')
             </if>
             <if test="params.sendFailure == 'Y'">
                 AND STAT = 3

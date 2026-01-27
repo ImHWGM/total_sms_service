@@ -1,5 +1,6 @@
 package kr.wisead.domain.user.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,7 @@ import kr.wisead.common.util.PasswordValidator;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.email.service.EmailService;
+import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.user.dto.FindIdRequest;
 import kr.wisead.domain.user.dto.FindIdResponse;
 import kr.wisead.domain.user.dto.FindPasswordRequest;
@@ -43,6 +45,7 @@ public class UserService {
   private final EmailAuthService emailAuthService;
   private final EmailService emailService;
   private final AdminService adminService;
+  private final WalletService walletService;
 
   @Value("${wisead.base-url:http://localhost:3000}")
   private String baseUrl;
@@ -60,7 +63,11 @@ public class UserService {
         userMapper
             .findBySeq(seq)
             .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-    return UserResponse.from(user);
+
+    // 사용 가능 금액 조회
+    BigDecimal availableBalance = walletService.getWalletSummary(seq).getTotal();
+
+    return UserResponse.from(user, availableBalance);
   }
 
   /** 회원 정보 조회 (by USER_ID) */

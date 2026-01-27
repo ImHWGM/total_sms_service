@@ -107,10 +107,11 @@ public class PeriodStatisticsService {
             tableName, msgType, serviceType, date, userId, userIds);
 
     if (stats == null) {
-      stats = createEmptyStats(date);
+      stats = createEmptyStats(date, serviceType);
     } else {
       stats.setWaitCnt(0);
       stats.setIngCnt(0);
+      stats.setServiceType(serviceType);
     }
 
     return stats;
@@ -130,7 +131,9 @@ public class PeriodStatisticsService {
             tableName, msgType, serviceType, date, userId, userIds);
 
     if (stats == null) {
-      stats = createEmptyStats(date);
+      stats = createEmptyStats(date, serviceType);
+    } else {
+      stats.setServiceType(serviceType);
     }
 
     // 대기 건수 조회
@@ -155,7 +158,7 @@ public class PeriodStatisticsService {
     int waitCnt =
         periodStatisticsMapper.countWaitStats(date, msgType, serviceType, userId, userIds);
 
-    DailyStatsResponse stats = createEmptyStats(date);
+    DailyStatsResponse stats = createEmptyStats(date, serviceType);
     stats.setWaitCnt(waitCnt);
     stats.setInCnt(waitCnt);
 
@@ -164,8 +167,14 @@ public class PeriodStatisticsService {
 
   /** 빈 통계 데이터 생성 */
   private DailyStatsResponse createEmptyStats(String date) {
+    return createEmptyStats(date, null);
+  }
+
+  /** 빈 통계 데이터 생성 (serviceType 포함) */
+  private DailyStatsResponse createEmptyStats(String date, String serviceType) {
     return DailyStatsResponse.builder()
         .dtStats(date)
+        .serviceType(serviceType)
         .inCnt(0)
         .succCnt(0)
         .errorCnt(0)
@@ -223,6 +232,7 @@ public class PeriodStatisticsService {
 
     return DailyStatsResponse.builder()
         .dtStats(startDateStr + " ~ " + endDateStr)
+        .serviceType(request.getServiceType())
         .inCnt(totalIn)
         .succCnt(totalSucc)
         .errorCnt(totalError)

@@ -366,10 +366,12 @@ public class UserService {
 
       // 6. 비밀번호 재설정 이메일 발송
       String resetLink = baseUrl + "/reset-password?token=" + token;
-      emailService.sendPasswordResetEmail(user.getEmail(), resetLink);
+      // 이메일 복호화 (DB에 암호화되어 저장됨)
+      String decryptedEmail = CryptoUtils.getDecryptedAES256Data(user.getEmail());
+      emailService.sendPasswordResetEmail(decryptedEmail, resetLink);
 
       // 7. 마스킹된 이메일 반환
-      String maskedEmail = maskEmail(user.getEmail());
+      String maskedEmail = maskEmail(decryptedEmail);
       log.info("비밀번호 찾기 성공 - 재설정 링크 발송: userId={}, email={}", request.getUserId(), maskedEmail);
 
       return FindPasswordResponse.success(maskedEmail);

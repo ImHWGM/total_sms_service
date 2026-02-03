@@ -8,6 +8,7 @@ import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.payment.dto.BalanceResponse;
 import kr.wisead.domain.payment.dto.ChargeRequest;
+import kr.wisead.domain.payment.dto.RefundResult;
 import kr.wisead.domain.payment.dto.SmsPriceRequest;
 import kr.wisead.domain.payment.dto.StandardRateResponse;
 import kr.wisead.domain.payment.dto.UserServiceRateRequest;
@@ -239,7 +240,7 @@ public class PaymentController {
   /** 환불 처리 POST /api/payment/refund/{txGroupId} */
   @PostMapping("/refund/{txGroupId}")
   @PreAuthorize("hasRole('ADMIN')")
-  public ApiResponse<kr.wisead.domain.payment.dto.RefundResult> processRefund(
+  public ApiResponse<RefundResult> processRefund(
       @PathVariable String txGroupId) {
     return ApiResponse.success(balanceService.refund(txGroupId));
   }

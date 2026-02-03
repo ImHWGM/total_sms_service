@@ -123,7 +123,7 @@
                 <when test="requestTime != null">#{requestTime}</when>
                 <otherwise>NOW()</otherwise>
             </choose>,
-            #{filecnt}, #{fileloc1}, #{fileloc2}, #{fileloc3},
+            IFNULL(#{filecnt}, 0), #{fileloc1}, #{fileloc2}, #{fileloc3},
             '301200115', #{extCol1}, #{extCol2}, #{extCol3}
         )
     </insert>
@@ -141,7 +141,7 @@
                 <when test="requestTime != null">#{requestTime}</when>
                 <otherwise>NOW()</otherwise>
             </choose>,
-            #{filecnt}, #{fileloc1}, #{fileloc2}, #{fileloc3},
+            IFNULL(#{filecnt}, 0), #{fileloc1}, #{fileloc2}, #{fileloc3},
             '301200115', #{extCol1}, #{extCol2}, #{extCol3}
         )
     </insert>
@@ -159,7 +159,7 @@
                 <when test="requestTime != null">#{requestTime}</when>
                 <otherwise>NOW()</otherwise>
             </choose>,
-            #{filecnt}, #{fileloc1}, #{fileloc2}, #{fileloc3},
+            IFNULL(#{filecnt}, 0), #{fileloc1}, #{fileloc2}, #{fileloc3},
             '301200115', #{extCol1}, #{extCol2}, #{extCol3}
         )
     </insert>

@@ -1,5 +1,7 @@
 package kr.wisead.config;
 
+import java.util.Arrays;
+import java.util.List;
 import kr.wisead.security.jwt.JwtAccessDeniedHandler;
 import kr.wisead.security.jwt.JwtAuthenticationEntryPoint;
 import kr.wisead.security.jwt.JwtAuthenticationFilter;
@@ -21,161 +23,158 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
-import java.util.List;
-
-/**
- * Spring Security 설정
- */
+/** Spring Security 설정 */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-    private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
+  private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+  private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
-    /**
-     * 인증 없이 접근 가능한 경로
-     */
-    private static final String[] PUBLIC_ENDPOINTS = {
-            // 인증 관련
-            "/api/auth/**",  // 로그인, 회원가입, 사업자번호 검증 등
-            "/api/public/**",
-            "/api/users/find-id",           // 아이디 찾기 (레거시)
-            "/api/users/find-id/**",        // 아이디 찾기 (2단계 플로우)
-            "/api/users/find-pw",           // 비밀번호 찾기
-            "/api/users/password/reset-validate",   // 비밀번호 재설정 토큰 검증
-            "/api/users/password/reset-confirm",    // 비밀번호 재설정 확인
-            "/api/email/verification/**",  // 이메일 인증 (회원가입, 로그인 시 사용)
-            "/api/unsubscribe",  // 이메일 수신거부
-            "/unsubscribe",  // 이메일 수신거부 (레거시 호환)
+  /** 인증 없이 접근 가능한 경로 */
+  private static final String[] PUBLIC_ENDPOINTS = {
+    // 인증 관련
+    "/api/auth/**", // 로그인, 회원가입, 사업자번호 검증 등
+    "/api/public/**",
+    "/api/users/find-id", // 아이디 찾기 (레거시)
+    "/api/users/find-id/**", // 아이디 찾기 (2단계 플로우)
+    "/api/users/find-pw", // 비밀번호 찾기
+    "/api/users/password/reset-validate", // 비밀번호 재설정 토큰 검증
+    "/api/users/password/reset-confirm", // 비밀번호 재설정 확인
+    "/api/email/verification/**", // 이메일 인증 (회원가입, 로그인 시 사용)
+    "/api/unsubscribe", // 이메일 수신거부
+    "/unsubscribe", // 이메일 수신거부 (레거시 호환)
 
-            // 설문 참여 (비로그인 허용)
-            "/api/survey/**",
-            "/api/front/**",
+    // 설문 참여 (비로그인 허용)
+    "/api/survey/**",
+    "/api/front/**",
 
-            // 행사 체크인 (비로그인 허용 - QR 스캔)
-            "/api/events/check/**",
+    // 행사 체크인 (비로그인 허용 - QR 스캔)
+    "/api/events/check/**",
 
-            // 문의 등록 (비로그인 허용)
-            "/api/inquiry",
+    // 문의 등록 (비로그인 허용)
+    "/api/inquiry",
 
-            // ARS 수신거부 (외부 ARS 시스템 호출)
-            "/ars/**",
+    // ARS 수신거부 (외부 ARS 시스템 호출)
+    "/ars/**",
 
-            // 결제 콜백 (PG사 호출)
-            "/api/payment/kg/**",
-            "/api/payment/callback",
+    // KCP 본인인증 (JSP 페이지)
+    "/kcpcert/**",
 
-            // 파일 다운로드/서빙
-            "/files/**",
-            "/survey/**",       // 설문 이미지 (DB 경로 직접 접근)
-            "/mmsfile/**",      // MMS 파일
-            "/template/**",     // 템플릿 이미지
-            "/bizreg/**",       // 사업자등록증
-            "/qrcode/**",       // QR 코드
+    // 결제 콜백 (PG사 호출)
+    "/api/payment/kg/**",
+    "/api/payment/callback",
 
-            // Swagger/API 문서
-            "/swagger-ui/**",
-            "/swagger-ui.html",
-            "/v3/api-docs/**",
-            "/swagger-resources/**",
+    // 파일 다운로드/서빙
+    "/files/**",
+    "/survey/**", // 설문 이미지 (DB 경로 직접 접근)
+    "/mmsfile/**", // MMS 파일
+    "/template/**", // 템플릿 이미지
+    "/bizreg/**", // 사업자등록증
+    "/qrcode/**", // QR 코드
 
-            // Actuator (상태 체크)
-            "/actuator/health",
-            "/actuator/info",
+    // Swagger/API 문서
+    "/swagger-ui/**",
+    "/swagger-ui.html",
+    "/v3/api-docs/**",
+    "/swagger-resources/**",
 
-            // 정적 리소스
-            "/favicon.ico",
-            "/error"
-    };
+    // Actuator (상태 체크)
+    "/actuator/health",
+    "/actuator/info",
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                // CSRF 비활성화 (JWT 사용)
-                .csrf(AbstractHttpConfigurer::disable)
+    // 정적 리소스
+    "/favicon.ico",
+    "/error"
+  };
 
-                // CORS 설정
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+  @Bean
+  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    http
+        // CSRF 비활성화 (JWT 사용)
+        .csrf(AbstractHttpConfigurer::disable)
 
-                // 세션 사용 안함 (Stateless)
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        // CORS 설정
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // 예외 처리
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
-                        .accessDeniedHandler(jwtAccessDeniedHandler))
+        // 세션 사용 안함 (Stateless)
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 요청 인가 설정
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated())
+        // 예외 처리
+        .exceptionHandling(
+            exception ->
+                exception
+                    .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                    .accessDeniedHandler(jwtAccessDeniedHandler))
 
-                // JWT 필터 추가
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        // 요청 인가 설정
+        .authorizeHttpRequests(
+            auth ->
+                auth.requestMatchers(PUBLIC_ENDPOINTS)
+                    .permitAll()
+                    .requestMatchers("/api/admin/**")
+                    .hasRole("ADMIN")
+                    .anyRequest()
+                    .authenticated())
 
-        return http.build();
-    }
+        // JWT 필터 추가
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-    /**
-     * CORS 설정 (React Native 연동)
-     */
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
+    return http.build();
+  }
 
-        // 허용할 Origin (개발 환경)
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000",      // React 개발 서버
-                "http://localhost:8081",      // React Native Metro
-                "http://localhost:19006",     // Expo Web
-                "http://10.0.2.2:8100",       // Android Emulator
-                "exp://localhost:19000"       // Expo
-        ));
+  /** CORS 설정 (React Native 연동) */
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration configuration = new CorsConfiguration();
 
-        // 모든 Origin 패턴 허용 (운영 환경에서는 특정 도메인으로 제한 권장)
-        configuration.setAllowedOriginPatterns(List.of("*"));
+    // 허용할 Origin (개발 환경)
+    configuration.setAllowedOrigins(
+        Arrays.asList(
+            "http://localhost:3000", // React 개발 서버
+            "http://localhost:8081", // React Native Metro
+            "http://localhost:19006", // Expo Web
+            "http://10.0.2.2:8100", // Android Emulator
+            "exp://localhost:19000" // Expo
+            ));
 
-        // 허용할 HTTP 메소드
-        configuration.setAllowedMethods(Arrays.asList(
-                "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
-        ));
+    // 모든 Origin 패턴 허용 (운영 환경에서는 특정 도메인으로 제한 권장)
+    configuration.setAllowedOriginPatterns(List.of("*"));
 
-        // 허용할 헤더
-        configuration.setAllowedHeaders(List.of("*"));
+    // 허용할 HTTP 메소드
+    configuration.setAllowedMethods(
+        Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
-        // 노출할 헤더 (클라이언트에서 접근 가능)
-        configuration.setExposedHeaders(Arrays.asList(
-                "Authorization",
-                "X-Total-Count",
-                "X-Page-Number",
-                "X-Page-Size"
-        ));
+    // 허용할 헤더
+    configuration.setAllowedHeaders(List.of("*"));
 
-        // 인증 정보 포함 허용
-        configuration.setAllowCredentials(true);
+    // 노출할 헤더 (클라이언트에서 접근 가능)
+    configuration.setExposedHeaders(
+        Arrays.asList("Authorization", "X-Total-Count", "X-Page-Number", "X-Page-Size"));
 
-        // Preflight 요청 캐시 시간 (1시간)
-        configuration.setMaxAge(3600L);
+    // 인증 정보 포함 허용
+    configuration.setAllowCredentials(true);
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
+    // Preflight 요청 캐시 시간 (1시간)
+    configuration.setMaxAge(3600L);
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
+    return source;
+  }
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
-    }
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
+
+  @Bean
+  public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
+      throws Exception {
+    return config.getAuthenticationManager();
+  }
 }

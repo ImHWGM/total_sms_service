@@ -232,7 +232,7 @@ public class AuthService {
       throw new BusinessException(ErrorCode.DUPLICATE_EMAIL, "이미 등록된 이메일입니다.");
     }
 
-    // 4. 연락처 암호화 처리
+    // 4-1. 연락처 암호화 처리
     String encryptedPhone = null;
     try {
       String phone = request.getPhone().replace("-", "");
@@ -240,6 +240,15 @@ public class AuthService {
     } catch (Exception e) {
       log.error("연락처 암호화 실패: {}", e.getMessage());
       throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "연락처 암호화에 실패했습니다.");
+    }
+    // 4-1. 담당자 암호화 처리 -> 비밀번호 찾기에서 담당자 암호화 처리가 들어가기에 회원가입시에도 있어야 함.
+    String encryptedPerson = null;
+    try {
+      String person = request.getPerson();
+      encryptedPerson = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(person));
+    } catch (Exception e) {
+      log.error("담당자 암호화 실패: {}", e.getMessage());
+      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "담당자 암호화에 실패했습니다.");
     }
 
     // 5. 사용자 생성
@@ -251,7 +260,8 @@ public class AuthService {
             .corpAddr(request.getCorpAddr())
             .bizNum(request.getBizNum())
             .bizTel(request.getBizTel())
-            .person(request.getPerson())
+//            .person(request.getPerson())
+            .person(encryptedPerson)
             .phone(encryptedPhone)
             .email(request.getEmail())
             .userLevel(1) // 일반 회원

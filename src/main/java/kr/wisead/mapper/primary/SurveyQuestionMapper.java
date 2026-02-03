@@ -1,47 +1,36 @@
 package kr.wisead.mapper.primary;
 
+import java.util.List;
+import java.util.Optional;
 import kr.wisead.domain.survey.entity.SurveyQuestion;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.List;
-import java.util.Optional;
-
-/**
- * 설문 문항 Mapper (Primary DB)
- */
+/** 설문 문항 Mapper (Primary DB) */
 @Mapper
 public interface SurveyQuestionMapper {
 
-    /**
-     * 이벤트의 문항 목록 조회
-     */
-    List<SurveyQuestion> selectByEventSeq(@Param("eventSeq") Integer eventSeq);
+  /** 이벤트의 문항 목록 조회 */
+  List<SurveyQuestion> selectByEventSeq(@Param("eventSeq") Integer eventSeq);
 
-    /**
-     * 문항 상세 조회
-     */
-    Optional<SurveyQuestion> selectByQuestionSeq(@Param("questionSeq") Integer questionSeq);
+  /** 문항 상세 조회 */
+  Optional<SurveyQuestion> selectByQuestionSeq(@Param("questionSeq") Integer questionSeq);
 
-    /**
-     * 이벤트의 문항 개수
-     */
-    int countByEventSeq(@Param("eventSeq") Integer eventSeq);
+  /** 이벤트의 문항 개수 */
+  int countByEventSeq(@Param("eventSeq") Integer eventSeq);
 
-    /**
-     * 문항 등록
-     */
-    int insert(SurveyQuestion question);
+  /** 문항 등록 */
+  int insert(SurveyQuestion question);
 
-    /**
-     * 문항 이미지 수정
-     */
-    int updateQuestionImg(@Param("eventSeq") Integer eventSeq,
-                          @Param("questionSeq") Integer questionSeq,
-                          @Param("questionImg") String questionImg);
+  /** 문항 이미지 수정 */
+  int updateQuestionImg(
+      @Param("eventSeq") Integer eventSeq,
+      @Param("questionSeq") Integer questionSeq,
+      @Param("questionImg") String questionImg);
 
-    /**
-     * 이벤트의 문항 전체 삭제
-     */
-    int deleteByEventSeq(@Param("eventSeq") Integer eventSeq);
+  /** 이벤트의 문항 전체 삭제 */
+  int deleteByEventSeq(@Param("eventSeq") Integer eventSeq);
+
+  /** 이벤트에서 수집하는 개인정보 타입 목록 조회 (NE: 이름, CU: 전화번호, SO: 주민번호, EM: 이메일, AD: 주소) */
+  List<String> selectPrivacyTypesByEventSeq(@Param("eventSeq") Integer eventSeq);
 }

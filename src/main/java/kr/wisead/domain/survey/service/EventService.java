@@ -132,8 +132,8 @@ public class EventService {
     String authCodeUrl = null;
     String qrCodeImgPath = null;
     if ("Y".equals(request.getQrCode())) {
-      // QR 코드 신청 비용 차감 (잔액 부족 시 예외 발생)
-      billingService.deductInitialQrFee(userId, "설문 생성 - QR 코드 신청");
+      // QR 코드 신청 비용 차감 (잔액 부족 시 예외 발생) - userSeq 사용
+      billingService.deductInitialQrFee(userSeq, "설문 생성 - QR 코드 신청");
       authCodeUrl = CommonUtils.randomCode(20);
       qrCodeImgPath = generateQrCodeImage(authCodeUrl);
     }
@@ -284,8 +284,10 @@ public class EventService {
     // QR 간편인증 사용으로 변경되었고, 기존에 authCodeUrl이 없으면 새로 생성 (비용 차감 후)
     if ("Y".equals(request.getQrCode())
         && (event.getAuthCodeUrl() == null || event.getAuthCodeUrl().isEmpty())) {
-      // QR 코드 신청 비용 차감 (잔액 부족 시 예외 발생)
-      billingService.deductInitialQrFee(uptId, "설문 수정 - QR 코드 신청");
+      // JWT username은 userSeq이므로 직접 파싱
+      Integer uptUserSeq = userIdResolver.fromJwtUsername(uptId);
+      // QR 코드 신청 비용 차감 (잔액 부족 시 예외 발생) - userSeq 사용
+      billingService.deductInitialQrFee(uptUserSeq, "설문 수정 - QR 코드 신청");
       String authCodeUrl = CommonUtils.randomCode(20);
       String qrCodeImgPath = generateQrCodeImage(authCodeUrl);
       event.setQrCodeInfo(qrCodeImgPath, authCodeUrl);

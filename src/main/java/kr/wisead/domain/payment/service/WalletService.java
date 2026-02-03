@@ -660,6 +660,165 @@ public class WalletService {
     return txGroupId;
   }
 
+  /**
+   * 부분 환불 처리 (txGroupId 기반, 지정 금액만 환불) - 환불 순서: CASH → POINT → BONUS (결제 역순) - 각 화폐별 결제 금액 범위 내에서
+   * 순차 환불
+   *
+   * @param txGroupId 거래 그룹 ID
+   * @param refundAmount 환불할 금액
+   * @return 환불 결과
+   */
+  @Transactional
+  public RefundResult refundPartialByGroup(String txGroupId, BigDecimal refundAmount) {
+    List<Transaction> originalTxs = transactionMapper.selectByGroupId(txGroupId);
+    if (originalTxs.isEmpty()) {
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "거래 내역을 찾을 수 없습니다.");
+    }
+
+    // DEDUCT 거래만 필터링
+    List<Transaction> deductTxs =
+        originalTxs.stream()
+            .filter(tx -> Transaction.TX_TYPE_DEDUCT.equals(tx.getTxType()))
+            .toList();
+
+    if (deductTxs.isEmpty()) {
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "차감 거래 내역을 찾을 수 없습니다.");
+    }
+
+    // CASH → POINT → BONUS 순서로 정렬 (결제 역순으로 환불)
+    List<Transaction> sortedTxs = new ArrayList<>(deductTxs);
+    sortedTxs.sort(
+        Comparator.comparingInt(
+            tx -> {
+              String type = tx.getCurrencyType();
+              return switch (type) {
+                case "CASH" -> 0;
+                case "POINT" -> 1;
+                case "BONUS" -> 2;
+                default -> 3;
+              };
+            }));
+
+    LocalDate today = LocalDate.now();
+    String refundTxGroupId = UUID.randomUUID().toString().replace("-", "");
+    BigDecimal remainingRefund = refundAmount;
+    BigDecimal totalRefunded = BigDecimal.ZERO;
+    BigDecimal expiredAmount = BigDecimal.ZERO;
+    List<RefundResult.RefundDetail> details = new ArrayList<>();
+    int refundedCount = 0;
+
+    // userSeq 확인
+    Integer userSeq = sortedTxs.get(0).getUserSeq();
+
+    // N+1 최적화: POINT/BONUS 잔액 미리 조회
+    Map<String, BigDecimal> currencyBalances = new HashMap<>();
+    List<WalletLotMapper.CurrencyBalance> lotBalances =
+        walletLotMapper.selectAllSumRemaining(userSeq, today);
+    for (WalletLotMapper.CurrencyBalance cb : lotBalances) {
+      currencyBalances.put(cb.currencyType(), cb.balance());
+    }
+
+    for (Transaction tx : sortedTxs) {
+      if (remainingRefund.compareTo(BigDecimal.ZERO) <= 0) break;
+
+      BigDecimal txAmount = tx.getAmount();
+      BigDecimal refundFromThis = remainingRefund.min(txAmount);
+
+      if (Transaction.CURRENCY_CASH.equals(tx.getCurrencyType())) {
+        // CASH 환불
+        walletMapper.addBalance(tx.getUserSeq(), "CASH", refundFromThis);
+        Wallet wallet = walletMapper.selectByUserSeq(tx.getUserSeq(), "CASH").orElseThrow();
+
+        Transaction refundTx =
+            Transaction.createRefund(
+                refundTxGroupId,
+                tx.getUserSeq(),
+                "CASH",
+                refundFromThis,
+                wallet.getBalance(),
+                tx.getSeq(),
+                "발송 실패 부분 환불");
+        transactionMapper.insert(refundTx);
+
+        totalRefunded = totalRefunded.add(refundFromThis);
+        remainingRefund = remainingRefund.subtract(refundFromThis);
+        refundedCount++;
+
+        details.add(
+            RefundResult.RefundDetail.builder()
+                .currencyType("CASH")
+                .amount(refundFromThis)
+                .refunded(true)
+                .build());
+
+      } else if (tx.isExpiredLot(today)) {
+        // POINT/BONUS 만료 → 해당 금액은 환불 불가, 다음 화폐로 이동
+        expiredAmount = expiredAmount.add(refundFromThis);
+
+        details.add(
+            RefundResult.RefundDetail.builder()
+                .currencyType(tx.getCurrencyType())
+                .amount(refundFromThis)
+                .refunded(false)
+                .reason("유효기간 만료")
+                .build());
+
+        // 만료된 금액은 환불 대상에서 제외하지 않음 (다음 화폐에서 환불 시도)
+        // remainingRefund는 유지
+
+      } else {
+        // POINT/BONUS 환불 (유효)
+        walletLotMapper.addRemainingAndReactivate(tx.getLotSeq(), refundFromThis);
+
+        String currencyType = tx.getCurrencyType();
+        BigDecimal currentBalance = currencyBalances.getOrDefault(currencyType, BigDecimal.ZERO);
+        BigDecimal newBalance = currentBalance.add(refundFromThis);
+        currencyBalances.put(currencyType, newBalance);
+
+        Transaction refundTx =
+            Transaction.createRefund(
+                refundTxGroupId,
+                tx.getUserSeq(),
+                currencyType,
+                refundFromThis,
+                newBalance,
+                tx.getSeq(),
+                "발송 실패 부분 환불");
+        transactionMapper.insert(refundTx);
+
+        totalRefunded = totalRefunded.add(refundFromThis);
+        remainingRefund = remainingRefund.subtract(refundFromThis);
+        refundedCount++;
+
+        details.add(
+            RefundResult.RefundDetail.builder()
+                .currencyType(currencyType)
+                .amount(refundFromThis)
+                .refunded(true)
+                .build());
+      }
+    }
+
+    String message = RefundResult.buildMessage(totalRefunded, expiredAmount);
+    log.info(
+        "부분 환불 완료 - txGroupId: {}, requestedAmount: {}, refundedAmount: {}, expiredAmount: {}",
+        txGroupId,
+        refundAmount,
+        totalRefunded,
+        expiredAmount);
+
+    return RefundResult.builder()
+        .txGroupId(txGroupId)
+        .refundTxGroupId(refundTxGroupId)
+        .requestedAmount(refundAmount)
+        .refundedAmount(totalRefunded)
+        .expiredAmount(expiredAmount)
+        .refundedCount(refundedCount)
+        .details(details)
+        .message(message)
+        .build();
+  }
+
   // ========== userId 기반 오버로드 메서드 (API 호환용) ==========
 
   /** CASH 충전 (userId 기반) */

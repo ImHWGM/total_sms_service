@@ -27,6 +27,7 @@
         <result property="extCol1" column="EXT_COL1"/>
         <result property="extCol2" column="EXT_COL2"/>
         <result property="extCol3" column="EXT_COL3"/>
+        <result property="refundYn" column="REFUND_YN"/>
     </resultMap>
 
     <!-- 공통 컬럼 -->
@@ -164,5 +165,41 @@
         ORDER BY REQUEST_TIME ASC
         LIMIT 1
     </select>
+
+    <!-- ========== 발송 실패 환불 배치용 ========== -->
+
+    <!-- REFUND_YN 컬럼 존재 여부 확인 -->
+    <select id="checkRefundColumnExists" resultType="int">
+        SELECT COUNT(*)
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = #{tableName}
+          AND COLUMN_NAME = 'REFUND_YN'
+    </select>
+
+    <!-- REFUND_YN 컬럼 추가 -->
+    <update id="addRefundColumn">
+        ALTER TABLE ${tableName} ADD COLUMN REFUND_YN CHAR(1) DEFAULT 'N'
+    </update>
+
+    <!-- 환불되지 않은 발송 실패 건 조회 -->
+    <select id="selectUnrefundedFailures" resultMap="MsgResultMap">
+        SELECT <include refid="selectColumns"/>, REFUND_YN
+        FROM ${tableName}
+        WHERE RESULT != '0'
+          AND STAT = 3
+          AND REFUND_YN = 'N'
+          AND EXT_COL2 IS NOT NULL
+          AND EXT_COL2 != ''
+        ORDER BY MSEQ ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 환불 처리 완료 후 REFUND_YN 업데이트 -->
+    <update id="updateRefundStatus">
+        UPDATE ${tableName}
+        SET REFUND_YN = #{refundYn}
+        WHERE MSEQ = #{mseq}
+    </update>
 
 </mapper>

@@ -31,7 +31,7 @@ public class KcpAuthService {
   @Value("${kcp.enc_key:}")
   private String encKey;
 
-  @Value("${kcp.web_siteid:wisead}")
+  @Value("${kcp.web_siteid:}")
   private String webSiteid;
 
   @Value("${kcp.ret_url:}")

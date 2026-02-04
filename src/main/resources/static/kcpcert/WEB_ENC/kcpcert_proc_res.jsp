@@ -5,15 +5,15 @@
 <%@ include file="../cfg/cert_conf.jsp"%>
 <%
     /* ============================================================================== */
-    /* =   ÀÎÁõµ¥ÀÌÅÍ ¼ö½Å ¹× º¹È£È­ ÆäÀÌÁö                                         = */
+    /* =   ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½È£È­ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½                                         = */
     /* = -------------------------------------------------------------------------- = */
-    /* =   ÇØ´ç ÆäÀÌÁö´Â ¹İµå½Ã °¡¸ÍÁ¡ ¼­¹ö¿¡ ¾÷·Îµå µÇ¾î¾ß ÇÏ¸ç                    = */
-    /* =   °¡±ŞÀû ¼öÁ¤¾øÀÌ »ç¿ëÇÏ½Ã±â ¹Ù¶ø´Ï´Ù.                                     = */
+    /* =   ï¿½Ø´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½İµï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Îµï¿½ ï¿½Ç¾ï¿½ï¿½ ï¿½Ï¸ï¿½                    = */
+    /* =   ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ï½Ã±ï¿½ ï¿½Ù¶ï¿½ï¿½Ï´ï¿½.                                     = */
     /* ============================================================================== */
 %>
 <%!
     /* ============================================================================== */
-    /* =   null °ªÀ» Ã³¸®ÇÏ´Â ¸Ş¼Òµå                                                = */
+    /* =   null ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½Ş¼Òµï¿½                                                = */
     /* = -------------------------------------------------------------------------- = */
     public String f_get_parm_str( String val )
     {
@@ -40,13 +40,13 @@
 
     String dn_hash       = "";
 	/*------------------------------------------------------------------------*/
-    /*  :: ÀüÃ¼ ÆÄ¶ó¹ÌÅÍ ³²±â±â                                               */
+    /*  :: ï¿½ï¿½Ã¼ ï¿½Ä¶ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½                                               */
     /*------------------------------------------------------------------------*/
     StringBuffer sbParam = new StringBuffer();
     CT_CLI       cc      = new CT_CLI();
-	//cc.setCharSetUtf8(); // UTF-8 Ã³¸®
+	//cc.setCharSetUtf8(); // UTF-8 Ã³ï¿½ï¿½
 
-    // request ·Î ³Ñ¾î¿Â °ª Ã³¸®
+    // request ï¿½ï¿½ ï¿½Ñ¾ï¿½ï¿½ ï¿½ï¿½ Ã³ï¿½ï¿½
     Enumeration params = request.getParameterNames();
     while(params.hasMoreElements())
     {
@@ -89,8 +89,8 @@
             {
                 dn_hash = f_get_parm_str( valParam[i] );
             }
-            // °á°ú ¸Ş½ÃÁö°¡ ÇÑ±Û µ¥ÀÌÅÍ URL decoding ÇØÁà¾ßÇÕ´Ï´Ù.
-            // ºÎ¸ğÃ¢À¸·Î ³Ñ±â´Â form µ¥ÀÌÅÍ »ı¼º ÇÊµå
+            // ï¿½ï¿½ï¿½ ï¿½Ş½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ñ±ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ URL decoding ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
+            // ï¿½Î¸ï¿½Ã¢ï¿½ï¿½ï¿½ï¿½ ï¿½Ñ±ï¿½ï¿½ form ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Êµï¿½
             if( nmParam.equals( "res_msg"       ) )
             {
                 sbParam.append( "<input type=\"hidden\" name=\"" + nmParam + "\" value=\"" + URLDecoder.decode( valParam[i], "UTF-8" ) + "\"/>" );
@@ -103,54 +103,54 @@
         }
     }
 
-    // °á°ú Ã³¸®
+    // ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
         if( res_cd.equals( "0000" ) )
         {
-            // dn_hash °ËÁõ
-            // KCP °¡ ¸®ÅÏÇØ µå¸®´Â dn_hash ¿Í »çÀÌÆ® ÄÚµå, ¿äÃ»¹øÈ£ , ÀÎÁõ¹øÈ£¸¦ °ËÁõÇÏ¿©
-            // ÇØ´ç µ¥ÀÌÅÍÀÇ À§º¯Á¶¸¦ ¹æÁöÇÕ´Ï´Ù
+            // dn_hash ï¿½ï¿½ï¿½ï¿½
+            // KCP ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½å¸®ï¿½ï¿½ dn_hash ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½Úµï¿½, ï¿½ï¿½Ã»ï¿½ï¿½È£ , ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È£ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½
+            // ï¿½Ø´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½
             if ( !cc.checkValidHash( g_conf_ENC_KEY, dn_hash, ( site_cd + ordr_idxx + cert_no ) ) )
             {
-                // °ËÁõ ½ÇÆĞ½Ã Ã³¸® ¿µ¿ª
+                // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ğ½ï¿½ Ã³ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
-                System.out.println("dn_hash º¯Á¶ À§ÇèÀÖÀ½");
-                //cc = null; // °´Ã¼ ¹İ³³ ( ·çÆ¾ Å»Ãâ½Ã¿¡¸¸ È£Ãâ )
+                System.out.println("dn_hash ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+                //cc = null; // ï¿½ï¿½Ã¼ ï¿½İ³ï¿½ ( ï¿½ï¿½Æ¾ Å»ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½ È£ï¿½ï¿½ )
             }
 
-            // °¡¸ÍÁ¡ DB Ã³¸® ÆäÀÌÁö ¿µ¿ª
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ DB Ã³ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
             System.out.println(site_cd);
             System.out.println(cert_no);
-            //System.out.println(enc_cert_data2); // ¾ÏÈ£È­ v2
+            //System.out.println(enc_cert_data2); // ï¿½ï¿½È£È­ v2
 
-            // ÀÎÁõµ¥ÀÌÅÍ º¹È£È­ ÇÔ¼ö
-            // ÇØ´ç ÇÔ¼ö´Â ¾ÏÈ£È­µÈ enc_cert_data2 ¸¦
-            // site_cd ¿Í cert_no ¸¦ °¡Áö°í º¹È­È­ ÇÏ´Â ÇÔ¼ö ÀÔ´Ï´Ù.
-            // Á¤»óÀûÀ¸·Î º¹È£È­ µÈ°æ¿ì¿¡¸¸ ÀÎÁõµ¥ÀÌÅÍ¸¦ °¡Á®¿Ã¼ö ÀÖ½À´Ï´Ù.
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È£È­ ï¿½Ô¼ï¿½
+            // ï¿½Ø´ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½ ï¿½ï¿½È£È­ï¿½ï¿½ enc_cert_data2 ï¿½ï¿½
+            // site_cd ï¿½ï¿½ cert_no ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È­È­ ï¿½Ï´ï¿½ ï¿½Ô¼ï¿½ ï¿½Ô´Ï´ï¿½.
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È£È­ ï¿½È°ï¿½ì¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ã¼ï¿½ ï¿½Ö½ï¿½ï¿½Ï´ï¿½.
             cc.decryptEncCert( g_conf_ENC_KEY, site_cd, cert_no, enc_cert_data2 );
-            //cc.setCharSetUtf8(); // º¹È£¿Í °á°ú°ª ÀÎÄÚµù º¯°æ ¸Ş¼­µå ( UTF-8 ÀÎÄÚµù »ç¿ë½Ã ÁÖ¼®À» ÇØÁ¦ÇÏ½Ã±â ¹Ù¶ø´Ï´Ù.)
+            //cc.setCharSetUtf8(); // ï¿½ï¿½È£ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Úµï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ş¼ï¿½ï¿½ï¿½ ( UTF-8 ï¿½ï¿½ï¿½Úµï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¼ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï½Ã±ï¿½ ï¿½Ù¶ï¿½ï¿½Ï´ï¿½.)
 
-            System.out.println( "ÀÌµ¿Åë½Å»ç ÄÚµå"    + cc.getKeyValue("comm_id"     ) ); // ÀÌµ¿Åë½Å»ç ÄÚµå
-            System.out.println( "ÀüÈ­¹øÈ£"           + cc.getKeyValue("phone_no"    ) ); // ÀüÈ­¹øÈ£
-            System.out.println( "ÀÌ¸§"               + cc.getKeyValue("user_name"   ) ); // ÀÌ¸§
-            System.out.println( "»ı³â¿ùÀÏ"           + cc.getKeyValue("birth_day"   ) ); // »ı³â¿ùÀÏ
-            System.out.println( "¼ºº°ÄÚµå"           + cc.getKeyValue("sex_code"    ) ); // ¼ºº°ÄÚµå
-            System.out.println( "³»/¿Ü±¹ÀÎ Á¤º¸ "    + cc.getKeyValue("local_code"  ) ); // ³»/¿Ü±¹ÀÎ Á¤º¸
+            System.out.println( "ï¿½Ìµï¿½ï¿½ï¿½Å»ï¿½ ï¿½Úµï¿½"    + cc.getKeyValue("comm_id"     ) ); // ï¿½Ìµï¿½ï¿½ï¿½Å»ï¿½ ï¿½Úµï¿½
+            System.out.println( "ï¿½ï¿½È­ï¿½ï¿½È£"           + cc.getKeyValue("phone_no"    ) ); // ï¿½ï¿½È­ï¿½ï¿½È£
+            System.out.println( "ï¿½Ì¸ï¿½"               + cc.getKeyValue("user_name"   ) ); // ï¿½Ì¸ï¿½
+            System.out.println( "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½"           + cc.getKeyValue("birth_day"   ) ); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+            System.out.println( "ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½"           + cc.getKeyValue("sex_code"    ) ); // ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½
+            System.out.println( "ï¿½ï¿½/ï¿½Ü±ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ "    + cc.getKeyValue("local_code"  ) ); // ï¿½ï¿½/ï¿½Ü±ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             System.out.println( "CI"                 + cc.getKeyValue("ci"          ) ); // CI
-            System.out.println( "DI Áßº¹°¡ÀÔ È®ÀÎ°ª" + cc.getKeyValue("di"          ) ); // DI Áßº¹°¡ÀÔ È®ÀÎ°ª
-            System.out.println( "CI_URL"             + URLDecoder.decode( cc.getKeyValue("ci_url"      ) ) ); // CI URL ÀÎÄÚµù °ª
-            System.out.println( "DI_URL"             + URLDecoder.decode( cc.getKeyValue("di_url"      ) ) ); // DI URL ÀÎÄÚµù °ª
-            System.out.println( "À¥»çÀÌÆ® ¾ÆÀÌµğ  "  + cc.getKeyValue("web_siteid"  ) ); // ¾ÏÈ£È­µÈ À¥»çÀÌÆ® ¾ÆÀÌµğ
-            System.out.println( "¾ÏÈ£È­µÈ °á°úÄÚµå"  + cc.getKeyValue("res_cd"      ) ); // ¾ÏÈ£È­µÈ °á°úÄÚµå
-            System.out.println( "¾ÏÈ£È­µÈ °á°ú¸Ş½ÃÁö"+ cc.getKeyValue("res_msg"     ) ); // ¾ÏÈ£È­µÈ °á°ú¸Ş½ÃÁö
+            System.out.println( "DI ï¿½ßºï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½Î°ï¿½" + cc.getKeyValue("di"          ) ); // DI ï¿½ßºï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½Î°ï¿½
+            System.out.println( "CI_URL"             + URLDecoder.decode( cc.getKeyValue("ci_url"      ) ) ); // CI URL ï¿½ï¿½ï¿½Úµï¿½ ï¿½ï¿½
+            System.out.println( "DI_URL"             + URLDecoder.decode( cc.getKeyValue("di_url"      ) ) ); // DI URL ï¿½ï¿½ï¿½Úµï¿½ ï¿½ï¿½
+            System.out.println( "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½Ìµï¿½  "  + cc.getKeyValue("web_siteid"  ) ); // ï¿½ï¿½È£È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½Ìµï¿½
+            System.out.println( "ï¿½ï¿½È£È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Úµï¿½"  + cc.getKeyValue("res_cd"      ) ); // ï¿½ï¿½È£È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Úµï¿½
+            System.out.println( "ï¿½ï¿½È£È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ş½ï¿½ï¿½ï¿½"+ cc.getKeyValue("res_msg"     ) ); // ï¿½ï¿½È£È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ş½ï¿½ï¿½ï¿½
 
         }
         else/*if( res_cd.equals( "0000" ) != true )*/
         {
-            // ÀÎÁõ½ÇÆĞ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         }
 
-    cc = null; // °´Ã¼ ¹İ³³
+    cc = null; // ï¿½ï¿½Ã¼ ï¿½İ³ï¿½
 %>
 
 
@@ -165,13 +165,33 @@
             {
                 try
                 {
-                    opener.auth_data( document.form_auth ); // ºÎ¸ğÃ¢À¸·Î °ª Àü´Ş
+                    // í¼ ë°ì´í„°ë¥¼ ê°ì²´ë¡œ ë³€í™˜
+                    var form = document.form_auth;
+                    var formData = {};
+                    for (var i = 0; i < form.elements.length; i++) {
+                        var element = form.elements[i];
+                        if (element.name) {
+                            formData[element.name] = element.value;
+                        }
+                    }
 
-                    window.close();// ÆË¾÷ ´İ±â
+                    // postMessageë¡œ ë¶€ëª¨ ì°½ì— ì „ì†¡ (í¬ë¡œìŠ¤ ì˜¤ë¦¬ì§„ ì§€ì›)
+                    var message = {
+                        type: "KCP_AUTH_RESULT",
+                        success: formData.res_cd === "0000",
+                        data: formData
+                    };
+
+                    if (opener && !opener.closed) {
+                        opener.postMessage(message, "*");
+                        window.close();
+                    } else {
+                        alert("ë¶€ëª¨ ì°½ì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.");
+                    }
                 }
                 catch(e)
                 {
-                    alert(e); // Á¤»óÀûÀÎ ºÎ¸ğÃ¢ÀÇ iframe ¸¦ ¸øÃ£Àº °æ¿ìÀÓ
+                    alert("ì¸ì¦ ì²˜ë¦¬ ì¤‘ ì˜¤ë¥˜: " + e.message);
                 }
             }
         </script>

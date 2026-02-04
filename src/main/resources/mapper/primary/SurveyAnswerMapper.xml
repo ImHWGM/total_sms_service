@@ -53,8 +53,7 @@
             QUESTION_TYPE_DETAIL as questionTypeDetail,
             ANSWER as answer,
             FILE_PATH as filePath,
-            REG_DATE as regDate,
-            REG_ID as regId
+            REG_DATE as regDate
         FROM SURVEY_ANSWER
         WHERE EVENT_SEQ = #{eventSeq}
         AND USER_SEQ = #{userSeq}
@@ -67,11 +66,11 @@
         INSERT INTO SURVEY_ANSWER (
             EVENT_SEQ, QUESTION_SEQ, USER_SEQ, ITEM_SEQ,
             QUESTION_TYPE, QUESTION_TYPE_DETAIL, ANSWER, FILE_PATH,
-            REG_DATE, REG_ID
+            REG_DATE
         ) VALUES (
             #{eventSeq}, #{questionSeq}, #{userSeq}, #{itemSeq},
             #{questionType}, #{questionTypeDetail}, #{answer}, #{filePath},
-            NOW(), #{regId}
+            NOW()
         )
     </insert>
 
@@ -103,8 +102,7 @@
             QUESTION_TYPE_DETAIL as questionTypeDetail,
             ANSWER as answer,
             FILE_PATH as filePath,
-            REG_DATE as regDate,
-            REG_ID as regId
+            REG_DATE as regDate
         FROM SURVEY_ANSWER
         WHERE EVENT_SEQ = #{eventSeq}
         ORDER BY USER_SEQ, QUESTION_SEQ
@@ -122,8 +120,7 @@
             QUESTION_TYPE_DETAIL as questionTypeDetail,
             ANSWER as answer,
             FILE_PATH as filePath,
-            REG_DATE as regDate,
-            REG_ID as regId
+            REG_DATE as regDate
         FROM SURVEY_ANSWER
         WHERE EVENT_SEQ = #{eventSeq}
         AND QUESTION_SEQ = #{questionSeq}
@@ -135,12 +132,12 @@
         INSERT INTO SURVEY_ANSWER (
             EVENT_SEQ, QUESTION_SEQ, USER_SEQ, ITEM_SEQ,
             QUESTION_TYPE, QUESTION_TYPE_DETAIL, ANSWER, FILE_PATH,
-            REG_DATE, REG_ID
+            REG_DATE
         ) VALUES
         <foreach collection="list" item="item" separator=",">
             (#{item.eventSeq}, #{item.questionSeq}, #{item.userSeq}, #{item.itemSeq},
              #{item.questionType}, #{item.questionTypeDetail}, #{item.answer}, #{item.filePath},
-             NOW(), #{item.regId})
+             NOW())
         </foreach>
     </insert>
 

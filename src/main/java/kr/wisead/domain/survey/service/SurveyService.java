@@ -153,11 +153,7 @@ public class SurveyService {
           // 파일 업로드
           answer =
               SurveyAnswer.createFileUpload(
-                  eventSeq,
-                  answerReq.getQuestionSeq(),
-                  user.getSeq(),
-                  answerReq.getFilePath(),
-                  request.getUserKey());
+                  eventSeq, answerReq.getQuestionSeq(), user.getSeq(), answerReq.getFilePath());
         } else if ("MC".equals(answerReq.getQuestionType())) {
           // 객관식
           answer =
@@ -168,17 +164,12 @@ public class SurveyService {
                   answerReq.getItemSeq(),
                   answerReq.getQuestionType(),
                   answerReq.getQuestionTypeDetail(),
-                  answerReq.getAnswer(),
-                  request.getUserKey());
+                  answerReq.getAnswer());
         } else {
           // 주관식
           answer =
               SurveyAnswer.createShortAnswer(
-                  eventSeq,
-                  answerReq.getQuestionSeq(),
-                  user.getSeq(),
-                  answerReq.getAnswer(),
-                  request.getUserKey());
+                  eventSeq, answerReq.getQuestionSeq(), user.getSeq(), answerReq.getAnswer());
         }
 
         surveyAnswerMapper.insert(answer);

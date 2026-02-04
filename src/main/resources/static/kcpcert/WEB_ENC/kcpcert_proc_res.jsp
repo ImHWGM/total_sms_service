@@ -5,15 +5,15 @@
 <%@ include file="../cfg/cert_conf.jsp"%>
 <%
     /* ============================================================================== */
-    /* =   ���������� ���� �� ��ȣȭ ������                                         = */
+    /* =   인증데이터 수신 및 복호화 페이지                                         = */
     /* = -------------------------------------------------------------------------- = */
-    /* =   �ش� �������� �ݵ�� ������ ������ ���ε� �Ǿ�� �ϸ�                    = */
-    /* =   ������ �������� ����Ͻñ� �ٶ��ϴ�.                                     = */
+    /* =   해당 페이지는 반드시 가맹점 서버에 업로드 되어야 하며                    = */
+    /* =   가급적 수정없이 사용하시기 바랍니다.                                     = */
     /* ============================================================================== */
 %>
 <%!
     /* ============================================================================== */
-    /* =   null ���� ó���ϴ� �޼ҵ�                                                = */
+    /* =   null 값을 처리하는 메소드                                                = */
     /* = -------------------------------------------------------------------------- = */
     public String f_get_parm_str( String val )
     {
@@ -40,13 +40,13 @@
 
     String dn_hash       = "";
 	/*------------------------------------------------------------------------*/
-    /*  :: ��ü �Ķ���� �����                                               */
+    /*  :: 전체 파라미터 남기기                                               */
     /*------------------------------------------------------------------------*/
     StringBuffer sbParam = new StringBuffer();
     CT_CLI       cc      = new CT_CLI();
-	//cc.setCharSetUtf8(); // UTF-8 ó��
+    //cc.setCharSetUtf8(); // UTF-8 처리
 
-    // request �� �Ѿ�� �� ó��
+    // request 로 넘어온 값 처리
     Enumeration params = request.getParameterNames();
     while(params.hasMoreElements())
     {
@@ -89,8 +89,8 @@
             {
                 dn_hash = f_get_parm_str( valParam[i] );
             }
-            // ��� �޽����� �ѱ� ������ URL decoding ������մϴ�.
-            // �θ�â���� �ѱ�� form ������ ���� �ʵ�
+            // 결과 메시지가 한글 데이터 URL decoding 해줘야합니다.
+            // 부모창으로 넘기는 form 데이터 생성 필드
             if( nmParam.equals( "res_msg"       ) )
             {
                 sbParam.append( "<input type=\"hidden\" name=\"" + nmParam + "\" value=\"" + URLDecoder.decode( valParam[i], "UTF-8" ) + "\"/>" );
@@ -103,54 +103,56 @@
         }
     }
 
-    // ��� ó��
+    // 결과 처리
         if( res_cd.equals( "0000" ) )
         {
-            // dn_hash ����
-            // KCP �� ������ �帮�� dn_hash �� ����Ʈ �ڵ�, ��û��ȣ , ������ȣ�� �����Ͽ�
-            // �ش� �������� �������� �����մϴ�
+            // dn_hash 검증
+            // KCP 가 리턴해 드리는 dn_hash 와 사이트 코드, 요청번호 , 인증번호를 검증하여
+            // 해당 데이터의 위변조를 방지합니다
             if ( !cc.checkValidHash( g_conf_ENC_KEY, dn_hash, ( site_cd + ordr_idxx + cert_no ) ) )
             {
-                // ���� ���н� ó�� ����
+                // 검증 실패시 처리 영역
 
-                System.out.println("dn_hash ���� ��������");
-                //cc = null; // ��ü �ݳ� ( ��ƾ Ż��ÿ��� ȣ�� )
+                System.out.println("dn_hash 변조 위험있음");
+                //cc = null; // 객체 반납 ( 루틴 탈출시에만 호출 )
             }
 
-            // ������ DB ó�� ������ ����
+            // 가맹점 DB 처리 페이지 영역
 
             System.out.println(site_cd);
             System.out.println(cert_no);
             //System.out.println(enc_cert_data2); // ��ȣȭ v2
 
-            // ���������� ��ȣȭ �Լ�
-            // �ش� �Լ��� ��ȣȭ�� enc_cert_data2 ��
-            // site_cd �� cert_no �� ������ ��ȭȭ �ϴ� �Լ� �Դϴ�.
-            // ���������� ��ȣȭ �Ȱ�쿡�� ���������͸� �����ü� �ֽ��ϴ�.
-            cc.decryptEncCert( g_conf_ENC_KEY, site_cd, cert_no, enc_cert_data2 );
-            //cc.setCharSetUtf8(); // ��ȣ�� ����� ���ڵ� ���� �޼��� ( UTF-8 ���ڵ� ���� �ּ��� �����Ͻñ� �ٶ��ϴ�.)
+            //System.out.println(enc_cert_data2); // 암호화 v2
 
-            System.out.println( "�̵���Ż� �ڵ�"    + cc.getKeyValue("comm_id"     ) ); // �̵���Ż� �ڵ�
-            System.out.println( "��ȭ��ȣ"           + cc.getKeyValue("phone_no"    ) ); // ��ȭ��ȣ
-            System.out.println( "�̸�"               + cc.getKeyValue("user_name"   ) ); // �̸�
-            System.out.println( "�������"           + cc.getKeyValue("birth_day"   ) ); // �������
-            System.out.println( "�����ڵ�"           + cc.getKeyValue("sex_code"    ) ); // �����ڵ�
-            System.out.println( "��/�ܱ��� ���� "    + cc.getKeyValue("local_code"  ) ); // ��/�ܱ��� ����
+            // 인증데이터 복호화 함수
+            // 해당 함수는 암호화된 enc_cert_data2 를
+            // site_cd 와 cert_no 를 가지고 복화화 하는 함수 입니다.
+            // 정상적으로 복호화 된경우에만 인증데이터를 가져올수 있습니다.
+            cc.decryptEncCert( g_conf_ENC_KEY, site_cd, cert_no, enc_cert_data2 );
+            //cc.setCharSetUtf8(); // 복호와 결과값 인코딩 변경 메서드 ( UTF-8 인코딩 사용시 주석을 해제하시기 바랍니다.)
+
+            System.out.println( "이동통신사 코드"    + cc.getKeyValue("comm_id"     ) ); // 이동통신사 코드
+            System.out.println( "전화번호"           + cc.getKeyValue("phone_no"    ) ); // 전화번호
+            System.out.println( "이름"               + cc.getKeyValue("user_name"   ) ); // 이름
+            System.out.println( "생년월일"           + cc.getKeyValue("birth_day"   ) ); // 생년월일
+            System.out.println( "성별코드"           + cc.getKeyValue("sex_code"    ) ); // 성별코드
+            System.out.println( "내/외국인 정보 "    + cc.getKeyValue("local_code"  ) ); // 내/외국인 정보
             System.out.println( "CI"                 + cc.getKeyValue("ci"          ) ); // CI
-            System.out.println( "DI �ߺ����� Ȯ�ΰ�" + cc.getKeyValue("di"          ) ); // DI �ߺ����� Ȯ�ΰ�
-            System.out.println( "CI_URL"             + URLDecoder.decode( cc.getKeyValue("ci_url"      ) ) ); // CI URL ���ڵ� ��
-            System.out.println( "DI_URL"             + URLDecoder.decode( cc.getKeyValue("di_url"      ) ) ); // DI URL ���ڵ� ��
-            System.out.println( "������Ʈ ���̵�  "  + cc.getKeyValue("web_siteid"  ) ); // ��ȣȭ�� ������Ʈ ���̵�
-            System.out.println( "��ȣȭ�� ����ڵ�"  + cc.getKeyValue("res_cd"      ) ); // ��ȣȭ�� ����ڵ�
-            System.out.println( "��ȣȭ�� ����޽���"+ cc.getKeyValue("res_msg"     ) ); // ��ȣȭ�� ����޽���
+            System.out.println( "DI 중복가입 확인값" + cc.getKeyValue("di"          ) ); // DI 중복가입 확인값
+            System.out.println( "CI_URL"             + URLDecoder.decode( cc.getKeyValue("ci_url"      ) ) ); // CI URL 인코딩 값
+            System.out.println( "DI_URL"             + URLDecoder.decode( cc.getKeyValue("di_url"      ) ) ); // DI URL 인코딩 값
+            System.out.println( "웹사이트 아이디  "  + cc.getKeyValue("web_siteid"  ) ); // 암호화된 웹사이트 아이디
+            System.out.println( "암호화된 결과코드"  + cc.getKeyValue("res_cd"      ) ); // 암호화된 결과코드
+            System.out.println( "암호화된 결과메시지"+ cc.getKeyValue("res_msg"     ) ); // 암호화된 결과메시지
 
         }
         else/*if( res_cd.equals( "0000" ) != true )*/
         {
-            // ��������
+            // 인증실패
         }
 
-    cc = null; // ��ü �ݳ�
+    cc = null; // 객체 반납
 %>
 
 

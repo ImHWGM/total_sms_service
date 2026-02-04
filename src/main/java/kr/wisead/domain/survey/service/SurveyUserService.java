@@ -154,40 +154,14 @@ public class SurveyUserService {
       String userId,
       jakarta.servlet.http.HttpServletRequest httpRequest) {
 
-    // 마스킹 해제 요청인 경우 권한 체크 및 사유 검증
+    // 마스킹 해제 요청인 경우 사유 검증 및 로그 기록
     if (!masked) {
       // 사유 필수 체크
       if (CommonUtils.isNullOrEmpty(reason)) {
         throw new BusinessException(ErrorCode.INVALID_INPUT, "마스킹 해제 사유는 필수입니다.");
       }
 
-      // 권한 체크: A레벨 또는 이벤트 소유자만 가능
-      if (eventSeq != null) {
-        SurveyMaster event =
-            surveyMasterMapper
-                .selectByEventSeq(eventSeq)
-                .orElseThrow(
-                    () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
-        Integer userLevel = adminService.getUserLevel(userId);
-        try {
-          adminService.validateModifyPermission(userId, userLevel, event.getRegId());
-        } catch (BusinessException e) {
-          // 권한 없음 - 실패 로그 기록
-          actionLogService.logPhoneMasking(
-              userId, userId, "UNMASK_FAIL", reason, String.valueOf(page), httpRequest);
-          throw e;
-        }
-      } else {
-        // eventSeq 없이 전체 조회 시 A레벨만 허용
-        Integer userLevel = adminService.getUserLevel(userId);
-        if (userLevel == null || userLevel > 1) {
-          actionLogService.logPhoneMasking(
-              userId, userId, "UNMASK_FAIL", reason, String.valueOf(page), httpRequest);
-          throw new BusinessException(ErrorCode.ACCESS_DENIED, "마스킹 해제 권한이 없습니다.");
-        }
-      }
-
-      // 마스킹 해제 성공 로그 기록
+      // 마스킹 해제 로그 기록
       actionLogService.logPhoneMasking(
           userId, userId, "UNMASK", reason, String.valueOf(page), httpRequest);
       log.info(

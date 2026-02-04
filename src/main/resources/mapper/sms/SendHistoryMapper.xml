@@ -49,10 +49,10 @@
             <if test="params.endDate != null and params.endDate != ''">
                 AND REQUEST_TIME &lt;= CONCAT(#{params.endDate}, ' 23:59:59')
             </if>
-            <if test="params.sendFailure == 'Y'">
+            <if test="params.sendFailure == 'Y'.toString()">
                 AND STAT = 3
             </if>
-            <if test="params.userId != null and params.userId != '' and params.userId != 'ALL'">
+            <if test="params.userId != null and params.userId != '' and params.userId != 'ALL'.toString()">
                 <choose>
                     <when test="params.userId.indexOf(',') >= 0">
                         AND EXT_COL3 IN
@@ -68,35 +68,35 @@
             <if test="params.keyword != null and params.keyword != ''">
                 <choose>
                     <!-- A: 메시지타입 -->
-                    <when test="params.type == 'A'">
+                    <when test="params.type == 'A'.toString()">
                         AND MSG_TYPE LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
                     <!-- B: 수신번호 -->
-                    <when test="params.type == 'B' or params.type == 'dstAddr'">
+                    <when test="params.type == 'B'.toString() or params.type == 'dstAddr'">
                         AND DSTADDR LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
                     <!-- C: 발신번호 -->
-                    <when test="params.type == 'C' or params.type == 'callBack'">
+                    <when test="params.type == 'C'.toString() or params.type == 'callBack'">
                         AND CALLBACK LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
                     <!-- D: 제목 -->
-                    <when test="params.type == 'D' or params.type == 'subject'">
+                    <when test="params.type == 'D'.toString() or params.type == 'subject'">
                         AND SUBJECT LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
                     <!-- E: 내용 -->
-                    <when test="params.type == 'E' or params.type == 'text'">
+                    <when test="params.type == 'E'.toString() or params.type == 'text'">
                         AND TEXT LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
                     <!-- F: 상태 -->
-                    <when test="params.type == 'F'">
+                    <when test="params.type == 'F'.toString()">
                         AND STAT = #{params.keyword}
                     </when>
                     <!-- G: 등록자 -->
-                    <when test="params.type == 'G'">
+                    <when test="params.type == 'G'.toString()">
                         AND EXT_COL3 LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
                     <!-- H: 결과 -->
-                    <when test="params.type == 'H'">
+                    <when test="params.type == 'H'.toString()">
                         AND RESULT LIKE CONCAT('%', #{params.keyword}, '%')
                     </when>
                     <otherwise>

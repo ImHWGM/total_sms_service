@@ -63,33 +63,33 @@
     <sql id="searchCondition">
         <if test="keyword != null and keyword != ''">
             <choose>
-                <when test="type == 'A'">
+                <when test="type == 'A'.toString()">
                     AND MSG_TYPE LIKE CONCAT('%', #{keyword}, '%')
                 </when>
-                <when test="type == 'B'">
+                <when test="type == 'B'.toString()">
                     AND DSTADDR = #{keyword}
                 </when>
-                <when test="type == 'C'">
+                <when test="type == 'C'.toString()">
                     AND CALLBACK LIKE CONCAT('%', #{keyword}, '%')
                 </when>
-                <when test="type == 'D'">
+                <when test="type == 'D'.toString()">
                     AND RESULT LIKE CONCAT('%', #{keyword}, '%')
                 </when>
-                <when test="type == 'E'">
+                <when test="type == 'E'.toString()">
                     AND SUBJECT LIKE CONCAT('%', #{keyword}, '%')
                 </when>
-                <when test="type == 'F'">
+                <when test="type == 'F'.toString()">
                     AND TEXT LIKE CONCAT('%', #{keyword}, '%')
                 </when>
-                <when test="type == 'G'">
+                <when test="type == 'G'.toString()">
                     AND STAT = #{keyword}
                 </when>
-                <when test="type == 'H'">
+                <when test="type == 'H'.toString()">
                     AND EXT_COL3 = #{keyword}
                 </when>
             </choose>
         </if>
-        <if test="sendFailure == '1'">
+        <if test="sendFailure == '1'.toString()">
             AND RESULT != '0'
         </if>
     </sql>

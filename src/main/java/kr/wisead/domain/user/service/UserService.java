@@ -365,7 +365,7 @@ public class UserService {
       passwordResetTokenMapper.insert(resetToken);
 
       // 6. 비밀번호 재설정 이메일 발송
-      String resetLink = baseUrl + "/reset-password?token=" + token;
+      String resetLink = baseUrl + "/auth/reset-password?token=" + token;
       // 이메일 복호화 (DB에 암호화되어 저장됨)
       String decryptedEmail = CryptoUtils.getDecryptedAES256Data(user.getEmail());
       emailService.sendPasswordResetEmail(decryptedEmail, resetLink);

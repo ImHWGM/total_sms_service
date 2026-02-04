@@ -45,6 +45,12 @@
             <if test="eventType != null and eventType != ''">
                 AND M.EVENT_TYPE = #{eventType}
             </if>
+            <if test="eventTypes != null and eventTypes.size() > 0">
+                AND M.EVENT_TYPE IN
+                <foreach collection="eventTypes" item="type" open="(" separator="," close=")">
+                    #{type}
+                </foreach>
+            </if>
             <if test="surveyStatus != null and surveyStatus != ''">
                 AND M.STATUS = #{surveyStatus}
             </if>

@@ -84,15 +84,15 @@ public class UserStatisticsService {
   /** 사용자별 QR 통계 조회 */
   @Transactional(readOnly = true)
   public List<UserQrStatsResponse> findQrStats(StatsSearchRequest request) {
-    Long userSeq = request.getUserId() != null ? Long.valueOf(request.getUserId()) : null;
-    List<Long> userSeqs =
+    String userId = request.getUserId() != null ? request.getUserId() : null;
+    List<String> userIds =
         request.getUserIds() != null
-            ? request.getUserIds().stream().map(Long::valueOf).collect(Collectors.toList())
+            ? request.getUserIds().stream().map(String::valueOf).collect(Collectors.toList())
             : null;
 
     List<UserQrStatsResponse> stats =
         surveyMasterMapper.selectQrStatsByUser(
-            request.getStartDate(), request.getEndDate(), userSeq, userSeqs);
+            request.getStartDate(), request.getEndDate(), userId, userIds);
 
     return stats != null ? stats : new ArrayList<>();
   }

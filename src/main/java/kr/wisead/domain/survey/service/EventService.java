@@ -125,6 +125,9 @@ public class EventService {
       throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자를 찾을 수 없습니다.");
     }
 
+    // regId용 실제 user_id 조회
+    String actualUserId = userIdResolver.resolveUserId(userId);
+
     // 이벤트 코드 생성
     String eventCode = generateEventCode();
 
@@ -166,7 +169,7 @@ public class EventService {
             .qrCodeImgPath(qrCodeImgPath)
             .endMessage(request.getEndMessage())
             .eventEndImg(null) // 임시 경로 대신 null로 저장, 이동 후 업데이트
-            .regId(userId)
+            .regId(actualUserId)
             .build();
 
     surveyMasterMapper.insert(event);
@@ -216,7 +219,7 @@ public class EventService {
     // 문항 등록 및 이미지 저장
     if (request.getQuestions() != null && !request.getQuestions().isEmpty()) {
       saveQuestionsWithImages(
-          eventSeq, request.getQuestions(), userId, questionImages, itemImages, eventSeqStr);
+          eventSeq, request.getQuestions(), actualUserId, questionImages, itemImages, eventSeqStr);
     }
 
     return getEventDetail(eventSeq);
@@ -280,6 +283,9 @@ public class EventService {
     // 권한 체크: 이벤트 소유자 또는 A레벨만 수정 가능
     Integer userLevel = adminService.getUserLevel(uptId);
     adminService.validateModifyPermission(uptId, userLevel, event.getRegId());
+
+    // uptId용 실제 user_id 조회
+    String actualUptId = userIdResolver.resolveUserId(uptId);
 
     // QR 간편인증 사용으로 변경되었고, 기존에 authCodeUrl이 없으면 새로 생성 (비용 차감 후)
     if ("Y".equals(request.getQrCode())
@@ -380,7 +386,7 @@ public class EventService {
         request.getEndMessage(),
         eventDescImg,
         eventEndImg,
-        uptId);
+        actualUptId);
 
     surveyMasterMapper.update(event);
     log.info("이벤트 수정 완료 - eventSeq: {}", eventSeq);
@@ -397,7 +403,7 @@ public class EventService {
       surveyQuestionMapper.deleteByEventSeq(eventSeq);
       // JSON 방식 사용 (이미지 경로 변환 처리)
       saveQuestionsWithImages(
-          eventSeq, request.getQuestions(), uptId, questionImages, itemImages, eventSeqStr);
+          eventSeq, request.getQuestions(), actualUptId, questionImages, itemImages, eventSeqStr);
     }
 
     return getEventDetail(eventSeq);

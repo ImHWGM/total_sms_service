@@ -236,7 +236,7 @@
     <!-- 사용자별 QR 통계 조회 (진행 중 상태의 방문만 카운트) -->
     <select id="selectQrStatsByUser" resultType="kr.wisead.domain.statistics.dto.UserQrStatsResponse">
         SELECT
-            CAST(u.seq AS CHAR) AS userId,
+            u.user_id AS userId,
             u.corp_name AS userName,
             m.EVENT_NAME AS eventName,
             COUNT(DISTINCT m.EVENT_SEQ) AS eventCount,
@@ -250,17 +250,17 @@
         <if test="endDate != null and endDate != ''">
             AND DATE(m.REG_DATE) <![CDATA[<=]]> #{endDate}
         </if>
-        <if test="userSeq != null">
-            AND u.seq = #{userSeq}
+        <if test="userId != null and userId != ''">
+            AND u.user_id = #{userId}
         </if>
-        <if test="userSeqs != null and userSeqs.size() > 0">
-            AND u.seq IN
-            <foreach collection="userSeqs" item="seq" open="(" separator="," close=")">
-                #{seq}
+        <if test="userIds != null and userIds.size() > 0">
+            AND u.user_id IN
+            <foreach collection="userIds" item="id" open="(" separator="," close=")">
+                #{id}
             </foreach>
         </if>
-        GROUP BY u.seq, u.corp_name, m.EVENT_NAME, m.EVENT_SEQ
-        ORDER BY u.seq
+        GROUP BY u.user_id, u.corp_name, m.EVENT_NAME, m.EVENT_SEQ
+        ORDER BY u.user_id
     </select>
 
 </mapper>

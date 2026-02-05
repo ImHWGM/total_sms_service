@@ -12,6 +12,8 @@ import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.common.util.UserIdResolver;
+import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.survey.dto.SurveyUserRequest;
 import kr.wisead.domain.survey.dto.SurveyUserResponse;
@@ -33,7 +35,8 @@ public class SurveyUserService {
   private final SurveyUserMapper surveyUserMapper;
   private final SurveyMasterMapper surveyMasterMapper;
   private final AdminService adminService;
-  private final kr.wisead.domain.admin.service.ActionLogService actionLogService;
+  private final ActionLogService actionLogService;
+  private final UserIdResolver userIdResolver;
 
   /** 이벤트별 참여자 목록 조회 */
   @Transactional(readOnly = true)
@@ -305,6 +308,9 @@ public class SurveyUserService {
     // 사용자 키 생성
     String userKey = generateUserKey();
 
+    // regId용 실제 user_id 조회
+    String actualRegId = userIdResolver.resolveUserId(regId);
+
     // 전화번호 암호화
     String encryptedPhone = null;
     if (!CommonUtils.isNullOrEmpty(request.getUserPhone())) {
@@ -323,7 +329,7 @@ public class SurveyUserService {
             .userPhone(encryptedPhone)
             .resendUserPhone(encryptedPhone)
             .delYn("N")
-            .regId(regId)
+            .regId(actualRegId)
             .build();
 
     surveyUserMapper.insert(user);
@@ -341,6 +347,9 @@ public class SurveyUserService {
             .selectByEventSeq(eventSeq)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+    // regId용 실제 user_id 조회
+    String actualRegId = userIdResolver.resolveUserId(regId);
 
     List<SurveyUser> users = new ArrayList<>();
     for (SurveyUserRequest request : requests) {
@@ -363,7 +372,7 @@ public class SurveyUserService {
               .userKey(userKey)
               .userPhone(encryptedPhone)
               .resendUserPhone(encryptedPhone)
-              .regId(regId)
+              .regId(actualRegId)
               .build());
     }
 
@@ -413,6 +422,9 @@ public class SurveyUserService {
       }
     }
 
+    // uptId용 실제 user_id 조회
+    String actualUptId = userIdResolver.resolveUserId(uptId);
+
     SurveyUser updateUser =
         SurveyUser.builder()
             .seq(userSeq)
@@ -422,7 +434,7 @@ public class SurveyUserService {
             .userEmail(request.getUserEmail())
             .address(request.getAddress())
             .address2(request.getAddress2())
-            .uptId(uptId)
+            .uptId(actualUptId)
             .build();
 
     surveyUserMapper.update(updateUser);

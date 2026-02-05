@@ -1,5 +1,6 @@
 package kr.wisead.domain.file.controller;
 
+import java.util.UUID;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.domain.file.dto.FileUploadResponse;
 import kr.wisead.domain.file.service.FileStorageService;
@@ -169,7 +170,7 @@ public class FileUploadController {
     if (tempId != null && !tempId.isBlank()) {
       return "temp_" + tempId;
     }
-    return "temp_" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    return "temp_" + UUID.randomUUID().toString().substring(0, 8);
   }
 
   /** 설문 임시 이미지를 이벤트 디렉토리로 이동 - 신규 이벤트 생성 후 호출 */

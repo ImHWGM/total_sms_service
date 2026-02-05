@@ -85,6 +85,50 @@ public class FrontAuthService {
         .build();
   }
 
+  /** 이벤트 코드로 익명 사용자 생성 (NA 무인증 설문 - Access Link 접근) */
+  @Transactional
+  public SurveyUserResponse createEventUser(String eventCode) {
+    // 1. 이벤트 조회
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventCode(eventCode)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+    // 2. 이벤트 상태 확인
+    if (!event.isActive()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "현재 참여할 수 없는 이벤트입니다.");
+    }
+
+    // 3. 사용자 키 생성
+    String userKey = CommonUtils.randomCode(20);
+
+    // 4. 익명 사용자 등록 (AUTH_USER_MAPPING 없이)
+    SurveyUser user =
+        SurveyUser.builder()
+            .eventSeq(event.getEventSeq())
+            .userKey(userKey)
+            .regId("EVENT_USER")
+            .build();
+
+    surveyUserMapper.insertQrUser(user);
+
+    log.info(
+        "Event 사용자 생성 - eventSeq: {}, eventCode: {}, userKey: {}",
+        event.getEventSeq(),
+        eventCode,
+        userKey);
+
+    return SurveyUserResponse.builder()
+        .userSeq(user.getSeq())
+        .userKey(userKey)
+        .eventSeq(event.getEventSeq())
+        .eventCode(event.getEventCode())
+        .eventType(event.getEventType())
+        .eventName(event.getEventName())
+        .build();
+  }
+
   /** 휴대폰 번호로 사용자 검증 (재발송 시나리오) */
   @Transactional(readOnly = true)
   public SurveyUserResponse validatePhone(PhoneValidationRequest request) {

@@ -26,6 +26,13 @@ public class FrontAuthController {
     return ApiResponse.success(response);
   }
 
+  /** 이벤트 코드로 사용자 생성 - NA(무인증) 설문에서 Access Link 접근 시 익명 사용자 자동 생성 */
+  @PostMapping("/event/user")
+  public ApiResponse<SurveyUserResponse> createEventUser(@RequestParam String eventCode) {
+    SurveyUserResponse response = frontAuthService.createEventUser(eventCode);
+    return ApiResponse.success(response);
+  }
+
   /** 휴대폰 번호로 사용자 검증 - 재발송 시나리오에서 휴대폰 번호로 기존 사용자 조회 */
   @PostMapping("/validate/phone")
   public ApiResponse<SurveyUserResponse> validatePhone(

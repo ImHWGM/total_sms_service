@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import kr.wisead.common.exception.BusinessException;
@@ -233,7 +234,7 @@ public class FileStorageService {
   private void deleteDirectory(Path directory) throws IOException {
     if (Files.exists(directory)) {
       Files.walk(directory)
-          .sorted(java.util.Comparator.reverseOrder())
+          .sorted(Comparator.reverseOrder())
           .forEach(
               path -> {
                 try {

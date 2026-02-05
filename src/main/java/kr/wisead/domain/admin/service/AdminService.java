@@ -2,6 +2,7 @@ package kr.wisead.domain.admin.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
@@ -199,7 +200,7 @@ public class AdminService {
       }
       // 운영관리자(A) - 관리 계정 데이터만 수정 가능
       if (currentLevel == 60) {
-        java.util.List<String> managedUserIds =
+        List<String> managedUserIds =
             customerCompanyMapper.selectManagedUserIds(currentUserId);
         return managedUserIds != null && managedUserIds.contains(targetOwnerId);
       }
@@ -233,7 +234,7 @@ public class AdminService {
       return "ALL";
     } else if (userLevel >= 50) {
       // 50-89: 관리하는 계정들 조회
-      java.util.List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(userId);
+      List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(userId);
 
       if (managedUserIds == null || managedUserIds.isEmpty()) {
         log.info("권한 레벨 {} - 관리 계정 없음, 본인만 조회: {}", userLevel, userId);

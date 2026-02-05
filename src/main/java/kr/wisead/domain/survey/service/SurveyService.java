@@ -120,6 +120,42 @@ public class SurveyService {
     }
   }
 
+  /** 범용인증 확인 (eventCode 기반) */
+  @Transactional
+  public SurveyUserResponse checkGeneralAuthByEventCode(String eventCode, String generalAuthCode) {
+    Map<String, Object> authResult =
+        surveyUserMapper.checkGeneralAuthStatusByEventCode(eventCode, generalAuthCode);
+
+    if (authResult == null || authResult.isEmpty()) {
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "유효하지 않은 인증코드입니다.");
+    }
+
+    String authStatus = (String) authResult.get("authStatus");
+    switch (authStatus) {
+      case "NOT_FOUND":
+        throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "유효하지 않은 인증코드입니다.");
+      case "ALREADY_ANSWERED":
+        throw new BusinessException(ErrorCode.INVALID_INPUT, "이미 설문에 참여하셨습니다.");
+      case "TIME_RESTRICTED":
+        throw new BusinessException(ErrorCode.INVALID_INPUT, "잠시 후 다시 시도해주세요.");
+      case "VALID":
+        String userKey = (String) authResult.get("userKey");
+        surveyUserMapper.updateAuthTime(userKey);
+        surveyUserMapper.updateStartTime(userKey);
+
+        SurveyUser user =
+            surveyUserMapper
+                .selectByGeneralAuthCodeAndEventCode(eventCode, generalAuthCode)
+                .orElseThrow(
+                    () ->
+                        new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자 정보를 찾을 수 없습니다."));
+
+        return SurveyUserResponse.from(user);
+      default:
+        throw new BusinessException(ErrorCode.INTERNAL_ERROR, "인증 처리 중 오류가 발생했습니다.");
+    }
+  }
+
   /** 설문 제출 */
   @Transactional
   public void submitSurvey(Integer eventSeq, SurveySubmitRequest request) {

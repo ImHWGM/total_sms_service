@@ -238,6 +238,28 @@ public class AdminController {
     return ApiResponse.success(response);
   }
 
+  /**
+   * 권한별 선택 가능 사용자 아이디 목록 조회 GET /api/admin/selectable-user-ids
+   *
+   * <p>- 최고관리자 (레벨 90, 99): 전체 사용자 아이디 목록 - 운영관리자 (레벨 50, 60): 본인 + customer_company 테이블의 관리 계정 아이디
+   * - 기업 (레벨 10): 본인 아이디만
+   */
+  @GetMapping("/selectable-user-ids")
+  public ApiResponse<List<String>> getSelectableUserIds(
+      @RequestHeader("Authorization") String token) {
+
+    String accessToken = extractToken(token);
+    String userSeq = jwtTokenProvider.getUserId(accessToken); // JWT에서 seq 추출
+
+    // seq로 userId 조회 필요
+    String userId = adminService.getUserIdBySeq(userSeq);
+    Integer userLevel = adminService.getUserLevel(userSeq);
+
+    List<String> userIds = adminService.getSelectableUserIds(userId, userLevel);
+
+    return ApiResponse.success(userIds);
+  }
+
   // ==================== Private Methods ====================
 
   /** Authorization 헤더에서 Bearer 토큰 추출 */

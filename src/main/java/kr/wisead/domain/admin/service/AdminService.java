@@ -200,8 +200,7 @@ public class AdminService {
       }
       // 운영관리자(A) - 관리 계정 데이터만 수정 가능
       if (currentLevel == 60) {
-        List<String> managedUserIds =
-            customerCompanyMapper.selectManagedUserIds(currentUserId);
+        List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(currentUserId);
         return managedUserIds != null && managedUserIds.contains(targetOwnerId);
       }
     }
@@ -253,6 +252,66 @@ public class AdminService {
       // 50 미만: 본인만
       log.info("권한 레벨 {}로 본인만 조회: {}", userLevel, userId);
       return userId;
+    }
+  }
+
+  /** SEQ로 USER_ID 조회 */
+  public String getUserIdBySeq(String userSeq) {
+    try {
+      Integer seq = Integer.parseInt(userSeq);
+      return userMapper.findUserIdBySeq(seq);
+    } catch (NumberFormatException e) {
+      // userSeq가 이미 userId인 경우
+      return userSeq;
+    }
+  }
+
+  /**
+   * 권한별 선택 가능한 사용자 아이디 목록 조회
+   *
+   * @param userId 현재 로그인 사용자 ID
+   * @param userLevel 사용자 권한 레벨
+   * @return 선택 가능한 사용자 아이디 목록
+   */
+  public List<String> getSelectableUserIds(String userId, Integer userLevel) {
+    if (userLevel == null) {
+      log.warn("userLevel이 null입니다. userId: {}", userId);
+      return java.util.Collections.singletonList(userId);
+    }
+
+    if (userLevel >= 90) {
+      // 최고관리자 (90, 99): 전체 사용자 목록
+      log.info("최고관리자 권한으로 전체 사용자 목록 조회: userId={}, level={}", userId, userLevel);
+      return userMapper.findAllUserIds();
+    } else if (userLevel >= 50) {
+      // 운영관리자 (50, 60): 본인 + 관리 계정
+      List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(userId);
+
+      // 본인 아이디 추가
+      if (managedUserIds == null) {
+        managedUserIds = new java.util.ArrayList<>();
+      } else {
+        managedUserIds = new java.util.ArrayList<>(managedUserIds); // 불변 리스트 방지
+      }
+
+      if (!managedUserIds.contains(userId)) {
+        managedUserIds.add(0, userId); // 본인 아이디를 맨 앞에 추가
+      }
+
+      log.info(
+          "운영관리자 권한으로 관리 계정 조회: userId={}, level={}, count={}",
+          userId,
+          userLevel,
+          managedUserIds.size());
+
+      return managedUserIds.stream()
+          .distinct()
+          .sorted()
+          .collect(java.util.stream.Collectors.toList());
+    } else {
+      // 기업 (10) 및 기타: 본인만
+      log.info("기업 권한으로 본인만 조회: userId={}, level={}", userId, userLevel);
+      return java.util.Collections.singletonList(userId);
     }
   }
 

@@ -100,4 +100,7 @@ public interface UserMapper {
       @Param("corpName") String corpName,
       @Param("person") String person,
       @Param("phone") String phone);
+
+  /** 모든 활성 사용자 아이디 목록 조회 */
+  List<String> findAllUserIds();
 }

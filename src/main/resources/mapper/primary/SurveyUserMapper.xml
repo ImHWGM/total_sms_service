@@ -225,6 +225,34 @@
         LIMIT 1
     </select>
 
+    <!-- 범용인증 상태 확인 (eventCode 기반) -->
+    <select id="checkGeneralAuthStatusByEventCode" resultType="map">
+        SELECT
+            CASE
+                WHEN MAP.GENERAL_AUTH_CODE IS NULL THEN 'NOT_FOUND'
+                WHEN U.SUBMISSION_DATE IS NOT NULL THEN 'ALREADY_ANSWERED'
+                WHEN U.SUBMISSION_DATE IS NULL AND U.SURVEY_AUTH_TIME IS NOT NULL
+                     AND U.SURVEY_AUTH_TIME >= DATE_SUB(NOW(), INTERVAL 1 MINUTE) THEN 'TIME_RESTRICTED'
+                WHEN U.SUBMISSION_DATE IS NULL AND (U.SURVEY_AUTH_TIME IS NULL
+                     OR U.SURVEY_AUTH_TIME &lt; DATE_SUB(NOW(), INTERVAL 1 MINUTE)) THEN 'VALID'
+                ELSE 'NOT_FOUND'
+            END as authStatus,
+            M.EVENT_SEQ as eventSeq,
+            M.EVENT_CODE as eventCode,
+            M.EVENT_TYPE as eventType,
+            MAP.GENERAL_AUTH_CODE as generalAuthCode,
+            MAP.USER_KEY as userKey,
+            U.SUBMISSION_DATE as submissionDate,
+            U.SURVEY_AUTH_TIME as surveyAuthTime,
+            NOW() as currentTime
+        FROM SURVEY_MASTER M
+        INNER JOIN AUTH_USER_MAPPING MAP ON M.EVENT_SEQ = MAP.EVENT_SEQ
+            AND MAP.GENERAL_AUTH_CODE = #{generalAuthCode}
+        LEFT JOIN SURVEY_USER U ON (MAP.EVENT_SEQ = U.EVENT_SEQ AND MAP.USER_KEY = U.USER_KEY)
+        WHERE M.EVENT_CODE = #{eventCode}
+        LIMIT 1
+    </select>
+
     <!-- 범용인증으로 사용자 정보 조회 -->
     <select id="selectByGeneralAuthCode" resultType="kr.wisead.domain.survey.entity.SurveyUser">
         SELECT
@@ -240,6 +268,27 @@
         LEFT JOIN SURVEY_USER U ON MAP.USER_KEY = U.USER_KEY AND MAP.EVENT_SEQ = U.EVENT_SEQ
         WHERE MAP.GENERAL_AUTH_CODE = #{generalAuthCode}
         AND M.AUTH_CODE_URL = #{authCodeUrl}
+        AND (U.SUBMISSION_DATE IS NULL)
+        AND (U.SURVEY_AUTH_TIME IS NULL OR U.SURVEY_AUTH_TIME &lt; DATE_SUB(NOW(), INTERVAL 1 MINUTE))
+        ORDER BY MAP.REG_DATE ASC
+        LIMIT 1
+    </select>
+
+    <!-- 범용인증으로 사용자 정보 조회 (eventCode 기반) -->
+    <select id="selectByGeneralAuthCodeAndEventCode" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            U.SEQ as seq,
+            U.EVENT_SEQ as eventSeq,
+            U.USER_KEY as userKey,
+            M.EVENT_CODE as eventCode,
+            M.EVENT_TYPE as eventType,
+            M.AUTH as auth,
+            MAP.GENERAL_AUTH_CODE as generalAuthCode
+        FROM SURVEY_MASTER M
+        INNER JOIN AUTH_USER_MAPPING MAP ON M.EVENT_SEQ = MAP.EVENT_SEQ
+        LEFT JOIN SURVEY_USER U ON MAP.USER_KEY = U.USER_KEY AND MAP.EVENT_SEQ = U.EVENT_SEQ
+        WHERE MAP.GENERAL_AUTH_CODE = #{generalAuthCode}
+        AND M.EVENT_CODE = #{eventCode}
         AND (U.SUBMISSION_DATE IS NULL)
         AND (U.SURVEY_AUTH_TIME IS NULL OR U.SURVEY_AUTH_TIME &lt; DATE_SUB(NOW(), INTERVAL 1 MINUTE))
         ORDER BY MAP.REG_DATE ASC

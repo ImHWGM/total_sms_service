@@ -269,7 +269,6 @@
         WHERE MAP.GENERAL_AUTH_CODE = #{generalAuthCode}
         AND M.AUTH_CODE_URL = #{authCodeUrl}
         AND (U.SUBMISSION_DATE IS NULL)
-        AND (U.SURVEY_AUTH_TIME IS NULL OR U.SURVEY_AUTH_TIME &lt; DATE_SUB(NOW(), INTERVAL 1 MINUTE))
         ORDER BY MAP.REG_DATE ASC
         LIMIT 1
     </select>
@@ -290,7 +289,6 @@
         WHERE MAP.GENERAL_AUTH_CODE = #{generalAuthCode}
         AND M.EVENT_CODE = #{eventCode}
         AND (U.SUBMISSION_DATE IS NULL)
-        AND (U.SURVEY_AUTH_TIME IS NULL OR U.SURVEY_AUTH_TIME &lt; DATE_SUB(NOW(), INTERVAL 1 MINUTE))
         ORDER BY MAP.REG_DATE ASC
         LIMIT 1
     </select>

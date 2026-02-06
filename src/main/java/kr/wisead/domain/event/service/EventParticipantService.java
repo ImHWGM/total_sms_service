@@ -36,6 +36,67 @@ public class EventParticipantService {
   @Value("${wisead.url:http://localhost:8080}")
   private String wiseadUrl;
 
+  /** 현장 참가자 등록 (공개 API) */
+  @Transactional
+  public OnsiteRegistrationResponse registerOnsiteParticipant(
+      String eventCode, OnsiteRegistrationRequest request) {
+    // 1. eventCode로 이벤트 조회
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventCode(eventCode)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "존재하지 않는 행사입니다."));
+
+    // 2. 중복 체크 (동일 이벤트 + 이름 + 전화번호)
+    String cleanPhone = request.getUserPhone().replace("-", "");
+    String encryptedPhone = encryptPhone(cleanPhone);
+
+    boolean exists =
+        participantMapper.existsByEventSeqAndNameAndPhone(
+            event.getEventSeq(), request.getUserName(), encryptedPhone);
+    if (exists) {
+      throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "이미 등록된 참가자입니다.");
+    }
+
+    // 3. SURVEY_USER 생성 (이름/이메일 포함)
+    LocalDateTime attendTime = LocalDateTime.now();
+    String userKey = UUID.randomUUID().toString().replace("-", "");
+
+    SurveyUser surveyUser =
+        SurveyUser.builder()
+            .eventSeq(event.getEventSeq())
+            .userKey(userKey)
+            .userName(request.getUserName())
+            .userPhone(encryptedPhone)
+            .userEmail(request.getUserEmail())
+            .delYn("N")
+            .regId("ONSITE")
+            .build();
+
+    surveyUserMapper.insertForParticipant(surveyUser);
+
+    // 4. EVENT_PARTICIPANT 생성
+    EventParticipant participant =
+        EventParticipant.create(
+            surveyUser.getSeq(),
+            event.getEventSeq(),
+            request.getDepartment(),
+            request.getPosition(),
+            "일반",
+            null);
+
+    participantMapper.insert(participant);
+
+    // 5. 응답 반환
+    EventParticipant saved =
+        participantMapper
+            .selectDetailBySeq(participant.getSeq())
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+
+    return OnsiteRegistrationResponse.from(saved, cleanPhone, attendTime).withQrCodeUrl(wiseadUrl);
+  }
+
   /** 참가자 등록 */
   @Transactional
   public EventParticipantResponse createParticipant(EventParticipantRequest request, String regId) {

@@ -49,6 +49,9 @@ public interface SurveyUserMapper {
   /** 참여자 등록 */
   int insert(SurveyUser user);
 
+  /** 참여자 등록 (이름/이메일 포함 - 현장등록용) */
+  int insertForParticipant(SurveyUser user);
+
   /** 설문 제출 (개인정보 업데이트) */
   int updateSubmission(SurveyUser user);
 

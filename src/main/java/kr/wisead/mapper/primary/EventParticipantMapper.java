@@ -74,6 +74,10 @@ public interface EventParticipantMapper {
   /** 이벤트 참가자 목록 (엑셀용 - 전체 데이터) */
   List<EventParticipant> selectAllForExcel(@Param("eventSeq") Integer eventSeq);
 
+  /** 이벤트 + 이름으로 참가자 조회 (인증용 1차 필터링) */
+  List<EventParticipant> selectByEventSeqAndUserName(
+      @Param("eventSeq") Integer eventSeq, @Param("userName") String userName);
+
   /** 이벤트 + 이름 + 암호화된 전화번호로 중복 체크 */
   boolean existsByEventSeqAndNameAndPhone(
       @Param("eventSeq") Integer eventSeq,

@@ -62,9 +62,6 @@ public class SecurityConfig {
     // ARS 수신거부 (외부 ARS 시스템 호출)
     "/ars/**",
 
-    // KCP 본인인증 (JSP 페이지)
-    "/kcpcert/**",
-
     // 결제 콜백 (PG사 호출)
     "/api/payment/kg/**",
     "/api/payment/callback",

@@ -40,6 +40,9 @@ public class KcpAuthService {
   @Value("${kcp.gw_url:https://cert.kcp.co.kr/kcp_cert/cert_view.jsp}")
   private String gwUrl;
 
+  @Value("${wisead.base-url:*}")
+  private String frontendOrigin;
+
   /** KCP 인증 시작 데이터 생성 - 프론트엔드에서 KCP 팝업 인증 페이지 호출 시 필요한 데이터 */
   public KcpAuthResponse generateAuthData(String eventCode, String userKey) {
     try {
@@ -233,14 +236,22 @@ public class KcpAuthService {
                 di: "%s"
             };
 
-            if (window.opener) {
-                window.opener.postMessage({
+            var targetWindow = window.opener;
+            while (targetWindow && targetWindow.opener) {
+                targetWindow = targetWindow.opener;
+            }
+
+            if (targetWindow) {
+                targetWindow.postMessage({
                     type: 'KCP_AUTH_RESULT',
                     data: resultData
-                }, '*');
+                }, '%s');
             }
 
             setTimeout(function() {
+                if (window.opener) {
+                    try { window.opener.close(); } catch(e) {}
+                }
                 window.close();
             }, 500);
         </script>
@@ -253,7 +264,8 @@ public class KcpAuthService {
         escapeForJs(birthDay),
         escapeForJs(sexCode),
         escapeForJs(ci),
-        escapeForJs(di));
+        escapeForJs(di),
+        escapeForJs(frontendOrigin));
   }
 
   private String generateErrorHtml(String message) {
@@ -265,14 +277,22 @@ public class KcpAuthService {
         <head><meta charset="UTF-8"><title>인증 실패</title></head>
         <body>
         <script>
-            if (window.opener) {
-                window.opener.postMessage({
+            var targetWindow = window.opener;
+            while (targetWindow && targetWindow.opener) {
+                targetWindow = targetWindow.opener;
+            }
+
+            if (targetWindow) {
+                targetWindow.postMessage({
                     type: 'KCP_AUTH_RESULT',
                     data: { success: false, message: "%s" }
-                }, '*');
+                }, '%s');
             }
 
             setTimeout(function() {
+                if (window.opener) {
+                    try { window.opener.close(); } catch(e) {}
+                }
                 window.close();
             }, 2000);
         </script>
@@ -281,7 +301,7 @@ public class KcpAuthService {
         </body>
         </html>
         """,
-        escaped, HtmlUtils.htmlEscape(message == null ? "" : message));
+        escaped, escapeForJs(frontendOrigin), HtmlUtils.htmlEscape(message == null ? "" : message));
   }
 
   /** JavaScript 문자열 및 HTML 이스케이프 */

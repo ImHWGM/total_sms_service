@@ -8,6 +8,7 @@ import kr.wisead.security.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -116,6 +117,16 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(PUBLIC_ENDPOINTS)
                     .permitAll()
+                    // 인증된 사용자면 접근 가능 (내부 비즈니스 로직에서 권한별 분기)
+                    .requestMatchers("/api/admin/selectable-user-ids")
+                    .authenticated()
+                    .requestMatchers("/api/admin/level")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/admin/logs/phone-masking")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/admin/logs/download")
+                    .authenticated()
+                    // 나머지 관리자 API는 ADMIN 역할 필요
                     .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
                     .anyRequest()

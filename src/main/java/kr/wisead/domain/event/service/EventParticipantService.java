@@ -97,6 +97,58 @@ public class EventParticipantService {
     return OnsiteRegistrationResponse.from(saved, cleanPhone, attendTime).withQrCodeUrl(wiseadUrl);
   }
 
+  /** 참가자 인증 (이름 + 연락처로 조회) */
+  @Transactional(readOnly = true)
+  public VerifyParticipantResponse verifyParticipant(
+      String eventCode, VerifyParticipantRequest request) {
+    // 1. eventCode로 이벤트 조회
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventCode(eventCode)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "존재하지 않는 행사입니다."));
+
+    // 2. SQL에서 이름으로 1차 필터링 (대규모 행사 성능 최적화)
+    List<EventParticipant> candidates =
+        participantMapper.selectByEventSeqAndUserName(event.getEventSeq(), request.getName());
+
+    if (candidates.isEmpty()) {
+      return VerifyParticipantResponse.notVerified();
+    }
+
+    // 3. Java에서 전화번호 복호화 후 비교 (2차 필터링)
+    String requestPhone = request.getPhone().replace("-", "");
+
+    for (EventParticipant candidate : candidates) {
+      String decryptedPhone = decryptPhone(candidate.getUserPhone());
+      if (decryptedPhone != null) {
+        String cleanDecryptedPhone = decryptedPhone.replace("-", "");
+        if (requestPhone.equals(cleanDecryptedPhone)) {
+          // 일치하는 참가자 발견
+          String qrCodeUrl = wiseadUrl + "/event/check/" + candidate.getCheckCode();
+
+          VerifyParticipantResponse.ParticipantInfo info =
+              VerifyParticipantResponse.ParticipantInfo.builder()
+                  .seq(candidate.getSeq())
+                  .name(candidate.getUserName())
+                  .phone(requestPhone)
+                  .department(candidate.getDepartment())
+                  .position(candidate.getPosition())
+                  .participantType(candidate.getParticipantType())
+                  .checkCode(candidate.getCheckCode())
+                  .eventName(candidate.getEventName())
+                  .qrCodeUrl(qrCodeUrl)
+                  .build();
+
+          return VerifyParticipantResponse.verified(info);
+        }
+      }
+    }
+
+    // 일치하는 참가자 없음
+    return VerifyParticipantResponse.notVerified();
+  }
+
   /** 참가자 등록 */
   @Transactional
   public EventParticipantResponse createParticipant(EventParticipantRequest request, String regId) {

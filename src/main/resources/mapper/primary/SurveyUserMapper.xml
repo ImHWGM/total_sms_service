@@ -148,6 +148,16 @@
         )
     </insert>
 
+    <!-- 참여자 등록 (이름/이메일 포함 - 현장등록용) -->
+    <insert id="insertForParticipant" parameterType="kr.wisead.domain.survey.entity.SurveyUser"
+            useGeneratedKeys="true" keyProperty="seq" keyColumn="SEQ">
+        INSERT INTO SURVEY_USER (
+            EVENT_SEQ, USER_KEY, USER_NAME, USER_PHONE, USER_EMAIL, DEL_YN, REG_ID, REG_DATE
+        ) VALUES (
+            #{eventSeq}, #{userKey}, #{userName}, #{userPhone}, #{userEmail}, 'N', #{regId}, NOW()
+        )
+    </insert>
+
     <!-- 설문 제출 -->
     <update id="updateSubmission" parameterType="kr.wisead.domain.survey.entity.SurveyUser">
         UPDATE SURVEY_USER

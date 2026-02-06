@@ -255,6 +255,19 @@
         AND T.ACTION_CODE = 'CHECK_IN'
     </select>
 
+    <!-- 이벤트 + 이름 + 암호화된 전화번호로 중복 체크 -->
+    <select id="existsByEventSeqAndNameAndPhone" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM EVENT_PARTICIPANT P
+            INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+            WHERE P.EVENT_SEQ = #{eventSeq}
+            AND U.USER_NAME = #{userName}
+            AND U.USER_PHONE = #{encryptedPhone}
+            AND U.DEL_YN = 'N'
+        )
+    </select>
+
     <!-- 엑셀용 전체 참가자 목록 (액션 현황 포함) -->
     <select id="selectAllForExcel" resultType="kr.wisead.domain.event.entity.EventParticipant">
         SELECT

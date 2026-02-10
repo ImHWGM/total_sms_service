@@ -51,6 +51,12 @@ public class FileStorageService {
   private static final List<String> ALLOWED_DOC_EXTENSIONS =
       Arrays.asList("pdf", "doc", "docx", "xls", "xlsx", "hwp");
 
+  // 설문 응답 파일 허용 확장자 (이미지 + 문서 + 압축)
+  private static final List<String> ALLOWED_SURVEY_ANSWER_EXTENSIONS =
+      Arrays.asList(
+          "jpg", "jpeg", "png", "gif", "bmp", "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx",
+          "hwp", "zip", "alz", "7z");
+
   /** MMS 파일 저장 */
   public String storeMmsFile(MultipartFile file) {
     validateFile(file);
@@ -164,6 +170,35 @@ public class FileStorageService {
     String fileName = "End" + extension;
     saveFile(file, targetLocation, fileName);
     return buildSurveyImageUrl(directoryId, fileName);
+  }
+
+  /**
+   * 설문 응답 파일 저장 (이미지 + 문서 + 압축 파일 허용)
+   *
+   * @param file 업로드 파일
+   * @param eventSeq 설문 이벤트 시퀀스
+   * @param questionSeq 문항 시퀀스
+   * @return 웹 접근 가능한 URL (예: /survey/181/answers/3/20260210_143052_a1b2c3.pdf)
+   */
+  public String storeSurveyAnswerFile(MultipartFile file, int eventSeq, int questionSeq) {
+    validateFile(file);
+    validateSurveyAnswerExtension(file);
+
+    String extension = getExtension(file.getOriginalFilename());
+    String timestamp =
+        java.time.LocalDateTime.now()
+            .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+    String uuid = UUID.randomUUID().toString().substring(0, 6);
+    String fileName = timestamp + "_" + uuid + extension;
+
+    Path targetLocation =
+        Paths.get(
+                surveyImgFilePath, String.valueOf(eventSeq), "answers", String.valueOf(questionSeq))
+            .toAbsolutePath()
+            .normalize();
+
+    saveFile(file, targetLocation, fileName);
+    return "/survey/" + eventSeq + "/answers/" + questionSeq + "/" + fileName;
   }
 
   /**
@@ -400,6 +435,15 @@ public class FileStorageService {
       throw new BusinessException(
           ErrorCode.INVALID_FILE_TYPE,
           "허용되지 않은 이미지 형식입니다. (허용: " + String.join(", ", ALLOWED_IMAGE_EXTENSIONS) + ")");
+    }
+  }
+
+  private void validateSurveyAnswerExtension(MultipartFile file) {
+    String extension = StringUtils.getFilenameExtension(file.getOriginalFilename());
+    if (extension == null || !ALLOWED_SURVEY_ANSWER_EXTENSIONS.contains(extension.toLowerCase())) {
+      throw new BusinessException(
+          ErrorCode.INVALID_FILE_TYPE,
+          "허용되지 않은 파일 형식입니다. (허용: " + String.join(", ", ALLOWED_SURVEY_ANSWER_EXTENSIONS) + ")");
     }
   }
 

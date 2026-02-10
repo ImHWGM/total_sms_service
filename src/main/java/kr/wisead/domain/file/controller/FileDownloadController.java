@@ -86,6 +86,24 @@ public class FileDownloadController {
     return serveFile(surveyFileStorageLocation, folder, fileName);
   }
 
+  /** 설문 응답 파일 다운로드/서빙 */
+  @GetMapping({
+    "/survey/{eventSeq}/answers/{questionSeq}/{fileName:.+}",
+    "/files/survey/{eventSeq}/answers/{questionSeq}/{fileName:.+}"
+  })
+  public ResponseEntity<Resource> serveSurveyAnswerFile(
+      @PathVariable String eventSeq,
+      @PathVariable String questionSeq,
+      @PathVariable String fileName)
+      throws Exception {
+    Path filePath =
+        validateAndResolvePath(
+            surveyFileStorageLocation, eventSeq, "answers", questionSeq, fileName);
+    String contentType = getContentType(filePath, DEFAULT_CONTENT_TYPE);
+    String disposition = contentType.startsWith("image/") ? "inline" : "attachment";
+    return buildFileResponse(filePath, fileName, disposition, contentType);
+  }
+
   /** 템플릿 이미지 다운로드/서빙 */
   @GetMapping({"/files/template/{folder}/{fileName:.+}", "/template/{folder}/{fileName:.+}"})
   public ResponseEntity<Resource> serveTemplateFile(

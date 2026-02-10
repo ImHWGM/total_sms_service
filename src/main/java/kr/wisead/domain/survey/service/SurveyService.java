@@ -189,7 +189,11 @@ public class SurveyService {
           // 파일 업로드
           answer =
               SurveyAnswer.createFileUpload(
-                  eventSeq, answerReq.getQuestionSeq(), user.getSeq(), answerReq.getFilePath());
+                  eventSeq,
+                  answerReq.getQuestionSeq(),
+                  user.getSeq(),
+                  answerReq.getItemSeq(),
+                  answerReq.getFilePath());
         } else if ("MC".equals(answerReq.getQuestionType())) {
           // 객관식
           answer =
@@ -205,7 +209,12 @@ public class SurveyService {
           // 주관식
           answer =
               SurveyAnswer.createShortAnswer(
-                  eventSeq, answerReq.getQuestionSeq(), user.getSeq(), answerReq.getAnswer());
+                  eventSeq,
+                  answerReq.getQuestionSeq(),
+                  user.getSeq(),
+                  answerReq.getItemSeq(),
+                  answerReq.getQuestionTypeDetail(),
+                  answerReq.getAnswer());
         }
 
         surveyAnswerMapper.insert(answer);

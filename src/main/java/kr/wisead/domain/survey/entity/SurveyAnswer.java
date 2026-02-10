@@ -43,24 +43,31 @@ public class SurveyAnswer {
 
   /** 주관식 답변 생성 */
   public static SurveyAnswer createShortAnswer(
-      Integer eventSeq, Integer questionSeq, Integer userSeq, String answer) {
+      Integer eventSeq,
+      Integer questionSeq,
+      Integer userSeq,
+      Integer itemSeq,
+      String questionTypeDetail,
+      String answer) {
     return SurveyAnswer.builder()
         .eventSeq(eventSeq)
         .questionSeq(questionSeq)
         .userSeq(userSeq)
+        .itemSeq(itemSeq)
         .questionType("SA")
-        .questionTypeDetail("SA")
+        .questionTypeDetail(questionTypeDetail)
         .answer(answer)
         .build();
   }
 
   /** 파일 업로드 답변 생성 */
   public static SurveyAnswer createFileUpload(
-      Integer eventSeq, Integer questionSeq, Integer userSeq, String filePath) {
+      Integer eventSeq, Integer questionSeq, Integer userSeq, Integer itemSeq, String filePath) {
     return SurveyAnswer.builder()
         .eventSeq(eventSeq)
         .questionSeq(questionSeq)
         .userSeq(userSeq)
+        .itemSeq(itemSeq)
         .questionType("SA")
         .questionTypeDetail("FE")
         .filePath(filePath)

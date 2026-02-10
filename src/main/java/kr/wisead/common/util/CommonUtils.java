@@ -231,4 +231,14 @@ public class CommonUtils {
     }
     return result.toString();
   }
+
+  /** 외국인 ID 마스킹 (Passport No./TIN) */
+  public static String maskingForeignId(String strOrg) {
+    String str = replaceNull(strOrg, "");
+    if (isNullOrEmpty(str)) return str;
+    if (str.length() <= 4) {
+      return str.substring(0, 1) + "***";
+    }
+    return str.substring(0, 2) + "*".repeat(str.length() - 4) + str.substring(str.length() - 2);
+  }
 }

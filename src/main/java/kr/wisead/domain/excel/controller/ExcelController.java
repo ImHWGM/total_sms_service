@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import kr.wisead.common.response.ApiResponse;
+import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.ActionLogService;
@@ -681,7 +682,12 @@ public class ExcelController {
     if (juminNum == null) return null;
     try {
       String decrypted = CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(juminNum.toString()));
-      if (decrypted != null && decrypted.length() >= 13) {
+      if (decrypted == null) return null;
+      // 외국인 ID인 경우 (FOREIGN: 접두사)
+      if (decrypted.startsWith("FOREIGN:")) {
+        return CommonUtils.maskingForeignId(decrypted.substring("FOREIGN:".length()));
+      }
+      if (decrypted.length() >= 13) {
         // 뒷자리 마스킹
         return decrypted.substring(0, 7) + "******";
       }

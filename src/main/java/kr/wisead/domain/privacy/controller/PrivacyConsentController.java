@@ -34,6 +34,7 @@ public class PrivacyConsentController {
       @PathVariable int userSeq,
       @PathVariable int eventSeq,
       @RequestParam(value = "includeSignature", defaultValue = "true") boolean includeSignature,
+      @RequestParam(value = "language", defaultValue = "ko") String language,
       @RequestHeader("Authorization") String token) {
 
     String requestUserId = jwtTokenProvider.getUserId(extractToken(token));
@@ -47,7 +48,8 @@ public class PrivacyConsentController {
           includeSignature);
 
       byte[] pdfContent =
-          privacyConsentPdfService.generatePrivacyConsentPdf(userSeq, eventSeq, includeSignature);
+          privacyConsentPdfService.generatePrivacyConsentPdf(
+              userSeq, eventSeq, includeSignature, language);
 
       log.info(
           "개인정보제공동의서 PDF 다운로드 성공 - 요청자: {}, eventSeq: {}, userSeq: {}, PDF 크기: {} bytes",
@@ -97,6 +99,7 @@ public class PrivacyConsentController {
   public ResponseEntity<byte[]> downloadEventPrivacyConsentZip(
       @PathVariable int eventSeq,
       @RequestParam(value = "includeSignature", defaultValue = "true") boolean includeSignature,
+      @RequestParam(value = "language", defaultValue = "ko") String language,
       @RequestHeader("Authorization") String token) {
 
     String requestUserId = jwtTokenProvider.getUserId(extractToken(token));
@@ -109,7 +112,8 @@ public class PrivacyConsentController {
           includeSignature);
 
       byte[] zipContent =
-          privacyConsentPdfService.generatePrivacyConsentPdfZip(eventSeq, includeSignature);
+          privacyConsentPdfService.generatePrivacyConsentPdfZip(
+              eventSeq, includeSignature, language);
 
       log.info(
           "개인정보제공동의서 ZIP 다운로드 성공 - 요청자: {}, eventSeq: {}, ZIP 크기: {} bytes",
@@ -155,8 +159,10 @@ public class PrivacyConsentController {
     try {
       log.info("개인정보제공동의서 미리보기 생성 시작 - 요청자: {}, 제목: {}", requestUserId, previewTitle);
 
+      String language = request.getLanguage() != null ? request.getLanguage() : "ko";
       byte[] pdfContent =
-          privacyConsentPdfService.generatePreviewPdf(request.getTitle(), request.getContent());
+          privacyConsentPdfService.generatePreviewPdf(
+              request.getTitle(), request.getContent(), language);
 
       log.info(
           "개인정보제공동의서 미리보기 생성 성공 - 요청자: {}, 제목: {}, PDF 크기: {} bytes",

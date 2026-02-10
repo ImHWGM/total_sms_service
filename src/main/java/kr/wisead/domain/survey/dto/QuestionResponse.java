@@ -18,6 +18,7 @@ public class QuestionResponse {
   private String question; // 문항 내용
   private String questionImg; // 문항 이미지
   private Integer order; // 순서
+  private String foreignAllow; // 외국인 허용 여부
 
   // 객관식 문항의 보기 목록
   private List<ItemResponse> items;
@@ -35,6 +36,7 @@ public class QuestionResponse {
         .question(entity.getQuestion())
         .questionImg(entity.getQuestionImg())
         .order(entity.getOrder())
+        .foreignAllow(entity.getForeignAllow())
         .build();
   }
 

@@ -49,6 +49,14 @@ public class PrivacyConsentPdfService {
   private static final String CONSENT_METHOD_NOTICE = "※ 동의 방식: 온라인 설문 참여 시 체크박스를 통한 동의";
   private static final String AGREE_CHECKBOX_TEXT = "위 개인정보 수집ㆍ이용 안내를 확인하였습니다.       확인함 ☑";
 
+  // English constants
+  private static final String PDF_TITLE_EN =
+      "Consent for Collection and Use of Personal Information";
+  private static final String CONSENT_METHOD_NOTICE_EN =
+      "* Consent method: Consent via checkbox during online survey participation";
+  private static final String AGREE_CHECKBOX_TEXT_EN =
+      "I have read and agree to the above.       Agreed V";
+
   // PDF 설정 상수
   private static final float PAGE_WIDTH = PDRectangle.A4.getWidth();
   private static final float PAGE_HEIGHT = PDRectangle.A4.getHeight();
@@ -63,10 +71,42 @@ public class PrivacyConsentPdfService {
   private final SurveyQuestionMapper surveyQuestionMapper;
   private final SurveyUserMapper surveyUserMapper;
 
+  private String getTitle(String language) {
+    return "en".equals(language) ? PDF_TITLE_EN : PDF_TITLE;
+  }
+
+  private String getConsentMethodNotice(String language) {
+    return "en".equals(language) ? CONSENT_METHOD_NOTICE_EN : CONSENT_METHOD_NOTICE;
+  }
+
+  private String getConsentDatePrefix(String language) {
+    return "en".equals(language) ? "Date of Consent :   " : "동의일시 :   ";
+  }
+
+  private String getConsenterPrefix(String language) {
+    return "en".equals(language) ? "Consenter   :   " : "동의자   :   ";
+  }
+
+  private String getSignatureSuffix(String language) {
+    return "en".equals(language) ? "      (Signature)" : "      (서명)";
+  }
+
+  private String getSignatureNotice(String language) {
+    return "en".equals(language)
+        ? "* This name is digitally processed information, not an actual signature."
+        : "※ 본 성명은 전산 처리된 정보이며 실제 서명이 아닙니다.";
+  }
+
+  private String getPreviewNotice(String language) {
+    return "en".equals(language)
+        ? "* This document is a preview and does not contain an actual signature."
+        : "※ 본 문서는 미리보기용으로 실제 서명이 아닙니다.";
+  }
+
   /** 단건 개인정보제공동의서 PDF 생성 */
   @Transactional(readOnly = true)
-  public byte[] generatePrivacyConsentPdf(int userSeq, int eventSeq, boolean includeSignature)
-      throws Exception {
+  public byte[] generatePrivacyConsentPdf(
+      int userSeq, int eventSeq, boolean includeSignature, String language) throws Exception {
     SurveyMaster event =
         surveyMasterMapper
             .selectByEventSeq(eventSeq)
@@ -102,13 +142,13 @@ public class PrivacyConsentPdfService {
     // 동의서에 표시할 이름 결정 (이름을 수집한 경우 이름, 아니면 전화번호 뒷자리)
     String displayName = destroyedResult.getDisplayName();
 
-    return createPdf(event, user, displayName, includeSignature);
+    return createPdf(event, user, displayName, includeSignature, language);
   }
 
   /** 다건 개인정보제공동의서 PDF.zip 생성 */
   @Transactional(readOnly = true)
-  public byte[] generatePrivacyConsentPdfZip(int eventSeq, boolean includeSignature)
-      throws Exception {
+  public byte[] generatePrivacyConsentPdfZip(
+      int eventSeq, boolean includeSignature, String language) throws Exception {
     SurveyMaster event =
         surveyMasterMapper
             .selectByEventSeq(eventSeq)
@@ -152,7 +192,7 @@ public class PrivacyConsentPdfService {
         String displayName = destroyedResult.getDisplayName();
 
         try {
-          byte[] pdfContent = createPdf(event, user, displayName, includeSignature);
+          byte[] pdfContent = createPdf(event, user, displayName, includeSignature, language);
           String fileName = String.format("개인정보제공동의서_%s.pdf", displayName);
 
           ZipEntry entry = new ZipEntry(fileName);
@@ -166,16 +206,29 @@ public class PrivacyConsentPdfService {
       }
 
       if (destroyedDataCount > 0) {
-        String infoContent =
-            String.format(
-                "개인정보제공동의서 다운로드 안내\n\n"
-                    + "전체 참여자 수: %d명\n"
-                    + "생성된 동의서: %d개\n"
-                    + "개인정보 파기 데이터: %d개\n\n"
-                    + "※ 개인정보 보관기간이 지나 파기된 데이터는 동의서를 생성할 수 없습니다.",
-                totalUsers, generatedPdfCount, destroyedDataCount);
+        String infoContent;
+        if ("en".equals(language)) {
+          infoContent =
+              String.format(
+                  "Privacy Consent Download Information\n\n"
+                      + "Total participants: %d\n"
+                      + "Generated consent forms: %d\n"
+                      + "Destroyed personal data: %d\n\n"
+                      + "* Consent forms cannot be generated for data whose retention period has"
+                      + " expired.",
+                  totalUsers, generatedPdfCount, destroyedDataCount);
+        } else {
+          infoContent =
+              String.format(
+                  "개인정보제공동의서 다운로드 안내\n\n"
+                      + "전체 참여자 수: %d명\n"
+                      + "생성된 동의서: %d개\n"
+                      + "개인정보 파기 데이터: %d개\n\n"
+                      + "※ 개인정보 보관기간이 지나 파기된 데이터는 동의서를 생성할 수 없습니다.",
+                  totalUsers, generatedPdfCount, destroyedDataCount);
+        }
 
-        ZipEntry infoEntry = new ZipEntry("안내사항.txt");
+        ZipEntry infoEntry = new ZipEntry("en".equals(language) ? "Notice.txt" : "안내사항.txt");
         zos.putNextEntry(infoEntry);
         zos.write(infoContent.getBytes("UTF-8"));
         zos.closeEntry();
@@ -214,7 +267,7 @@ public class PrivacyConsentPdfService {
   }
 
   /** 미리보기용 개인정보제공동의서 PDF 생성 */
-  public byte[] generatePreviewPdf(String title, String content) throws Exception {
+  public byte[] generatePreviewPdf(String title, String content, String language) throws Exception {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
     try (PDDocument document = new PDDocument()) {
@@ -228,12 +281,13 @@ public class PrivacyConsentPdfService {
 
       try {
         // 제목
-        float titleWidth = getStringWidth(PDF_TITLE, fonts.getBoldFont(), TITLE_FONT_SIZE);
+        String pdfTitle = getTitle(language);
+        float titleWidth = getStringWidth(pdfTitle, fonts.getBoldFont(), TITLE_FONT_SIZE);
         float titleX = (PAGE_WIDTH - titleWidth) / 2;
         contentStream.beginText();
         contentStream.setFont(fonts.getBoldFont(), TITLE_FONT_SIZE);
         contentStream.newLineAtOffset(titleX, yPosition);
-        contentStream.showText(ensureSafeText(PDF_TITLE, fonts.getBoldFont()));
+        contentStream.showText(ensureSafeText(pdfTitle, fonts.getBoldFont()));
         contentStream.endText();
         yPosition -= LINE_HEIGHT;
 
@@ -270,22 +324,24 @@ public class PrivacyConsentPdfService {
         yPosition -= LINE_HEIGHT;
 
         // 동의 확인 문구
-        writeAgreeCheckboxText(contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition);
+        writeAgreeCheckboxText(contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language);
         yPosition -= LINE_HEIGHT;
 
         // 동의 방식 안내 문구
+        String consentMethodNotice = getConsentMethodNotice(language);
         float noticeWidth =
-            getStringWidth(CONSENT_METHOD_NOTICE, fonts.getRegularFont(), SMALL_FONT_SIZE);
+            getStringWidth(consentMethodNotice, fonts.getRegularFont(), SMALL_FONT_SIZE);
         float noticeX = (PAGE_WIDTH - noticeWidth) / 2;
         contentStream.beginText();
         contentStream.setFont(fonts.getRegularFont(), SMALL_FONT_SIZE);
         contentStream.newLineAtOffset(noticeX, yPosition);
-        contentStream.showText(ensureSafeText(CONSENT_METHOD_NOTICE, fonts.getRegularFont()));
+        contentStream.showText(ensureSafeText(consentMethodNotice, fonts.getRegularFont()));
         contentStream.endText();
         yPosition -= LINE_HEIGHT * 2;
 
         // 날짜 및 이름
-        SimpleDateFormat sdf = new SimpleDateFormat("동의일시 :   yyyy. MM. dd.      HH:mm:ss");
+        SimpleDateFormat sdf =
+            new SimpleDateFormat(getConsentDatePrefix(language) + "yyyy. MM. dd.      HH:mm:ss");
         String consentDate = sdf.format(new Date());
         float dateWidth = getStringWidth(consentDate, fonts.getRegularFont(), FONT_SIZE);
         float dateX = PAGE_WIDTH - MARGIN - dateWidth;
@@ -296,7 +352,7 @@ public class PrivacyConsentPdfService {
         contentStream.endText();
         yPosition -= LINE_HEIGHT;
 
-        String nameText = "동의자   :   OOO";
+        String nameText = getConsenterPrefix(language) + "OOO";
         float nameWidth = getStringWidth(nameText, fonts.getRegularFont(), FONT_SIZE);
         float nameX = PAGE_WIDTH - MARGIN - nameWidth;
         contentStream.beginText();
@@ -307,7 +363,7 @@ public class PrivacyConsentPdfService {
         yPosition -= LINE_HEIGHT;
 
         // 미리보기 안내 문구
-        String previewNotice = "※ 본 문서는 미리보기용으로 실제 서명이 아닙니다.";
+        String previewNotice = getPreviewNotice(language);
         float previewNoticeWidth =
             getStringWidth(previewNotice, fonts.getRegularFont(), SMALL_FONT_SIZE);
         float previewNoticeX = PAGE_WIDTH - MARGIN - previewNoticeWidth;
@@ -331,7 +387,11 @@ public class PrivacyConsentPdfService {
   // ==================== Private Methods ====================
 
   private byte[] createPdf(
-      SurveyMaster event, SurveyUser user, String decryptedName, boolean includeSignature)
+      SurveyMaster event,
+      SurveyUser user,
+      String decryptedName,
+      boolean includeSignature,
+      String language)
       throws Exception {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -346,12 +406,13 @@ public class PrivacyConsentPdfService {
 
       try {
         // 제목 (중앙 정렬)
-        float titleWidth = getStringWidth(PDF_TITLE, fonts.getBoldFont(), TITLE_FONT_SIZE);
+        String pdfTitle = getTitle(language);
+        float titleWidth = getStringWidth(pdfTitle, fonts.getBoldFont(), TITLE_FONT_SIZE);
         float titleX = (PAGE_WIDTH - titleWidth) / 2;
         contentStream.beginText();
         contentStream.setFont(fonts.getBoldFont(), TITLE_FONT_SIZE);
         contentStream.newLineAtOffset(titleX, yPosition);
-        contentStream.showText(ensureSafeText(PDF_TITLE, fonts.getBoldFont()));
+        contentStream.showText(ensureSafeText(pdfTitle, fonts.getBoldFont()));
         contentStream.endText();
         yPosition -= LINE_HEIGHT;
 
@@ -397,24 +458,26 @@ public class PrivacyConsentPdfService {
         }
 
         // 동의 체크박스 출력
-        writeAgreeCheckboxText(contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition);
+        writeAgreeCheckboxText(contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language);
         yPosition -= LINE_HEIGHT;
 
         // 서명 없는 버전일 때 동의 방식 안내 문구
         if (!includeSignature) {
+          String consentMethodNotice = getConsentMethodNotice(language);
           float noticeWidth =
-              getStringWidth(CONSENT_METHOD_NOTICE, fonts.getRegularFont(), SMALL_FONT_SIZE);
+              getStringWidth(consentMethodNotice, fonts.getRegularFont(), SMALL_FONT_SIZE);
           float noticeX = (PAGE_WIDTH - noticeWidth) / 2;
           contentStream.beginText();
           contentStream.setFont(fonts.getRegularFont(), SMALL_FONT_SIZE);
           contentStream.newLineAtOffset(noticeX, yPosition);
-          contentStream.showText(ensureSafeText(CONSENT_METHOD_NOTICE, fonts.getRegularFont()));
+          contentStream.showText(ensureSafeText(consentMethodNotice, fonts.getRegularFont()));
           contentStream.endText();
           yPosition -= LINE_HEIGHT * 2;
         }
 
         // 서명란
-        SimpleDateFormat sdf = new SimpleDateFormat("동의일시 :   yyyy. MM. dd.      HH:mm:ss");
+        SimpleDateFormat sdf =
+            new SimpleDateFormat(getConsentDatePrefix(language) + "yyyy. MM. dd.      HH:mm:ss");
         String consentDate;
         if (user.getSurveyStartTime() != null) {
           consentDate = sdf.format(java.sql.Timestamp.valueOf(user.getSurveyStartTime()));
@@ -446,8 +509,8 @@ public class PrivacyConsentPdfService {
         // 이름
         String nameSignatureText =
             includeSignature
-                ? "동의자   :   " + decryptedName + "      (서명)"
-                : "동의자   :   " + decryptedName;
+                ? getConsenterPrefix(language) + decryptedName + getSignatureSuffix(language)
+                : getConsenterPrefix(language) + decryptedName;
         float nameSignatureWidth =
             getStringWidth(nameSignatureText, fonts.getRegularFont(), FONT_SIZE);
         float nameSignatureX = PAGE_WIDTH - MARGIN - nameSignatureWidth;
@@ -484,7 +547,7 @@ public class PrivacyConsentPdfService {
 
           // 서명 안내 문구
           yPosition -= LINE_HEIGHT;
-          String signatureNotice = "※ 본 성명은 전산 처리된 정보이며 실제 서명이 아닙니다.";
+          String signatureNotice = getSignatureNotice(language);
           float signatureNoticeWidth =
               getStringWidth(signatureNotice, fonts.getRegularFont(), SMALL_FONT_SIZE);
           float signatureNoticeX = PAGE_WIDTH - MARGIN - signatureNoticeWidth;
@@ -574,9 +637,13 @@ public class PrivacyConsentPdfService {
       FontSet fonts,
       float fontSize,
       float pageWidth,
-      float yPosition)
+      float yPosition,
+      String language)
       throws IOException {
-    String textBeforeCheckbox = "위 개인정보 수집ㆍ이용 안내를 확인하였습니다.       확인함 ";
+    String textBeforeCheckbox =
+        "en".equals(language)
+            ? "I have read and agree to the above.       Agreed "
+            : "위 개인정보 수집ㆍ이용 안내를 확인하였습니다.       확인함 ";
     String checkboxChar = "V";
 
     String safeTextBefore = ensureSafeText(textBeforeCheckbox, fonts.getBoldFont());

@@ -58,6 +58,7 @@ public class SecurityConfig {
 
     // 문의 등록 (비로그인 허용)
     "/api/inquiry",
+    "/api/file/survey/answer", // 설문 응답 파일 업로드 (비로그인)
 
     // ARS 수신거부 (외부 ARS 시스템 호출)
     "/ars/**",

@@ -162,6 +162,24 @@ public class FileUploadController {
     return ApiResponse.success(response);
   }
 
+  /** 설문 응답 파일 업로드 (비로그인 허용) */
+  @PostMapping("/survey/answer")
+  public ApiResponse<FileUploadResponse> uploadSurveyAnswerFile(
+      @RequestParam("eventSeq") int eventSeq,
+      @RequestParam("questionSeq") int questionSeq,
+      @RequestParam("file") MultipartFile file) {
+    String filePath = fileStorageService.storeSurveyAnswerFile(file, eventSeq, questionSeq);
+    FileUploadResponse response =
+        FileUploadResponse.builder()
+            .success(true)
+            .message("설문 응답 파일 업로드가 완료되었습니다.")
+            .filePath(filePath)
+            .originalFileName(file.getOriginalFilename())
+            .fileSize(file.getSize())
+            .build();
+    return ApiResponse.success(response);
+  }
+
   /** 디렉토리 ID 결정 - eventSeq가 있으면 eventSeq 사용 - eventSeq가 없으면 tempId 사용 - 둘 다 없으면 UUID 생성 */
   private String resolveDirectoryId(Integer eventSeq, String tempId) {
     if (eventSeq != null && eventSeq > 0) {

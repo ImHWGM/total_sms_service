@@ -2,8 +2,11 @@ package kr.wisead.domain.message.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
@@ -463,6 +466,9 @@ public class MessageSendService {
    * @param text 내용 (useOriginal=false일 때 사용, #유저키# 치환됨)
    * @param callback 발신번호
    * @param useOriginal true: 이전 발송 내용 그대로, false: 새 내용으로 발송
+   * @param reqType 발송 타입 ("0": 즉시, "1": 예약)
+   * @param reqDate 예약 발송일시 (yyyyMMddHHmmss 또는 yyyy-MM-dd HH:mm:ss)
+   * @param useUrlYn 이전 메시지 URL 추출 사용 여부 ("Y": 추출, "N": 처리 없음, null: 기존 동작)
    * @param regId 등록자 ID
    * @return mseq
    */
@@ -473,6 +479,9 @@ public class MessageSendService {
       String text,
       String callback,
       boolean useOriginal,
+      String reqType,
+      String reqDate,
+      String useUrlYn,
       String regId) {
     // SURVEY_USER에서 사용자 정보 조회
     SurveyUser surveyUser =
@@ -516,20 +525,41 @@ public class MessageSendService {
       finalCallback = callback != null ? callback : previous.getCallback();
       log.info("이전 발송 내용으로 재발송 - userSeq: {}, subject: {}", userSeq, finalSubject);
     } else {
-      // 새 내용으로 발송 (설문 링크 생성)
-      if (userKey == null || userKey.isEmpty()) {
-        throw new BusinessException(ErrorCode.INVALID_INPUT, "userKey가 존재하지 않습니다.");
+      // 새 내용으로 발송
+      if ("Y".equalsIgnoreCase(useUrlYn)) {
+        // useUrlYn=Y: 이전 메시지에서 URL 추출하여 #유저키# 위치에 삽입
+        List<String> tables = getResultTableNames(eventSeq);
+        MsgResult previous = msgResultMapper.selectPreviousSend(tables, eventSeq, userSeq);
+
+        if (previous == null) {
+          throw new BusinessException(
+              ErrorCode.RESOURCE_NOT_FOUND, "이전 발송 내역을 찾을 수 없습니다. (URL 추출 불가)");
+        }
+
+        String previousUrl = extractEpopkonUrl(previous.getText());
+        if (previousUrl == null) {
+          throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이전 발송 메시지에서 URL을 찾을 수 없습니다.");
+        }
+
+        finalText = text.replace("#유저키#", previousUrl).replace("#userKey#", previousUrl);
+        log.info("이전 URL 추출 재발송 - userSeq: {}, url: {}", userSeq, previousUrl);
+      } else if ("N".equalsIgnoreCase(useUrlYn)) {
+        // useUrlYn=N: URL 처리 없이 텍스트 그대로 발송
+        finalText = text;
+        log.info("URL 미사용 재발송 - userSeq: {}", userSeq);
+      } else {
+        // useUrlYn 미지정 (기존 동작): #유저키# → userKey 치환 + URL 단축
+        if (userKey == null || userKey.isEmpty()) {
+          throw new BusinessException(ErrorCode.INVALID_INPUT, "userKey가 존재하지 않습니다.");
+        }
+
+        finalText = text.replace("#유저키#", userKey).replace("#userKey#", userKey);
+        finalText = ShortUrlUtils.shortenUrlsInText(finalText, wiseadUrl);
+        log.info("새 내용으로 재발송 - userSeq: {}, userKey: {}", userSeq, userKey);
       }
-
-      // #유저키#, #userKey#를 userKey 값만으로 치환 (전체 URL이 아닌 userKey만)
-      finalText = text.replace("#유저키#", userKey).replace("#userKey#", userKey);
-
-      // URL 패턴을 찾아서 단축 URL로 변환
-      finalText = ShortUrlUtils.shortenUrlsInText(finalText, wiseadUrl);
 
       finalSubject = subject;
       finalCallback = callback;
-      log.info("새 내용으로 재발송 - userSeq: {}, userKey: {}", userSeq, userKey);
     }
 
     // MSG_QUEUE에 등록 (재발송은 별도 결제 없이 진행되므로 txGroupId = null)
@@ -546,6 +576,16 @@ public class MessageSendService {
             null, // txGroupId: 재발송은 별도 결제 없음
             realUserId);
 
+    // 예약 발송 처리
+    if ("1".equals(reqType) || "reserve".equalsIgnoreCase(reqType)) {
+      if (reqDate == null || reqDate.isBlank()) {
+        throw new BusinessException(ErrorCode.INVALID_INPUT, "예약 발송 시 reqDate는 필수입니다.");
+      }
+      LocalDateTime requestTime = parseResendRequestTime(reqDate);
+      msgQueue = msgQueue.withRequestTime(requestTime);
+      log.info("예약 재발송 설정 - userSeq: {}, requestTime: {}", userSeq, requestTime);
+    }
+
     msgQueueMapper.insertLms(msgQueue);
     log.info("설문 재발송 완료 - userSeq: {}, mseq: {}", userSeq, msgQueue.getMseq());
 
@@ -560,6 +600,9 @@ public class MessageSendService {
       String text,
       String callback,
       boolean useOriginal,
+      String reqType,
+      String reqDate,
+      String useUrlYn,
       String regId) {
     int successCount = 0;
     int failCount = 0;
@@ -567,7 +610,8 @@ public class MessageSendService {
 
     for (Integer userSeq : userSeqList) {
       try {
-        resendSurveyMessage(userSeq, subject, text, callback, useOriginal, regId);
+        resendSurveyMessage(
+            userSeq, subject, text, callback, useOriginal, reqType, reqDate, useUrlYn, regId);
         successCount++;
       } catch (Exception e) {
         failCount++;
@@ -704,6 +748,36 @@ public class MessageSendService {
             + now.minusMonths(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM")));
 
     return tables;
+  }
+
+  /** 예약 시간 파싱 - 두 가지 형식 지원 (yyyyMMddHHmmss, yyyy-MM-dd HH:mm:ss) */
+  private LocalDateTime parseResendRequestTime(String reqDate) {
+    try {
+      DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+      return LocalDateTime.parse(reqDate, formatter);
+    } catch (Exception e) {
+      try {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+        return LocalDateTime.parse(reqDate, formatter);
+      } catch (Exception ex) {
+        log.error("재발송 예약 시간 파싱 실패: {}", reqDate);
+        throw new BusinessException(ErrorCode.INVALID_INPUT, "예약 시간 형식이 올바르지 않습니다: " + reqDate);
+      }
+    }
+  }
+
+  /** 텍스트에서 epopkon.com 도메인 URL 추출 (단축 URL 포함) */
+  private String extractEpopkonUrl(String text) {
+    if (text == null || text.isEmpty()) {
+      return null;
+    }
+    Pattern pattern =
+        java.util.regex.Pattern.compile("https?://[\\w.-]*epopkon\\.com[^\\s]*");
+    Matcher matcher = pattern.matcher(text);
+    if (matcher.find()) {
+      return matcher.group();
+    }
+    return null;
   }
 
   /**

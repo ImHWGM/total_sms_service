@@ -111,7 +111,7 @@
         INSERT INTO msg_queue (
             MSG_TYPE, DSTADDR, CALLBACK, STAT, SUBJECT, TEXT,
             INSERT_TIME, REQUEST_TIME, FILECNT, FILELOC1, FILELOC2, FILELOC3,
-            SENDER_CODE, EXT_COL1, EXT_COL2, EXT_COL3
+            SENDER_CODE, EXT_COL0, EXT_COL1, EXT_COL2, EXT_COL3
         ) VALUES (
             #{msgType}, #{dstaddr}, #{callback}, '0',
             <choose>
@@ -124,7 +124,7 @@
                 <otherwise>NOW()</otherwise>
             </choose>,
             IFNULL(#{filecnt}, 0), #{fileloc1}, #{fileloc2}, #{fileloc3},
-            '301200115', #{extCol1}, #{extCol2}, #{extCol3}
+            '301200115', #{extCol0}, #{extCol1}, #{extCol2}, #{extCol3}
         )
     </insert>
 
@@ -134,7 +134,7 @@
         INSERT INTO msg_queue (
             MSG_TYPE, DSTADDR, CALLBACK, STAT, SUBJECT, TEXT,
             INSERT_TIME, REQUEST_TIME, FILECNT, FILELOC1, FILELOC2, FILELOC3,
-            SENDER_CODE, EXT_COL1, EXT_COL2, EXT_COL3
+            SENDER_CODE, EXT_COL0, EXT_COL1, EXT_COL2, EXT_COL3
         ) VALUES (
             #{msgType}, #{dstaddr}, #{callback}, '0', #{subject}, #{text}, NOW(),
             <choose>
@@ -142,7 +142,7 @@
                 <otherwise>NOW()</otherwise>
             </choose>,
             IFNULL(#{filecnt}, 0), #{fileloc1}, #{fileloc2}, #{fileloc3},
-            '301200115', #{extCol1}, #{extCol2}, #{extCol3}
+            '301200115', #{extCol0}, #{extCol1}, #{extCol2}, #{extCol3}
         )
     </insert>
 
@@ -152,7 +152,7 @@
         INSERT INTO msg_queue (
             MSG_TYPE, DSTADDR, CALLBACK, STAT, SUBJECT, TEXT,
             INSERT_TIME, REQUEST_TIME, FILECNT, FILELOC1, FILELOC2, FILELOC3,
-            SENDER_CODE, EXT_COL1, EXT_COL2, EXT_COL3
+            SENDER_CODE, EXT_COL0, EXT_COL1, EXT_COL2, EXT_COL3
         ) VALUES (
             #{msgType}, #{dstaddr}, #{callback}, '0', #{subject}, #{text}, NOW(),
             <choose>
@@ -160,7 +160,7 @@
                 <otherwise>NOW()</otherwise>
             </choose>,
             IFNULL(#{filecnt}, 0), #{fileloc1}, #{fileloc2}, #{fileloc3},
-            '301200115', #{extCol1}, #{extCol2}, #{extCol3}
+            '301200115', #{extCol0}, #{extCol1}, #{extCol2}, #{extCol3}
         )
     </insert>
 

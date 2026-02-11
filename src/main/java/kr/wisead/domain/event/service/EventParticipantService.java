@@ -416,7 +416,10 @@ public class EventParticipantService {
                         .actionCode((String) m.get("actionCode"))
                         .actionName((String) m.get("actionName"))
                         .completed("Y".equals(m.get("completed")))
-                        .completedAt((LocalDateTime) m.get("completedAt"))
+//                        .completedAt((LocalDateTime) m.get("completedAt"))
+                        .completedAt(m.get("completedAt") != null
+                                ? ((java.sql.Timestamp) m.get("completedAt")).toLocalDateTime()
+                                : null)
                         .confirmedBy((String) m.get("confirmedBy"))
                         .requireAdminAuth("Y".equals(m.get("requireAdminAuth")))
                         .allowMultiple("Y".equals(m.get("allowMultiple")))

@@ -67,7 +67,7 @@ public class EventParticipant {
     /**
      * 명찰 출력 여부 확인
      */
-    public boolean isNametagPrinted() {
+    public boolean checkNametagPrinted() {
         return "Y".equals(this.nametagPrinted);
     }
 

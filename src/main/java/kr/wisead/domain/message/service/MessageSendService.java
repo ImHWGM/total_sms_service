@@ -13,6 +13,8 @@ import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.ShortUrlUtils;
 import kr.wisead.common.util.UserIdResolver;
+import kr.wisead.domain.event.dto.ParticipantForMessageResponse;
+import kr.wisead.domain.event.service.EventParticipantService;
 import kr.wisead.domain.message.dto.*;
 import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.message.entity.MsgResult;
@@ -41,6 +43,7 @@ public class MessageSendService {
   private final SurveyMasterMapper surveyMasterMapper;
   private final WalletService walletService;
   private final UserIdResolver userIdResolver;
+  private final EventParticipantService eventParticipantService;
 
   @Value("${wisead.url:https://wisead.kr}")
   private String wiseadUrl;
@@ -771,8 +774,7 @@ public class MessageSendService {
     if (text == null || text.isEmpty()) {
       return null;
     }
-    Pattern pattern =
-        java.util.regex.Pattern.compile("https?://[\\w.-]*epopkon\\.com[^\\s]*");
+    Pattern pattern = java.util.regex.Pattern.compile("https?://[\\w.-]*epopkon\\.com[^\\s]*");
     Matcher matcher = pattern.matcher(text);
     if (matcher.find()) {
       return matcher.group();
@@ -940,7 +942,8 @@ public class MessageSendService {
           receivers.size());
     }
 
-    String txGroupId = java.util.UUID.randomUUID().toString().replace("-", "");
+    // 잔액 확인 및 차감 (행사참여자 문자 전용 요금)
+    String txGroupId = deductForMessage(regId, "event_attendance", receivers.size(), "L");
     int successCount = 0;
     int failCount = 0;
     List<String> failedPhones = new ArrayList<>();
@@ -950,6 +953,25 @@ public class MessageSendService {
     for (EventMessageRequest.Receiver receiver : receivers) {
       try {
         String phone = receiver.getNormalizedPhone();
+
+        // 비참여자 자동 등록
+        Long participantSeq = receiver.getParticipantSeq();
+        Integer surveyUserSeq = receiver.getSurveyUserSeq();
+
+        if (participantSeq == null && phone != null) {
+          try {
+            String receiverName = receiver.getName() != null ? receiver.getName() : "";
+            ParticipantForMessageResponse registered =
+                eventParticipantService.registerParticipantForMessage(
+                    request.getEventSeq(), receiverName, phone, regId);
+            participantSeq = registered.getParticipantSeq();
+            surveyUserSeq = registered.getSurveyUserSeq();
+            log.info("비참여자 자동 등록 - phone: {}, participantSeq: {}", phone, participantSeq);
+          } catch (Exception e) {
+            log.warn("비참여자 자동 등록 실패 - phone: {}, error: {}", phone, e.getMessage());
+          }
+        }
+
         String text = request.getText();
 
         // 이벤트 정보 치환
@@ -975,9 +997,6 @@ public class MessageSendService {
         if (receiver.getRepChar02() != null && !receiver.getRepChar02().isEmpty()) {
           text = text.replace("#대치문자2#", receiver.getRepChar02());
         }
-        if (receiver.getRepChar03() != null && !receiver.getRepChar03().isEmpty()) {
-          text = text.replace("#대치문자3#", receiver.getRepChar03());
-        }
 
         // QR링크 치환 (단축 URL 적용)
         if (receiver.getQrLink() != null && !receiver.getQrLink().isEmpty()) {
@@ -1002,8 +1021,8 @@ public class MessageSendService {
                 request.getSubject(),
                 text,
                 request.getEventSeq(),
-                receiver.getParticipantSeq(),
-                receiver.getSurveyUserSeq(),
+                participantSeq,
+                surveyUserSeq,
                 txGroupId,
                 realUserId);
 

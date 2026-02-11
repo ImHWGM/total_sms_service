@@ -200,6 +200,80 @@ public class EventParticipantService {
     return EventParticipantResponse.from(saved).withQrCodeUrl(wiseadUrl);
   }
 
+  /** 문자 발송용 참가자 전체 목록 조회 (페이징 없음) */
+  @Transactional(readOnly = true)
+  public List<ParticipantForMessageResponse> getParticipantsForMessage(Integer eventSeq) {
+    List<EventParticipant> participants = participantMapper.selectByEventSeq(eventSeq);
+
+    return participants.stream()
+        .map(
+            p ->
+                ParticipantForMessageResponse.builder()
+                    .participantSeq(p.getSeq())
+                    .surveyUserSeq(p.getSurveyUserSeq())
+                    .name(p.getUserName())
+                    .phone(decryptPhone(p.getUserPhone()))
+                    .checkCode(p.getCheckCode())
+                    .department(p.getDepartment())
+                    .position(p.getPosition())
+                    .participantType(p.getParticipantType())
+                    .build())
+        .collect(Collectors.toList());
+  }
+
+  /** 문자 발송용 참가자 자동 등록 (미등록 시 생성, 기등록 시 기존 정보 반환) */
+  @Transactional
+  public ParticipantForMessageResponse registerParticipantForMessage(
+      Integer eventSeq, String name, String phone, String regId) {
+
+    String encryptedPhone = encryptPhone(phone);
+
+    // 1. 기존 참여자 조회 (같은 행사 + 같은 전화번호)
+    Optional<EventParticipant> existing =
+        participantMapper.selectByEventSeqAndPhone(eventSeq, encryptedPhone);
+
+    if (existing.isPresent()) {
+      EventParticipant p = existing.get();
+      return ParticipantForMessageResponse.builder()
+          .participantSeq(p.getSeq())
+          .surveyUserSeq(p.getSurveyUserSeq())
+          .name(p.getUserName())
+          .phone(phone)
+          .checkCode(p.getCheckCode())
+          .department(p.getDepartment())
+          .position(p.getPosition())
+          .participantType(p.getParticipantType())
+          .build();
+    }
+
+    // 2. SURVEY_USER 생성
+    String userKey = UUID.randomUUID().toString().replace("-", "");
+    SurveyUser surveyUser =
+        SurveyUser.builder()
+            .eventSeq(eventSeq)
+            .userKey(userKey)
+            .userName(name)
+            .userPhone(encryptedPhone)
+            .delYn("N")
+            .regId(regId)
+            .build();
+    surveyUserMapper.insertForParticipant(surveyUser);
+
+    // 3. EVENT_PARTICIPANT 생성 (이름/전화번호만, 소속/직급은 참여자 관리에서 수정)
+    EventParticipant participant =
+        EventParticipant.create(surveyUser.getSeq(), eventSeq, null, null, "일반", "문자발송 시 자동등록");
+    participantMapper.insert(participant);
+
+    return ParticipantForMessageResponse.builder()
+        .participantSeq(participant.getSeq())
+        .surveyUserSeq(surveyUser.getSeq())
+        .name(name)
+        .phone(phone)
+        .checkCode(participant.getCheckCode())
+        .participantType("일반")
+        .build();
+  }
+
   /** 참가자 목록 조회 */
   @Transactional(readOnly = true)
   public PageResponse<EventParticipantResponse> getParticipants(ParticipantSearchRequest request) {

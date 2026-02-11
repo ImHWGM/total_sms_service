@@ -83,4 +83,8 @@ public interface EventParticipantMapper {
       @Param("eventSeq") Integer eventSeq,
       @Param("userName") String userName,
       @Param("encryptedPhone") String encryptedPhone);
+
+  /** 이벤트 + 암호화된 전화번호로 참여자 조회 (문자 발송용 자동등록) */
+  Optional<EventParticipant> selectByEventSeqAndPhone(
+      @Param("eventSeq") Integer eventSeq, @Param("encryptedPhone") String encryptedPhone);
 }

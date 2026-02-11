@@ -1,5 +1,6 @@
 package kr.wisead.domain.event.service;
 
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -418,7 +419,7 @@ public class EventParticipantService {
                         .completed("Y".equals(m.get("completed")))
 //                        .completedAt((LocalDateTime) m.get("completedAt"))
                         .completedAt(m.get("completedAt") != null
-                                ? ((java.sql.Timestamp) m.get("completedAt")).toLocalDateTime()
+                                ? ((Timestamp) m.get("completedAt")).toLocalDateTime()
                                 : null)
                         .confirmedBy((String) m.get("confirmedBy"))
                         .requireAdminAuth("Y".equals(m.get("requireAdminAuth")))

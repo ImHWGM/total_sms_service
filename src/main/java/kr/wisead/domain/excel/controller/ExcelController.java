@@ -245,6 +245,11 @@ public class ExcelController {
           headers = Arrays.asList("휴대폰번호", "대치문자1", "대치문자2", "대치문자3");
           fileName = "수신자목록_템플릿.xlsx";
           break;
+        case "event-phone":
+          sheet = excelService.createSheet(workbook, "수신자목록");
+          headers = Arrays.asList("이름", "전화번호", "대치번호1", "대치번호2");
+          fileName = "행사_수신자목록_템플릿.xlsx";
+          break;
         case "survey":
           sheet = excelService.createSheet(workbook, "설문대상자");
           headers = Arrays.asList("이름", "휴대폰번호", "인증코드");

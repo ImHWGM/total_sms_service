@@ -176,7 +176,7 @@ public class EventParticipantService {
             .regId(regId)
             .build();
 
-    surveyUserMapper.insert(surveyUser);
+    surveyUserMapper.insertForParticipant(surveyUser);
 
     // 2. EVENT_PARTICIPANT 생성
     EventParticipant participant =

@@ -998,6 +998,14 @@ public class MessageSendService {
           text = text.replace("#대치문자2#", receiver.getRepChar02());
         }
 
+        // 행사관리 전용 대치번호 치환
+        if (receiver.getRepChar01() != null && !receiver.getRepChar01().isEmpty()) {
+          text = text.replace("#대치번호1#", receiver.getRepChar01());
+        }
+        if (receiver.getRepChar02() != null && !receiver.getRepChar02().isEmpty()) {
+          text = text.replace("#대치번호2#", receiver.getRepChar02());
+        }
+
         // QR링크 치환 (단축 URL 적용)
         if (receiver.getQrLink() != null && !receiver.getQrLink().isEmpty()) {
           String shortenedQrLink = ShortUrlUtils.shortenUrl(receiver.getQrLink());

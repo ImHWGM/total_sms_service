@@ -12,6 +12,8 @@
         P.PARTICIPANT_TYPE as participantType,
         P.MEMO as memo,
         P.NAMETAG_PRINTED as nametagPrinted,
+        P.ATTEND_TIME as attendTime,
+        P.REGIST_TYPE as registType,
         P.REG_DATE as regDate,
         P.MOD_DATE as modDate
     </sql>
@@ -131,10 +133,10 @@
     <insert id="insert" useGeneratedKeys="true" keyProperty="seq">
         INSERT INTO EVENT_PARTICIPANT (
             SURVEY_USER_SEQ, EVENT_SEQ, CHECK_CODE, DEPARTMENT,
-            POSITION, PARTICIPANT_TYPE, MEMO, NAMETAG_PRINTED, REG_DATE
+            POSITION, PARTICIPANT_TYPE, MEMO, NAMETAG_PRINTED, ATTEND_TIME, REGIST_TYPE, REG_DATE
         ) VALUES (
             #{surveyUserSeq}, #{eventSeq}, #{checkCode}, #{department},
-            #{position}, #{participantType}, #{memo}, #{nametagPrinted}, NOW()
+            #{position}, #{participantType}, #{memo}, #{nametagPrinted}, #{attendTime}, #{registType}, NOW()
         )
     </insert>
 
@@ -142,11 +144,11 @@
     <insert id="insertBatch">
         INSERT INTO EVENT_PARTICIPANT (
             SURVEY_USER_SEQ, EVENT_SEQ, CHECK_CODE, DEPARTMENT,
-            POSITION, PARTICIPANT_TYPE, MEMO, NAMETAG_PRINTED, REG_DATE
+            POSITION, PARTICIPANT_TYPE, MEMO, NAMETAG_PRINTED, ATTEND_TIME, REGIST_TYPE, REG_DATE
         ) VALUES
         <foreach collection="list" item="item" separator=",">
             (#{item.surveyUserSeq}, #{item.eventSeq}, #{item.checkCode}, #{item.department},
-             #{item.position}, #{item.participantType}, #{item.memo}, #{item.nametagPrinted}, NOW())
+             #{item.position}, #{item.participantType}, #{item.memo}, #{item.nametagPrinted}, #{item.attendTime}, #{item.registType}, NOW())
         </foreach>
     </insert>
 

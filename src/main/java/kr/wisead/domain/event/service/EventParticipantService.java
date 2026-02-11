@@ -2,6 +2,7 @@ package kr.wisead.domain.event.service;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
@@ -77,6 +78,7 @@ public class EventParticipantService {
     surveyUserMapper.insertForParticipant(surveyUser);
 
     // 4. EVENT_PARTICIPANT 생성
+    String attendTimeStr = attendTime.format(DateTimeFormatter.ofPattern("HH:mm"));
     EventParticipant participant =
         EventParticipant.create(
             surveyUser.getSeq(),
@@ -84,7 +86,9 @@ public class EventParticipantService {
             request.getDepartment(),
             request.getPosition(),
             "일반",
-            null);
+            null,
+            "현장등록",
+            attendTimeStr);
 
     participantMapper.insert(participant);
 
@@ -187,7 +191,9 @@ public class EventParticipantService {
             request.getDepartment(),
             request.getPosition(),
             request.getParticipantType(),
-            request.getMemo());
+            request.getMemo(),
+            "사전등록",
+            null);
 
     participantMapper.insert(participant);
 
@@ -262,7 +268,8 @@ public class EventParticipantService {
 
     // 3. EVENT_PARTICIPANT 생성 (이름/전화번호만, 소속/직급은 참여자 관리에서 수정)
     EventParticipant participant =
-        EventParticipant.create(surveyUser.getSeq(), eventSeq, null, null, "일반", "문자발송 시 자동등록");
+        EventParticipant.create(
+            surveyUser.getSeq(), eventSeq, null, null, "일반", "문자발송 시 자동등록", "사전등록", null);
     participantMapper.insert(participant);
 
     return ParticipantForMessageResponse.builder()
@@ -417,8 +424,9 @@ public class EventParticipantService {
                         .actionCode((String) m.get("actionCode"))
                         .actionName((String) m.get("actionName"))
                         .completed("Y".equals(m.get("completed")))
-//                        .completedAt((LocalDateTime) m.get("completedAt"))
-                        .completedAt(m.get("completedAt") != null
+                        //                        .completedAt((LocalDateTime) m.get("completedAt"))
+                        .completedAt(
+                            m.get("completedAt") != null
                                 ? ((Timestamp) m.get("completedAt")).toLocalDateTime()
                                 : null)
                         .confirmedBy((String) m.get("confirmedBy"))

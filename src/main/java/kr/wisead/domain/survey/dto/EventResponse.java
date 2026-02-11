@@ -33,6 +33,9 @@ public class EventResponse {
   private String authCodeUrl; // QR코드 간편 URL
   private String endMessage; // 설문 종료 메시지
   private String eventEndImg; // 설문 마무리 이미지
+  private String venue; // 행사 장소
+  private String organizer; // 주최/주관
+  private String badgePrintYn; // 출입증 출력 여부
   private LocalDateTime regDate; // 등록일
   private String regId; // 등록 ID
 
@@ -83,6 +86,9 @@ public class EventResponse {
         .authCodeUrl(entity.getAuthCodeUrl())
         .endMessage(entity.getEndMessage())
         .eventEndImg(entity.getEventEndImg())
+        .venue(entity.getVenue())
+        .organizer(entity.getOrganizer())
+        .badgePrintYn(entity.getBadgePrintYn())
         .regDate(entity.getRegDate())
         .regId(entity.getRegId())
         .totSurveyUser(entity.getTotSurveyUser())

@@ -27,7 +27,10 @@
         M.REG_DATE as regDate,
         M.REG_ID as regId,
         M.UPT_DATE as uptDate,
-        M.UPT_ID as uptId
+        M.UPT_ID as uptId,
+        M.VENUE as venue,
+        M.ORGANIZER as organizer,
+        M.BADGE_PRINT_YN as badgePrintYn
     </sql>
 
     <sql id="selectWithCounts">
@@ -135,13 +138,13 @@
             EVENT_DESC_IMG, EVENT_DESC, EVENT_TYPE, START_DATE, END_DATE,
             STATUS, PRIVACY_POLICY_YN, PRIVACY_POLICY_TTL, PRIVACY_POLICY_DESC,
             AUTH, QR_CODE, QR_CODE_IMG_PATH, AUTH_CODE_URL,
-            END_MESSAGE, EVENT_END_IMG, REG_DATE, REG_ID
+            END_MESSAGE, EVENT_END_IMG, VENUE, ORGANIZER, BADGE_PRINT_YN, REG_DATE, REG_ID
         ) VALUES (
             #{userSeq}, #{eventCode}, #{eventName}, #{eventEmphasisYn},
             #{eventDescImg}, #{eventDesc}, #{eventType}, #{startDate}, #{endDate},
             #{status}, #{privacyPolicyYn}, #{privacyPolicyTtl}, #{privacyPolicyDesc},
             #{auth}, #{qrCode}, #{qrCodeImgPath}, #{authCodeUrl},
-            #{endMessage}, #{eventEndImg}, NOW(), #{regId}
+            #{endMessage}, #{eventEndImg}, #{venue}, #{organizer}, #{badgePrintYn}, NOW(), #{regId}
         )
     </insert>
 
@@ -170,6 +173,9 @@
             EVENT_DESC_IMG = #{eventDescImg},
             END_MESSAGE = #{endMessage},
             EVENT_END_IMG = #{eventEndImg},
+            VENUE = #{venue},
+            ORGANIZER = #{organizer},
+            BADGE_PRINT_YN = #{badgePrintYn},
             UPT_ID = #{uptId},
             UPT_DATE = NOW()
         WHERE EVENT_SEQ = #{eventSeq}

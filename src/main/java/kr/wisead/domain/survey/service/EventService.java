@@ -168,6 +168,9 @@ public class EventService {
             .authCodeUrl(authCodeUrl)
             .qrCodeImgPath(qrCodeImgPath)
             .endMessage(request.getEndMessage())
+            .venue(request.getVenue())
+            .organizer(request.getOrganizer())
+            .badgePrintYn(request.getBadgePrintYn())
             .eventEndImg(null) // 임시 경로 대신 null로 저장, 이동 후 업데이트
             .regId(actualUserId)
             .build();
@@ -386,6 +389,9 @@ public class EventService {
         request.getEndMessage(),
         eventDescImg,
         eventEndImg,
+        request.getVenue(),
+        request.getOrganizer(),
+        request.getBadgePrintYn(),
         actualUptId);
 
     surveyMasterMapper.update(event);

@@ -1,10 +1,14 @@
 package kr.wisead.domain.message.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import kr.wisead.common.exception.BusinessException;
@@ -16,6 +20,7 @@ import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.event.dto.ParticipantForMessageResponse;
 import kr.wisead.domain.event.service.EventParticipantService;
 import kr.wisead.domain.message.dto.*;
+import kr.wisead.domain.message.dto.EventMessageRequest.Receiver;
 import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.message.entity.MsgResult;
 import kr.wisead.domain.payment.service.WalletService;
@@ -738,19 +743,47 @@ public class MessageSendService {
     return resendToDuplicates(request, regId);
   }
 
-  /** 이벤트 시퀀스 기반으로 조회할 msg_result 테이블명 목록 생성 현재 월부터 1개월 전까지 */
+  /** 이벤트 시퀀스 기반으로 조회할 msg_result 테이블명 목록 생성 설문 시작일 -1개월부터 현재 월까지, 실제 존재하는 테이블만 반환 */
   private List<String> getResultTableNames(Integer eventSeq) {
-    List<String> tables = new ArrayList<>();
-    java.time.LocalDate now = java.time.LocalDate.now();
+    DateTimeFormatter TABLE_MONTH_FMT =
+        DateTimeFormatter.ofPattern("yyyyMM");
+    LocalDate now = LocalDate.now();
+    LocalDate startMonth = now.minusMonths(1); // 기본: 1개월 전
 
-    // 현재 월
-    tables.add("msg_result_" + now.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM")));
-    // 1개월 전
-    tables.add(
-        "msg_result_"
-            + now.minusMonths(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM")));
+    // 설문 시작일 조회하여 검색 시작월 결정
+    if (eventSeq != null) {
+      try {
+        SurveyMaster survey = surveyMasterMapper.selectByEventSeq(eventSeq).orElse(null);
+        if (survey != null && survey.getStartDate() != null && !survey.getStartDate().isEmpty()) {
+          LocalDate surveyStart =
+              LocalDate.parse(survey.getStartDate().substring(0, 10));
+          startMonth = surveyStart.minusMonths(1);
+        }
+      } catch (Exception e) {
+        log.warn("설문 시작일 조회 실패 - eventSeq: {}, 기본 범위 사용", eventSeq);
+      }
+    }
 
-    return tables;
+    // startMonth ~ 현재월까지 테이블명 생성
+    List<String> candidates = new ArrayList<>();
+    LocalDate month = YearMonth.from(startMonth).atDay(1);
+    LocalDate endMonth = YearMonth.from(now).atDay(1);
+    while (!month.isAfter(endMonth)) {
+      candidates.add("msg_result_" + month.format(TABLE_MONTH_FMT));
+      month = month.plusMonths(1);
+    }
+
+    // 실제 존재하는 테이블만 필터링
+    return candidates.stream()
+        .filter(
+            table -> {
+              try {
+                return msgResultMapper.tableExists(table) > 0;
+              } catch (Exception e) {
+                return false;
+              }
+            })
+        .collect(java.util.stream.Collectors.toList());
   }
 
   /** 예약 시간 파싱 - 두 가지 형식 지원 (yyyyMMddHHmmss, yyyy-MM-dd HH:mm:ss) */
@@ -926,8 +959,8 @@ public class MessageSendService {
 
     // 중복 번호 제거
     if (request.isDelDuplicateNum()) {
-      java.util.Map<String, EventMessageRequest.Receiver> uniqueMap =
-          new java.util.LinkedHashMap<>();
+      Map<String, Receiver> uniqueMap =
+          new LinkedHashMap<>();
       for (EventMessageRequest.Receiver r : receivers) {
         String phone = r.getNormalizedPhone();
         if (uniqueMap.putIfAbsent(phone, r) != null) {

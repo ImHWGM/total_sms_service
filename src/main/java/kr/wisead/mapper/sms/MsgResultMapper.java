@@ -56,6 +56,9 @@ public interface MsgResultMapper {
       @Param("eventSeq") Integer eventSeq,
       @Param("userSeq") Integer userSeq);
 
+  /** msg_result_YYYYMM 테이블 존재 여부 확인 */
+  int tableExists(@Param("tableName") String tableName);
+
   // ========== 발송 실패 환불 배치용 ==========
 
   /** REFUND_YN 컬럼 존재 여부 확인 */

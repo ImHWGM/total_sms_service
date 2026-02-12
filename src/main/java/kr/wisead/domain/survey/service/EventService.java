@@ -11,6 +11,7 @@ import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.QrCodeUtils;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.AdminService;
+import kr.wisead.domain.event.service.EventActionTypeService;
 import kr.wisead.domain.excel.service.ExcelService;
 import kr.wisead.domain.file.service.FileStorageService;
 import kr.wisead.domain.payment.service.BillingService;
@@ -47,6 +48,7 @@ public class EventService {
   private final AdminService adminService;
   private final FileStorageService fileStorageService;
   private final BillingService billingService;
+  private final EventActionTypeService eventActionTypeService;
   private final UserIdResolver userIdResolver;
 
   @Value("${upload.dir:./uploads}")
@@ -176,6 +178,12 @@ public class EventService {
             .build();
 
     surveyMasterMapper.insert(event);
+
+    // 행사 타입인 경우 기본 액션 유형 자동 생성 (CHECK_IN 등)
+    if ("E".equals(request.getEventType())) {
+      eventActionTypeService.createDefaultActionTypes(event.getEventSeq());
+    }
+
     log.info(
         "이벤트 생성 완료 - eventSeq: {}, eventCode: {}, qrCode: {}",
         event.getEventSeq(),

@@ -491,7 +491,8 @@ public class ExcelController {
     SurveyExcelDownloadRequest.DownloadType downloadType = downloadRequest.getDownloadType();
     String eventType = downloadRequest.getEventType();
     boolean isSurvey = "S".equals(eventType);
-    String menuName = isSurvey ? "설문조사" : "개인정보취합";
+    boolean isEvent = "E".equals(eventType);
+    String menuName = isSurvey ? "설문조사" : isEvent ? "행사" : "개인정보취합";
 
     log.info("[엑셀 다운로드 시작] {} 참여현황 - 사용자: {}, 다운로드타입: {}", menuName, userId, downloadType);
 
@@ -535,6 +536,29 @@ public class ExcelController {
                   data.get("userKey") != null ? data.get("userKey") : "",
                   formatDateTime(data.get("surveyStartTime")),
                   formatDateTime(data.get("submissionDate"))),
+              null);
+        }
+      } else if (isEvent) {
+        // 행사 전용 헤더
+        List<String> headers = Arrays.asList("번호", "행사명", "이름", "연락처", "소속", "직급", "발송시간");
+        excelService.createHeaderRow(sheet, 0, headers, headerStyle);
+
+        // 데이터 행 생성
+        int rowNum = 1;
+        for (Map<String, Object> data : dataList) {
+          String userName = decryptData(data.get("userName"));
+          String phone = decryptPhone(data.get("userPhone"));
+          excelService.createDataRow(
+              sheet,
+              rowNum++,
+              Arrays.asList(
+                  data.get("seq"),
+                  removeEmphasis(data.get("eventName")),
+                  userName != null ? userName : "",
+                  phone != null ? phone : "",
+                  data.get("department") != null ? data.get("department") : "",
+                  data.get("position") != null ? data.get("position") : "",
+                  formatDateTime(data.get("regDate"))),
               null);
         }
       } else {

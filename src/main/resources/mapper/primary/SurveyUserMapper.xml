@@ -375,10 +375,13 @@
             U.SHIPMENT_DATE as shipmentDate,
             U.SURVEY_START_TIME as surveyStartTime,
             U.SUBMISSION_DATE as submissionDate,
-            U.REG_DATE as regDate
+            U.REG_DATE as regDate,
+            EP.DEPARTMENT as department,
+            EP.POSITION as position
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
         LEFT JOIN USER USR ON M.USER_SEQ = USR.SEQ
+        LEFT JOIN EVENT_PARTICIPANT EP ON U.SEQ = EP.SURVEY_USER_SEQ
         <where>
             U.DEL_YN = 'N'
             <if test="eventSeq != null">
@@ -680,10 +683,13 @@
             U.SHIPMENT_DATE as shipmentDate,
             U.SURVEY_START_TIME as surveyStartTime,
             U.SUBMISSION_DATE as submissionDate,
-            U.REG_DATE as regDate
+            U.REG_DATE as regDate,
+            EP.DEPARTMENT as department,
+            EP.POSITION as position
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
         LEFT JOIN USER USR ON M.USER_SEQ = USR.SEQ
+        LEFT JOIN EVENT_PARTICIPANT EP ON U.SEQ = EP.SURVEY_USER_SEQ
         WHERE U.DEL_YN = 'N'
         AND U.SEQ IN
         <foreach collection="seqList" item="seq" open="(" separator="," close=")">

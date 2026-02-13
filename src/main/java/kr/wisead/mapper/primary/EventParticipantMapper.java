@@ -87,4 +87,7 @@ public interface EventParticipantMapper {
   /** 이벤트 + 암호화된 전화번호로 참여자 조회 (문자 발송용 자동등록) */
   Optional<EventParticipant> selectByEventSeqAndPhone(
       @Param("eventSeq") Integer eventSeq, @Param("encryptedPhone") String encryptedPhone);
+
+  /** 참석시간 업데이트 (체크인 시 사용) */
+  int updateAttendTime(@Param("seq") Long seq, @Param("attendTime") String attendTime);
 }

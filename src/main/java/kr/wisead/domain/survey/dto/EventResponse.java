@@ -35,7 +35,7 @@ public class EventResponse {
   private String eventEndImg; // 설문 마무리 이미지
   private String venue; // 행사 장소
   private String organizer; // 주최/주관
-  private String badgePrintYn; // 출입증 출력 여부
+  private String badgePrintType; // 서비스 옵션
   private LocalDateTime regDate; // 등록일
   private String regId; // 등록 ID
 
@@ -88,7 +88,7 @@ public class EventResponse {
         .eventEndImg(entity.getEventEndImg())
         .venue(entity.getVenue())
         .organizer(entity.getOrganizer())
-        .badgePrintYn(entity.getBadgePrintYn())
+        .badgePrintType(entity.getBadgePrintType())
         .regDate(entity.getRegDate())
         .regId(entity.getRegId())
         .totSurveyUser(entity.getTotSurveyUser())

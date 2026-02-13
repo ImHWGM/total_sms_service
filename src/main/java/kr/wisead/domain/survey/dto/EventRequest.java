@@ -51,7 +51,7 @@ public class EventRequest {
 
   private String organizer; // 주최/주관
 
-  private String badgePrintYn; // 출입증 출력 여부 ("Y"/"N")
+  private String badgePrintType; // 서비스 옵션 (N:명찰출력, C:체크인카드)
 
   // 문항 목록 (설문 생성 시)
   private List<QuestionRequest> questions;

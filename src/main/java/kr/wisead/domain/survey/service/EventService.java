@@ -118,6 +118,16 @@ public class EventService {
       MultipartFile endImageFile,
       List<MultipartFile> questionImages,
       List<MultipartFile> itemImages) {
+    
+    // 서비스 옵션(badgePrintType) 권한 검증
+    Integer userLevel = adminService.getUserLevel(userId);
+    String badgePrintType = null;  // 기본값: null (← 빈값""에서 변경)
+    if (userLevel != null && userLevel >= 50) {
+      badgePrintType = request.getBadgePrintType();
+    } else if (request.getBadgePrintType() != null) {
+      throw new BusinessException(ErrorCode.UNAUTHORIZED, "서비스 옵션 변경 권한이 없습니다.");
+    }
+
     // JWT username은 userSeq이므로 직접 파싱
     Integer userSeq = userIdResolver.fromJwtUsername(userId);
     if (userSeq == null) {
@@ -126,15 +136,6 @@ public class EventService {
 
     // regId용 실제 user_id 조회
     String actualUserId = userIdResolver.resolveUserId(userId);
-
-    // 서비스 옵션(badgePrintYn) 권한 검증
-    Integer userLevel = adminService.getUserLevel(userId);
-    String badgePrintYn = "";
-    if (userLevel != null && userLevel >= 50) {
-      badgePrintYn = request.getBadgePrintYn() != null ? request.getBadgePrintYn() : "";
-    } else if (request.getBadgePrintYn() != null && !request.getBadgePrintYn().isEmpty()) {
-      throw new BusinessException(ErrorCode.UNAUTHORIZED, "서비스 옵션 변경 권한이 없습니다.");
-    }
 
     // 이벤트 코드 생성
     String eventCode = generateEventCode();
@@ -178,7 +179,7 @@ public class EventService {
         .venue(request.getVenue())
         .organizer(request.getOrganizer())
 //        .badgePrintYn(request.getBadgePrintYn())
-        .badgePrintYn(badgePrintYn) // request에서 바로 가져오지 않고, 유효성 검사를 거친 값을 저장한다.
+        .badgePrintType(badgePrintType) // request에서 바로 가져오지 않고, 유효성 검사를 거친 값을 저장한다.
         .eventEndImg(null) // 임시 경로 대신 null로 저장, 이동 후 업데이트
         .regId(actualUserId)
         .build();
@@ -302,6 +303,15 @@ public class EventService {
     Integer userLevel = adminService.getUserLevel(uptId);
     adminService.validateModifyPermission(uptId, userLevel, event.getRegId());
 
+    // 기업관리자(userLevel<50) badgePrintType 변경 검증
+    if (userLevel != null && userLevel < 50) {
+      String currentBadgePrintType = event.getBadgePrintType();
+      if (request.getBadgePrintType() != null
+          && !request.getBadgePrintType().equals(currentBadgePrintType)) {
+        throw new BusinessException(ErrorCode.UNAUTHORIZED, "서비스 옵션 변경 권한이 없습니다.");
+      }
+    }
+
     // uptId용 실제 user_id 조회
     String actualUptId = userIdResolver.resolveUserId(uptId);
 
@@ -391,15 +401,6 @@ public class EventService {
       log.info("종료 이미지 삭제 - eventSeq: {}", eventSeq);
     }
 
-    // 기업관리자(userLevel<50) badgePrintYn 변경 시도 검증
-    if (userLevel != null && userLevel < 50) {
-      String currentBadgePrintYn = event.getBadgePrintYn();
-      if (request.getBadgePrintYn() != null
-              && !request.getBadgePrintYn().equals(currentBadgePrintYn)) {
-        throw new BusinessException(ErrorCode.UNAUTHORIZED, "서비스 옵션 변경 권한이 없습니다.");
-      }
-    }
-
     event.update(
         request.getEventName(),
         request.getEventEmphasisYn(),
@@ -418,7 +419,7 @@ public class EventService {
         eventEndImg,
         request.getVenue(),
         request.getOrganizer(),
-        request.getBadgePrintYn(),
+        request.getBadgePrintType(),
         actualUptId);
 
     surveyMasterMapper.update(event);

@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /** 행사 참가자 관리 Controller */
 @Slf4j
@@ -42,6 +43,17 @@ public class EventParticipantController {
     EventParticipantResponse response =
         participantService.createParticipant(request, userDetails.getUsername());
     return ApiResponse.success(response, "참가자가 등록되었습니다.");
+  }
+
+  /** 참가자 엑셀 일괄 등록 */
+  @PostMapping("/batch")
+  public ApiResponse<Map<String, Object>> uploadParticipantExcel(
+          @PathVariable Integer eventSeq,
+          @RequestParam("file") MultipartFile file,
+          @AuthenticationPrincipal UserDetails userDetails) {
+    Map<String, Object> result =
+            participantService.uploadParticipantExcel(eventSeq, file, userDetails.getUsername());
+    return ApiResponse.success(result, "일괄 등록 완료");
   }
 
   /** 문자 발송용 참가자 전체 목록 조회 (페이징 없음) */

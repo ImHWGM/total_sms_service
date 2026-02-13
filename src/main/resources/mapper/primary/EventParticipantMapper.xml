@@ -311,4 +311,12 @@
         LIMIT 1
     </select>
 
+    <!-- 참석시간 업데이트 (체크인 시) -->
+    <update id="updateAttendTime">
+        UPDATE EVENT_PARTICIPANT
+        SET ATTEND_TIME = #{attendTime},
+            MOD_DATE = NOW()
+        WHERE SEQ = #{seq}
+    </update>
+
 </mapper>

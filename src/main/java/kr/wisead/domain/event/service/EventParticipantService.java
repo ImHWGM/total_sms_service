@@ -1,8 +1,6 @@
 package kr.wisead.domain.event.service;
 
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
@@ -64,7 +62,6 @@ public class EventParticipantService {
     }
 
     // 3. SURVEY_USER 생성 (이름/이메일 포함)
-    LocalDateTime attendTime = LocalDateTime.now();
     String userKey = UUID.randomUUID().toString().replace("-", "");
 
     SurveyUser surveyUser =
@@ -80,8 +77,7 @@ public class EventParticipantService {
 
     surveyUserMapper.insertForParticipant(surveyUser);
 
-    // 4. EVENT_PARTICIPANT 생성
-    String attendTimeStr = attendTime.format(DateTimeFormatter.ofPattern("HH:mm"));
+    // 4. EVENT_PARTICIPANT 생성 (attendTime은 체크인 시 기록)
     EventParticipant participant =
         EventParticipant.create(
             surveyUser.getSeq(),
@@ -91,7 +87,7 @@ public class EventParticipantService {
             "일반",
             null,
             "현장등록",
-            attendTimeStr);
+            null);
 
     participantMapper.insert(participant);
 
@@ -102,7 +98,7 @@ public class EventParticipantService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    return OnsiteRegistrationResponse.from(saved, cleanPhone, attendTime).withQrCodeUrl(wiseadUrl);
+    return OnsiteRegistrationResponse.from(saved, cleanPhone, null).withQrCodeUrl(wiseadUrl);
   }
 
   /** 참가자 인증 (이름 + 연락처로 조회) */

@@ -12,6 +12,7 @@ import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.event.dto.*;
 import kr.wisead.domain.event.entity.*;
+import kr.wisead.domain.excel.service.ExcelService;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
 import kr.wisead.mapper.primary.*;
@@ -20,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 /** 행사 참가자 서비스 */
 @Slf4j
@@ -34,6 +36,7 @@ public class EventParticipantService {
   private final SurveyUserMapper surveyUserMapper;
   private final SurveyMasterMapper surveyMasterMapper;
   private final AdminService adminService;
+  private final ExcelService excelService;
 
   @Value("${wisead.url:http://localhost:8080}")
   private String wiseadUrl;
@@ -205,6 +208,170 @@ public class EventParticipantService {
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
     return EventParticipantResponse.from(saved).withQrCodeUrl(wiseadUrl);
+  }
+
+  /** 참가자 엑셀 일괄 등록 */
+  @Transactional
+  public Map<String, Object> uploadParticipantExcel(
+          Integer eventSeq, MultipartFile file, String regId
+  ) {
+    Map<String, Object> result = new HashMap<>();
+
+    // === 1단계 : 파일 기본 검증 ===
+    // 확장자 검증
+    String originalFilename = file.getOriginalFilename();
+    if (originalFilename == null
+      || (!originalFilename.endsWith(".xlsx") && !originalFilename.endsWith(".xls"))) {
+      throw new BusinessException(ErrorCode.INVALID_FILE_TYPE, "엑셀 파일만 업로드 가능합니다. (.xlsx, .xls)");
+    }
+
+    // 파일 크기 검증 (5MB)
+    if (file.getSize() > 5 * 1024 * 1024) {
+      throw new BusinessException(ErrorCode.FILE_SIZE_EXCEEDED, "파일 크기는 5MB 이하만 가능합니다.");
+    }
+
+    // === 2단계: 권한 체크 (기존 createParticipant와 동일) ===
+    SurveyMaster event =
+            surveyMasterMapper
+                    .selectByEventSeq(eventSeq)
+                    .orElseThrow(
+                            () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트 정보를 찾을 수 없습니다.")
+                    );
+    Integer userLevel = adminService.getUserLevel(regId);
+    adminService.validateModifyPermission(regId, userLevel, event.getRegId());
+
+    // === 3단계: 엑셀 데이터 읽기 ===
+    // A: 이름, B: 전화번호, C: 이메일, D: 소속, E: 직급, F: 참여자유형
+    // 2행부터 읽기 (1행은 헤더)
+    List<Map<String, String>> excelContent =
+            excelService.readExcel(file, 2, "A", "B", "C", "D", "E", "F");
+
+    if (excelContent.isEmpty()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "엑셀 파일에 데이터가 없습니다.");
+    }
+
+    // 행 수 제한 (1,000행)
+    if (excelContent.size() > 1000) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "최대 1,000행까지 등록 가능합니다. (현재: " + excelContent.size() + "행)");
+    }
+
+    // === 4단계: 행별 검증 및 데이터 수집 ===
+    int successCount = 0;
+    int failCount = 0;
+    List<String> errors = new ArrayList<>();
+
+    // 유효한 참가자를 위한 리스트 (EventParticipant는 나중에 batch insert)
+    List<EventParticipant> participantsToInsert = new ArrayList<>();
+
+    // 허용되는 참여자 유형
+    Set<String> validTypes = Set.of("VIP", "일반", "스태프");
+
+    for (int i = 0; i < excelContent.size(); i++) {
+      Map<String, String> row = excelContent.get(i);
+      int rowNum = i + 2; // 실제 엑설 행 번호 (1행은 헤더)
+
+      String name = row.get("A"); // 이름
+      String phone = row.get("B"); // 전화번호
+      String email = row.get("C"); // 이메일
+      String department = row.get("D"); // 소속
+      String position = row.get("E");   // 직급
+      String participantType = row.get("F"); // 참여자유형
+
+      // ----- 필수값 검증 -----
+      if (name == null || name.trim().isEmpty()) {
+        errors.add(rowNum + "행: 이름이 비어있습니다.");
+        failCount++;
+        continue;
+      }
+      name = name.trim();
+      if (phone == null || phone.trim().isEmpty()) {
+        errors.add(rowNum + "행: 전화번호가 비어있습니다.");
+        failCount++;
+        continue;
+      }
+      phone = phone.trim();
+      // ----- 전화번호 형식 검증 -----
+      // 하이픈 제거 후 숫자만 남겨서 검증
+      String cleanPhone = phone.replace("-", "");
+      if (!cleanPhone.matches("^\\d{10,13}$")) {
+        errors.add(rowNum + "행: 전화번호 형식이 올바르지 않습니다.");
+        failCount++;
+        continue;
+      }
+
+      // ----- 이메일 형식 검증 (입력된 경우만) -----
+      if (email != null && !email.trim().isEmpty()) {
+        email = email.trim();
+        if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+          errors.add(rowNum + "행: 이메일 형식이 올바르지 않습니다.");
+          failCount++;
+          continue;
+        }
+      } else {
+        email = null;
+      }
+
+      // ----- 참여자유형 기본값 처리 -----
+      if (participantType == null || participantType.trim().isEmpty()
+              || !validTypes.contains(participantType.trim())) {
+        participantType = "일반";
+      } else {
+        participantType = participantType.trim();
+      }
+      // ----- 중복 전화번호 검증 (같은 행사 내) -----
+      String encryptedPhone = encryptPhone(cleanPhone);
+      Optional<EventParticipant> existing =
+              participantMapper.selectByEventSeqAndPhone(eventSeq, encryptedPhone);
+      if (existing.isPresent()) {
+        errors.add(rowNum + "행: 이미 등록된 전화번호입니다 (" + formatPhone(cleanPhone) + ").");
+        failCount++;
+        continue;
+      }
+
+      // ===== 5단계: 유효한 행 → SurveyUser 개별 INSERT =====
+      // SurveyUser는 INSERT 후 생성된 seq를 가져와야 하므로 개별 insert
+      String userKey = UUID.randomUUID().toString().replace("-", "");
+      SurveyUser surveyUser =
+              SurveyUser.builder()
+                      .eventSeq(eventSeq)
+                      .userKey(userKey)
+                      .userName(name)
+                      .userPhone(encryptedPhone)
+                      .userEmail(email)
+                      .delYn("N")
+                      .regId(regId)
+                      .build();
+      surveyUserMapper.insertForParticipant(surveyUser);
+      // EventParticipant 생성 (나중에 batch insert)
+      EventParticipant participant =
+              EventParticipant.create(
+                      surveyUser.getSeq(),
+                      eventSeq,
+                      department != null ? department.trim() : null,
+                      position != null ? position.trim() : null,
+                      participantType,
+                      null,         // memo
+                      "엑셀등록",   // registType
+                      null);        // attendTime
+      participantsToInsert.add(participant);
+      successCount++;
+    }
+
+    // ===== 6단계: EventParticipant 일괄 INSERT =====
+    if (!participantsToInsert.isEmpty()) {
+      participantMapper.insertBatch(participantsToInsert);
+    }
+    // ===== 7단계: 결과 반환 =====
+    result.put("totalCount", excelContent.size());
+    result.put("successCount", successCount);
+    result.put("failureCount", failCount);
+    if (!errors.isEmpty()) {
+      result.put("errors", errors);
+    }
+    log.info(
+            "참가자 엑셀 일괄 등록 완료 - eventSeq: {}, 전체: {}, 성공: {}, 실패: {}",
+            eventSeq, excelContent.size(), successCount, failCount);
+    return result;
   }
 
   /** 문자 발송용 참가자 전체 목록 조회 (페이징 없음) */

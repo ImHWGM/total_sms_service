@@ -38,6 +38,7 @@ public class SurveyMaster {
   private String venue; // 행사 장소
   private String organizer; // 주최/주관
   private String badgePrintType; // 출입증 출력 여부
+  private String nametagConfig; // 명찰 템플릿 설정 (JSON 문자열)
 
   // 집계 정보 (조회용)
   private Integer totSurveyUser; // 설문 대상자 수
@@ -55,6 +56,7 @@ public class SurveyMaster {
       String venue,
       String organizer,
       String badgePrintType,
+      String nametagConfig,
       String regId) {
     return SurveyMaster.builder()
         .userSeq(userSeq)
@@ -68,6 +70,7 @@ public class SurveyMaster {
         .venue(venue)
         .organizer(organizer)
         .badgePrintType(badgePrintType)
+        .nametagConfig(nametagConfig)
         .regId(regId)
         .build();
   }
@@ -92,6 +95,7 @@ public class SurveyMaster {
       String venue,
       String organizer,
       String badgePrintType,
+      String nametagConfig,
       String uptId) {
     this.eventName = eventName;
     this.eventEmphasisYn = eventEmphasisYn;
@@ -111,6 +115,7 @@ public class SurveyMaster {
     this.venue = venue;
     this.organizer = organizer;
     this.badgePrintType = badgePrintType;
+    this.nametagConfig = nametagConfig;
     this.uptId = uptId;
   }
 

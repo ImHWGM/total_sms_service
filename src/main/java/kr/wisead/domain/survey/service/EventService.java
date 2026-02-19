@@ -180,6 +180,7 @@ public class EventService {
         .organizer(request.getOrganizer())
 //        .badgePrintYn(request.getBadgePrintYn())
         .badgePrintType(badgePrintType) // request에서 바로 가져오지 않고, 유효성 검사를 거친 값을 저장한다.
+        .nametagConfig(request.getNametagConfig())
         .eventEndImg(null) // 임시 경로 대신 null로 저장, 이동 후 업데이트
         .regId(actualUserId)
         .build();
@@ -420,6 +421,7 @@ public class EventService {
         request.getVenue(),
         request.getOrganizer(),
         request.getBadgePrintType(),
+        request.getNametagConfig(),
         actualUptId);
 
     surveyMasterMapper.update(event);

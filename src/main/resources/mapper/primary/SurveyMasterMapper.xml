@@ -30,7 +30,8 @@
         M.UPT_ID as uptId,
         M.VENUE as venue,
         M.ORGANIZER as organizer,
-        M.BADGE_PRINT_TYPE as badgePrintType
+        M.BADGE_PRINT_TYPE as badgePrintType,
+        M.NAMETAG_CONFIG as nametagConfig
     </sql>
 
     <sql id="selectWithCounts">
@@ -138,13 +139,13 @@
             EVENT_DESC_IMG, EVENT_DESC, EVENT_TYPE, START_DATE, END_DATE,
             STATUS, PRIVACY_POLICY_YN, PRIVACY_POLICY_TTL, PRIVACY_POLICY_DESC,
             AUTH, QR_CODE, QR_CODE_IMG_PATH, AUTH_CODE_URL,
-            END_MESSAGE, EVENT_END_IMG, VENUE, ORGANIZER, BADGE_PRINT_TYPE, REG_DATE, REG_ID
+            END_MESSAGE, EVENT_END_IMG, VENUE, ORGANIZER, BADGE_PRINT_TYPE, NAMETAG_CONFIG, REG_DATE, REG_ID
         ) VALUES (
             #{userSeq}, #{eventCode}, #{eventName}, #{eventEmphasisYn},
             #{eventDescImg}, #{eventDesc}, #{eventType}, #{startDate}, #{endDate},
             #{status}, #{privacyPolicyYn}, #{privacyPolicyTtl}, #{privacyPolicyDesc},
             #{auth}, #{qrCode}, #{qrCodeImgPath}, #{authCodeUrl},
-            #{endMessage}, #{eventEndImg}, #{venue}, #{organizer}, #{badgePrintType}, NOW(),
+            #{endMessage}, #{eventEndImg}, #{venue}, #{organizer}, #{badgePrintType}, #{nametagConfig}, NOW(),
             #{regId}
         )
     </insert>
@@ -177,6 +178,7 @@
             VENUE = #{venue},
             ORGANIZER = #{organizer},
         BADGE_PRINT_TYPE = #{badgePrintType},
+            NAMETAG_CONFIG = #{nametagConfig},
             UPT_ID = #{uptId},
             UPT_DATE = NOW()
         WHERE EVENT_SEQ = #{eventSeq}

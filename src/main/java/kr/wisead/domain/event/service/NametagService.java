@@ -78,7 +78,7 @@ public class NametagService {
   public kr.wisead.domain.event.dto.NametagResponse getNametagDataByCheckCode(String checkCode) {
     EventParticipant participant =
         participantMapper
-            .selectByCheckCode(checkCode)
+            .selectDetailByCheckCode(checkCode)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 

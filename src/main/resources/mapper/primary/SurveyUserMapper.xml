@@ -645,10 +645,13 @@
             M.PRIVACY_POLICY_YN as privacyPolicyYn,
             M.PRIVACY_POLICY_TTL as privacyPolicyTtl,
             M.PRIVACY_POLICY_DESC as privacyPolicyDesc,
-            USR.CORP_NAME as corpName
+        USR.CORP_NAME as corpName,
+        EP.DEPARTMENT as department,
+        EP.POSITION as position
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
         LEFT JOIN USER USR ON M.USER_SEQ = USR.SEQ
+        LEFT JOIN EVENT_PARTICIPANT EP ON U.SEQ = EP.SURVEY_USER_SEQ
         <include refid="searchCondition"/>
         ORDER BY U.REG_DATE DESC
         <if test="offset != null and size != null">

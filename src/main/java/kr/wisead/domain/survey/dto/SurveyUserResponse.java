@@ -41,6 +41,9 @@ public class SurveyUserResponse {
   private String privacyPolicyTtl; // 개인정보 취합 타이틀
   private String privacyPolicyDesc; // 개인정보 취합 안내
   private String corpName; // 고객사명
+  // 추가
+  private String department; // 소속
+  private String position; // 직급
 
   /** Entity -> Response 변환 (암호화된 개인정보 복호화 포함) */
   public static SurveyUserResponse from(SurveyUser entity) {

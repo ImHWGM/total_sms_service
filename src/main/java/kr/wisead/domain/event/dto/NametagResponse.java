@@ -38,7 +38,7 @@ public class NametagResponse {
   }
 
   /**
-   * Entity -> Response 변환 (이름, 연락처 언마스킹)
+   * Entity -> Response 변환 (이름, 연락처 복호화)
    */
   public static NametagResponse from(EventParticipant participant, String decryptedName,
       String decryptedPhone) {

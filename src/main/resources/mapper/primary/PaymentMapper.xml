@@ -4,7 +4,7 @@
 
     <!-- 결제 정보 등록 -->
     <insert id="insertPayment" useGeneratedKeys="true" keyProperty="kgSeq">
-        INSERT INTO KG_PAYMENT (
+        INSERT INTO kg_payment_info (
             SVC_ID,
             MOBIL_ID,
             TRADE_ID,
@@ -20,8 +20,7 @@
             CARD_CODE,
             CARD_NAME,
             APPR_NO,
-            OWN_DIV_CD,
-            REG_DATE
+            OWN_DIV_CD
         ) VALUES (
             #{svcId},
             #{mobilId},
@@ -38,15 +37,14 @@
             #{cardCode},
             #{cardName},
             #{apprNo},
-            #{ownDivCd},
-            NOW()
+            #{ownDivCd}
         )
     </insert>
 
     <!-- 거래 ID로 결제 정보 존재 여부 확인 -->
     <select id="existsByTradeId" resultType="boolean">
         SELECT EXISTS(
-            SELECT 1 FROM KG_PAYMENT WHERE TRADE_ID = #{tradeId}
+            SELECT 1 FROM kg_payment_info WHERE TRADE_ID = #{tradeId}
         )
     </select>
 
@@ -69,9 +67,8 @@
             CARD_CODE AS cardCode,
             CARD_NAME AS cardName,
             APPR_NO AS apprNo,
-            OWN_DIV_CD AS ownDivCd,
-            REG_DATE AS regDate
-        FROM KG_PAYMENT
+            OWN_DIV_CD AS ownDivCd
+        FROM kg_payment_info
         WHERE TRADE_ID = #{tradeId}
     </select>
 
@@ -88,9 +85,8 @@
             USER_ID AS userId,
             USER_NAME AS userName,
             CARD_NAME AS cardName,
-            APPR_NO AS apprNo,
-            REG_DATE AS regDate
-        FROM KG_PAYMENT
+            APPR_NO AS apprNo
+        FROM kg_payment_info
         WHERE USER_ID = #{userId}
         ORDER BY KG_SEQ DESC
         LIMIT #{offset}, #{limit}
@@ -99,7 +95,7 @@
     <!-- 사용자 결제 내역 총 개수 -->
     <select id="selectPaymentHistoryCount" resultType="int">
         SELECT COUNT(*)
-        FROM KG_PAYMENT
+        FROM kg_payment_info
         WHERE USER_ID = #{userId}
     </select>
 

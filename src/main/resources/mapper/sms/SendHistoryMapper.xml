@@ -50,7 +50,7 @@
                 AND REQUEST_TIME &lt;= CONCAT(#{params.endDate}, ' 23:59:59')
             </if>
             <if test="params.sendFailure == 'Y'.toString()">
-                AND STAT = 3
+                AND STAT = 3 AND RESULT != 0
             </if>
             <if test="params.userId != null and params.userId != '' and params.userId != 'ALL'.toString()">
                 <choose>

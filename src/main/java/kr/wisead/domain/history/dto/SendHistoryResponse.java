@@ -72,7 +72,7 @@ public class SendHistoryResponse {
             case 0 -> "대기";
             case 1 -> "발송중";
             case 2 -> "발송완료";
-            case 3 -> "실패";
+            case 3 -> "결과수신";
             case 4 -> "취소";
             default -> "알수없음";
         };

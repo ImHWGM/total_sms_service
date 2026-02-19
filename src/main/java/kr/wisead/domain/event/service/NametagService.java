@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import kr.wisead.common.util.CryptoUtils;
 
 /** 명찰 서비스 */
 @Slf4j
@@ -34,11 +35,12 @@ public class NametagService {
     Map<String, Object> nametagData = new HashMap<>();
     nametagData.put("participantSeq", participant.getSeq());
     nametagData.put("eventName", participant.getEventName());
-    nametagData.put("name", participant.getUserName());
+    nametagData.put("name", decryptField(participant.getUserName()));
     nametagData.put("department", participant.getDepartment());
     nametagData.put("position", participant.getPosition());
     nametagData.put("participantType", participant.getParticipantType());
     nametagData.put("checkCode", participant.getCheckCode());
+    nametagData.put("contact", decryptField(participant.getUserPhone()));
 
     return nametagData;
   }
@@ -82,7 +84,13 @@ public class NametagService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    return kr.wisead.domain.event.dto.NametagResponse.from(participant);
+    // DB에서 가져온 값은 AES256 + Base64로 암호화되어 있음
+    // 명찰에는 사람이 읽을 수 있는 값이 필요하므로 복호화
+    String decryptedName = decryptField(participant.getUserName());
+    String decryptedPhone = decryptField(participant.getUserPhone());
+
+    return kr.wisead.domain.event.dto.NametagResponse.from(participant, decryptedName,
+        decryptedPhone);
   }
 
   /** 명찰 출력 로그 기록 - checkCode 기반 (QR 스캔용) */
@@ -111,5 +119,20 @@ public class NametagService {
         checkCode,
         request.getTemplateType(),
         printBy);
+  }
+
+  /**
+   * 암호화된 필드 복호화 (AES256 + Base64)
+   */
+  private String decryptField(String encryptedValue) {
+    if (encryptedValue == null || encryptedValue.isEmpty()) {
+      return null;
+    }
+    try {
+      return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedValue));
+    } catch (Exception e) {
+      log.warn("필드 복호화 실패: {}", e.getMessage());
+      return encryptedValue; // 복호화 실패 시 원본 반환 (서비스 중단 방지)
+    }
   }
 }

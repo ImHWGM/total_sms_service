@@ -20,6 +20,7 @@ public class NametagResponse {
   private String participantType;
   private String checkCode;
   private String nametagPrinted;
+  private String contact; // 프론트엔드가 명찰에 연락처 표시용
 
   /** Entity -> Response 변환 */
   public static NametagResponse from(EventParticipant participant) {
@@ -33,6 +34,25 @@ public class NametagResponse {
         .participantType(participant.getParticipantType())
         .checkCode(participant.getCheckCode())
         .nametagPrinted(participant.getNametagPrinted())
+        .build();
+  }
+
+  /**
+   * Entity -> Response 변환 (이름, 연락처 언마스킹)
+   */
+  public static NametagResponse from(EventParticipant participant, String decryptedName,
+      String decryptedPhone) {
+    return NametagResponse.builder()
+        .participantSeq(participant.getSeq())
+        .eventSeq(participant.getEventSeq())
+        .eventName(participant.getEventName())
+        .name(decryptedName)
+        .department(participant.getDepartment())
+        .position(participant.getPosition())
+        .participantType(participant.getParticipantType())
+        .checkCode(participant.getCheckCode())
+        .nametagPrinted(participant.getNametagPrinted())
+        .contact(decryptedPhone)
         .build();
   }
 }

@@ -589,7 +589,9 @@ public class SurveyUserService {
   /** Entity to Response 변환 (복호화 + 마스킹 포함) */
   private SurveyUserResponse toResponse(SurveyUser user) {
     // 복호화
-    String decryptedPhone = decryptData(user.getResendUserPhone());
+    String decryptedPhone = decryptData(
+        user.getResendUserPhone() != null ? user.getResendUserPhone() : user.getUserPhone()
+    );
     String decryptedName = decryptData(user.getUserName());
     String decryptedJuminNum = decryptData(user.getJuminNum());
     String decryptedAddress = decryptData(user.getAddress());
@@ -630,6 +632,8 @@ public class SurveyUserService {
         .privacyPolicyTtl(user.getPrivacyPolicyTtl())
         .privacyPolicyDesc(user.getPrivacyPolicyDesc())
         .corpName(user.getCorpName())
+        .department(user.getDepartment())
+        .position(user.getPosition())
         .build();
   }
 
@@ -641,7 +645,9 @@ public class SurveyUserService {
    */
   private SurveyUserResponse toResponse(SurveyUser user, boolean masked) {
     // 복호화
-    String decryptedPhone = decryptData(user.getResendUserPhone());
+    String decryptedPhone = decryptData(
+        user.getResendUserPhone() != null ? user.getResendUserPhone() : user.getUserPhone()
+    );
     String decryptedName = decryptData(user.getUserName());
     String decryptedJuminNum = decryptData(user.getJuminNum());
     String decryptedAddress = decryptData(user.getAddress());
@@ -690,6 +696,8 @@ public class SurveyUserService {
         .privacyPolicyTtl(user.getPrivacyPolicyTtl())
         .privacyPolicyDesc(user.getPrivacyPolicyDesc())
         .corpName(user.getCorpName())
+        .department(user.getDepartment())
+        .position(user.getPosition())
         .build();
   }
 

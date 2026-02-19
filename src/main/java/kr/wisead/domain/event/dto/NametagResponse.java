@@ -21,6 +21,7 @@ public class NametagResponse {
   private String checkCode;
   private String nametagPrinted;
   private String contact; // 프론트엔드가 명찰에 연락처 표시용
+  private String nametagConfig; // 명찰 설정
 
   /** Entity -> Response 변환 */
   public static NametagResponse from(EventParticipant participant) {
@@ -34,6 +35,7 @@ public class NametagResponse {
         .participantType(participant.getParticipantType())
         .checkCode(participant.getCheckCode())
         .nametagPrinted(participant.getNametagPrinted())
+        .nametagConfig(participant.getNametagConfig())
         .build();
   }
 
@@ -53,6 +55,7 @@ public class NametagResponse {
         .checkCode(participant.getCheckCode())
         .nametagPrinted(participant.getNametagPrinted())
         .contact(decryptedPhone)
+        .nametagConfig(participant.getNametagConfig())
         .build();
   }
 }

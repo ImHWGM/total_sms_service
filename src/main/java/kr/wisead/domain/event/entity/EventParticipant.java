@@ -32,6 +32,7 @@ public class EventParticipant {
 
   // 조회용 필드 (SURVEY_MASTER JOIN)
   private String eventName; // 행사명
+  private String nametagConfig; // 명찰 설정
 
   // 조회용 필드 (엑셀 다운로드용)
   private String actionSummary; // 액션 수행 현황 요약

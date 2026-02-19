@@ -53,6 +53,8 @@ public class EventRequest {
 
   private String badgePrintType; // 서비스 옵션 (N:명찰출력, C:체크인카드)
 
+  private String nametagConfig; // 명찰 템플릿 설정 (JSON 문자열)
+
   // 문항 목록 (설문 생성 시)
   private List<QuestionRequest> questions;
 

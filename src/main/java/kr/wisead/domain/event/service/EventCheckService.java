@@ -26,6 +26,7 @@ public class EventCheckService {
   private final EventNametagLogMapper nametagLogMapper;
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
+  private final SurveyMasterMapper surveyMasterMapper;
 
   @Value("${wisead.url:http://localhost:8080}")
   private String wiseadUrl;
@@ -39,6 +40,25 @@ public class EventCheckService {
             .selectDetailByCheckCode(checkCode)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+
+    // 1.5. 행사 상태 검증
+    var event =
+        surveyMasterMapper
+            .selectByEventSeq(participant.getEventSeq())
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사 정보를 찾을 수 없습니다."));
+
+    if (!"P".equals(event.getStatus())) {
+      String statusName =
+          switch (event.getStatus()) {
+            case "A" -> "대기";
+            case "S" -> "중지";
+            case "F" -> "종료";
+            default -> "알 수 없음";
+          };
+      throw new BusinessException(
+          ErrorCode.INVALID_INPUT, "현재 행사 상태에서는 체크인할 수 없습니다. (행사 상태: " + statusName + ")");
+    }
 
     // 2. CHECK_IN 액션 유형 조회
     EventActionType checkInType =

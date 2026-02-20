@@ -350,7 +350,7 @@ public class EventParticipantService {
               position != null ? position.trim() : null,
               participantType,
               null, // memo
-              "엑셀등록", // registType
+              "사전등록", // registType
               null); // attendTime
       participantsToInsert.add(participant);
       successCount++;
@@ -764,6 +764,11 @@ public class EventParticipantService {
               row.put("소속", p.getDepartment());
               row.put("직책", p.getPosition());
               row.put("참가자 유형", p.getParticipantType());
+              row.put(
+                  "등록구분",
+                  p.getAttendTime() != null && !p.getAttendTime().isEmpty()
+                      ? p.getRegistType()
+                      : "미참석");
               row.put("명찰 출력", "Y".equals(p.getNametagPrinted()) ? "출력완료" : "미출력");
               row.put("액션 현황", p.getActionSummary());
               row.put("메모", p.getMemo());

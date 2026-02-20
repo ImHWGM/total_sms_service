@@ -50,7 +50,10 @@ public class EventParticipantResponse {
         .memo(entity.getMemo())
         .nametagPrinted(entity.getNametagPrinted())
         .attendTime(entity.getAttendTime())
-        .registType(entity.getRegistType())
+        .registType(
+            entity.getAttendTime() != null && !entity.getAttendTime().isEmpty()
+                ? entity.getRegistType()
+                : "미참석")
         .regDate(entity.getRegDate())
         .modDate(entity.getModDate())
         .userName(entity.getUserName())

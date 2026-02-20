@@ -27,7 +27,8 @@
 
     <sql id="selectDetailColumns">
         <include refid="selectWithUserColumns"/>,
-        M.EVENT_NAME as eventName
+        M.EVENT_NAME as eventName,
+        M.NAMETAG_CONFIG as nametagConfig
     </sql>
 
     <!-- 시퀀스로 조회 -->

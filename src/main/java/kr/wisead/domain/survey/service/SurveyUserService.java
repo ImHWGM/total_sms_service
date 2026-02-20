@@ -165,8 +165,9 @@ public class SurveyUserService {
       }
 
       // 마스킹 해제 로그 기록
+      String userName = userIdResolver.resolveUserName(userId);
       actionLogService.logPhoneMasking(
-          userId, userId, "UNMASK", reason, String.valueOf(page), httpRequest);
+          userId, userName, "UNMASK", reason, String.valueOf(page), httpRequest);
       log.info(
           "[마스킹해제] userId={}, eventSeq={}, page={}, reason={}", userId, eventSeq, page, reason);
     }

@@ -62,4 +62,30 @@ public class UserIdResolver {
       return jwtSubject;
     }
   }
+
+  /**
+   * userId로 사용자 이름(person) 조회 및 복호화 (null-safe)
+   */
+  public String resolveUserName(String userId) {
+    if (userId == null || userId.isBlank()) {
+      return userId;
+    }
+    try {
+      return userMapper.findByUserId(userId)
+          .map(user -> {
+            try {
+              String person = user.getPerson();
+              if (person == null) {
+                return userId;
+              }
+              return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(person));
+            } catch (Exception e) {
+              return userId;
+            }
+          })
+          .orElse(userId);
+    } catch (Exception e) {
+      return userId;
+    }
+  }
 }

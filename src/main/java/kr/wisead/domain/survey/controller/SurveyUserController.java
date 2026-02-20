@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.survey.dto.SurveyUserRequest;
 import kr.wisead.domain.survey.dto.SurveyUserResponse;
 import kr.wisead.domain.survey.service.SurveyUserService;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class SurveyUserController {
 
   private final SurveyUserService surveyUserService;
+  private final UserIdResolver userIdResolver;
 
   /**
    * 참여자 목록 조회 (검색 + 페이징) GET
@@ -59,7 +61,9 @@ public class SurveyUserController {
       @AuthenticationPrincipal UserDetails userDetails,
       jakarta.servlet.http.HttpServletRequest httpRequest) {
 
-    String userId = userDetails != null ? userDetails.getUsername() : "ANONYMOUS";
+    String userId = userDetails != null
+        ? userIdResolver.resolveUserId(userDetails.getUsername())
+        : "ANONYMOUS";
     log.info(
         "[발송조회 검색] userId={}, eventType={}, searchType={}, keyword={}, startDate={}, endDate={},"
             + " status={}, masked={}",

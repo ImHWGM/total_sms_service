@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.ars.dto.BlockedSenderResponse;
@@ -37,6 +39,7 @@ public class SendHistoryController {
     private final ActionLogService actionLogService;
     private final AdminService adminService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserIdResolver userIdResolver;
 
     /**
      * 발송 이력 목록 조회
@@ -54,7 +57,7 @@ public class SendHistoryController {
             @RequestHeader("Authorization") String token) {
 
         String accessToken = token.replace("Bearer ", "");
-        String userId = jwtTokenProvider.getUserId(accessToken);
+        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
         Integer userLevel = adminService.getUserLevel(userId);
 
         // 권한에 따른 조회 대상 설정
@@ -92,8 +95,8 @@ public class SendHistoryController {
             HttpServletResponse response) throws Exception {
 
         String accessToken = token.replace("Bearer ", "");
-        String userId = jwtTokenProvider.getUserId(accessToken);
-        String userName = jwtTokenProvider.getUserName(accessToken);
+        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+        String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
         Integer userLevel = adminService.getUserLevel(userId);
 
         // 다운로드 로그 기록
@@ -178,7 +181,8 @@ public class SendHistoryController {
             @RequestParam(defaultValue = "10") int size,
             @RequestHeader("Authorization") String token) {
 
-        String userId = jwtTokenProvider.getUserId(token.replace("Bearer ", ""));
+        String userId = userIdResolver.resolveUserId(
+            jwtTokenProvider.getUserId(token.replace("Bearer ", "")));
         // TODO: storeCode 조회 로직 필요 (사용자별 스토어 코드)
         String storeCode = userId; // 임시로 userId 사용
 
@@ -197,8 +201,8 @@ public class SendHistoryController {
             HttpServletRequest request) {
 
         String accessToken = token.replace("Bearer ", "");
-        String userId = jwtTokenProvider.getUserId(accessToken);
-        String userName = jwtTokenProvider.getUserName(accessToken);
+        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+        String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
 
         // 삭제 로그 기록
         actionLogService.logDownloadAction(userId, userName, "수신거부 삭제", "D",
@@ -219,8 +223,8 @@ public class SendHistoryController {
             HttpServletResponse response) throws Exception {
 
         String accessToken = token.replace("Bearer ", "");
-        String userId = jwtTokenProvider.getUserId(accessToken);
-        String userName = jwtTokenProvider.getUserName(accessToken);
+        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+        String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
         String storeCode = userId; // TODO: 스토어 코드 조회
 
         // 다운로드 로그 기록
@@ -274,4 +278,14 @@ public class SendHistoryController {
         log.info("수신거부 엑셀 다운로드 완료: userId={}, 건수={}", userId, blockedList.size());
     }
 
+    private String decryptName(String encryptedName) {
+        if (encryptedName == null) {
+            return null;
+        }
+        try {
+            return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedName));
+        } catch (Exception e) {
+            return encryptedName;
+        }
+    }
 }

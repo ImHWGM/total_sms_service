@@ -247,7 +247,7 @@ public class ExcelController {
           break;
         case "event-phone":
           sheet = excelService.createSheet(workbook, "수신자목록");
-          headers = Arrays.asList("이름", "전화번호", "대치번호1", "대치번호2");
+          headers = Arrays.asList("전화번호", "이름", "대치번호1", "대치번호2");
           fileName = "행사_수신자목록_템플릿.xlsx";
           break;
         case "survey":

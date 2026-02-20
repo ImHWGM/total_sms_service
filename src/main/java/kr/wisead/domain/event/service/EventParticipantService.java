@@ -70,6 +70,7 @@ public class EventParticipantService {
             .userKey(userKey)
             .userName(request.getUserName())
             .userPhone(encryptedPhone)
+            .resendUserPhone(encryptedPhone)
             .userEmail(request.getUserEmail())
             .delYn("N")
             .regId("ONSITE")
@@ -175,6 +176,7 @@ public class EventParticipantService {
             .userKey(userKey)
             .userName(request.getUserName())
             .userPhone(encryptedPhone)
+            .resendUserPhone(encryptedPhone)
             .userEmail(request.getUserEmail())
             .delYn("N")
             .regId(regId)
@@ -209,15 +211,14 @@ public class EventParticipantService {
   /** 참가자 엑셀 일괄 등록 */
   @Transactional
   public Map<String, Object> uploadParticipantExcel(
-          Integer eventSeq, MultipartFile file, String regId
-  ) {
+      Integer eventSeq, MultipartFile file, String regId) {
     Map<String, Object> result = new HashMap<>();
 
     // === 1단계 : 파일 기본 검증 ===
     // 확장자 검증
     String originalFilename = file.getOriginalFilename();
     if (originalFilename == null
-      || (!originalFilename.endsWith(".xlsx") && !originalFilename.endsWith(".xls"))) {
+        || (!originalFilename.endsWith(".xlsx") && !originalFilename.endsWith(".xls"))) {
       throw new BusinessException(ErrorCode.INVALID_FILE_TYPE, "엑셀 파일만 업로드 가능합니다. (.xlsx, .xls)");
     }
 
@@ -228,11 +229,10 @@ public class EventParticipantService {
 
     // === 2단계: 권한 체크 (기존 createParticipant와 동일) ===
     SurveyMaster event =
-            surveyMasterMapper
-                    .selectByEventSeq(eventSeq)
-                    .orElseThrow(
-                            () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트 정보를 찾을 수 없습니다.")
-                    );
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트 정보를 찾을 수 없습니다."));
     Integer userLevel = adminService.getUserLevel(regId);
     adminService.validateModifyPermission(regId, userLevel, event.getRegId());
 
@@ -240,7 +240,7 @@ public class EventParticipantService {
     // A: 이름, B: 전화번호, C: 이메일, D: 소속, E: 직급, F: 참여자유형
     // 2행부터 읽기 (1행은 헤더)
     List<Map<String, String>> excelContent =
-            excelService.readExcel(file, 2, "A", "B", "C", "D", "E", "F");
+        excelService.readExcel(file, 2, "A", "B", "C", "D", "E", "F");
 
     if (excelContent.isEmpty()) {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "엑셀 파일에 데이터가 없습니다.");
@@ -248,7 +248,8 @@ public class EventParticipantService {
 
     // 행 수 제한 (1,000행)
     if (excelContent.size() > 1000) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT, "최대 1,000행까지 등록 가능합니다. (현재: " + excelContent.size() + "행)");
+      throw new BusinessException(
+          ErrorCode.INVALID_INPUT, "최대 1,000행까지 등록 가능합니다. (현재: " + excelContent.size() + "행)");
     }
 
     // === 4단계: 행별 검증 및 데이터 수집 ===
@@ -270,7 +271,7 @@ public class EventParticipantService {
       String phone = row.get("B"); // 전화번호
       String email = row.get("C"); // 이메일
       String department = row.get("D"); // 소속
-      String position = row.get("E");   // 직급
+      String position = row.get("E"); // 직급
       String participantType = row.get("F"); // 참여자유형
 
       // ----- 필수값 검증 -----
@@ -308,8 +309,9 @@ public class EventParticipantService {
       }
 
       // ----- 참여자유형 기본값 처리 -----
-      if (participantType == null || participantType.trim().isEmpty()
-              || !validTypes.contains(participantType.trim())) {
+      if (participantType == null
+          || participantType.trim().isEmpty()
+          || !validTypes.contains(participantType.trim())) {
         participantType = "일반";
       } else {
         participantType = participantType.trim();
@@ -317,7 +319,7 @@ public class EventParticipantService {
       // ----- 중복 전화번호 검증 (같은 행사 내) -----
       String encryptedPhone = encryptPhone(cleanPhone);
       Optional<EventParticipant> existing =
-              participantMapper.selectByEventSeqAndPhone(eventSeq, encryptedPhone);
+          participantMapper.selectByEventSeqAndPhone(eventSeq, encryptedPhone);
       if (existing.isPresent()) {
         errors.add(rowNum + "행: 이미 등록된 전화번호입니다 (" + formatPhone(cleanPhone) + ").");
         failCount++;
@@ -328,27 +330,28 @@ public class EventParticipantService {
       // SurveyUser는 INSERT 후 생성된 seq를 가져와야 하므로 개별 insert
       String userKey = UUID.randomUUID().toString().replace("-", "");
       SurveyUser surveyUser =
-              SurveyUser.builder()
-                      .eventSeq(eventSeq)
-                      .userKey(userKey)
-                      .userName(name)
-                      .userPhone(encryptedPhone)
-                      .userEmail(email)
-                      .delYn("N")
-                      .regId(regId)
-                      .build();
+          SurveyUser.builder()
+              .eventSeq(eventSeq)
+              .userKey(userKey)
+              .userName(name)
+              .userPhone(encryptedPhone)
+              .resendUserPhone(encryptedPhone)
+              .userEmail(email)
+              .delYn("N")
+              .regId(regId)
+              .build();
       surveyUserMapper.insertForParticipant(surveyUser);
       // EventParticipant 생성 (나중에 batch insert)
       EventParticipant participant =
-              EventParticipant.create(
-                      surveyUser.getSeq(),
-                      eventSeq,
-                      department != null ? department.trim() : null,
-                      position != null ? position.trim() : null,
-                      participantType,
-                      null,         // memo
-                      "엑셀등록",   // registType
-                      null);        // attendTime
+          EventParticipant.create(
+              surveyUser.getSeq(),
+              eventSeq,
+              department != null ? department.trim() : null,
+              position != null ? position.trim() : null,
+              participantType,
+              null, // memo
+              "엑셀등록", // registType
+              null); // attendTime
       participantsToInsert.add(participant);
       successCount++;
     }
@@ -365,8 +368,11 @@ public class EventParticipantService {
       result.put("errors", errors);
     }
     log.info(
-            "참가자 엑셀 일괄 등록 완료 - eventSeq: {}, 전체: {}, 성공: {}, 실패: {}",
-            eventSeq, excelContent.size(), successCount, failCount);
+        "참가자 엑셀 일괄 등록 완료 - eventSeq: {}, 전체: {}, 성공: {}, 실패: {}",
+        eventSeq,
+        excelContent.size(),
+        successCount,
+        failCount);
     return result;
   }
 
@@ -424,6 +430,7 @@ public class EventParticipantService {
             .userKey(userKey)
             .userName(name)
             .userPhone(encryptedPhone)
+            .resendUserPhone(encryptedPhone)
             .delYn("N")
             .regId(regId)
             .build();

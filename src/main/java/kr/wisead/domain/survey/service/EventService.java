@@ -66,7 +66,8 @@ public class EventService {
     int total = surveyMasterMapper.selectCount(request);
     List<SurveyMaster> events = surveyMasterMapper.selectList(request);
 
-    List<EventResponse> content = events.stream().map(EventResponse::from).collect(Collectors.toList());
+    List<EventResponse> content =
+        events.stream().map(EventResponse::from).collect(Collectors.toList());
 
     return PageResponse.of(content, request.getPageNum(), request.getAmount(), total);
   }
@@ -74,10 +75,11 @@ public class EventService {
   /** 이벤트 상세 조회 */
   @Transactional(readOnly = true)
   public EventResponse getEventDetail(Integer eventSeq) {
-    SurveyMaster event = surveyMasterMapper
-        .selectByEventSeq(eventSeq)
-        .orElseThrow(
-            () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
 
     EventResponse response = EventResponse.from(event);
 
@@ -86,28 +88,29 @@ public class EventService {
     List<SurveyItem> allItems = surveyItemMapper.selectByEventSeq(eventSeq);
 
     // 문항 응답 변환
-    List<QuestionResponse> questionResponses = questions.stream()
-        .map(
-            q -> {
-              QuestionResponse qr = QuestionResponse.from(q);
-              // 객관식인 경우 보기 추가
-              if (q.isMultipleChoice()) {
-                List<ItemResponse> items = allItems.stream()
-                    .filter(item -> item.getQuestionSeq().equals(q.getQuestionSeq()))
-                    .map(ItemResponse::from)
-                    .collect(Collectors.toList());
-                qr = qr.withItems(items);
-              }
-              return qr;
-            })
-        .collect(Collectors.toList());
+    List<QuestionResponse> questionResponses =
+        questions.stream()
+            .map(
+                q -> {
+                  QuestionResponse qr = QuestionResponse.from(q);
+                  // 객관식인 경우 보기 추가
+                  if (q.isMultipleChoice()) {
+                    List<ItemResponse> items =
+                        allItems.stream()
+                            .filter(item -> item.getQuestionSeq().equals(q.getQuestionSeq()))
+                            .map(ItemResponse::from)
+                            .collect(Collectors.toList());
+                    qr = qr.withItems(items);
+                  }
+                  return qr;
+                })
+            .collect(Collectors.toList());
 
     return response.withQuestions(questionResponses);
   }
 
   /**
-   * 이벤트 생성 (이미지 파일 포함) - 설문 데이터와 이미지를 한번에 처리 (레거시 방식) - JSON 방식: 임시 경로로 업로드된 이미지를
-   * eventSeq 폴더로 이동 후
+   * 이벤트 생성 (이미지 파일 포함) - 설문 데이터와 이미지를 한번에 처리 (레거시 방식) - JSON 방식: 임시 경로로 업로드된 이미지를 eventSeq 폴더로 이동 후
    * 경로 업데이트
    */
   @Transactional
@@ -118,10 +121,10 @@ public class EventService {
       MultipartFile endImageFile,
       List<MultipartFile> questionImages,
       List<MultipartFile> itemImages) {
-    
+
     // 서비스 옵션(badgePrintType) 권한 검증
     Integer userLevel = adminService.getUserLevel(userId);
-    String badgePrintType = null;  // 기본값: null (← 빈값""에서 변경)
+    String badgePrintType = null; // 기본값: null (← 빈값""에서 변경)
     if (userLevel != null && userLevel >= 50) {
       badgePrintType = request.getBadgePrintType();
     } else if (request.getBadgePrintType() != null) {
@@ -157,33 +160,34 @@ public class EventService {
     }
 
     // 이벤트 저장 (이미지 경로는 나중에 업데이트)
-    SurveyMaster event = SurveyMaster.builder()
-        .userSeq(userSeq)
-        .eventCode(eventCode)
-        .eventName(request.getEventName())
-        .eventEmphasisYn(request.getEventEmphasisYn())
-        .eventDesc(request.getEventDesc())
-        .eventDescImg(null) // 임시 경로 대신 null로 저장, 이동 후 업데이트
-        .eventType(request.getEventType())
-        .startDate(request.getStartDate())
-        .endDate(request.getEndDate())
-        .status(request.getStatus() != null ? request.getStatus() : "A")
-        .privacyPolicyYn(request.getPrivacyPolicyYn())
-        .privacyPolicyTtl(request.getPrivacyPolicyTtl())
-        .privacyPolicyDesc(request.getPrivacyPolicyDesc())
-        .auth(request.getAuth())
-        .qrCode(request.getQrCode())
-        .authCodeUrl(authCodeUrl)
-        .qrCodeImgPath(qrCodeImgPath)
-        .endMessage(request.getEndMessage())
-        .venue(request.getVenue())
-        .organizer(request.getOrganizer())
-//        .badgePrintYn(request.getBadgePrintYn())
-        .badgePrintType(badgePrintType) // request에서 바로 가져오지 않고, 유효성 검사를 거친 값을 저장한다.
-        .nametagConfig(request.getNametagConfig())
-        .eventEndImg(null) // 임시 경로 대신 null로 저장, 이동 후 업데이트
-        .regId(actualUserId)
-        .build();
+    SurveyMaster event =
+        SurveyMaster.builder()
+            .userSeq(userSeq)
+            .eventCode(eventCode)
+            .eventName(request.getEventName())
+            .eventEmphasisYn(request.getEventEmphasisYn())
+            .eventDesc(request.getEventDesc())
+            .eventDescImg(null) // 임시 경로 대신 null로 저장, 이동 후 업데이트
+            .eventType(request.getEventType())
+            .startDate(request.getStartDate())
+            .endDate(request.getEndDate())
+            .status(request.getStatus() != null ? request.getStatus() : "A")
+            .privacyPolicyYn(request.getPrivacyPolicyYn())
+            .privacyPolicyTtl(request.getPrivacyPolicyTtl())
+            .privacyPolicyDesc(request.getPrivacyPolicyDesc())
+            .auth(request.getAuth())
+            .qrCode(request.getQrCode())
+            .authCodeUrl(authCodeUrl)
+            .qrCodeImgPath(qrCodeImgPath)
+            .endMessage(request.getEndMessage())
+            .venue(request.getVenue())
+            .organizer(request.getOrganizer())
+            //        .badgePrintYn(request.getBadgePrintYn())
+            .badgePrintType(badgePrintType) // request에서 바로 가져오지 않고, 유효성 검사를 거친 값을 저장한다.
+            .nametagConfig(request.getNametagConfig())
+            .eventEndImg(null) // 임시 경로 대신 null로 저장, 이동 후 업데이트
+            .regId(actualUserId)
+            .build();
 
     surveyMasterMapper.insert(event);
 
@@ -209,7 +213,8 @@ public class EventService {
 
         // 이동된 경로로 DB 업데이트
         if (request.getEventDescImg() != null && !request.getEventDescImg().isEmpty()) {
-          String newDescImgPath = convertTempPathToEventPath(request.getEventDescImg(), eventSeqStr);
+          String newDescImgPath =
+              convertTempPathToEventPath(request.getEventDescImg(), eventSeqStr);
           surveyMasterMapper.updateDescImg(eventSeq, newDescImgPath);
           log.info("설명 이미지 경로 업데이트 - eventSeq: {}, path: {}", eventSeq, newDescImgPath);
         }
@@ -244,8 +249,7 @@ public class EventService {
   }
 
   /**
-   * 임시 경로에서 tempId 추출 예:
-   * "https://api.example.com/files/survey/temp_f1ce16db/Desc.png" → "f1ce16db"
+   * 임시 경로에서 tempId 추출 예: "https://api.example.com/files/survey/temp_f1ce16db/Desc.png" → "f1ce16db"
    */
   private String extractTempIdFromPath(String path) {
     if (path == null || path.isEmpty()) {
@@ -269,8 +273,7 @@ public class EventService {
   }
 
   /**
-   * 임시 경로를 eventSeq 기반 경로로 변환 예:
-   * "https://api.example.com/files/survey/temp_f1ce16db/Desc.png" →
+   * 임시 경로를 eventSeq 기반 경로로 변환 예: "https://api.example.com/files/survey/temp_f1ce16db/Desc.png" →
    * "https://api.example.com/files/survey/181/Desc.png"
    */
   private String convertTempPathToEventPath(String tempPath, String eventSeq) {
@@ -282,8 +285,7 @@ public class EventService {
   }
 
   /**
-   * 이벤트 수정 (이미지 파일 포함) - 설문 데이터와 이미지를 한번에 처리 (레거시 방식) - JSON 방식: 임시 경로로 업로드된 이미지를
-   * eventSeq 폴더로 이동 후
+   * 이벤트 수정 (이미지 파일 포함) - 설문 데이터와 이미지를 한번에 처리 (레거시 방식) - JSON 방식: 임시 경로로 업로드된 이미지를 eventSeq 폴더로 이동 후
    * 경로 업데이트
    */
   @Transactional
@@ -295,10 +297,11 @@ public class EventService {
       MultipartFile endImageFile,
       List<MultipartFile> questionImages,
       List<MultipartFile> itemImages) {
-    SurveyMaster event = surveyMasterMapper
-        .selectByEventSeq(eventSeq)
-        .orElseThrow(
-            () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
 
     // 권한 체크: 이벤트 소유자 또는 A레벨만 수정 가능
     Integer userLevel = adminService.getUserLevel(uptId);
@@ -340,16 +343,13 @@ public class EventService {
       // 문항/답항 이미지에서 tempId 추출 시도
       for (QuestionRequest qReq : request.getQuestions()) {
         tempId = extractTempIdFromPath(qReq.getQuestionImg());
-        if (tempId != null)
-          break;
+        if (tempId != null) break;
         if (qReq.getItems() != null) {
           for (ItemRequest iReq : qReq.getItems()) {
             tempId = extractTempIdFromPath(iReq.getItemImg());
-            if (tempId != null)
-              break;
+            if (tempId != null) break;
           }
-          if (tempId != null)
-            break;
+          if (tempId != null) break;
         }
       }
     }
@@ -448,10 +448,11 @@ public class EventService {
   /** 이벤트 상태 변경 */
   @Transactional
   public void updateEventStatus(Integer eventSeq, String status, String userId) {
-    SurveyMaster event = surveyMasterMapper
-        .selectByEventSeq(eventSeq)
-        .orElseThrow(
-            () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
 
     // 권한 체크: 이벤트 소유자 또는 A레벨만 수정 가능
     Integer userLevel = adminService.getUserLevel(userId);
@@ -464,10 +465,11 @@ public class EventService {
   /** 설문 통계 조회 */
   @Transactional(readOnly = true)
   public SurveyStatisticsResponse getStatistics(Integer eventSeq) {
-    SurveyMaster event = surveyMasterMapper
-        .selectByEventSeq(eventSeq)
-        .orElseThrow(
-            () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
 
     // 참여자 통계
     int totalParticipants = surveyUserMapper.countByEventSeq(eventSeq);
@@ -475,53 +477,60 @@ public class EventService {
     int absentees = surveyUserMapper.countAbsenteesByEventSeq(eventSeq);
     int lurkers = surveyUserMapper.countLurkersByEventSeq(eventSeq);
 
-    Double responseRate = totalParticipants > 0 ? (double) completedParticipants / totalParticipants * 100 : 0.0;
+    Double responseRate =
+        totalParticipants > 0 ? (double) completedParticipants / totalParticipants * 100 : 0.0;
 
     // 문항별 통계
     List<SurveyQuestion> questions = surveyQuestionMapper.selectByEventSeq(eventSeq);
     List<SurveyItem> allItems = surveyItemMapper.selectByEventSeq(eventSeq);
 
-    List<SurveyStatisticsResponse.QuestionStatistics> questionStats = questions.stream()
-        .map(
-            q -> {
-              int totalAnswers = surveyAnswerMapper.countByQuestionSeq(eventSeq, q.getQuestionSeq());
+    List<SurveyStatisticsResponse.QuestionStatistics> questionStats =
+        questions.stream()
+            .map(
+                q -> {
+                  int totalAnswers =
+                      surveyAnswerMapper.countByQuestionSeq(eventSeq, q.getQuestionSeq());
 
-              List<SurveyStatisticsResponse.ItemStatistics> itemStats = null;
-              if (q.isMultipleChoice()) {
-                itemStats = allItems.stream()
-                    .filter(item -> item.getQuestionSeq().equals(q.getQuestionSeq()))
-                    .map(
-                        item -> {
-                          int count;
-                          if (q.isMultiSelect()) {
-                            count = surveyAnswerMapper.countByItemValueMCM(
-                                eventSeq, q.getQuestionSeq(), item.getItemValue());
-                          } else {
-                            count = surveyAnswerMapper.countByItemSeq(
-                                eventSeq, q.getQuestionSeq(), item.getItemSeq());
-                          }
-                          double percentage = totalAnswers > 0 ? (double) count / totalAnswers * 100 : 0.0;
+                  List<SurveyStatisticsResponse.ItemStatistics> itemStats = null;
+                  if (q.isMultipleChoice()) {
+                    itemStats =
+                        allItems.stream()
+                            .filter(item -> item.getQuestionSeq().equals(q.getQuestionSeq()))
+                            .map(
+                                item -> {
+                                  int count;
+                                  if (q.isMultiSelect()) {
+                                    count =
+                                        surveyAnswerMapper.countByItemValueMCM(
+                                            eventSeq, q.getQuestionSeq(), item.getItemValue());
+                                  } else {
+                                    count =
+                                        surveyAnswerMapper.countByItemSeq(
+                                            eventSeq, q.getQuestionSeq(), item.getItemSeq());
+                                  }
+                                  double percentage =
+                                      totalAnswers > 0 ? (double) count / totalAnswers * 100 : 0.0;
 
-                          return SurveyStatisticsResponse.ItemStatistics.builder()
-                              .itemSeq(item.getItemSeq())
-                              .item(item.getItem())
-                              .itemValue(item.getItemValue())
-                              .count(count)
-                              .percentage(percentage)
-                              .build();
-                        })
-                    .collect(Collectors.toList());
-              }
+                                  return SurveyStatisticsResponse.ItemStatistics.builder()
+                                      .itemSeq(item.getItemSeq())
+                                      .item(item.getItem())
+                                      .itemValue(item.getItemValue())
+                                      .count(count)
+                                      .percentage(percentage)
+                                      .build();
+                                })
+                            .collect(Collectors.toList());
+                  }
 
-              return SurveyStatisticsResponse.QuestionStatistics.builder()
-                  .questionSeq(q.getQuestionSeq())
-                  .question(q.getQuestion())
-                  .questionType(q.getQuestionType())
-                  .totalAnswers(totalAnswers)
-                  .itemStatistics(itemStats)
-                  .build();
-            })
-        .collect(Collectors.toList());
+                  return SurveyStatisticsResponse.QuestionStatistics.builder()
+                      .questionSeq(q.getQuestionSeq())
+                      .question(q.getQuestion())
+                      .questionType(q.getQuestionType())
+                      .totalAnswers(totalAnswers)
+                      .itemStatistics(itemStats)
+                      .build();
+                })
+            .collect(Collectors.toList());
 
     return SurveyStatisticsResponse.builder()
         .eventSeq(eventSeq)
@@ -554,10 +563,11 @@ public class EventService {
   @Transactional
   public void addAuthKey(Integer eventSeq, String authCode, String regId) {
     // 이벤트 존재 확인 및 권한 체크
-    SurveyMaster event = surveyMasterMapper
-        .selectByEventSeq(eventSeq)
-        .orElseThrow(
-            () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
 
     Integer userLevel = adminService.getUserLevel(regId);
     adminService.validateModifyPermission(regId, userLevel, event.getRegId());
@@ -575,7 +585,8 @@ public class EventService {
     surveyUserMapper.insert(user);
 
     // AuthUserMapping 등록
-    AuthUserMapping mapping = AuthUserMapping.create(eventSeq, user.getSeq(), userKey, authCode, regId);
+    AuthUserMapping mapping =
+        AuthUserMapping.create(eventSeq, user.getSeq(), userKey, authCode, regId);
     authUserMappingMapper.insert(mapping);
 
     log.info("범용인증키 추가 - eventSeq: {}, authCode: {}", eventSeq, authCode);
@@ -585,10 +596,11 @@ public class EventService {
   @Transactional
   public void deleteAuthKey(Integer eventSeq, String userKey, String userId) {
     // 이벤트 존재 확인 및 권한 체크
-    SurveyMaster event = surveyMasterMapper
-        .selectByEventSeq(eventSeq)
-        .orElseThrow(
-            () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
 
     Integer userLevel = adminService.getUserLevel(userId);
     adminService.validateModifyPermission(userId, userLevel, event.getRegId());
@@ -616,14 +628,15 @@ public class EventService {
     for (QuestionRequest qReq : questions) {
       int questionOrder = qReq.getOrder() != null ? qReq.getOrder() : order;
 
-      SurveyQuestion question = SurveyQuestion.create(
-          eventSeq,
-          qReq.getQuestionType(),
-          qReq.getQuestionTypeDetail(),
-          qReq.getQuestion(),
-          questionOrder,
-          qReq.getForeignAllow(),
-          regId);
+      SurveyQuestion question =
+          SurveyQuestion.create(
+              eventSeq,
+              qReq.getQuestionType(),
+              qReq.getQuestionTypeDetail(),
+              qReq.getQuestion(),
+              questionOrder,
+              qReq.getForeignAllow(),
+              regId);
 
       // JSON 방식: 문항 이미지 경로 변환 후 저장
       if (qReq.getQuestionImg() != null && !qReq.getQuestionImg().isEmpty()) {
@@ -640,13 +653,14 @@ public class EventService {
         for (ItemRequest iReq : qReq.getItems()) {
           int currentItemOrder = iReq.getOrder() != null ? iReq.getOrder() : itemOrder;
 
-          SurveyItem item = SurveyItem.create(
-              eventSeq,
-              question.getQuestionSeq(),
-              iReq.getItem(),
-              iReq.getItemValue(),
-              currentItemOrder,
-              regId);
+          SurveyItem item =
+              SurveyItem.create(
+                  eventSeq,
+                  question.getQuestionSeq(),
+                  iReq.getItem(),
+                  iReq.getItemValue(),
+                  currentItemOrder,
+                  regId);
 
           // JSON 방식: 항목 이미지 경로 변환 후 저장
           if (iReq.getItemImg() != null && !iReq.getItemImg().isEmpty()) {
@@ -672,8 +686,7 @@ public class EventService {
   }
 
   /**
-   * 문항 저장 (레거시 방식 - MultipartFile 이미지 포함) - 파일명 규칙: questionImages는
-   * "{questionOrder}.{ext}",
+   * 문항 저장 (레거시 방식 - MultipartFile 이미지 포함) - 파일명 규칙: questionImages는 "{questionOrder}.{ext}",
    * itemImages는 "{questionOrder}_{itemOrder}.{ext}"
    */
   private void saveQuestionsWithImages(
@@ -714,9 +727,10 @@ public class EventService {
           String fileName = file.getOriginalFilename();
           if (fileName != null) {
             // 확장자 제거 후 파싱
-            String nameWithoutExt = fileName.contains(".")
-                ? fileName.substring(0, fileName.lastIndexOf('.'))
-                : fileName;
+            String nameWithoutExt =
+                fileName.contains(".")
+                    ? fileName.substring(0, fileName.lastIndexOf('.'))
+                    : fileName;
             if (nameWithoutExt.contains("_")) {
               itemImageMap.put(nameWithoutExt, file); // "1_1" → file
             }
@@ -729,20 +743,22 @@ public class EventService {
     for (QuestionRequest qReq : questions) {
       int questionOrder = qReq.getOrder() != null ? qReq.getOrder() : order;
 
-      SurveyQuestion question = SurveyQuestion.create(
-          eventSeq,
-          qReq.getQuestionType(),
-          qReq.getQuestionTypeDetail(),
-          qReq.getQuestion(),
-          questionOrder,
-          qReq.getForeignAllow(),
-          regId);
+      SurveyQuestion question =
+          SurveyQuestion.create(
+              eventSeq,
+              qReq.getQuestionType(),
+              qReq.getQuestionTypeDetail(),
+              qReq.getQuestion(),
+              questionOrder,
+              qReq.getForeignAllow(),
+              regId);
       surveyQuestionMapper.insert(question);
 
       // 문항 이미지 저장
       MultipartFile questionImgFile = questionImageMap.get(questionOrder);
       if (questionImgFile != null) {
-        String questionImgPath = fileStorageService.storeSurveyQuestionImg(questionImgFile, eventSeqStr, questionOrder);
+        String questionImgPath =
+            fileStorageService.storeSurveyQuestionImg(questionImgFile, eventSeqStr, questionOrder);
         surveyQuestionMapper.updateQuestionImg(
             eventSeq, question.getQuestionSeq(), questionImgPath);
         log.info(
@@ -758,13 +774,14 @@ public class EventService {
         for (ItemRequest iReq : qReq.getItems()) {
           int currentItemOrder = iReq.getOrder() != null ? iReq.getOrder() : itemOrder;
 
-          SurveyItem item = SurveyItem.create(
-              eventSeq,
-              question.getQuestionSeq(),
-              iReq.getItem(),
-              iReq.getItemValue(),
-              currentItemOrder,
-              regId);
+          SurveyItem item =
+              SurveyItem.create(
+                  eventSeq,
+                  question.getQuestionSeq(),
+                  iReq.getItem(),
+                  iReq.getItemValue(),
+                  currentItemOrder,
+                  regId);
           if (iReq.getJumpQuestion() != null) {
             item.setJumpQuestion(iReq.getJumpQuestion());
           }
@@ -774,8 +791,9 @@ public class EventService {
           String itemImageKey = questionOrder + "_" + currentItemOrder;
           MultipartFile itemImgFile = itemImageMap.get(itemImageKey);
           if (itemImgFile != null) {
-            String itemImgPath = fileStorageService.storeSurveyItemImg(
-                itemImgFile, eventSeqStr, questionOrder, currentItemOrder);
+            String itemImgPath =
+                fileStorageService.storeSurveyItemImg(
+                    itemImgFile, eventSeqStr, questionOrder, currentItemOrder);
             surveyItemMapper.updateItemImg(
                 eventSeq, question.getQuestionSeq(), item.getItemSeq(), itemImgPath);
             log.info(
@@ -797,14 +815,15 @@ public class EventService {
   private void saveQuestions(Integer eventSeq, List<QuestionRequest> questions, String regId) {
     int order = 1;
     for (QuestionRequest qReq : questions) {
-      SurveyQuestion question = SurveyQuestion.create(
-          eventSeq,
-          qReq.getQuestionType(),
-          qReq.getQuestionTypeDetail(),
-          qReq.getQuestion(),
-          qReq.getOrder() != null ? qReq.getOrder() : order,
-          qReq.getForeignAllow(),
-          regId);
+      SurveyQuestion question =
+          SurveyQuestion.create(
+              eventSeq,
+              qReq.getQuestionType(),
+              qReq.getQuestionTypeDetail(),
+              qReq.getQuestion(),
+              qReq.getOrder() != null ? qReq.getOrder() : order,
+              qReq.getForeignAllow(),
+              regId);
       if (qReq.getQuestionImg() != null) {
         question.setQuestionImg(qReq.getQuestionImg());
       }
@@ -814,13 +833,14 @@ public class EventService {
       if (qReq.getItems() != null && !qReq.getItems().isEmpty()) {
         int itemOrder = 1;
         for (ItemRequest iReq : qReq.getItems()) {
-          SurveyItem item = SurveyItem.create(
-              eventSeq,
-              question.getQuestionSeq(),
-              iReq.getItem(),
-              iReq.getItemValue(),
-              iReq.getOrder() != null ? iReq.getOrder() : itemOrder,
-              regId);
+          SurveyItem item =
+              SurveyItem.create(
+                  eventSeq,
+                  question.getQuestionSeq(),
+                  iReq.getItem(),
+                  iReq.getItemValue(),
+                  iReq.getOrder() != null ? iReq.getOrder() : itemOrder,
+                  regId);
           if (iReq.getItemImg() != null) {
             item.setItemImg(iReq.getItemImg());
           }
@@ -861,10 +881,11 @@ public class EventService {
   @Transactional
   public void updateAuthKeyDesc(Integer eventSeq, String authKeyDesc, String userId) {
     // 이벤트 존재 확인 및 권한 체크
-    SurveyMaster event = surveyMasterMapper
-        .selectByEventSeq(eventSeq)
-        .orElseThrow(
-            () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
 
     Integer userLevel = adminService.getUserLevel(userId);
     adminService.validateModifyPermission(userId, userLevel, event.getRegId());
@@ -877,10 +898,11 @@ public class EventService {
   @Transactional
   public List<String> generateUserKeys(Integer eventSeq, int count, String regId) {
     // 이벤트 존재 확인 및 권한 체크
-    SurveyMaster event = surveyMasterMapper
-        .selectByEventSeq(eventSeq)
-        .orElseThrow(
-            () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
 
     Integer userLevel = adminService.getUserLevel(regId);
     adminService.validateModifyPermission(regId, userLevel, event.getRegId());
@@ -1000,7 +1022,8 @@ public class EventService {
       surveyUserMapper.insert(user);
 
       // AuthUserMapping 생성
-      AuthUserMapping mapping = AuthUserMapping.create(eventSeq, user.getSeq(), userKey, authCode, regId);
+      AuthUserMapping mapping =
+          AuthUserMapping.create(eventSeq, user.getSeq(), userKey, authCode, regId);
       authUserMappingMapper.insert(mapping);
 
       successCount++;
@@ -1021,17 +1044,17 @@ public class EventService {
   }
 
   /**
-   * 이벤트 결과 엑셀 다운로드 데이터 생성 (4개 시트) - 시트1: 개요 (기본정보, 배포현황, 참여현황, 응답시간) - 시트2:
-   * 전체_응답결과 (문항별 통계) - 시트3:
+   * 이벤트 결과 엑셀 다운로드 데이터 생성 (4개 시트) - 시트1: 개요 (기본정보, 배포현황, 참여현황, 응답시간) - 시트2: 전체_응답결과 (문항별 통계) - 시트3:
    * 개별전체(응답자) (응답자 행동분석 + 응답) - 시트4: 개별전체(비응답자) (미응답자 목록)
    */
   @Transactional(readOnly = true)
   public byte[] generateEventResultExcel(Integer eventSeq) {
     // 이벤트 조회
-    SurveyMaster event = surveyMasterMapper
-        .selectByEventSeq(eventSeq)
-        .orElseThrow(
-            () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
 
     // 문항 목록 조회
     List<SurveyQuestion> questions = surveyQuestionMapper.selectByEventSeq(eventSeq);
@@ -1118,7 +1141,8 @@ public class EventService {
     // 제목
     Row titleRow = sheet.createRow(rowIdx++);
     Cell titleCell = titleRow.createCell(0);
-    String eventName = event.getEventName() != null ? event.getEventName().replaceAll("[{}]", "") : "";
+    String eventName =
+        event.getEventName() != null ? event.getEventName().replaceAll("[{}]", "") : "";
     titleCell.setCellValue(eventName);
     titleCell.setCellStyle(titleStyle);
     sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 3));
@@ -1139,9 +1163,10 @@ public class EventService {
 
     // 기간
     Row row2 = sheet.createRow(rowIdx++);
-    String period = (event.getStartDate() != null ? event.getStartDate() : "")
-        + " ~ "
-        + (event.getEndDate() != null ? event.getEndDate() : "");
+    String period =
+        (event.getStartDate() != null ? event.getStartDate() : "")
+            + " ~ "
+            + (event.getEndDate() != null ? event.getEndDate() : "");
     createLabelValueRow(row2, 0, "기간", period, labelStyle, valueStyle);
     sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 1, 3));
 
@@ -1233,7 +1258,8 @@ public class EventService {
     for (SurveyQuestion question : questions) {
       // 문항 제목
       Row qRow = sheet.createRow(rowIdx++);
-      String qTypeText = getQuestionTypeText(question.getQuestionType(), question.getQuestionTypeDetail());
+      String qTypeText =
+          getQuestionTypeText(question.getQuestionType(), question.getQuestionTypeDetail());
       String qText = "Q" + question.getOrder() + qTypeText + question.getQuestion();
 
       Cell qCell = qRow.createCell(0);
@@ -1252,18 +1278,21 @@ public class EventService {
         createCell(headerRow, 1, "응답자수(명)", itemHeaderStyle);
         createCell(headerRow, 2, "응답률(%)", itemHeaderStyle);
 
-        List<SurveyItem> items = allItems.stream()
-            .filter(item -> item.getQuestionSeq().equals(question.getQuestionSeq()))
-            .collect(Collectors.toList());
+        List<SurveyItem> items =
+            allItems.stream()
+                .filter(item -> item.getQuestionSeq().equals(question.getQuestionSeq()))
+                .collect(Collectors.toList());
 
         for (SurveyItem item : items) {
           int count;
           if (question.isMultiSelect()) {
-            count = surveyAnswerMapper.countByItemValueMCM(
-                eventSeq, question.getQuestionSeq(), item.getItemValue());
+            count =
+                surveyAnswerMapper.countByItemValueMCM(
+                    eventSeq, question.getQuestionSeq(), item.getItemValue());
           } else {
-            count = surveyAnswerMapper.countByItemSeq(
-                eventSeq, question.getQuestionSeq(), item.getItemSeq());
+            count =
+                surveyAnswerMapper.countByItemSeq(
+                    eventSeq, question.getQuestionSeq(), item.getItemSeq());
           }
 
           Row itemRow = sheet.createRow(rowIdx++);
@@ -1357,19 +1386,22 @@ public class EventService {
       createCell(dataRow, 1, "-", normalStyle);
 
       // 접속일시
-      String surveyStartTime = participant.getSurveyStartTime() != null
-          ? participant.getSurveyStartTime().format(dateTimeFormatter)
-          : "-";
+      String surveyStartTime =
+          participant.getSurveyStartTime() != null
+              ? participant.getSurveyStartTime().format(dateTimeFormatter)
+              : "-";
       createCell(dataRow, 2, surveyStartTime, normalStyle);
 
       // 응답일시
-      String submissionDate = participant.getSubmissionDate() != null
-          ? participant.getSubmissionDate().format(dateTimeFormatter)
-          : "-";
+      String submissionDate =
+          participant.getSubmissionDate() != null
+              ? participant.getSubmissionDate().format(dateTimeFormatter)
+              : "-";
       createCell(dataRow, 3, submissionDate, normalStyle);
 
       // 문항별 응답
-      Map<Integer, String> userAnswers = userAnswersMap.getOrDefault(participant.getSeq(), new HashMap<>());
+      Map<Integer, String> userAnswers =
+          userAnswersMap.getOrDefault(participant.getSeq(), new HashMap<>());
       for (int i = 0; i < questions.size(); i++) {
         SurveyQuestion question = questions.get(i);
         String answer = userAnswers.get(question.getQuestionSeq());
@@ -1421,9 +1453,10 @@ public class EventService {
       createCell(dataRow, 1, "-", normalStyle);
 
       // 접속일시
-      String surveyStartTime = absentee.getSurveyStartTime() != null
-          ? absentee.getSurveyStartTime().format(dateTimeFormatter)
-          : "-";
+      String surveyStartTime =
+          absentee.getSurveyStartTime() != null
+              ? absentee.getSurveyStartTime().format(dateTimeFormatter)
+              : "-";
       createCell(dataRow, 2, surveyStartTime, normalStyle);
     }
   }
@@ -1545,12 +1578,44 @@ public class EventService {
     }
   }
 
-  /**
-   * QR 코드 이미지 생성
-   *
-   * @param authCodeUrl QR 코드가 가리킬 인증 URL 코드
-   * @return QR 코드 이미지 상대 경로 (예: /qrcode/xxx.png)
-   */
+  /** 현장등록 QR 코드 생성 */
+  @Transactional
+  public String generateOnsiteRegistrationQrCode(Integer eventSeq, String userId) {
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+    // 권한 검증
+    Integer userLevel = adminService.getUserLevel(userId);
+    adminService.validateModifyPermission(userId, userLevel, event.getRegId());
+
+    // 현장등록 페이지 URL로 QR 코드 생성
+    String qrContents = wiseadUrl + "/event/register/" + event.getEventCode();
+    String savePath = uploadDir + "/qrcode/";
+
+    QrCodeUtils qrCodeUtils = new QrCodeUtils();
+    String fileName = qrCodeUtils.createQrCode(qrContents, savePath);
+
+    if (fileName == null || fileName.isEmpty()) {
+      throw new BusinessException(ErrorCode.INTERNAL_ERROR, "QR 코드 생성에 실패했습니다.");
+    }
+
+    String qrCodeImgPath = "/qrcode/" + fileName;
+
+    // SURVEY_MASTER QR 정보 업데이트
+    surveyMasterMapper.updateQrCode(eventSeq, "Y", qrCodeImgPath);
+
+    log.info(
+        "현장등록 QR 코드 생성 완료 - eventSeq: {}, eventCode: {}, path: {}",
+        eventSeq,
+        event.getEventCode(),
+        qrCodeImgPath);
+
+    return qrCodeImgPath;
+  }
+
   private String generateQrCodeImage(String authCodeUrl) {
     try {
       QrCodeUtils qrCodeUtils = new QrCodeUtils();

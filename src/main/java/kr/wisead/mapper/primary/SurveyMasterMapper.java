@@ -2,6 +2,7 @@ package kr.wisead.mapper.primary;
 
 import java.util.List;
 import java.util.Optional;
+import kr.wisead.domain.statistics.dto.UserQrStatsResponse;
 import kr.wisead.domain.survey.dto.EventSearchRequest;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import org.apache.ibatis.annotations.Mapper;
@@ -55,8 +56,14 @@ public interface SurveyMasterMapper {
   int updateAuthKeyDesc(
       @Param("eventSeq") Integer eventSeq, @Param("authKeyDesc") String authKeyDesc);
 
+  /** QR코드 정보 업데이트 */
+  int updateQrCode(
+      @Param("eventSeq") Integer eventSeq,
+      @Param("qrCode") String qrCode,
+      @Param("qrCodeImgPath") String qrCodeImgPath);
+
   /** 사용자별 QR 통계 조회 */
-  List<kr.wisead.domain.statistics.dto.UserQrStatsResponse> selectQrStatsByUser(
+  List<UserQrStatsResponse> selectQrStatsByUser(
       @Param("startDate") String startDate,
       @Param("endDate") String endDate,
       @Param("userId") String userId,

@@ -205,6 +205,15 @@
         WHERE EVENT_SEQ = #{eventSeq}
     </update>
 
+    <!-- QR코드 정보 업데이트 -->
+    <update id="updateQrCode">
+        UPDATE SURVEY_MASTER
+        SET QR_CODE = #{qrCode},
+            QR_CODE_IMG_PATH = #{qrCodeImgPath},
+            UPT_DATE = NOW()
+        WHERE EVENT_SEQ = #{eventSeq}
+    </update>
+
     <!-- 만료된 이벤트 상태 업데이트 -->
     <update id="updateExpiredEventsStatus">
         UPDATE SURVEY_MASTER

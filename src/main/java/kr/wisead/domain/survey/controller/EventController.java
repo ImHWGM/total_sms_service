@@ -103,6 +103,15 @@ public class EventController {
     return ApiResponse.success(null);
   }
 
+  /** 현장등록 QR 코드 생성 */
+  @PostMapping("/{eventSeq}/onsite-qrcode")
+  public ApiResponse<Map<String, String>> generateOnsiteQrCode(
+      @AuthenticationPrincipal UserDetails userDetails, @PathVariable Integer eventSeq) {
+    String userId = userDetails.getUsername();
+    String qrCodeImgPath = eventService.generateOnsiteRegistrationQrCode(eventSeq, userId);
+    return ApiResponse.success(Map.of("qrCodeImgPath", qrCodeImgPath), "QR 코드가 생성되었습니다.");
+  }
+
   /** 설문 통계 조회 */
   @GetMapping("/{eventSeq}/statistics")
   public ApiResponse<SurveyStatisticsResponse> getStatistics(@PathVariable Integer eventSeq) {

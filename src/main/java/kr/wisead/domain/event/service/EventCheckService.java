@@ -75,7 +75,7 @@ public class EventCheckService {
     EventParticipantResponse participantResponse = EventParticipantResponse.from(participant);
 
     if (alreadyCheckedIn) {
-      return EventCheckResponse.alreadyCheckedIn(participantResponse);
+      return EventCheckResponse.alreadyCheckedIn(participantResponse, event.getBadgePrintType());
     }
 
     // 4. 체크인 로그 등록
@@ -97,7 +97,7 @@ public class EventCheckService {
         participant.getSeq(),
         participant.getUserName());
 
-    return EventCheckResponse.checkIn(participantResponse, nametagUrl);
+    return EventCheckResponse.checkIn(participantResponse, nametagUrl, event.getBadgePrintType());
   }
 
   /** 액션 처리 (관리자용) */

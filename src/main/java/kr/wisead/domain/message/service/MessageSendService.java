@@ -57,6 +57,9 @@ public class MessageSendService {
   @Value("${wisead.url:https://wisead.kr}")
   private String wiseadUrl;
 
+  @Value("${api.base.url:}")
+  private String apiBaseUrl;
+
   /**
    * 일반 문자 발송 (SMS/LMS/MMS) MSG_QUEUE 테이블에 등록하면 외부 에이전트가 발송 처리
    *
@@ -275,6 +278,10 @@ public class MessageSendService {
 
     List<MsgResultResponse> content = results.stream().map(MsgResultResponse::from).toList();
 
+    if (apiBaseUrl != null && !apiBaseUrl.isEmpty()) {
+      content.forEach(r -> r.withFullImageUrls(apiBaseUrl));
+    }
+
     return PageResponse.of(content, request.getPageNum(), request.getAmount(), total);
   }
 
@@ -452,6 +459,10 @@ public class MessageSendService {
     List<MsgQueue> results = msgQueueMapper.findPendingByRegIdPaging(regId, offset, size);
 
     List<MsgQueueResponse> content = results.stream().map(MsgQueueResponse::from).toList();
+
+    if (apiBaseUrl != null && !apiBaseUrl.isEmpty()) {
+      content.forEach(r -> r.withFullImageUrls(apiBaseUrl));
+    }
 
     return PageResponse.of(content, page, size, total);
   }

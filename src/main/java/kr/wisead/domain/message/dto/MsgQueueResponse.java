@@ -1,6 +1,7 @@
 package kr.wisead.domain.message.dto;
 
 import java.time.LocalDateTime;
+import kr.wisead.common.util.UrlUtils;
 import kr.wisead.domain.message.entity.MsgQueue;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -99,6 +100,13 @@ public class MsgQueueResponse {
         .sendType(null)
         .regId(entity.getExtCol3())
         .build();
+  }
+
+  /** 파일 경로를 절대 URL로 변환 */
+  public void withFullImageUrls(String apiBaseUrl) {
+    this.fileloc1 = UrlUtils.toAbsoluteUrl(this.fileloc1, apiBaseUrl);
+    this.fileloc2 = UrlUtils.toAbsoluteUrl(this.fileloc2, apiBaseUrl);
+    this.fileloc3 = UrlUtils.toAbsoluteUrl(this.fileloc3, apiBaseUrl);
   }
 
   private static String getMsgTypeName(String msgType) {

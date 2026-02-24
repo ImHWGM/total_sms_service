@@ -11,6 +11,8 @@ import java.util.List;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.dto.*;
 import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
@@ -41,6 +43,7 @@ public class AdminController {
   private final ActionLogService actionLogService;
   private final ExcelService excelService;
   private final JwtTokenProvider jwtTokenProvider;
+  private final UserIdResolver userIdResolver;
 
   /** 관리자 계정 생성 POST /api/admin/account */
   @PostMapping("/account")
@@ -102,8 +105,8 @@ public class AdminController {
       HttpServletRequest httpRequest) {
 
     String accessToken = extractToken(token);
-    String userId = jwtTokenProvider.getUserId(accessToken);
-    String userName = jwtTokenProvider.getUserName(accessToken);
+    String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+    String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
 
     // 다운로드 로그 기록
     actionLogService.logDownloadAction(userId, userName, "로그관리 엑셀다운로드", "D", "업무용", httpRequest);
@@ -180,8 +183,8 @@ public class AdminController {
       HttpServletRequest httpRequest) {
 
     String accessToken = extractToken(token);
-    String userId = jwtTokenProvider.getUserId(accessToken);
-    String userName = jwtTokenProvider.getUserName(accessToken);
+    String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+    String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
 
     try {
       actionLogService.logPhoneMasking(
@@ -209,8 +212,8 @@ public class AdminController {
       HttpServletRequest httpRequest) {
 
     String accessToken = extractToken(token);
-    String userId = jwtTokenProvider.getUserId(accessToken);
-    String userName = jwtTokenProvider.getUserName(accessToken);
+    String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+    String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
 
     actionLogService.logDownloadAction(userId, userName, menuName, "D", reason, httpRequest);
 
@@ -265,5 +268,16 @@ public class AdminController {
   /** Authorization 헤더에서 Bearer 토큰 추출 */
   private String extractToken(String authHeader) {
     return authHeader.replace(BEARER_PREFIX, "");
+  }
+
+  private String decryptName(String encryptedName) {
+    if (encryptedName == null) {
+      return null;
+    }
+    try {
+      return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedName));
+    } catch (Exception e) {
+      return encryptedName;
+    }
   }
 }

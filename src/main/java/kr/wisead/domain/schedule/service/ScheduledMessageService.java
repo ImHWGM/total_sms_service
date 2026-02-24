@@ -15,10 +15,11 @@ import kr.wisead.domain.schedule.entity.ScheduledMessage;
 import kr.wisead.mapper.sms.ScheduledMessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 예약 메시지 서비스 (리팩토링 버전) - BalanceService 사용 */
+/** 예약 메시지 서비스 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -27,6 +28,9 @@ public class ScheduledMessageService {
   private final ScheduledMessageMapper scheduledMessageMapper;
   private final BalanceService balanceService;
   private final WalletService walletService;
+
+  @Value("${api.base.url:}")
+  private String apiBaseUrl;
 
   /** 예약 메시지 목록 조회 */
   @Transactional(readOnly = true)
@@ -49,6 +53,10 @@ public class ScheduledMessageService {
     List<ScheduledMessageResponse> responses =
         messages.stream().map(ScheduledMessageResponse::from).toList();
 
+    if (apiBaseUrl != null && !apiBaseUrl.isEmpty()) {
+      responses.forEach(r -> r.withFullImageUrls(apiBaseUrl));
+    }
+
     return PageResponse.of(responses, request.getPage(), request.getSize(), total);
   }
 
@@ -56,7 +64,11 @@ public class ScheduledMessageService {
   @Transactional(readOnly = true)
   public ScheduledMessageResponse getMessageById(int mSeq, String userId) {
     ScheduledMessage message = scheduledMessageMapper.selectMessageById(mSeq, userId);
-    return ScheduledMessageResponse.from(message);
+    ScheduledMessageResponse response = ScheduledMessageResponse.from(message);
+    if (response != null && apiBaseUrl != null && !apiBaseUrl.isEmpty()) {
+      response.withFullImageUrls(apiBaseUrl);
+    }
+    return response;
   }
 
   /** 예약 시간 변경 */

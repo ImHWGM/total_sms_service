@@ -44,6 +44,10 @@
                 EXT_COL1,
                 EXT_COL2,
                 EXT_COL3,
+                FILECNT,
+                FILELOC1,
+                FILELOC2,
+                FILELOC3,
                 ROW_NUMBER() OVER (PARTITION BY
                     CASE
                         WHEN EXT_COL0 IS NULL THEN EXT_COL1
@@ -105,7 +109,11 @@
             EXT_COL1 as extCol1,
             EXT_COL2 as extCol2,
             EXT_COL3 as extCol3,
-            message_count as messageCount
+            message_count as messageCount,
+            FILECNT as fileCnt,
+            FILELOC1 as fileLoc1,
+            FILELOC2 as fileLoc2,
+            FILELOC3 as fileLoc3
         FROM grouped_data
         WHERE rn = 1
         ORDER BY INSERT_TIME DESC, EXT_COL1 DESC

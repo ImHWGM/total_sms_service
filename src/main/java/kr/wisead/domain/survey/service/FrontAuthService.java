@@ -9,6 +9,7 @@ import javax.crypto.Cipher;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
+import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.survey.dto.KeypadResponse;
 import kr.wisead.domain.survey.dto.PhoneValidationRequest;
 import kr.wisead.domain.survey.dto.SurveyUserResponse;
@@ -133,15 +134,19 @@ public class FrontAuthService {
   @Transactional(readOnly = true)
   public SurveyUserResponse validatePhone(PhoneValidationRequest request) {
     String phone = normalizePhone(request.getPhone());
+    String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(phone));
 
     Optional<SurveyUser> userOpt;
 
     if (!CommonUtils.isNullOrEmpty(request.getEventCode())) {
       // 이벤트 코드로 검증
-      userOpt = surveyUserMapper.selectByEventCodeAndResendPhone(request.getEventCode(), phone);
+      userOpt =
+          surveyUserMapper.selectByEventCodeAndResendPhone(request.getEventCode(), encryptedPhone);
     } else if (!CommonUtils.isNullOrEmpty(request.getAuthCodeUrl())) {
       // QR 코드 URL로 검증
-      userOpt = surveyUserMapper.selectByAuthCodeUrlAndResendPhone(request.getAuthCodeUrl(), phone);
+      userOpt =
+          surveyUserMapper.selectByAuthCodeUrlAndResendPhone(
+              request.getAuthCodeUrl(), encryptedPhone);
     } else {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "이벤트 코드 또는 QR코드 URL이 필요합니다.");
     }
@@ -161,7 +166,8 @@ public class FrontAuthService {
   @Transactional(readOnly = true)
   public boolean checkPhoneExists(String eventCode, String phone) {
     String normalizedPhone = normalizePhone(phone);
-    return surveyUserMapper.existsByEventCodeAndResendPhone(eventCode, normalizedPhone);
+    String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(normalizedPhone));
+    return surveyUserMapper.existsByEventCodeAndResendPhone(eventCode, encryptedPhone);
   }
 
   /** 가상 키패드 데이터 생성 (RSA 키쌍) */

@@ -33,6 +33,7 @@ public class EventParticipantService {
   private final EventNametagLogMapper nametagLogMapper;
   private final SurveyUserMapper surveyUserMapper;
   private final SurveyMasterMapper surveyMasterMapper;
+  private final SmsSendMapper smsSendMapper;
   private final AdminService adminService;
   private final ExcelService excelService;
 
@@ -376,10 +377,13 @@ public class EventParticipantService {
     return result;
   }
 
-  /** 문자 발송용 참가자 전체 목록 조회 (페이징 없음) */
+  /** 문자 발송용 참가자 전체 목록 조회 (페이징 없음, 발송 이력 포함) */
   @Transactional(readOnly = true)
   public List<ParticipantForMessageResponse> getParticipantsForMessage(Integer eventSeq) {
     List<EventParticipant> participants = participantMapper.selectByEventSeq(eventSeq);
+
+    // sms_send에서 발송 이력이 있는 userSeq 조회
+    Set<Integer> sentUserSeqs = new HashSet<>(smsSendMapper.selectSentUserSeqs(eventSeq));
 
     return participants.stream()
         .map(
@@ -393,6 +397,7 @@ public class EventParticipantService {
                     .department(p.getDepartment())
                     .position(p.getPosition())
                     .participantType(p.getParticipantType())
+                    .messageSent(sentUserSeqs.contains(p.getSurveyUserSeq()))
                     .build())
         .collect(Collectors.toList());
   }

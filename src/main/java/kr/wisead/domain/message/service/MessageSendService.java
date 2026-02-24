@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import kr.wisead.common.exception.BusinessException;
@@ -23,9 +24,11 @@ import kr.wisead.domain.message.dto.*;
 import kr.wisead.domain.message.dto.EventMessageRequest.Receiver;
 import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.message.entity.MsgResult;
+import kr.wisead.domain.message.entity.SmsSend;
 import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
+import kr.wisead.mapper.primary.SmsSendMapper;
 import kr.wisead.mapper.primary.SurveyMasterMapper;
 import kr.wisead.mapper.primary.SurveyUserMapper;
 import kr.wisead.mapper.sms.MsgQueueMapper;
@@ -46,6 +49,7 @@ public class MessageSendService {
   private final MsgResultMapper msgResultMapper;
   private final SurveyUserMapper surveyUserMapper;
   private final SurveyMasterMapper surveyMasterMapper;
+  private final SmsSendMapper smsSendMapper;
   private final WalletService walletService;
   private final UserIdResolver userIdResolver;
   private final EventParticipantService eventParticipantService;
@@ -235,6 +239,7 @@ public class MessageSendService {
     }
 
     msgQueueMapper.insertForSurvey(msgQueue);
+    recordSmsSend(eventSeq, userSeq, subject, text, "1", dstaddr, callback, regId);
     log.info(
         "설문 문자 발송 등록 - eventSeq: {}, userSeq: {}, mseq: {}", eventSeq, userSeq, msgQueue.getMseq());
 
@@ -595,6 +600,15 @@ public class MessageSendService {
     }
 
     msgQueueMapper.insertLms(msgQueue);
+    recordSmsSend(
+        eventSeq,
+        userSeq,
+        finalSubject,
+        finalText,
+        "1",
+        normalizePhoneNumber(dstaddr),
+        finalCallback,
+        regId);
     log.info("설문 재발송 완료 - userSeq: {}, mseq: {}", userSeq, msgQueue.getMseq());
 
     return msgQueue.getMseq();
@@ -704,6 +718,15 @@ public class MessageSendService {
                 realUserId);
 
         msgQueueMapper.insertLms(msgQueue);
+        recordSmsSend(
+            request.getEventSeq(),
+            receiver.getUserSeq(),
+            request.getSubject(),
+            text,
+            "1",
+            phone,
+            request.getCallback(),
+            regId);
         successCount++;
 
       } catch (Exception e) {
@@ -745,8 +768,7 @@ public class MessageSendService {
 
   /** 이벤트 시퀀스 기반으로 조회할 msg_result 테이블명 목록 생성 설문 시작일 -1개월부터 현재 월까지, 실제 존재하는 테이블만 반환 */
   private List<String> getResultTableNames(Integer eventSeq) {
-    DateTimeFormatter TABLE_MONTH_FMT =
-        DateTimeFormatter.ofPattern("yyyyMM");
+    DateTimeFormatter TABLE_MONTH_FMT = DateTimeFormatter.ofPattern("yyyyMM");
     LocalDate now = LocalDate.now();
     LocalDate startMonth = now.minusMonths(1); // 기본: 1개월 전
 
@@ -755,8 +777,7 @@ public class MessageSendService {
       try {
         SurveyMaster survey = surveyMasterMapper.selectByEventSeq(eventSeq).orElse(null);
         if (survey != null && survey.getStartDate() != null && !survey.getStartDate().isEmpty()) {
-          LocalDate surveyStart =
-              LocalDate.parse(survey.getStartDate().substring(0, 10));
+          LocalDate surveyStart = LocalDate.parse(survey.getStartDate().substring(0, 10));
           startMonth = surveyStart.minusMonths(1);
         }
       } catch (Exception e) {
@@ -783,7 +804,7 @@ public class MessageSendService {
                 return false;
               }
             })
-        .collect(java.util.stream.Collectors.toList());
+        .toList();
   }
 
   /** 예약 시간 파싱 - 두 가지 형식 지원 (yyyyMMddHHmmss, yyyy-MM-dd HH:mm:ss) */
@@ -807,7 +828,7 @@ public class MessageSendService {
     if (text == null || text.isEmpty()) {
       return null;
     }
-    Pattern pattern = java.util.regex.Pattern.compile("https?://[\\w.-]*epopkon\\.com[^\\s]*");
+    Pattern pattern = Pattern.compile("https?://[\\w.-]*epopkon\\.com[^\\s]*");
     Matcher matcher = pattern.matcher(text);
     if (matcher.find()) {
       return matcher.group();
@@ -839,8 +860,7 @@ public class MessageSendService {
 
     // 중복 번호 제거
     if (request.isDelDuplicateNum()) {
-      java.util.Map<String, SurveyMessageRequest.Receiver> uniqueMap =
-          new java.util.LinkedHashMap<>();
+      Map<String, SurveyMessageRequest.Receiver> uniqueMap = new LinkedHashMap<>();
       for (SurveyMessageRequest.Receiver r : receivers) {
         String phone = r.getNormalizedPhone();
         if (uniqueMap.putIfAbsent(phone, r) != null) {
@@ -855,7 +875,7 @@ public class MessageSendService {
           receivers.size());
     }
 
-    String txGroupId = java.util.UUID.randomUUID().toString().replace("-", "");
+    String txGroupId = UUID.randomUUID().toString().replace("-", "");
     int successCount = 0;
     int failCount = 0;
     List<String> failedPhones = new ArrayList<>();
@@ -908,6 +928,15 @@ public class MessageSendService {
 
         // LMS로 발송
         msgQueueMapper.insertLms(msgQueue);
+        recordSmsSend(
+            request.getEventSeq(),
+            receiver.getUserSeq(),
+            request.getSubject(),
+            text,
+            "1",
+            phone,
+            request.getNormalizedCallback(),
+            regId);
 
         mseqList.add(msgQueue.getMseq());
         successCount++;
@@ -959,8 +988,7 @@ public class MessageSendService {
 
     // 중복 번호 제거
     if (request.isDelDuplicateNum()) {
-      Map<String, Receiver> uniqueMap =
-          new LinkedHashMap<>();
+      Map<String, Receiver> uniqueMap = new LinkedHashMap<>();
       for (EventMessageRequest.Receiver r : receivers) {
         String phone = r.getNormalizedPhone();
         if (uniqueMap.putIfAbsent(phone, r) != null) {
@@ -1074,6 +1102,15 @@ public class MessageSendService {
 
         // LMS로 발송
         msgQueueMapper.insertLms(msgQueue);
+        recordSmsSend(
+            request.getEventSeq(),
+            surveyUserSeq,
+            request.getSubject(),
+            text,
+            "1",
+            phone,
+            request.getNormalizedCallback(),
+            regId);
 
         mseqList.add(msgQueue.getMseq());
         successCount++;
@@ -1101,6 +1138,33 @@ public class MessageSendService {
   }
 
   // ==================== Private Helper Methods ====================
+
+  /** sms_send 발송 이력 기록 (실패 시 로그만 남기고 발송 자체는 성공 처리) */
+  private void recordSmsSend(
+      Integer eventSeq,
+      Integer userSeq,
+      String subject,
+      String content,
+      String sendType,
+      String receivedNum,
+      String callback,
+      String regId) {
+    if (eventSeq == null || userSeq == null) {
+      return;
+    }
+    try {
+      SmsSend smsSend =
+          SmsSend.create(
+              eventSeq, userSeq, subject, content, sendType, receivedNum, callback, regId);
+      smsSendMapper.insert(smsSend);
+    } catch (Exception e) {
+      log.warn(
+          "sms_send 발송 이력 기록 실패 - eventSeq: {}, userSeq: {}, error: {}",
+          eventSeq,
+          userSeq,
+          e.getMessage());
+    }
+  }
 
   /** 대치문자 처리 (#대치문자1#, #대치문자2#, #대치문자3# 치환) */
   private String applyReplaceChars(

@@ -124,7 +124,8 @@ public class FileDownloadController {
   @GetMapping({
     "/qrcode/{fileName:.+}",
     "/files/qrcode/{fileName:.+}",
-    "/survey/qrcode/{fileName:.+}"
+    "/survey/qrcode/{fileName:.+}",
+    "/survey/qvey/qrcode/{fileName:.+}"
   })
   public ResponseEntity<Resource> serveQrCodeFile(@PathVariable String fileName) throws Exception {
     Path filePath = validateAndResolvePath(qrFileStorageLocation, "qrcode", fileName);

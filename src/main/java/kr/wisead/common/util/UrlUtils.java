@@ -1,7 +1,14 @@
 package kr.wisead.common.util;
 
+import lombok.extern.slf4j.Slf4j;
+
 /** URL 관련 유틸리티 */
+@Slf4j
 public final class UrlUtils {
+
+  private static final String[] KNOWN_PATH_SEGMENTS = {
+    "/survey/", "/qrcode/", "/mmsfile/", "/template/", "/bizreg/"
+  };
 
   private UrlUtils() {}
 
@@ -12,10 +19,6 @@ public final class UrlUtils {
    * @param baseUrl base URL (예: https://api.example.com)
    * @return 절대 URL 또는 원본 (null/empty/이미 절대 URL인 경우)
    */
-  private static final String[] KNOWN_PATH_SEGMENTS = {
-    "/survey/", "/qrcode/", "/mmsfile/", "/template/", "/bizreg/"
-  };
-
   public static String toAbsoluteUrl(String path, String baseUrl) {
     if (path == null || path.isEmpty()) {
       return path;
@@ -44,6 +47,7 @@ public final class UrlUtils {
         return normalized.substring(idx);
       }
     }
+    log.warn("레거시 경로에서 알려진 세그먼트를 찾을 수 없음: {}", absolutePath);
     return absolutePath;
   }
 }

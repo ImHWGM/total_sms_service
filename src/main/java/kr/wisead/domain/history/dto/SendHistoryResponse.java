@@ -1,5 +1,6 @@
 package kr.wisead.domain.history.dto;
 
+import kr.wisead.common.util.UrlUtils;
 import kr.wisead.domain.history.entity.SendHistory;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -60,6 +61,11 @@ public class SendHistoryResponse {
                 .sendType(entity.getExtCol2())
                 .senderId(entity.getExtCol3())
                 .build();
+    }
+
+    /** 파일 경로를 절대 URL로 변환 */
+    public void withFullImageUrls(String apiBaseUrl) {
+        this.fileLoc = UrlUtils.toAbsoluteUrl(this.fileLoc, apiBaseUrl);
     }
 
     /**

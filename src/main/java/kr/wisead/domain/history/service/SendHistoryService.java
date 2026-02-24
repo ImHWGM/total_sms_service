@@ -12,6 +12,7 @@ import kr.wisead.domain.history.entity.SendHistory;
 import kr.wisead.mapper.sms.SendHistoryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,9 @@ public class SendHistoryService {
 
   private final SendHistoryMapper sendHistoryMapper;
   private final ArsService arsService;
+
+  @Value("${api.base.url:}")
+  private String apiBaseUrl;
 
   /** 발송 이력 목록 조회 (여러 월 테이블 조회) */
   @Transactional(readOnly = true)
@@ -95,6 +99,10 @@ public class SendHistoryService {
 
     List<SendHistoryResponse> responses =
         allResults.stream().map(SendHistoryResponse::from).toList();
+
+    if (apiBaseUrl != null && !apiBaseUrl.isEmpty()) {
+      responses.forEach(r -> r.withFullImageUrls(apiBaseUrl));
+    }
 
     return PageResponse.of(responses, request.getPage(), request.getSize(), totalCount);
   }

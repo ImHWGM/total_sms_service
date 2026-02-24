@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Date;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.privacy.dto.PrivacyPreviewRequest;
 import kr.wisead.domain.privacy.service.PrivacyConsentPdfService;
 import kr.wisead.security.jwt.JwtTokenProvider;
@@ -27,6 +28,7 @@ public class PrivacyConsentController {
 
   private final PrivacyConsentPdfService privacyConsentPdfService;
   private final JwtTokenProvider jwtTokenProvider;
+  private final UserIdResolver userIdResolver;
 
   /** 단건 개인정보제공동의서 PDF 다운로드 GET /api/privacy-consent/download/user/{userSeq}/event/{eventSeq} */
   @GetMapping("/download/user/{userSeq}/event/{eventSeq}")
@@ -37,7 +39,8 @@ public class PrivacyConsentController {
       @RequestParam(value = "language", defaultValue = "ko") String language,
       @RequestHeader("Authorization") String token) {
 
-    String requestUserId = jwtTokenProvider.getUserId(extractToken(token));
+    String requestUserId = userIdResolver.resolveUserId(
+        jwtTokenProvider.getUserId(extractToken(token)));
 
     try {
       log.info(
@@ -102,7 +105,8 @@ public class PrivacyConsentController {
       @RequestParam(value = "language", defaultValue = "ko") String language,
       @RequestHeader("Authorization") String token) {
 
-    String requestUserId = jwtTokenProvider.getUserId(extractToken(token));
+    String requestUserId = userIdResolver.resolveUserId(
+        jwtTokenProvider.getUserId(extractToken(token)));
 
     try {
       log.info(
@@ -153,7 +157,8 @@ public class PrivacyConsentController {
   public ResponseEntity<byte[]> previewPrivacyConsent(
       @RequestBody PrivacyPreviewRequest request, @RequestHeader("Authorization") String token) {
 
-    String requestUserId = jwtTokenProvider.getUserId(extractToken(token));
+    String requestUserId = userIdResolver.resolveUserId(
+        jwtTokenProvider.getUserId(extractToken(token)));
     String previewTitle = request.getTitle() != null ? request.getTitle() : "Unknown";
 
     try {

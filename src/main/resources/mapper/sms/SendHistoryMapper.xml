@@ -145,4 +145,14 @@
         LIMIT 1
     </select>
 
+    <!-- 행사별 발송 결과 통계 (EXT_COL0 = eventSeq) -->
+    <select id="selectMessageStatsByEventSeq" resultType="map">
+        SELECT
+            COUNT(*) as totalSent,
+            SUM(CASE WHEN RESULT = '0' THEN 1 ELSE 0 END) as successCount,
+            SUM(CASE WHEN RESULT IS NOT NULL AND RESULT != '0' THEN 1 ELSE 0 END) as failCount
+        FROM ${tableName}
+        WHERE EXT_COL0 = #{eventSeq}
+    </select>
+
 </mapper>

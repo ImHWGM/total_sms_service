@@ -258,6 +258,19 @@
         AND T.ACTION_CODE = 'CHECK_IN'
     </select>
 
+    <!-- 등록구분별 통계 (registType 기준) -->
+    <select id="selectRegistTypeStats" resultType="map">
+        SELECT
+            SUM(CASE WHEN P.REGIST_TYPE = '사전등록' THEN 1 ELSE 0 END) as preRegisteredCount,
+            SUM(CASE WHEN P.REGIST_TYPE = '현장등록' THEN 1 ELSE 0 END) as onsiteRegisteredCount,
+            SUM(CASE WHEN P.REGIST_TYPE = '불참석' THEN 1 ELSE 0 END) as absentCount,
+            SUM(CASE WHEN P.REGIST_TYPE IS NULL OR P.REGIST_TYPE = '' OR P.REGIST_TYPE = '미등록' THEN 1 ELSE 0 END) as unregisteredCount
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+    </select>
+
     <!-- 이벤트 + 이름으로 참가자 조회 (인증용 1차 필터링) -->
     <select id="selectByEventSeqAndUserName" resultType="kr.wisead.domain.event.entity.EventParticipant">
         SELECT

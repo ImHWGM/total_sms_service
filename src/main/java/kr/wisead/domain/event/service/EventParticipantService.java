@@ -1,6 +1,9 @@
 package kr.wisead.domain.event.service;
 
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
@@ -14,6 +17,8 @@ import kr.wisead.domain.excel.service.ExcelService;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
 import kr.wisead.mapper.primary.*;
+import kr.wisead.mapper.sms.MsgQueueMapper;
+import kr.wisead.mapper.sms.SendHistoryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +39,8 @@ public class EventParticipantService {
   private final SurveyUserMapper surveyUserMapper;
   private final SurveyMasterMapper surveyMasterMapper;
   private final SmsSendMapper smsSendMapper;
+  private final MsgQueueMapper msgQueueMapper;
+  private final SendHistoryMapper sendHistoryMapper;
   private final AdminService adminService;
   private final ExcelService excelService;
 
@@ -677,6 +684,13 @@ public class EventParticipantService {
     double checkedInRate =
         totalCount > 0 ? Math.round((double) checkedInCount / totalCount * 1000) / 10.0 : 0;
 
+    // 등록구분별 통계 (registType)
+    Map<String, Object> registTypeStats = participantMapper.selectRegistTypeStats(eventSeq);
+    int preRegisteredCount = getIntValue(registTypeStats, "preRegisteredCount");
+    int onsiteRegisteredCount = getIntValue(registTypeStats, "onsiteRegisteredCount");
+    int absentCount = getIntValue(registTypeStats, "absentCount");
+    int unregisteredCount = getIntValue(registTypeStats, "unregisteredCount");
+
     // 참가자 유형별 통계
     List<Map<String, Object>> typeStats = participantMapper.selectParticipantTypeStats(eventSeq);
     List<EventStatisticsResponse.ParticipantTypeStat> byType =
@@ -696,8 +710,25 @@ public class EventParticipantService {
             .checkedInCount(checkedInCount)
             .notCheckedInCount(notCheckedInCount)
             .checkedInRate(checkedInRate)
+            .preRegisteredCount(preRegisteredCount)
+            .onsiteRegisteredCount(onsiteRegisteredCount)
+            .absentCount(absentCount)
+            .unregisteredCount(unregisteredCount)
             .byType(byType)
             .build();
+
+    // RSVP 통계 (같은 registType 데이터, 다른 관점)
+    EventStatisticsResponse.RsvpSummary rsvpSummary =
+        EventStatisticsResponse.RsvpSummary.builder()
+            .totalCount(totalCount)
+            .attendCount(preRegisteredCount)
+            .absentCount(absentCount)
+            .noResponseCount(unregisteredCount)
+            .onsiteRegisteredCount(onsiteRegisteredCount)
+            .build();
+
+    // 문자 발송 통계
+    EventStatisticsResponse.MessageSummary messageSummary = buildMessageSummary(event, eventSeq);
 
     // 액션별 통계
     List<Map<String, Object>> actionStats = actionLogMapper.selectActionStatsByEventSeq(eventSeq);
@@ -743,6 +774,8 @@ public class EventParticipantService {
         .eventSeq(eventSeq)
         .eventName(event.getEventName())
         .participantSummary(participantSummary)
+        .rsvpSummary(rsvpSummary)
+        .messageSummary(messageSummary)
         .actionStatistics(actionStatistics)
         .nametagSummary(nametagSummary)
         .build();
@@ -794,6 +827,73 @@ public class EventParticipantService {
     } catch (NumberFormatException e) {
       return 0;
     }
+  }
+
+  /** 문자 발송 통계 조회 (msg_result_YYYYMM + msg_queue) */
+  private EventStatisticsResponse.MessageSummary buildMessageSummary(
+      SurveyMaster event, Integer eventSeq) {
+    int totalSent = 0;
+    int successCount = 0;
+    int failCount = 0;
+
+    // msg_result_YYYYMM에서 완료된 발송 통계 조회 (행사 기간의 월별 테이블)
+    try {
+      List<String> tableNames = getResultTableNames(event.getStartDate());
+      for (String tableName : tableNames) {
+        try {
+          Map<String, Object> stats =
+              sendHistoryMapper.selectMessageStatsByEventSeq(tableName, eventSeq);
+          if (stats != null) {
+            totalSent += getIntValue(stats, "totalSent");
+            successCount += getIntValue(stats, "successCount");
+            failCount += getIntValue(stats, "failCount");
+          }
+        } catch (Exception e) {
+          log.debug("msg_result 테이블 조회 실패 (테이블 미존재 가능): {}", tableName);
+        }
+      }
+    } catch (Exception e) {
+      log.warn("문자 발송 통계 조회 실패 - eventSeq: {}, error: {}", eventSeq, e.getMessage());
+    }
+
+    // msg_queue에서 대기 중인 발송 건수
+    int pendingCount = 0;
+    try {
+      pendingCount = msgQueueMapper.countPendingByEventSeq(eventSeq);
+    } catch (Exception e) {
+      log.warn("대기 발송 건수 조회 실패 - eventSeq: {}, error: {}", eventSeq, e.getMessage());
+    }
+
+    totalSent += pendingCount;
+
+    return EventStatisticsResponse.MessageSummary.builder()
+        .totalSent(totalSent)
+        .successCount(successCount)
+        .failCount(failCount)
+        .pendingCount(pendingCount)
+        .build();
+  }
+
+  /** 행사 시작일 기준으로 현재까지의 msg_result_YYYYMM 테이블명 목록 생성 */
+  private List<String> getResultTableNames(String startDateStr) {
+    List<String> tableNames = new ArrayList<>();
+    DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyyMM");
+    YearMonth startMonth;
+    try {
+      LocalDate startDate = LocalDate.parse(startDateStr.substring(0, 10));
+      startMonth = YearMonth.from(startDate);
+    } catch (Exception e) {
+      // 파싱 실패 시 현재 월만 조회
+      startMonth = YearMonth.now();
+    }
+
+    YearMonth currentMonth = YearMonth.now();
+    YearMonth month = startMonth;
+    while (!month.isAfter(currentMonth)) {
+      tableNames.add("msg_result_" + month.format(monthFormatter));
+      month = month.plusMonths(1);
+    }
+    return tableNames;
   }
 
   private String formatPhone(String phone) {

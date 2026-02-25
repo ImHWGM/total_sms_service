@@ -193,4 +193,12 @@
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
+    <!-- 행사별 대기 중인 발송 건수 -->
+    <select id="countPendingByEventSeq" resultType="int">
+        SELECT COUNT(*)
+        FROM msg_queue
+        WHERE EXT_COL0 = #{eventSeq}
+        AND STAT IN ('0', '1', '2')
+    </select>
+
 </mapper>

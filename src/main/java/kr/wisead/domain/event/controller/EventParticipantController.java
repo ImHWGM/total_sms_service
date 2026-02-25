@@ -48,11 +48,11 @@ public class EventParticipantController {
   /** 참가자 엑셀 일괄 등록 */
   @PostMapping("/batch")
   public ApiResponse<Map<String, Object>> uploadParticipantExcel(
-          @PathVariable Integer eventSeq,
-          @RequestParam("file") MultipartFile file,
-          @AuthenticationPrincipal UserDetails userDetails) {
+      @PathVariable Integer eventSeq,
+      @RequestParam("file") MultipartFile file,
+      @AuthenticationPrincipal UserDetails userDetails) {
     Map<String, Object> result =
-            participantService.uploadParticipantExcel(eventSeq, file, userDetails.getUsername());
+        participantService.uploadParticipantExcel(eventSeq, file, userDetails.getUsername());
     return ApiResponse.success(result, "일괄 등록 완료");
   }
 
@@ -69,6 +69,7 @@ public class EventParticipantController {
       @PathVariable Integer eventSeq,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String participantType,
+      @RequestParam(required = false) String registType,
       @RequestParam(defaultValue = "1") Integer page,
       @RequestParam(defaultValue = "20") Integer size) {
     ParticipantSearchRequest request =
@@ -76,6 +77,7 @@ public class EventParticipantController {
             .eventSeq(eventSeq)
             .keyword(keyword)
             .participantType(participantType)
+            .registType(registType)
             .page(page)
             .size(size)
             .build();

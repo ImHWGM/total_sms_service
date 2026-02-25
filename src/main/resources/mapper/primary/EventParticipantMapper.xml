@@ -105,6 +105,16 @@
         <if test="participantType != null and participantType != ''">
             AND P.PARTICIPANT_TYPE = #{participantType}
         </if>
+        <if test="registType != null and registType != ''">
+            <choose>
+                <when test="registType == '미등록'">
+                    AND (P.REGIST_TYPE IS NULL OR P.REGIST_TYPE = '')
+                </when>
+                <otherwise>
+                    AND P.REGIST_TYPE = #{registType}
+                </otherwise>
+            </choose>
+        </if>
         ORDER BY P.REG_DATE DESC
         <if test="limit != null">
             LIMIT #{limit} OFFSET #{offset}
@@ -127,6 +137,16 @@
         </if>
         <if test="participantType != null and participantType != ''">
             AND P.PARTICIPANT_TYPE = #{participantType}
+        </if>
+        <if test="registType != null and registType != ''">
+            <choose>
+                <when test="registType == '미등록'">
+                    AND (P.REGIST_TYPE IS NULL OR P.REGIST_TYPE = '')
+                </when>
+                <otherwise>
+                    AND P.REGIST_TYPE = #{registType}
+                </otherwise>
+            </choose>
         </if>
     </select>
 
@@ -160,6 +180,7 @@
             POSITION = #{position},
             PARTICIPANT_TYPE = #{participantType},
             MEMO = #{memo},
+            REGIST_TYPE = #{registType},
             MOD_DATE = NOW()
         WHERE SEQ = #{seq}
     </update>

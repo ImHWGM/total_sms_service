@@ -2,9 +2,7 @@ package kr.wisead.domain.event.dto;
 
 import lombok.*;
 
-/**
- * 참가자 검색 요청 DTO
- */
+/** 참가자 검색 요청 DTO */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -12,15 +10,14 @@ import lombok.*;
 @Builder
 public class ParticipantSearchRequest {
 
-    private Integer eventSeq;
-    private String keyword;             // 이름, 소속, 직책 검색
-    private String participantType;     // 참가자 유형 필터
-    @Builder.Default
-    private Integer page = 1;
-    @Builder.Default
-    private Integer size = 20;
+  private Integer eventSeq;
+  private String keyword; // 이름, 소속, 직책 검색
+  private String participantType; // 참가자 유형 필터
+  private String registType; // 등록구분 필터 (사전등록/현장등록/불참석, null=전체)
+  @Builder.Default private Integer page = 1;
+  @Builder.Default private Integer size = 20;
 
-    public int getOffset() {
-        return (page - 1) * size;
-    }
+  public int getOffset() {
+    return (page - 1) * size;
+  }
 }

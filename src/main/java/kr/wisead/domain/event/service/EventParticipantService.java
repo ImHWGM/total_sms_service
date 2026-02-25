@@ -471,6 +471,7 @@ public class EventParticipantService {
     params.put("eventSeq", request.getEventSeq());
     params.put("keyword", request.getKeyword());
     params.put("participantType", request.getParticipantType());
+    params.put("registType", request.getRegistType());
     params.put("offset", request.getOffset());
     params.put("limit", request.getSize());
 
@@ -549,7 +550,8 @@ public class EventParticipantService {
         request.getDepartment(),
         request.getPosition(),
         request.getParticipantType(),
-        request.getMemo());
+        request.getMemo(),
+        request.getRegistType());
 
     participantMapper.update(participant);
 
@@ -802,11 +804,7 @@ public class EventParticipantService {
               row.put("소속", p.getDepartment());
               row.put("직책", p.getPosition());
               row.put("참가자 유형", p.getParticipantType());
-              row.put(
-                  "등록구분",
-                  p.getAttendTime() != null && !p.getAttendTime().isEmpty()
-                      ? p.getRegistType()
-                      : "미참석");
+              row.put("등록구분", p.getRegistType() != null ? p.getRegistType() : "미등록");
               row.put("명찰 출력", "Y".equals(p.getNametagPrinted()) ? "출력완료" : "미출력");
               row.put("액션 현황", p.getActionSummary());
               row.put("메모", p.getMemo());

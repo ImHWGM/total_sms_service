@@ -21,7 +21,7 @@ public class EventParticipant {
   private String memo; // 메모
   private String nametagPrinted; // 명찰 출력 여부
   private String attendTime; // 행사참석시간 (HH:mm)
-  private String registType; // 등록구분 (사전등록/현장등록)
+  private String registType; // 등록구분 (null=미등록/불참석/사전등록/현장등록)
   private LocalDateTime regDate; // 등록일
   private LocalDateTime modDate; // 수정일
 
@@ -73,11 +73,13 @@ public class EventParticipant {
   }
 
   /** 정보 수정 */
-  public void update(String department, String position, String participantType, String memo) {
+  public void update(
+      String department, String position, String participantType, String memo, String registType) {
     this.department = department;
     this.position = position;
     this.participantType = participantType;
     this.memo = memo;
+    this.registType = registType;
     this.modDate = LocalDateTime.now();
   }
 }

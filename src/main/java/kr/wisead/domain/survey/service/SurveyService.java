@@ -185,6 +185,16 @@ public class SurveyService {
       for (SurveySubmitRequest.AnswerRequest answerReq : request.getAnswers()) {
         SurveyAnswer answer;
 
+        // itemSeq가 null이면 해당 문항의 첫 번째 항목에서 조회 (FE 미전달 fallback)
+        Integer itemSeq = answerReq.getItemSeq();
+        if (itemSeq == null) {
+          itemSeq =
+              surveyItemMapper.selectByQuestionSeq(eventSeq, answerReq.getQuestionSeq()).stream()
+                  .findFirst()
+                  .map(SurveyItem::getItemSeq)
+                  .orElse(null);
+        }
+
         if ("FE".equals(answerReq.getQuestionTypeDetail())) {
           // 파일 업로드
           answer =
@@ -192,7 +202,7 @@ public class SurveyService {
                   eventSeq,
                   answerReq.getQuestionSeq(),
                   user.getSeq(),
-                  answerReq.getItemSeq(),
+                  itemSeq,
                   answerReq.getFilePath());
         } else if ("MC".equals(answerReq.getQuestionType())) {
           // 객관식
@@ -201,7 +211,7 @@ public class SurveyService {
                   eventSeq,
                   answerReq.getQuestionSeq(),
                   user.getSeq(),
-                  answerReq.getItemSeq(),
+                  itemSeq,
                   answerReq.getQuestionType(),
                   answerReq.getQuestionTypeDetail(),
                   answerReq.getAnswer());
@@ -212,7 +222,7 @@ public class SurveyService {
                   eventSeq,
                   answerReq.getQuestionSeq(),
                   user.getSeq(),
-                  answerReq.getItemSeq(),
+                  itemSeq,
                   answerReq.getQuestionTypeDetail(),
                   answerReq.getAnswer());
         }
@@ -278,12 +288,12 @@ public class SurveyService {
             .map(
                 q -> {
                   QuestionResponse qr = QuestionResponse.from(q);
-                  if (q.isMultipleChoice()) {
-                    List<ItemResponse> items =
-                        allItems.stream()
-                            .filter(item -> item.getQuestionSeq().equals(q.getQuestionSeq()))
-                            .map(ItemResponse::from)
-                            .collect(Collectors.toList());
+                  List<ItemResponse> items =
+                      allItems.stream()
+                          .filter(item -> item.getQuestionSeq().equals(q.getQuestionSeq()))
+                          .map(ItemResponse::from)
+                          .collect(Collectors.toList());
+                  if (!items.isEmpty()) {
                     qr = qr.withItems(items);
                   }
                   return qr;

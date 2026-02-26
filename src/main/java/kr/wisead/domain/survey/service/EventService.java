@@ -93,13 +93,12 @@ public class EventService {
             .map(
                 q -> {
                   QuestionResponse qr = QuestionResponse.from(q);
-                  // 객관식인 경우 보기 추가
-                  if (q.isMultipleChoice()) {
-                    List<ItemResponse> items =
-                        allItems.stream()
-                            .filter(item -> item.getQuestionSeq().equals(q.getQuestionSeq()))
-                            .map(ItemResponse::from)
-                            .collect(Collectors.toList());
+                  List<ItemResponse> items =
+                      allItems.stream()
+                          .filter(item -> item.getQuestionSeq().equals(q.getQuestionSeq()))
+                          .map(ItemResponse::from)
+                          .collect(Collectors.toList());
+                  if (!items.isEmpty()) {
                     qr = qr.withItems(items);
                   }
                   return qr;
@@ -646,7 +645,7 @@ public class EventService {
 
       surveyQuestionMapper.insert(question);
 
-      // 객관식 항목 저장
+      // 항목 저장
       if (qReq.getItems() != null && !qReq.getItems().isEmpty()) {
         int itemOrder = 1;
         for (ItemRequest iReq : qReq.getItems()) {
@@ -679,6 +678,8 @@ public class EventService {
 
           itemOrder++;
         }
+      } else if (!question.isMultipleChoice()) {
+        insertDefaultSubjectiveItem(eventSeq, question, qReq.getQuestionTypeDetail(), regId);
       }
       order++;
     }
@@ -767,7 +768,7 @@ public class EventService {
             questionImgPath);
       }
 
-      // 객관식 항목 저장
+      // 항목 저장
       if (qReq.getItems() != null && !qReq.getItems().isEmpty()) {
         int itemOrder = 1;
         for (ItemRequest iReq : qReq.getItems()) {
@@ -805,6 +806,8 @@ public class EventService {
 
           itemOrder++;
         }
+      } else if (!question.isMultipleChoice()) {
+        insertDefaultSubjectiveItem(eventSeq, question, qReq.getQuestionTypeDetail(), regId);
       }
       order++;
     }
@@ -828,7 +831,7 @@ public class EventService {
       }
       surveyQuestionMapper.insert(question);
 
-      // 객관식 항목 저장
+      // 항목 저장
       if (qReq.getItems() != null && !qReq.getItems().isEmpty()) {
         int itemOrder = 1;
         for (ItemRequest iReq : qReq.getItems()) {
@@ -849,9 +852,19 @@ public class EventService {
           surveyItemMapper.insert(item);
           itemOrder++;
         }
+      } else if (!question.isMultipleChoice()) {
+        insertDefaultSubjectiveItem(eventSeq, question, qReq.getQuestionTypeDetail(), regId);
       }
       order++;
     }
+  }
+
+  /** 주관식 질문에 기본 항목 1개 생성 (레거시 호환) */
+  private void insertDefaultSubjectiveItem(
+      Integer eventSeq, SurveyQuestion question, String questionTypeDetail, String regId) {
+    SurveyItem defaultItem =
+        SurveyItem.create(eventSeq, question.getQuestionSeq(), questionTypeDetail, "", 1, regId);
+    surveyItemMapper.insert(defaultItem);
   }
 
   /** 이벤트 코드 생성 */

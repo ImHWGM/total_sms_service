@@ -445,6 +445,7 @@ public class EventParticipantService {
                     .department(p.getDepartment())
                     .position(p.getPosition())
                     .participantType(p.getParticipantType())
+                    .registType(p.getRegistTypeOrDefault())
                     .messageSent(sentUserSeqs.contains(p.getSurveyUserSeq()))
                     .build())
         .collect(Collectors.toList());
@@ -472,6 +473,7 @@ public class EventParticipantService {
           .department(p.getDepartment())
           .position(p.getPosition())
           .participantType(p.getParticipantType())
+          .registType(p.getRegistTypeOrDefault())
           .build();
     }
 
@@ -502,6 +504,7 @@ public class EventParticipantService {
         .phone(phone)
         .checkCode(participant.getCheckCode())
         .participantType("일반")
+        .registType("사전등록")
         .build();
   }
 

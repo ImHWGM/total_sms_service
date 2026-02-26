@@ -11,6 +11,8 @@ import lombok.*;
 @Builder
 public class EventParticipant {
 
+  private static final String DEFAULT_REGIST_TYPE = "미등록";
+
   private Long seq; // 참가자 시퀀스
   private Integer surveyUserSeq; // SURVEY_USER 시퀀스 (1:1)
   private Integer eventSeq; // 이벤트 시퀀스 (SURVEY_MASTER)
@@ -70,6 +72,11 @@ public class EventParticipant {
   /** 명찰 출력 여부 확인 */
   public boolean checkNametagPrinted() {
     return "Y".equals(this.nametagPrinted);
+  }
+
+  /** 등록구분 반환 (null이면 "미등록") */
+  public String getRegistTypeOrDefault() {
+    return registType != null ? registType : DEFAULT_REGIST_TYPE;
   }
 
   /** 정보 수정 */

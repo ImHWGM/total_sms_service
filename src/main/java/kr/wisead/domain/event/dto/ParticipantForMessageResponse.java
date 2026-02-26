@@ -20,5 +20,6 @@ public class ParticipantForMessageResponse {
   private String department;
   private String position;
   private String participantType;
+  private String registType;
   private boolean messageSent;
 }

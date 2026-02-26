@@ -1,5 +1,6 @@
 package kr.wisead.domain.survey.service;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -155,7 +156,8 @@ public class SurveyUserService {
       boolean masked,
       String reason,
       String userId,
-      jakarta.servlet.http.HttpServletRequest httpRequest) {
+      Integer userLevel,
+      HttpServletRequest httpRequest) {
 
     // 마스킹 해제 요청인 경우 사유 검증 및 로그 기록
     if (!masked) {
@@ -181,6 +183,8 @@ public class SurveyUserService {
     params.put("status", status);
     params.put("offset", (page - 1) * size);
     params.put("size", size);
+    params.put("regId", userId);
+    params.put("userLevel", userLevel);
 
     // 검색 키워드 처리 (암호화 필요한 필드)
     if (!CommonUtils.isNullOrEmpty(keyword) && !CommonUtils.isNullOrEmpty(searchType)) {

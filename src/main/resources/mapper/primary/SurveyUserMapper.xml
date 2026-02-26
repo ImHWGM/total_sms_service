@@ -555,6 +555,9 @@
     <sql id="searchCondition">
         <where>
             U.DEL_YN = 'N'
+            <if test="userLevel != null and userLevel lt 50">
+                AND M.REG_ID = #{regId}
+            </if>
             <if test="eventSeq != null">
                 AND U.EVENT_SEQ = #{eventSeq}
             </if>

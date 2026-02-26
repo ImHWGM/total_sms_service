@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.UserIdResolver;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.survey.dto.*;
 import kr.wisead.domain.survey.service.EventService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class EventController {
 
   private final EventService eventService;
+  private final AdminService adminService;
+  private final UserIdResolver userIdResolver;
 
   /** 이벤트 목록 조회 */
   @GetMapping
@@ -45,20 +49,24 @@ public class EventController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "20") int size) {
 
-    EventSearchRequest request =
-        EventSearchRequest.builder()
-            .regId(userDetails.getUsername())
-            .eventType(eventType)
-            .eventTypes(eventTypes)
-            .surveyStatus(surveyStatus)
-            .startDate(startDate)
-            .endDate(endDate)
-            .searchKeyword(searchKeyword)
-            .sortField(sortField)
-            .sortOrder(sortOrder)
-            .pageNum(page)
-            .amount(size)
-            .build();
+    String userId = userDetails.getUsername();
+    Integer userLevel = adminService.getUserLevel(userId);
+    String actualRegId = userIdResolver.resolveUserId(userId);
+
+    EventSearchRequest request = EventSearchRequest.builder()
+        .regId(actualRegId)
+        .userLevel(userLevel)
+        .eventType(eventType)
+        .eventTypes(eventTypes)
+        .surveyStatus(surveyStatus)
+        .startDate(startDate)
+        .endDate(endDate)
+        .searchKeyword(searchKeyword)
+        .sortField(sortField)
+        .sortOrder(sortOrder)
+        .pageNum(page)
+        .amount(size)
+        .build();
 
     PageResponse<EventResponse> response = eventService.getEventList(request);
     return ApiResponse.success(response);
@@ -87,8 +95,7 @@ public class EventController {
       @PathVariable Integer eventSeq,
       @RequestBody @Valid EventRequest request) {
     String uptId = userDetails.getUsername();
-    EventResponse response =
-        eventService.updateEvent(eventSeq, request, uptId, null, null, null, null);
+    EventResponse response = eventService.updateEvent(eventSeq, request, uptId, null, null, null, null);
     return ApiResponse.success(response);
   }
 
@@ -123,11 +130,15 @@ public class EventController {
   @GetMapping("/search/names")
   public ApiResponse<List<String>> searchEventNames(
       @AuthenticationPrincipal UserDetails userDetails, @RequestParam String keyword) {
-    EventSearchRequest request =
-        EventSearchRequest.builder()
-            .regId(userDetails.getUsername())
-            .searchKeyword(keyword)
-            .build();
+    String userId = userDetails.getUsername();
+    Integer userLevel = adminService.getUserLevel(userId);
+    String actualRegId = userIdResolver.resolveUserId(userId);
+
+    EventSearchRequest request = EventSearchRequest.builder()
+        .regId(actualRegId)
+        .userLevel(userLevel)
+        .searchKeyword(keyword)
+        .build();
     List<String> names = eventService.searchEventNames(request);
     return ApiResponse.success(names);
   }
@@ -215,8 +226,7 @@ public class EventController {
 
     String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
     String fileName = "이벤트_참여_관리_" + timestamp + ".xlsx";
-    String encodedFileName =
-        URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+    String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
 
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFileName + "\"")

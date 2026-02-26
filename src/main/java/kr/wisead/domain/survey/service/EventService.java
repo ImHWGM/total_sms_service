@@ -1602,23 +1602,20 @@ public class EventService {
 
   /** RSA 암호화된 답변 대신 SURVEY_USER의 해당 개인정보 필드에서 복호화 */
   private String decryptUserFieldByType(SurveyUser user, String typeDetail) {
+    if ("AD".equals(typeDetail)) {
+      String addr = decryptDataSafe(user.getAddress());
+      String addr2 = decryptDataSafe(user.getAddress2());
+      return ((addr != null ? addr : "") + " " + (addr2 != null ? addr2 : "")).trim();
+    }
+
     String encrypted =
         switch (typeDetail) {
           case "SO" -> user.getJuminNum();
           case "CU" -> user.getUserPhone();
           case "NE" -> user.getUserName();
           case "EM" -> user.getUserEmail();
-          case "AD" -> {
-            String addr = decryptDataSafe(user.getAddress());
-            String addr2 = decryptDataSafe(user.getAddress2());
-            String result = (addr != null ? addr : "") + " " + (addr2 != null ? addr2 : "");
-            yield result.trim();
-          }
           default -> null;
         };
-    if ("AD".equals(typeDetail)) {
-      return encrypted != null ? encrypted : "";
-    }
     if (encrypted == null || encrypted.isEmpty()) {
       return "";
     }

@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import kr.wisead.common.exception.BusinessException;
@@ -886,7 +885,8 @@ public class MessageSendService {
           receivers.size());
     }
 
-    String txGroupId = UUID.randomUUID().toString().replace("-", "");
+    // 잔액 확인 및 차감 (설문 문자는 LMS 전용)
+    String txGroupId = deductForMessage(regId, "msg_lms", receivers.size(), "L");
     int successCount = 0;
     int failCount = 0;
     List<String> failedPhones = new ArrayList<>();

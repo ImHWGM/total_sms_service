@@ -197,16 +197,7 @@ public class AdMessageService {
         comment += String.format(" (수신거부 %d건 제외)", blockedCount);
       }
 
-      try {
-        balanceService.deductWithTxGroupId(userId, actualCharge, comment, userId, txGroupId);
-      } catch (Exception e) {
-        log.error(
-            "잔액 차감 실패 - userId: {}, charge: {}, txGroupId: {}, error: {}",
-            userId,
-            actualCharge,
-            txGroupId,
-            e.getMessage());
-      }
+      balanceService.deductWithTxGroupId(userId, actualCharge, comment, userId, txGroupId);
     }
 
     log.info(

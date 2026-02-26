@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.CommonUtils;
+import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.survey.dto.*;
 import kr.wisead.domain.survey.entity.*;
 import kr.wisead.mapper.primary.*;
@@ -24,6 +26,7 @@ public class SurveyService {
   private final SurveyItemMapper surveyItemMapper;
   private final SurveyUserMapper surveyUserMapper;
   private final SurveyAnswerMapper surveyAnswerMapper;
+  private final FrontAuthService frontAuthService;
 
   @org.springframework.beans.factory.annotation.Value("${api.base.url:}")
   private String apiBaseUrl;
@@ -180,10 +183,27 @@ public class SurveyService {
     // 기존 답변 삭제 (재제출 대비)
     surveyAnswerMapper.deleteByUserSeq(eventSeq, user.getSeq());
 
+    String submitJuminNum = request.getJuminNum();
+
     // 답변 저장
     if (request.getAnswers() != null) {
       for (SurveySubmitRequest.AnswerRequest answerReq : request.getAnswers()) {
         SurveyAnswer answer;
+        String answerValue = answerReq.getAnswer();
+
+        if ("SO".equals(answerReq.getQuestionTypeDetail())) {
+          String resolvedJuminNum = resolveSoAnswer(answerReq);
+          if (!CommonUtils.isNullOrEmpty(resolvedJuminNum)) {
+            submitJuminNum = resolvedJuminNum;
+            answerValue = encryptSensitiveValue(resolvedJuminNum);
+          } else if (answerValue != null && answerValue.startsWith("RSA:")) {
+            log.warn(
+                "SO RSA 답변 원문 저장 - 복호화 실패 (eventSeq: {}, userKey: {}, questionSeq: {})",
+                eventSeq,
+                request.getUserKey(),
+                answerReq.getQuestionSeq());
+          }
+        }
 
         // itemSeq가 null이면 해당 문항의 첫 번째 항목에서 조회 (FE 미전달 fallback)
         Integer itemSeq = answerReq.getItemSeq();
@@ -214,7 +234,7 @@ public class SurveyService {
                   itemSeq,
                   answerReq.getQuestionType(),
                   answerReq.getQuestionTypeDetail(),
-                  answerReq.getAnswer());
+                  answerValue);
         } else {
           // 주관식
           answer =
@@ -224,7 +244,7 @@ public class SurveyService {
                   user.getSeq(),
                   itemSeq,
                   answerReq.getQuestionTypeDetail(),
-                  answerReq.getAnswer());
+                  answerValue);
         }
 
         surveyAnswerMapper.insert(answer);
@@ -234,7 +254,7 @@ public class SurveyService {
     // 사용자 정보 업데이트 및 제출 처리
     user.submit(
         request.getUserName(),
-        request.getJuminNum(),
+        submitJuminNum,
         request.getUserPhone(),
         request.getUserEmail(),
         request.getAddress(),
@@ -243,6 +263,68 @@ public class SurveyService {
     surveyUserMapper.updateSubmission(user);
 
     log.info("설문 제출 완료 - eventSeq: {}, userKey: {}", eventSeq, request.getUserKey());
+  }
+
+  /** SO 답변을 평문 주민번호로 정규화 (RSA/FOREIGN/평문 지원) */
+  private String resolveSoAnswer(SurveySubmitRequest.AnswerRequest answerReq) {
+    String answer = answerReq.getAnswer();
+    if (CommonUtils.isNullOrEmpty(answer)) {
+      return null;
+    }
+
+    if (answer.startsWith("FOREIGN:")) {
+      return answer;
+    }
+
+    if (!answer.startsWith("RSA:")) {
+      String normalized = answer.trim();
+      return normalized.matches("\\d{6}-\\d{7}") ? normalized : null;
+    }
+
+    if (CommonUtils.isNullOrEmpty(answerReq.getKeypadId())) {
+      log.warn("SO RSA 복호화 스킵 - keypadId 누락 (questionSeq: {})", answerReq.getQuestionSeq());
+      return null;
+    }
+
+    String[] parts = answer.split(":", 3);
+    if (parts.length < 3) {
+      log.warn("SO RSA 복호화 스킵 - answer 형식 오류 (questionSeq: {})", answerReq.getQuestionSeq());
+      return null;
+    }
+
+    String front = parts[1] != null ? parts[1].replaceAll("\\D+", "") : "";
+    if (!front.matches("\\d{6}")) {
+      log.warn("SO RSA 복호화 스킵 - 앞자리 형식 오류 (questionSeq: {})", answerReq.getQuestionSeq());
+      return null;
+    }
+
+    try {
+      String decryptedBack = frontAuthService.decryptKeypadInput(answerReq.getKeypadId(), parts[2]);
+      String back = decryptedBack != null ? decryptedBack.replaceAll("\\D+", "") : "";
+      if (!back.matches("\\d{7}")) {
+        log.warn("SO RSA 복호화 스킵 - 뒷자리 형식 오류 (questionSeq: {})", answerReq.getQuestionSeq());
+        return null;
+      }
+      return front + "-" + back;
+    } catch (BusinessException e) {
+      log.warn(
+          "SO RSA 복호화 실패 (questionSeq: {}, reason: {})",
+          answerReq.getQuestionSeq(),
+          e.getMessage());
+      return null;
+    }
+  }
+
+  /** 개인정보 답변 저장용 AES256 + Base64(2중) 암호화 */
+  private String encryptSensitiveValue(String plainText) {
+    if (CommonUtils.isNullOrEmpty(plainText)) {
+      return plainText;
+    }
+    String encrypted = CryptoUtils.encryptAES256(plainText);
+    if (CommonUtils.isNullOrEmpty(encrypted)) {
+      return plainText;
+    }
+    return CryptoUtils.encodeBase64(encrypted);
   }
 
   /** 참여자 목록 조회 */

@@ -1419,9 +1419,14 @@ public class EventService {
         String answer = userAnswers.get(question.getQuestionSeq());
         String displayAnswer = "";
         if (answer != null) {
-          // 암호화된 답변 복호화 (개인정보 등 AES256+Base64 저장된 경우)
-          String decrypted = decryptDataSafe(answer);
-          displayAnswer = (decrypted != null ? decrypted : answer).replaceAll("##", " ");
+          if (answer.startsWith("RSA:")) {
+            // RSA 암호화 데이터: 세션 키 소멸로 직접 복호화 불가 → SURVEY_USER 필드에서 복호화
+            displayAnswer = decryptUserFieldByType(participant, question.getQuestionTypeDetail());
+          } else {
+            // AES256+Base64 암호화된 답변 복호화
+            String decrypted = decryptDataSafe(answer);
+            displayAnswer = (decrypted != null ? decrypted : answer).replaceAll("##", " ");
+          }
         }
         createCell(dataRow, 4 + i, displayAnswer, normalStyle);
       }
@@ -1582,7 +1587,7 @@ public class EventService {
     return String.format("%.1f%%", rate);
   }
 
-  /** 데이터 복호화 (예외 발생 시 null 반환) */
+  /** 데이터 복호화 (예외 발생 시 원본 반환) */
   private String decryptDataSafe(String encryptedData) {
     if (encryptedData == null || encryptedData.isEmpty()) {
       return null;
@@ -1593,6 +1598,32 @@ public class EventService {
       log.debug("데이터 복호화 실패: {}", e.getMessage());
       return encryptedData;
     }
+  }
+
+  /** RSA 암호화된 답변 대신 SURVEY_USER의 해당 개인정보 필드에서 복호화 */
+  private String decryptUserFieldByType(SurveyUser user, String typeDetail) {
+    String encrypted =
+        switch (typeDetail) {
+          case "SO" -> user.getJuminNum();
+          case "CU" -> user.getUserPhone();
+          case "NE" -> user.getUserName();
+          case "EM" -> user.getUserEmail();
+          case "AD" -> {
+            String addr = decryptDataSafe(user.getAddress());
+            String addr2 = decryptDataSafe(user.getAddress2());
+            String result = (addr != null ? addr : "") + " " + (addr2 != null ? addr2 : "");
+            yield result.trim();
+          }
+          default -> null;
+        };
+    if ("AD".equals(typeDetail)) {
+      return encrypted != null ? encrypted : "";
+    }
+    if (encrypted == null || encrypted.isEmpty()) {
+      return "";
+    }
+    String decrypted = decryptDataSafe(encrypted);
+    return decrypted != null ? decrypted : "";
   }
 
   /** 현장등록 QR 코드 생성 */

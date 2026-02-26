@@ -27,7 +27,8 @@ public class FilterConfig {
   }
 
   /**
-   * KG 모빌리언스 결제 콜백 EUC-KR 인코딩 필터 - /api/payment/kg/* 경로에만 적용 - CharacterEncodingFilter(UTF-8) 이후,
+   * KG 모빌리언스 결제 콜백 EUC-KR 인코딩 필터 - /api/payment/kg/* 경로에만 적용 -
+   * CharacterEncodingFilter(UTF-8) 이후,
    * 파라미터 파싱 전에 EUC-KR로 재설정
    */
   @Bean

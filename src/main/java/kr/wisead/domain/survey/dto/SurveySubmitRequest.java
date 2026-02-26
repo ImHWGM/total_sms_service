@@ -43,6 +43,7 @@ public class SurveySubmitRequest {
         private String questionTypeDetail;  // 문항 종류 상세
         private Integer itemSeq;            // 선택한 항목 시퀀스 (객관식)
         private String answer;              // 답변 내용 (주관식/객관식 값)
+        private String keypadId;            // SO 답변 RSA 키패드 세션 ID
         private String filePath;            // 파일 경로 (파일 업로드)
     }
 }

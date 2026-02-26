@@ -47,6 +47,47 @@ public class EventParticipantService {
   @Value("${wisead.url:http://localhost:8080}")
   private String wiseadUrl;
 
+  /** 행사 공개 정보 조회 (RSVP 페이지용) */
+  @Transactional(readOnly = true)
+  public EventPublicInfoResponse getEventPublicInfo(String eventCode) {
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventCode(eventCode)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사를 찾을 수 없습니다."));
+
+    return EventPublicInfoResponse.from(event);
+  }
+
+  /** RSVP 제출 (사전 참석 여부 응답) */
+  @Transactional
+  public RsvpResponse submitRsvp(String eventCode, RsvpRequest request) {
+    // 1. eventCode로 행사 조회
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventCode(eventCode)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사를 찾을 수 없습니다."));
+
+    // 2. 전화번호 암호화 후 참여자 조회
+    String cleanPhone = request.getPhone().replace("-", "");
+    String encryptedPhone = encryptPhone(cleanPhone);
+
+    EventParticipant participant =
+        participantMapper
+            .selectByEventSeqAndPhone(event.getEventSeq(), encryptedPhone)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "등록된 참여자 정보가 없습니다."));
+
+    // 3. registType 업데이트
+    participantMapper.updateRegistType(participant.getSeq(), request.getResponse());
+
+    return RsvpResponse.builder()
+        .participantName(participant.getUserName())
+        .response(request.getResponse())
+        .build();
+  }
+
   /** 현장 참가자 등록 (공개 API) */
   @Transactional
   public OnsiteRegistrationResponse registerOnsiteParticipant(

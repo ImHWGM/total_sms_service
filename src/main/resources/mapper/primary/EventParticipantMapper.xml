@@ -354,4 +354,12 @@
         WHERE SEQ = #{seq}
     </update>
 
+    <!-- 등록구분 업데이트 (RSVP 응답) -->
+    <update id="updateRegistType">
+        UPDATE EVENT_PARTICIPANT
+        SET REGIST_TYPE = #{registType},
+            MOD_DATE = NOW()
+        WHERE SEQ = #{seq}
+    </update>
+
 </mapper>

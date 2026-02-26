@@ -93,4 +93,7 @@ public interface EventParticipantMapper {
 
   /** 참석시간 업데이트 (체크인 시 사용) */
   int updateAttendTime(@Param("seq") Long seq, @Param("attendTime") String attendTime);
+
+  /** 등록구분 업데이트 (RSVP 응답) */
+  int updateRegistType(@Param("seq") Long seq, @Param("registType") String registType);
 }

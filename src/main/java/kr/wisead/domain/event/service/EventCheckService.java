@@ -49,15 +49,14 @@ public class EventCheckService {
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사 정보를 찾을 수 없습니다."));
 
     if (!"P".equals(event.getStatus())) {
-      String statusName =
+      String message =
           switch (event.getStatus()) {
-            case "A" -> "대기";
-            case "S" -> "중지";
-            case "F" -> "종료";
-            default -> "알 수 없음";
+            case "A" -> "아직 행사가 시작되지 않았습니다. 잠시만 기다려 주세요.";
+            case "S" -> "행사가 일시 중지되었습니다. 행사 운영팀에 문의해 주세요.";
+            case "F" -> "행사가 종료되어 체크인이 마감되었습니다. 참여해 주셔서 감사합니다.";
+            default -> "현재 행사 상태에서는 체크인할 수 없습니다.";
           };
-      throw new BusinessException(
-          ErrorCode.INVALID_INPUT, "현재 행사 상태에서는 체크인할 수 없습니다. (행사 상태: " + statusName + ")");
+      throw new BusinessException(ErrorCode.INVALID_INPUT, message);
     }
 
     // 2. CHECK_IN 액션 유형 조회

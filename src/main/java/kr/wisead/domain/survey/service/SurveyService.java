@@ -12,6 +12,7 @@ import kr.wisead.domain.survey.entity.*;
 import kr.wisead.mapper.primary.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +29,7 @@ public class SurveyService {
   private final SurveyAnswerMapper surveyAnswerMapper;
   private final FrontAuthService frontAuthService;
 
-  @org.springframework.beans.factory.annotation.Value("${api.base.url:}")
+  @Value("${api.base.url:}")
   private String apiBaseUrl;
 
   /** 이벤트 코드로 설문 정보 조회 */

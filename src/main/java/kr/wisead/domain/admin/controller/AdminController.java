@@ -225,8 +225,9 @@ public class AdminController {
   public ApiResponse<AdminLevelResponse> getUserLevel(
       @RequestHeader("Authorization") String token) {
 
-    String userId = jwtTokenProvider.getUserId(extractToken(token));
-    Integer level = adminService.getUserLevel(userId);
+    String userSeq = jwtTokenProvider.getUserId(extractToken(token));
+    String userId = userIdResolver.resolveUserId(userSeq);
+    Integer level = adminService.getUserLevel(userSeq);
     String levelName = adminService.getUserLevelName(level);
 
     AdminLevelResponse response =

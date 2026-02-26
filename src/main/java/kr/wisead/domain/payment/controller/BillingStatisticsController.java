@@ -2,6 +2,7 @@ package kr.wisead.domain.payment.controller;
 
 import java.util.List;
 import kr.wisead.common.response.ApiResponse;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.payment.dto.BillingStatsSearchRequest;
 import kr.wisead.domain.payment.dto.BillingSummaryResponse;
@@ -26,6 +27,7 @@ public class BillingStatisticsController {
 
   private final BillingStatisticsService billingStatisticsService;
   private final AdminService adminService;
+  private final UserIdResolver userIdResolver;
 
   /**
    * 일별 과금 통계 조회 GET
@@ -163,7 +165,7 @@ public class BillingStatisticsController {
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate) {
 
-    String userId = userDetails != null ? userDetails.getUsername() : null;
+    String userId = extractUserId(userDetails);
     UserBillingStatsResponse response =
         billingStatisticsService.getUserBillingSummary(userId, startDate, endDate);
     return ApiResponse.success(response);
@@ -201,12 +203,21 @@ public class BillingStatisticsController {
 
   // ==================== Private Methods ====================
 
-  /** userId가 지정되면 해당 값, 없으면 로그인 사용자의 username 반환 */
+  /** userId가 지정되면 해당 값, 없으면 JWT에서 실제 userId 추출 */
   private String resolveUserId(String userId, UserDetails userDetails) {
     if (userId != null) {
       return userId;
     }
-    return userDetails != null ? userDetails.getUsername() : null;
+    return extractUserId(userDetails);
+  }
+
+  /** UserDetails에서 실제 userId 추출 (JWT subject는 userSeq) */
+  private String extractUserId(UserDetails userDetails) {
+    if (userDetails == null) {
+      return null;
+    }
+    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
+    return userIdResolver.toUserId(userSeq);
   }
 
   /**
@@ -236,7 +247,7 @@ public class BillingStatisticsController {
           .build();
     }
 
-    String currentUserId = userDetails.getUsername();
+    String currentUserId = extractUserId(userDetails);
     Integer userLevel = adminService.getUserLevel(currentUserId);
 
     // determineQueryUserIds 결과: "ALL", "userId1,userId2", 또는 단일 userId

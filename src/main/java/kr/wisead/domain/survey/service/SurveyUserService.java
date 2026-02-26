@@ -590,9 +590,9 @@ public class SurveyUserService {
   /** Entity to Response 변환 (복호화 + 마스킹 포함) */
   private SurveyUserResponse toResponse(SurveyUser user) {
     // 복호화
-    String decryptedPhone = decryptData(
-        user.getResendUserPhone() != null ? user.getResendUserPhone() : user.getUserPhone()
-    );
+    String decryptedPhone =
+        decryptData(
+            user.getResendUserPhone() != null ? user.getResendUserPhone() : user.getUserPhone());
     String decryptedName = decryptData(user.getUserName());
     String decryptedJuminNum = decryptData(user.getJuminNum());
     String decryptedAddress = decryptData(user.getAddress());
@@ -623,6 +623,7 @@ public class SurveyUserService {
         .shipmentDate(user.getShipmentDate())
         .submissionDate(user.getSubmissionDate())
         .surveyStartTime(user.getSurveyStartTime())
+        .authTime(user.getSurveyAuthTime())
         .regDate(user.getRegDate())
         .status(status)
         .eventCode(user.getEventCode())
@@ -646,9 +647,9 @@ public class SurveyUserService {
    */
   private SurveyUserResponse toResponse(SurveyUser user, boolean masked) {
     // 복호화
-    String decryptedPhone = decryptData(
-        user.getResendUserPhone() != null ? user.getResendUserPhone() : user.getUserPhone()
-    );
+    String decryptedPhone =
+        decryptData(
+            user.getResendUserPhone() != null ? user.getResendUserPhone() : user.getUserPhone());
     String decryptedName = decryptData(user.getUserName());
     String decryptedJuminNum = decryptData(user.getJuminNum());
     String decryptedAddress = decryptData(user.getAddress());
@@ -687,6 +688,7 @@ public class SurveyUserService {
         .shipmentDate(user.getShipmentDate())
         .submissionDate(user.getSubmissionDate())
         .surveyStartTime(user.getSurveyStartTime())
+        .authTime(user.getSurveyAuthTime())
         .regDate(user.getRegDate())
         .status(status)
         .eventCode(user.getEventCode())

@@ -29,6 +29,7 @@ public class SurveyUserResponse {
   private LocalDate shipmentDate; // 배송일자
   private LocalDateTime submissionDate; // 설문완료일
   private LocalDateTime surveyStartTime; // 설문접속일
+  private LocalDateTime authTime; // 설문인증일
   private LocalDateTime regDate; // 등록일
   private String status; // 상태 (참여/미참여/접속중)
 
@@ -75,6 +76,7 @@ public class SurveyUserResponse {
         .shipmentDate(entity.getShipmentDate())
         .submissionDate(entity.getSubmissionDate())
         .surveyStartTime(entity.getSurveyStartTime())
+        .authTime(entity.getSurveyAuthTime())
         .regDate(entity.getRegDate())
         .status(status)
         .eventName(entity.getEventName())

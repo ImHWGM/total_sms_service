@@ -187,8 +187,11 @@ public class AdminService {
       return false;
     }
 
+    // JWT subject는 seq(숫자)일 수 있으므로 실제 userId로 변환
+    String resolvedUserId = getUserIdBySeq(currentUserId);
+
     // 본인 데이터는 항상 수정 가능
-    if (currentUserId.equals(targetOwnerId)) {
+    if (resolvedUserId.equals(targetOwnerId)) {
       return true;
     }
 
@@ -200,7 +203,7 @@ public class AdminService {
       }
       // 운영관리자(A) - 관리 계정 데이터만 수정 가능
       if (currentLevel == 60) {
-        List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(currentUserId);
+        List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(resolvedUserId);
         return managedUserIds != null && managedUserIds.contains(targetOwnerId);
       }
     }

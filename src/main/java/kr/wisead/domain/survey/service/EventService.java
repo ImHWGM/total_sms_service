@@ -427,19 +427,18 @@ public class EventService {
     surveyMasterMapper.update(event);
     log.info("이벤트 수정 완료 - eventSeq: {}", eventSeq);
 
-    // 문항 갱신 (기존 삭제 후 재등록)
+    // 문항 갱신: 응답이 존재하면 문항을 보호하고 메타데이터 변경만 허용
     if (request.getQuestions() != null) {
-      // 답변이 있는지 확인
       int answerCount = surveyAnswerMapper.countByEventSeq(eventSeq);
       if (answerCount > 0) {
-        throw new BusinessException(ErrorCode.INVALID_INPUT, "응답이 있는 설문은 문항을 수정할 수 없습니다.");
+        log.info("응답이 있는 설문 - 문항 갱신 생략 (eventSeq: {}, answerCount: {})", eventSeq, answerCount);
+      } else {
+        surveyItemMapper.deleteByEventSeq(eventSeq);
+        surveyQuestionMapper.deleteByEventSeq(eventSeq);
+        // JSON 방식 사용 (이미지 경로 변환 처리)
+        saveQuestionsWithImages(
+            eventSeq, request.getQuestions(), actualUptId, questionImages, itemImages, eventSeqStr);
       }
-
-      surveyItemMapper.deleteByEventSeq(eventSeq);
-      surveyQuestionMapper.deleteByEventSeq(eventSeq);
-      // JSON 방식 사용 (이미지 경로 변환 처리)
-      saveQuestionsWithImages(
-          eventSeq, request.getQuestions(), actualUptId, questionImages, itemImages, eventSeqStr);
     }
 
     return getEventDetail(eventSeq);

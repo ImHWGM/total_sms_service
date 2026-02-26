@@ -5,7 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -34,7 +39,7 @@ public class ShortUrlUtils {
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              UriComponentsBuilder.fromHttpUrl(SHORTEN_URL).toUriString(),
+              UriComponentsBuilder.fromUriString(SHORTEN_URL).toUriString(),
               HttpMethod.POST,
               entity,
               String.class);

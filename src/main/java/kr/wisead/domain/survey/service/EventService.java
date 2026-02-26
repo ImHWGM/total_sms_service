@@ -1417,7 +1417,12 @@ public class EventService {
       for (int i = 0; i < questions.size(); i++) {
         SurveyQuestion question = questions.get(i);
         String answer = userAnswers.get(question.getQuestionSeq());
-        String displayAnswer = answer != null ? answer.replaceAll("##", " ") : "";
+        String displayAnswer = "";
+        if (answer != null) {
+          // 암호화된 답변 복호화 (개인정보 등 AES256+Base64 저장된 경우)
+          String decrypted = decryptDataSafe(answer);
+          displayAnswer = (decrypted != null ? decrypted : answer).replaceAll("##", " ");
+        }
         createCell(dataRow, 4 + i, displayAnswer, normalStyle);
       }
     }

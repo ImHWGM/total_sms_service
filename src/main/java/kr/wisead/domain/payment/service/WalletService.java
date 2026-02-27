@@ -573,6 +573,21 @@ public class WalletService {
     WalletLot lot = WalletLot.createPointLot(userSeq, amount, expireDate, source);
     walletLotMapper.insert(lot);
 
+    // 거래 내역 기록
+    LocalDate today = LocalDate.now();
+    BigDecimal balanceAfter =
+        walletLotMapper.selectSumRemaining(userSeq, Transaction.CURRENCY_POINT, today);
+    Transaction tx =
+        Transaction.createLotGrant(
+            userSeq,
+            Transaction.CURRENCY_POINT,
+            amount,
+            lot.getLotSeq(),
+            expireDate,
+            balanceAfter,
+            source);
+    transactionMapper.insert(tx);
+
     log.info("포인트 적립 - userSeq: {}, amount: {}, expireDate: {}", userSeq, amount, expireDate);
     return WalletLotResponse.from(lot);
   }
@@ -583,6 +598,21 @@ public class WalletService {
       Integer userSeq, BigDecimal amount, LocalDate expireDate, String source) {
     WalletLot lot = WalletLot.createBonusLot(userSeq, amount, expireDate, source);
     walletLotMapper.insert(lot);
+
+    // 거래 내역 기록
+    LocalDate today = LocalDate.now();
+    BigDecimal balanceAfter =
+        walletLotMapper.selectSumRemaining(userSeq, Transaction.CURRENCY_BONUS, today);
+    Transaction tx =
+        Transaction.createLotGrant(
+            userSeq,
+            Transaction.CURRENCY_BONUS,
+            amount,
+            lot.getLotSeq(),
+            expireDate,
+            balanceAfter,
+            source);
+    transactionMapper.insert(tx);
 
     log.info("보너스 적립 - userSeq: {}, amount: {}, expireDate: {}", userSeq, amount, expireDate);
     return WalletLotResponse.from(lot);

@@ -59,6 +59,27 @@ public class Transaction {
         .build();
   }
 
+  /** Lot(POINT/BONUS) 적립 거래 생성 */
+  public static Transaction createLotGrant(
+      Integer userSeq,
+      String currencyType,
+      BigDecimal amount,
+      Long lotSeq,
+      LocalDate lotExpireDate,
+      BigDecimal balanceAfter,
+      String comment) {
+    return Transaction.builder()
+        .userSeq(userSeq)
+        .currencyType(currencyType)
+        .txType(TX_TYPE_CHARGE)
+        .amount(amount)
+        .lotSeq(lotSeq)
+        .lotExpireDate(lotExpireDate)
+        .balanceAfter(balanceAfter)
+        .comment(comment)
+        .build();
+  }
+
   /** CASH 차감 거래 생성 */
   public static Transaction createCashDeduct(
       String txGroupId,

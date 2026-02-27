@@ -817,18 +817,20 @@ public class MessageSendService {
         .toList();
   }
 
-  /** 예약 시간 파싱 - 두 가지 형식 지원 (yyyyMMddHHmmss, yyyy-MM-dd HH:mm:ss) */
+  /** 재발송 예약 시간 파싱 - 파싱 실패 시 예외 발생 (예약이 즉시 발송으로 변환되는 것을 방지) */
   private LocalDateTime parseResendRequestTime(String reqDate) {
     try {
-      DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-      return LocalDateTime.parse(reqDate, formatter);
-    } catch (Exception e) {
+      return LocalDateTime.parse(reqDate, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+    } catch (Exception e0) {
       try {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
-        return LocalDateTime.parse(reqDate, formatter);
-      } catch (Exception ex) {
-        log.error("재발송 예약 시간 파싱 실패: {}", reqDate);
-        throw new BusinessException(ErrorCode.INVALID_INPUT, "예약 시간 형식이 올바르지 않습니다: " + reqDate);
+        return LocalDateTime.parse(reqDate, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+      } catch (Exception e1) {
+        try {
+          return LocalDateTime.parse(reqDate, DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        } catch (Exception e2) {
+          log.error("재발송 예약 시간 파싱 실패: {}", reqDate);
+          throw new BusinessException(ErrorCode.INVALID_INPUT, "예약 시간 형식이 올바르지 않습니다: " + reqDate);
+        }
       }
     }
   }

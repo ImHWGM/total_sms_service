@@ -128,7 +128,7 @@ public class AdMessageService {
     }
 
     // 6. 잔액 확인
-    BalanceResponse latestBalance = balanceService.getCurrentBalance(userId);
+    BalanceResponse latestBalance = balanceService.getCurrentBalance(userSeq);
     if (latestBalance == null) {
       return AdMessageResponse.insufficientBalance("잔액 정보가 없습니다.\n요금 충전 후 서비스 이용이 가능합니다.");
     }
@@ -136,7 +136,7 @@ public class AdMessageService {
     BigDecimal unitPrice = getUnitPrice(latestBalance, request.getMsgTypeLabel());
     BigDecimal totalCharge = unitPrice.multiply(BigDecimal.valueOf(filteredRecipients.size()));
 
-    if (!balanceService.hasEnoughBalance(userId, totalCharge)) {
+    if (!balanceService.hasEnoughBalance(userSeq, totalCharge)) {
       return AdMessageResponse.insufficientBalance(
           String.format(
               "충전 금액이 부족합니다.\n필요: %s원, 잔액: %s원",

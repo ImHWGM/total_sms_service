@@ -79,12 +79,13 @@ public class EventParticipantService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "등록된 참여자 정보가 없습니다."));
 
-    // 3. registType 업데이트
-    participantMapper.updateRegistType(participant.getSeq(), request.getResponse());
+    // 3. 영문 응답값을 한국어로 변환 후 registType 업데이트
+    String registType = convertRsvpResponse(request.getResponse());
+    participantMapper.updateRegistType(participant.getSeq(), registType);
 
     return RsvpResponse.builder()
         .participantName(participant.getUserName())
-        .response(request.getResponse())
+        .response(registType)
         .build();
   }
 
@@ -690,6 +691,15 @@ public class EventParticipantService {
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
     return getParticipantStatus(participant.getSeq());
+  }
+
+  /** RSVP 영문 응답값을 한국어로 변환 */
+  private String convertRsvpResponse(String response) {
+    return switch (response) {
+      case "preregister" -> "사전등록";
+      case "absent" -> "불참석";
+      default -> response; // 이미 한국어인 경우 그대로 반환
+    };
   }
 
   /** 전화번호 암호화 */

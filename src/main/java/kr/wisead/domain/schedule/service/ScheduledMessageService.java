@@ -6,6 +6,7 @@ import java.util.List;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.payment.dto.BalanceResponse;
 import kr.wisead.domain.payment.service.BalanceService;
 import kr.wisead.domain.payment.service.WalletService;
@@ -28,6 +29,7 @@ public class ScheduledMessageService {
   private final ScheduledMessageMapper scheduledMessageMapper;
   private final BalanceService balanceService;
   private final WalletService walletService;
+  private final UserIdResolver userIdResolver;
 
   @Value("${api.base.url:}")
   private String apiBaseUrl;
@@ -89,12 +91,10 @@ public class ScheduledMessageService {
   /** 예약 취소 (환불 포함) */
   @Transactional
   public void cancelMessageGroup(String userId, String msgType, LocalDateTime insertTime) {
-    // 0. userId는 실제로 userSeq임 (JWT subject로 seq 사용)
-    Integer userSeq;
-    try {
-      userSeq = Integer.parseInt(userId);
-    } catch (NumberFormatException e) {
-      log.error("예약 취소 - 잘못된 사용자 식별자: userId={}", userId);
+    // 0. userId → userSeq 변환 (SMS DB의 문자열 userId를 Primary DB의 숫자 seq로)
+    Integer userSeq = userIdResolver.toUserSeq(userId);
+    if (userSeq == null) {
+      log.error("예약 취소 - 사용자를 찾을 수 없습니다: userId={}", userId);
       throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
     }
 

@@ -2,17 +2,24 @@ package kr.wisead.domain.payment.controller;
 
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.UserIdResolver;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.payment.dto.BalanceResponse;
 import kr.wisead.domain.payment.dto.ChargeRequest;
+import kr.wisead.domain.payment.dto.RefundPreviewResponse;
 import kr.wisead.domain.payment.dto.RefundResult;
 import kr.wisead.domain.payment.dto.SmsPriceRequest;
 import kr.wisead.domain.payment.dto.StandardRateResponse;
+import kr.wisead.domain.payment.dto.TransactionResponse;
 import kr.wisead.domain.payment.dto.UserServiceRateRequest;
 import kr.wisead.domain.payment.dto.UserServiceRateResponse;
+import kr.wisead.domain.payment.dto.WalletLotResponse;
+import kr.wisead.domain.payment.dto.WalletSummaryResponse;
 import kr.wisead.domain.payment.entity.Payment;
 import kr.wisead.domain.payment.service.BalanceService;
 import kr.wisead.domain.payment.service.BillingService;
@@ -20,6 +27,7 @@ import kr.wisead.domain.payment.service.PaymentService;
 import kr.wisead.domain.payment.service.UserServiceRateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -37,6 +45,7 @@ public class PaymentController {
   private final BillingService billingService;
   private final UserServiceRateService userServiceRateService;
   private final UserIdResolver userIdResolver;
+  private final AdminService adminService;
 
   /** 현재 잔액 조회 GET /api/payment/balance */
   @GetMapping("/balance")
@@ -107,13 +116,25 @@ public class PaymentController {
     return ApiResponse.success(response);
   }
 
-  /** 특정 사용자 잔액 내역 조회 (관리자용) GET /api/payment/balance/history/{userId} */
+  /** 특정 사용자 잔액 내역 조회 (본인/운영관리자/최고관리자) GET /api/payment/balance/history/{userId} */
   @GetMapping("/balance/history/{userId}")
-  @PreAuthorize("hasRole('ADMIN')")
   public ApiResponse<PageResponse<BalanceResponse>> getBalanceHistoryByUserId(
+      @AuthenticationPrincipal UserDetails userDetails,
       @PathVariable String userId,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
+    String currentUserId = userIdResolver.resolveUserId(userDetails.getUsername());
+    Integer userLevel = adminService.getUserLevel(userDetails.getUsername());
+
+    if (!currentUserId.equals(userId)) {
+      String queryScope = adminService.determineQueryUserIds(currentUserId, userLevel);
+      boolean hasAccess =
+          "ALL".equals(queryScope) || Arrays.asList(queryScope.split(",")).contains(userId);
+      if (!hasAccess) {
+        throw new AccessDeniedException("접근 권한이 없습니다.");
+      }
+    }
+
     PageResponse<BalanceResponse> response = balanceService.getBalanceHistory(userId, page, size);
     return ApiResponse.success(response);
   }
@@ -205,7 +226,7 @@ public class PaymentController {
 
   /** 지갑 요약 조회 (CASH/POINT/BONUS 분리) GET /api/payment/wallet/summary */
   @GetMapping("/wallet/summary")
-  public ApiResponse<kr.wisead.domain.payment.dto.WalletSummaryResponse> getWalletSummary(
+  public ApiResponse<WalletSummaryResponse> getWalletSummary(
       @AuthenticationPrincipal UserDetails userDetails) {
     String userId = userDetails.getUsername();
     return ApiResponse.success(balanceService.getWalletSummary(userId));
@@ -213,7 +234,7 @@ public class PaymentController {
 
   /** 활성 Lot 목록 조회 (만료일 포함) GET /api/payment/wallet/lots */
   @GetMapping("/wallet/lots")
-  public ApiResponse<java.util.List<kr.wisead.domain.payment.dto.WalletLotResponse>> getActiveLots(
+  public ApiResponse<List<WalletLotResponse>> getActiveLots(
       @AuthenticationPrincipal UserDetails userDetails) {
     String userId = userDetails.getUsername();
     return ApiResponse.success(balanceService.getActiveLots(userId));
@@ -221,27 +242,24 @@ public class PaymentController {
 
   /** 거래 이력 조회 (신규) GET /api/payment/transactions */
   @GetMapping("/transactions")
-  public ApiResponse<PageResponse<kr.wisead.domain.payment.dto.TransactionResponse>>
-      getTransactions(
-          @AuthenticationPrincipal UserDetails userDetails,
-          @RequestParam(defaultValue = "1") int page,
-          @RequestParam(defaultValue = "10") int size) {
+  public ApiResponse<PageResponse<TransactionResponse>> getTransactions(
+      @AuthenticationPrincipal UserDetails userDetails,
+      @RequestParam(defaultValue = "1") int page,
+      @RequestParam(defaultValue = "10") int size) {
     String userId = userDetails.getUsername();
     return ApiResponse.success(balanceService.getTransactionHistory(userId, page, size));
   }
 
   /** 환불 미리보기 GET /api/payment/refund/preview?txGroupId={id} */
   @GetMapping("/refund/preview")
-  public ApiResponse<kr.wisead.domain.payment.dto.RefundPreviewResponse> previewRefund(
-      @RequestParam String txGroupId) {
+  public ApiResponse<RefundPreviewResponse> previewRefund(@RequestParam String txGroupId) {
     return ApiResponse.success(balanceService.previewRefund(txGroupId));
   }
 
   /** 환불 처리 POST /api/payment/refund/{txGroupId} */
   @PostMapping("/refund/{txGroupId}")
   @PreAuthorize("hasRole('ADMIN')")
-  public ApiResponse<RefundResult> processRefund(
-      @PathVariable String txGroupId) {
+  public ApiResponse<RefundResult> processRefund(@PathVariable String txGroupId) {
     return ApiResponse.success(balanceService.refund(txGroupId));
   }
 

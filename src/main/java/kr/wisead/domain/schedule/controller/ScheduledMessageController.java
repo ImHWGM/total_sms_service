@@ -5,6 +5,7 @@ import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.schedule.dto.RescheduleRequest;
 import kr.wisead.domain.schedule.dto.ScheduledMessageResponse;
@@ -33,6 +34,7 @@ public class ScheduledMessageController {
     private final ScheduledMessageService scheduledMessageService;
     private final AdminService adminService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserIdResolver userIdResolver;
 
     /**
      * 예약 메시지 목록 조회
@@ -47,7 +49,7 @@ public class ScheduledMessageController {
             @RequestHeader("Authorization") String token) {
 
         String accessToken = token.replace("Bearer ", "");
-        String userId = jwtTokenProvider.getUserId(accessToken);
+        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
         Integer userLevel = adminService.getUserLevel(userId);
 
         // 권한에 따른 조회 대상 설정
@@ -75,7 +77,7 @@ public class ScheduledMessageController {
             @RequestHeader("Authorization") String token) {
 
         String accessToken = token.replace("Bearer ", "");
-        String userId = jwtTokenProvider.getUserId(accessToken);
+        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
         Integer userLevel = adminService.getUserLevel(userId);
         String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 
@@ -98,7 +100,7 @@ public class ScheduledMessageController {
             @RequestHeader("Authorization") String token) {
 
         String accessToken = token.replace("Bearer ", "");
-        String userId = jwtTokenProvider.getUserId(accessToken);
+        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
         Integer userLevel = adminService.getUserLevel(userId);
         String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 
@@ -135,7 +137,7 @@ public class ScheduledMessageController {
             @RequestHeader("Authorization") String token) {
 
         String accessToken = token.replace("Bearer ", "");
-        String userId = jwtTokenProvider.getUserId(accessToken);
+        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
         Integer userLevel = adminService.getUserLevel(userId);
         String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 

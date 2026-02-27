@@ -696,7 +696,7 @@ public class EventParticipantService {
   /** RSVP 영문 응답값을 한국어로 변환 */
   private String convertRsvpResponse(String response) {
     return switch (response) {
-      case "preregister" -> "사전등록";
+      case "attend", "preregister" -> "사전등록";
       case "absent" -> "불참석";
       default -> response; // 이미 한국어인 경우 그대로 반환
     };

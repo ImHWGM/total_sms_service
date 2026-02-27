@@ -17,7 +17,7 @@ public class RsvpRequest {
 
   @NotBlank(message = "응답은 필수입니다.")
   @Pattern(
-      regexp = "^(사전등록|불참석|preregister|absent)$",
-      message = "응답은 '사전등록(preregister)' 또는 '불참석(absent)'만 가능합니다.")
+      regexp = "^(사전등록|불참석|attend|preregister|absent)$",
+      message = "응답은 '사전등록(attend)' 또는 '불참석(absent)'만 가능합니다.")
   private String response;
 }

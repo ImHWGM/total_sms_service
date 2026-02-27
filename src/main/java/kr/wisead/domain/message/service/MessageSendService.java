@@ -403,16 +403,16 @@ public class MessageSendService {
 
   /** 부분 환불 (취소 건수 × 단가로 CASH 환불) - 원래 화폐 추적이 어려우므로 CASH로 환불 */
   private void refundPartial(String userId, String msgType, int count, String txGroupId) {
+    // userId는 실제로 userSeq임 (JWT subject로 seq 사용)
+    Integer userSeq;
     try {
-      // userId는 실제로 userSeq임 (JWT subject로 seq 사용)
-      Integer userSeq;
-      try {
-        userSeq = Integer.parseInt(userId);
-      } catch (NumberFormatException e) {
-        log.error("환불 처리 실패 - 잘못된 사용자 식별자: userId={}", userId);
-        return;
-      }
+      userSeq = Integer.parseInt(userId);
+    } catch (NumberFormatException e) {
+      log.error("환불 처리 실패 - 잘못된 사용자 식별자: userId={}", userId);
+      return;
+    }
 
+    try {
       String serviceId = getServiceIdFromMsgType(msgType);
       BigDecimal unitPrice = walletService.getAppliedRate(userSeq, serviceId);
       BigDecimal refundAmount = unitPrice.multiply(BigDecimal.valueOf(count));
@@ -585,7 +585,10 @@ public class MessageSendService {
       finalCallback = callback;
     }
 
-    // MSG_QUEUE에 등록 (재발송은 별도 결제 없이 진행되므로 txGroupId = null)
+    // 설문 요금 차감
+    String txGroupId = deductForMessage(regId, "survey", 1, "L");
+
+    // MSG_QUEUE에 등록
     String realUserId = userIdResolver.resolveUserId(regId);
     MsgQueue msgQueue =
         MsgQueue.createForSurvey(
@@ -596,7 +599,7 @@ public class MessageSendService {
             finalText,
             eventSeq,
             userSeq,
-            null, // txGroupId: 재발송은 별도 결제 없음
+            txGroupId,
             realUserId);
 
     // 예약 발송 처리
@@ -693,6 +696,9 @@ public class MessageSendService {
       return ResendResponse.fail("이벤트 정보를 찾을 수 없습니다.");
     }
 
+    // 설문 요금 차감
+    String txGroupId = deductForMessage(regId, "survey", receivers.size(), "L");
+
     int successCount = 0;
     int failCount = 0;
     List<String> failedList = new ArrayList<>();
@@ -714,7 +720,7 @@ public class MessageSendService {
 
         log.debug("설문 문자 준비 완료 - eventCode: {}, userKey: {}", eventCode, receiver.getUserKey());
 
-        // MSG_QUEUE에 등록 (중복 번호 재발송은 별도 결제 없이 진행되므로 txGroupId = null)
+        // MSG_QUEUE에 등록
         MsgQueue msgQueue =
             MsgQueue.createForSurvey(
                 "L", // LMS로 발송
@@ -724,7 +730,7 @@ public class MessageSendService {
                 text,
                 request.getEventSeq(),
                 receiver.getUserSeq(),
-                null, // txGroupId: 재발송은 별도 결제 없음
+                txGroupId,
                 realUserId);
 
         msgQueueMapper.insertLms(msgQueue);
@@ -887,8 +893,8 @@ public class MessageSendService {
           receivers.size());
     }
 
-    // 잔액 확인 및 차감 (설문 문자는 LMS 전용)
-    String txGroupId = deductForMessage(regId, "msg_lms", receivers.size(), "L");
+    // 잔액 확인 및 차감 (설문 요금 적용)
+    String txGroupId = deductForMessage(regId, "survey", receivers.size(), "L");
     int successCount = 0;
     int failCount = 0;
     List<String> failedPhones = new ArrayList<>();
@@ -900,23 +906,11 @@ public class MessageSendService {
         String phone = receiver.getNormalizedPhone();
         String text = request.getText();
 
-        // 대치문자 처리
-        if (receiver.getRepChar01() != null && !receiver.getRepChar01().isEmpty()) {
-          text = text.replace("#대치문자1#", receiver.getRepChar01());
-        }
-        if (receiver.getRepChar02() != null && !receiver.getRepChar02().isEmpty()) {
-          text = text.replace("#대치문자2#", receiver.getRepChar02());
-        }
-        if (receiver.getRepChar03() != null && !receiver.getRepChar03().isEmpty()) {
-          text = text.replace("#대치문자3#", receiver.getRepChar03());
-        }
-
-        // #유저키#, #userKey# 치환
-        if (receiver.getUserKey() != null && !receiver.getUserKey().isEmpty()) {
-          text =
-              text.replace("#유저키#", receiver.getUserKey())
-                  .replace("#userKey#", receiver.getUserKey());
-        }
+        // 대치문자 및 유저키 처리
+        text =
+            applyReplaceChars(
+                text, receiver.getRepChar01(), receiver.getRepChar02(), receiver.getRepChar03());
+        text = applyUserKey(text, receiver.getUserKey());
 
         // URL 패턴을 찾아서 단축 URL로 변환
         text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);

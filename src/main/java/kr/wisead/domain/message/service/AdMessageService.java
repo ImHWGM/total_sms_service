@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.UserIdResolver;
@@ -71,14 +70,15 @@ public class AdMessageService {
       return AdMessageResponse.fail(-1, "발송 대상이 없습니다.");
     }
 
-    // 2. 사용자의 상점코드 조회 (userId는 실제로 userSeq임 - JWT subject로 seq 사용)
-    String storeCode = null;
+    // 2. 사용자 시퀀스 파싱 (userId는 실제로 userSeq임 - JWT subject로 seq 사용)
+    Integer userSeq;
     try {
-      Integer userSeq = Integer.parseInt(userId);
-      storeCode = userMapper.findBySeq(userSeq).map(User::getStoreCode).orElse(null);
+      userSeq = Integer.parseInt(userId);
     } catch (NumberFormatException e) {
       log.warn("잘못된 사용자 식별자 - userId: {}", userId);
+      return AdMessageResponse.fail(-1, "사용자 정보를 찾을 수 없습니다.");
     }
+    String storeCode = userMapper.findBySeq(userSeq).map(User::getStoreCode).orElse(null);
     String realUserId = userIdResolver.resolveUserId(userId);
     if (storeCode == null || storeCode.isBlank()) {
       log.warn("상점코드 없음 - userId: {}", userId);
@@ -107,21 +107,16 @@ public class AdMessageService {
 
     // 4. 수신거부 번호 필터링
     List<String> phoneList =
-        recipients.stream()
-            .map(AdMessageRequest.Recipient::getNormalizedPhone)
-            .collect(Collectors.toList());
+        recipients.stream().map(AdMessageRequest.Recipient::getNormalizedPhone).toList();
 
     List<String> blockedPhones = blockedNumberService.filterBlockedNumbers(storeCode, phoneList);
     Set<String> blockedSet = new HashSet<>(blockedPhones);
 
-    List<String> maskedBlockedNumbers =
-        blockedPhones.stream().map(this::maskPhoneNumber).collect(Collectors.toList());
+    List<String> maskedBlockedNumbers = blockedPhones.stream().map(this::maskPhoneNumber).toList();
 
     // 수신거부 번호 제외
     List<AdMessageRequest.Recipient> filteredRecipients =
-        recipients.stream()
-            .filter(r -> !blockedSet.contains(r.getNormalizedPhone()))
-            .collect(Collectors.toList());
+        recipients.stream().filter(r -> !blockedSet.contains(r.getNormalizedPhone())).toList();
 
     int blockedCount = recipients.size() - filteredRecipients.size();
     log.info("수신거부 필터링 - 제외: {}건", blockedCount);
@@ -191,13 +186,13 @@ public class AdMessageService {
 
     // 8. 잔액 차감 (동일한 txGroupId로 차감하여 취소 시 환불 추적 가능)
     if (successCount > 0) {
-      BigDecimal actualCharge = unitPrice.multiply(BigDecimal.valueOf(successCount));
       String comment = String.format("광고문자발송 : %s %d건", request.getMsgTypeLabel(), successCount);
       if (blockedCount > 0) {
         comment += String.format(" (수신거부 %d건 제외)", blockedCount);
       }
 
-      balanceService.deductWithTxGroupId(userId, actualCharge, comment, userId, txGroupId);
+      balanceService.deductMessageChargeWithTxGroupId(
+          userSeq, successCount, request.getMsgTypeLabel(), comment, txGroupId);
     }
 
     log.info(

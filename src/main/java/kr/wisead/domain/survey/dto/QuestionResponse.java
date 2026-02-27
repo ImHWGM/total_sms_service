@@ -31,13 +31,21 @@ public class QuestionResponse {
     return QuestionResponse.builder()
         .questionSeq(entity.getQuestionSeq())
         .eventSeq(entity.getEventSeq())
-        .questionType(entity.getQuestionType())
+        .questionType(normalizeQuestionType(entity.getQuestionType()))
         .questionTypeDetail(entity.getQuestionTypeDetail())
         .question(entity.getQuestion())
         .questionImg(entity.getQuestionImg())
         .order(entity.getOrder())
         .foreignAllow(entity.getForeignAllow())
         .build();
+  }
+
+  /** 레거시 questionType 정규화 (SAA -> SA) */
+  private static String normalizeQuestionType(String questionType) {
+    if ("SAA".equals(questionType)) {
+      return "SA";
+    }
+    return questionType;
   }
 
   /** 보기 목록 추가 */
@@ -53,10 +61,11 @@ public class QuestionResponse {
   }
 
   /** 이미지 URL을 절대 경로로 변환 */
-  public void withFullImageUrls(String apiBaseUrl) {
+  public QuestionResponse withFullImageUrls(String apiBaseUrl) {
     this.questionImg = kr.wisead.common.util.UrlUtils.toAbsoluteUrl(this.questionImg, apiBaseUrl);
     if (this.items != null) {
       this.items.forEach(item -> item.withFullImageUrls(apiBaseUrl));
     }
+    return this;
   }
 }

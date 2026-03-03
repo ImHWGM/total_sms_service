@@ -73,7 +73,8 @@ public class SendHistoryService {
     int skipCount = request.getOffset();
 
     for (String tableName : tables) {
-      if (remaining <= 0) break;
+      if (remaining <= 0)
+        break;
 
       try {
         int tableCount = sendHistoryMapper.selectCount(tableName, params);
@@ -97,8 +98,7 @@ public class SendHistoryService {
       }
     }
 
-    List<SendHistoryResponse> responses =
-        allResults.stream().map(SendHistoryResponse::from).toList();
+    List<SendHistoryResponse> responses = allResults.stream().map(SendHistoryResponse::from).toList();
 
     if (apiBaseUrl != null && !apiBaseUrl.isEmpty()) {
       responses.forEach(r -> r.withFullImageUrls(apiBaseUrl));
@@ -127,8 +127,10 @@ public class SendHistoryService {
     // 시간순 정렬
     allResults.sort(
         (a, b) -> {
-          if (b.getRequestTime() == null) return -1;
-          if (a.getRequestTime() == null) return 1;
+          if (b.getRequestTime() == null)
+            return -1;
+          if (a.getRequestTime() == null)
+            return 1;
           return b.getRequestTime().compareTo(a.getRequestTime());
         });
 
@@ -159,15 +161,13 @@ public class SendHistoryService {
   private List<String> getTableNames(String startDateStr, String endDateStr) {
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    LocalDate startDate =
-        startDateStr != null && !startDateStr.isEmpty()
-            ? LocalDate.parse(startDateStr, formatter)
-            : LocalDate.now().minusDays(15);
+    LocalDate startDate = startDateStr != null && !startDateStr.isEmpty()
+        ? LocalDate.parse(startDateStr, formatter)
+        : LocalDate.now().minusDays(15);
 
-    LocalDate endDate =
-        endDateStr != null && !endDateStr.isEmpty()
-            ? LocalDate.parse(endDateStr, formatter)
-            : LocalDate.now().plusDays(30);
+    LocalDate endDate = endDateStr != null && !endDateStr.isEmpty()
+        ? LocalDate.parse(endDateStr, formatter)
+        : LocalDate.now().plusDays(30);
 
     List<String> tables = new ArrayList<>();
     LocalDate tableStart = startDate.withDayOfMonth(1);

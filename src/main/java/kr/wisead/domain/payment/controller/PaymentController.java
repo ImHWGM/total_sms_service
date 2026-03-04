@@ -1,10 +1,15 @@
 package kr.wisead.domain.payment.controller;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.UserIdResolver;
@@ -27,6 +32,7 @@ import kr.wisead.domain.payment.service.PaymentService;
 import kr.wisead.domain.payment.service.UserServiceRateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -46,6 +52,9 @@ public class PaymentController {
   private final UserServiceRateService userServiceRateService;
   private final UserIdResolver userIdResolver;
   private final AdminService adminService;
+
+  @Value("${wisead.url}")
+  private String wiseadUrl;
 
   /** 현재 잔액 조회 GET /api/payment/balance */
   @GetMapping("/balance")
@@ -206,6 +215,30 @@ public class PaymentController {
       log.error("KG 결제 처리 중 오류: {}", e.getMessage(), e);
       return "FAIL";
     }
+  }
+
+  /**
+   * KG 모빌리언스 결제 완료 리다이렉트 POST /api/payment/kg/ok
+   *
+   * <p>KG PG가 결제 완료 후 POST로 결과를 전송하면, 파라미터를 query string으로 변환하여 프론트엔드 SPA로 GET
+   * 리다이렉트합니다.
+   */
+  @PostMapping(value = "/kg/ok", produces = "text/html;charset=EUC-KR")
+  public void kgPaymentOk(
+      @RequestParam Map<String, String> params, HttpServletResponse response) throws IOException {
+    log.info("KG 결제 완료 리다이렉트 수신: {}", params);
+
+    String queryString =
+        params.entrySet().stream()
+            .map(
+                e ->
+                    URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8)
+                        + "="
+                        + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+            .collect(Collectors.joining("&"));
+
+    String redirectUrl = wiseadUrl + "/payment/result?" + queryString;
+    response.sendRedirect(redirectUrl);
   }
 
   /**

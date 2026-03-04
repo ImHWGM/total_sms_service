@@ -130,7 +130,7 @@ public class AdminController {
       CellStyle headerStyle = excelService.createHeaderStyle(workbook, 11, true, 192, 192, 192);
 
       List<String> headers =
-          Arrays.asList("NO", "아이디", "이름", "메뉴명", "메뉴URL", "Referer", "코드", "IP", "등록일시");
+          Arrays.asList("NO", "아이디", "기업명", "이름", "메뉴명", "메뉴URL", "Referer", "코드", "IP", "등록일시");
       excelService.createHeaderRow(sheet, 0, headers, headerStyle);
 
       int rowNum = 1;
@@ -144,6 +144,7 @@ public class AdminController {
             Arrays.asList(
                 totalCount--,
                 logItem.getUserId(),
+                logItem.getCorpName(), // 기업명 데이터 추가
                 logItem.getUserName(),
                 logItem.getMenuName(),
                 logItem.getMenuUrl(),

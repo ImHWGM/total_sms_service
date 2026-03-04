@@ -29,6 +29,7 @@ public class ActionLogResponse {
     private String userName;
     private String ip;
     private LocalDateTime regDate;
+    private String corpName;        // 회사명
 
     public static ActionLogResponse from(ActionLog entity) {
         if (entity == null) return null;
@@ -54,6 +55,7 @@ public class ActionLogResponse {
                 .userName(entity.getUserName())
                 .ip(entity.getIp())
                 .regDate(entity.getRegDate())
+            .corpName(entity.getCorpName())
                 .build();
     }
 }

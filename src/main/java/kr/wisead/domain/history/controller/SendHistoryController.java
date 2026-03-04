@@ -145,7 +145,9 @@ public class SendHistoryController {
         for (SendHistoryResponse history : historyList) {
             Row row = sheet.createRow(rowNum++);
             row.createCell(0).setCellValue(history.getMsgType() != null ? history.getMsgType() : "");
-            row.createCell(1).setCellValue(history.getReceiver() != null ? history.getReceiver() : "");
+//            row.createCell(1).setCellValue(history.getReceiver() != null ? history.getReceiver() : "");
+            row.createCell(1)
+                .setCellValue(history.getRawReceiver() != null ? history.getRawReceiver() : "");
             row.createCell(2).setCellValue(history.getCallback() != null ? history.getCallback() : "");
             row.createCell(3).setCellValue(history.getStatName() != null ? history.getStatName() : "");
             row.createCell(4).setCellValue(history.getResult() != null ? history.getResult() : "");

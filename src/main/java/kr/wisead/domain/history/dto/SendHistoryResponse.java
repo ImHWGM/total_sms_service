@@ -21,6 +21,7 @@ public class SendHistoryResponse {
     private Long seq;               // 메시지 시퀀스 (mseq)
     private String msgType;         // 메시지 타입
     private String receiver;        // 수신번호 (마스킹 처리됨)
+    private String rawReceiver;     // 원본 번호
     private String callback;        // 발신번호
     private String subject;         // 제목
     private String text;            // 내용
@@ -46,6 +47,7 @@ public class SendHistoryResponse {
                 .seq(entity.getMsgKey())
                 .msgType(entity.getMsgType())
                 .receiver(maskedReceiver)
+            .rawReceiver(entity.getDstAddr()) // 원본 번호
                 .callback(entity.getCallBack())
                 .subject(entity.getSubject())
                 .text(entity.getText())

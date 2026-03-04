@@ -38,4 +38,18 @@ public class PageResponse<T> {
                 .hasPrevious(page > 0)
                 .build();
     }
+
+    public static <T> PageResponse<T> empty() {
+        return PageResponse.<T>builder()
+            .content(java.util.Collections.emptyList())
+            .page(0)
+            .size(10)
+            .totalElements(0L)
+            .totalPages(0)
+            .first(true)
+            .last(true)
+            .hasNext(false)
+            .hasPrevious(false)
+            .build();
+    }
 }

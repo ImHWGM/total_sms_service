@@ -6,6 +6,7 @@ import java.util.List;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.common.util.MemberUtil;
 import kr.wisead.domain.admin.dto.AdminAccountRequest;
 import kr.wisead.domain.payment.entity.UserServiceRate;
 import kr.wisead.domain.payment.service.StandardRateService;
@@ -74,6 +75,20 @@ public class AdminService {
       throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "개인정보 암호화에 실패했습니다.");
     }
 
+    // 고유한 상점코드 생성
+    // 5번 모두 실패했다면 storeCode는 null이 됩니다.
+    String storeCode = null;
+    int attempts = 0;
+    while (attempts < 5) {
+      String tempCode = MemberUtil.generateStoreCode();
+      if (!userMapper.existsByStoreCode(tempCode)) {
+        storeCode = tempCode;
+        break; // 중복되지 않는 코드 발견 시 탈출
+      }
+      attempts++;
+      log.warn("상점코드 중복 발생 (시도 {}회): {}", attempts, tempCode);
+    }
+
     // 회원 정보 생성
     User user =
         User.builder()
@@ -92,6 +107,7 @@ public class AdminService {
             .status("승인") // 관리자 계정은 자동 승인
             .regId(creatorId)
             .loginFailureCnt(0)
+            .storeCode(storeCode)
             .build();
 
     // 회원 등록 (INSERT 후 user.seq에 자동 생성된 키가 주입됨)
@@ -267,6 +283,13 @@ public class AdminService {
       // userSeq가 이미 userId인 경우
       return userSeq;
     }
+  }
+
+  /**
+   * USER_ID로 상점코드 조회
+   */
+  public String getStoreCodeByUserId(String userId) {
+    return userMapper.selectStoreCodeByUserId(userId);
   }
 
   /**

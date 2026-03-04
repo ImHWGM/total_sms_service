@@ -183,8 +183,13 @@ public class SendHistoryController {
 
         String userId = userIdResolver.resolveUserId(
             jwtTokenProvider.getUserId(token.replace("Bearer ", "")));
-        // TODO: storeCode 조회 로직 필요 (사용자별 스토어 코드)
-        String storeCode = userId; // 임시로 userId 사용
+
+        // [완료] TODO: storeCode 조회 로직 필요 (사용자별 스토어 코드)
+//        String storeCode = userId; // 임시로 userId 사용
+        String storeCode = adminService.getStoreCodeByUserId(userId);
+        if (storeCode == null) {
+            return ApiResponse.success(PageResponse.empty());
+        }
 
         PageResponse<BlockedSenderResponse> response = sendHistoryService.getBlockedSenders(storeCode, page, size);
         return ApiResponse.success(response);
@@ -225,7 +230,14 @@ public class SendHistoryController {
         String accessToken = token.replace("Bearer ", "");
         String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
         String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
-        String storeCode = userId; // TODO: 스토어 코드 조회
+
+        // [완료] TODO: 스토어 코드 조회
+//        String storeCode = userId;
+        String storeCode = adminService.getStoreCodeByUserId(userId);
+        if (storeCode == null) {
+            log.warn("상점코드를 찾을 수 없습니다: userId={}", userId);
+            return;
+        }
 
         // 다운로드 로그 기록
         actionLogService.logDownloadAction(userId, userName, "수신거부 내역 다운로드", "D", "업무용", request);

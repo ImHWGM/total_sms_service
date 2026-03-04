@@ -202,7 +202,8 @@ public class ExcelController {
     byte[] content =
         billingExcelService.generateBillingExcel(request, currentUserId, targetUserIds);
 
-    String fileName = "과금통계_" + startDate + "_" + endDate + ".xlsx";
+    String downloadDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
+    String fileName = "요금통계및내역(" + startDate + "~" + endDate + ")_" + downloadDate + ".xlsx";
     String encodedFileName =
         URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
 
@@ -500,7 +501,11 @@ public class ExcelController {
     String logMenuName =
         String.format("%s 참여현황 엑셀다운로드 (%s)", menuName, getDownloadTypeText(downloadType));
     actionLogService.logDownloadAction(
-        userId, decryptName(user.getPerson()), logMenuName, "R", downloadRequest.getReason(),
+        userId,
+        decryptName(user.getPerson()),
+        logMenuName,
+        "R",
+        downloadRequest.getReason(),
         request);
 
     // 데이터 조회

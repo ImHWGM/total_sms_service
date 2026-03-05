@@ -291,4 +291,11 @@
         SELECT EXISTS(SELECT 1 FROM user WHERE STORE_CODE = ${storeCode})
     </select>
 
+    <!-- 상점코드로 사용자 ID 조회 (추가) -->
+    <select id="findUserIdByStoreCode" resultType="string">
+        SELECT USER_ID
+        FROM user
+        WHERE STORE_CODE = #{storeCode} LIMIT 1
+    </select>
+
 </mapper>

@@ -7,6 +7,7 @@ import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.ars.dto.BlockedSenderResponse;
 import kr.wisead.domain.ars.entity.BlockedSender;
 import kr.wisead.mapper.primary.BlockedSenderMapper;
+import kr.wisead.mapper.primary.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 public class BlockedNumberService {
 
     private final BlockedSenderMapper blockedSenderMapper;
+    private final UserMapper userMapper;
 
     /**
      * 수신거부 등록
@@ -107,8 +109,10 @@ public class BlockedNumberService {
         List<BlockedSender> blockedSenders = blockedSenderMapper.selectBlockedSendersWithPaging(storeCode, offset, size);
         int total = blockedSenderMapper.countBlockedSendersByStoreCode(storeCode);
 
+        String storeId = userMapper.findUserIdByStoreCode(storeCode);
+
         List<BlockedSenderResponse> responses = blockedSenders.stream()
-                .map(bs -> BlockedSenderResponse.from(bs, decryptPhoneNumber(bs.getAni())))
+            .map(bs -> BlockedSenderResponse.from(bs, decryptPhoneNumber(bs.getAni()), storeId))
                 .collect(Collectors.toList());
 
         return PageResponse.of(responses, page, size, total);
@@ -121,8 +125,10 @@ public class BlockedNumberService {
     public List<BlockedSenderResponse> getAllBlockedNumbers(String storeCode) {
         List<BlockedSender> blockedSenders = blockedSenderMapper.selectBlockedSendersByStoreCode(storeCode);
 
+        String storeId = userMapper.findUserIdByStoreCode(storeCode);
+
         return blockedSenders.stream()
-                .map(bs -> BlockedSenderResponse.from(bs, decryptPhoneNumber(bs.getAni())))
+            .map(bs -> BlockedSenderResponse.from(bs, decryptPhoneNumber(bs.getAni()), storeId))
                 .collect(Collectors.toList());
     }
 

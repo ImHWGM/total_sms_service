@@ -121,18 +121,18 @@ public class ScheduledMessageController {
             Row row = sheet.createRow(rowNum++);
             row.createCell(0).setCellValue(item.getMsgTypeName());
             row.createCell(1).setCellValue(item.getRawDstAddr());
-            row.createCell(1).setCellValue(item.getSubject());      // 제목 출력 (없으면 빈칸)
-            row.createCell(2).setCellValue(item.getText());         // 내용 출력
-            row.createCell(3).setCellValue(item.getCallBack());
-            row.createCell(4).setCellValue(
+            row.createCell(2).setCellValue(item.getSubject());      // 제목 출력 (없으면 빈칸)
+            row.createCell(3).setCellValue(item.getText());         // 내용 출력
+            row.createCell(4).setCellValue(item.getCallBack());
+            row.createCell(5).setCellValue(
                 item.getRequestTime() != null ? item.getRequestTime().format(dtf) : "");
             // 요청건수 null 체크
             if (item.getMessageCount() != null) {
-                row.createCell(5).setCellValue(item.getMessageCount());
+                row.createCell(6).setCellValue(item.getMessageCount());
             } else {
-                row.createCell(5).setCellValue(0);
+                row.createCell(6).setCellValue(0);
             }
-            row.createCell(6).setCellValue(item.getUserId());
+            row.createCell(7).setCellValue(item.getUserId());
         }
         // 4. 파일 다운로드 응답 설정
         String fileName =

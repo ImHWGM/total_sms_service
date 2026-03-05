@@ -1,11 +1,18 @@
 package kr.wisead.domain.schedule.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeFormatter;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.UserIdResolver;
+import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.schedule.dto.RescheduleRequest;
 import kr.wisead.domain.schedule.dto.ScheduledMessageResponse;
@@ -14,6 +21,10 @@ import kr.wisead.domain.schedule.service.ScheduledMessageService;
 import kr.wisead.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -35,6 +46,7 @@ public class ScheduledMessageController {
     private final AdminService adminService;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserIdResolver userIdResolver;
+    private final ActionLogService actionLogService;
 
     /**
      * 예약 메시지 목록 조회
@@ -65,6 +77,66 @@ public class ScheduledMessageController {
 
         PageResponse<ScheduledMessageResponse> response = scheduledMessageService.getScheduledMessages(request);
         return ApiResponse.success(response);
+    }
+
+    /**
+     * 예약 메시지 엑셀 다운로드
+     */
+    @PostMapping("/download")
+    public void downloadScheduledMessages(
+        @RequestParam(required = false) String msgType,
+        @RequestParam(required = false) String searchText,
+        @RequestParam String reason,
+        @RequestHeader("Authorization") String token,
+        HttpServletRequest request,
+        HttpServletResponse response) throws Exception {
+        String accessToken = token.replace("Bearer ", "");
+        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+        String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
+        Integer userLevel = adminService.getUserLevel(userId);
+        // 1. 다운로드 로그 기록
+        actionLogService.logDownloadAction(userId, userName, "예약 리스트 다운로드", "D", reason, request);
+        // 2. 데이터 조회
+        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
+        ScheduledMessageSearchRequest searchRequest = ScheduledMessageSearchRequest.builder()
+            .msgType(msgType)
+            .searchText(searchText)
+            .userId(queryUserId)
+            .build();
+        List<ScheduledMessageResponse> list = scheduledMessageService.getScheduledMessagesForDownload(
+            searchRequest);
+        // 3. 엑셀 생성 (POI 사용)
+        Workbook wb = new SXSSFWorkbook();
+        Sheet sheet = wb.createSheet("예약 메시지 내역");
+        // 헤더 생성 및 스타일 설정
+        String[] headers = {"문자 타입", "제목/내용", "발신번호", "예약시간", "요청건수", "등록자"};
+        Row headerRow = sheet.createRow(0);
+        for (int i = 0; i < headers.length; i++) {
+            headerRow.createCell(i).setCellValue(headers[i]);
+        }
+        // 데이터 채우기
+        int rowNum = 1;
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        for (ScheduledMessageResponse item : list) {
+            Row row = sheet.createRow(rowNum++);
+            row.createCell(0).setCellValue(item.getMsgType());
+            row.createCell(1)
+                .setCellValue(item.getSubject() != null ? item.getSubject() : item.getText());
+            row.createCell(2).setCellValue(item.getCallBack());
+            row.createCell(3).setCellValue(item.getRequestTime().format(dtf));
+            row.createCell(4).setCellValue(item.getMessageCount());
+            row.createCell(5).setCellValue(item.getUserId());
+        }
+        // 4. 파일 다운로드 응답 설정
+        String fileName =
+            "예약_메시지_내역_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                + ".xlsx";
+        response.setContentType(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition",
+            "attachment; filename=\"" + URLEncoder.encode(fileName, StandardCharsets.UTF_8) + "\"");
+        wb.write(response.getOutputStream());
+        wb.close();
     }
 
     /**
@@ -174,4 +246,19 @@ public class ScheduledMessageController {
         return ApiResponse.success("삭제되었습니다.");
     }
 
+    /**
+     * 암호화된 관리자명 복호화
+     */
+    private String decryptName(String encryptedName) {
+        if (encryptedName == null || encryptedName.isEmpty()) {
+            return encryptedName;
+        }
+        try {
+            // Base64 디코딩 후 AES256 복호화
+            return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedName));
+        } catch (Exception e) {
+            log.warn("사용자명 복호화 실패: {}", e.getMessage());
+            return encryptedName; // 실패 시 원본(암호문) 반환
+        }
+    }
 }

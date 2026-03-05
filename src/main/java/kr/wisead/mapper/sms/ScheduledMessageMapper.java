@@ -62,4 +62,12 @@ public interface ScheduledMessageMapper {
             @Param("userId") String userId,
             @Param("msgType") String msgType,
             @Param("insertTime") LocalDateTime insertTime);
+
+    /**
+     * 예약 메시지 전체 조회 (다운로드용)
+     */
+    List<ScheduledMessage> selectScheduledMessagesForDownload(
+        @Param("userId") String userId,
+        @Param("msgType") String msgType,
+        @Param("searchText") String searchText);
 }

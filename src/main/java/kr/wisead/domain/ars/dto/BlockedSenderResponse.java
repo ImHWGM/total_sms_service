@@ -17,15 +17,18 @@ public class BlockedSenderResponse {
 
     private String ani;             // 수신거부 번호 (복호화됨)
     private String storeCode;       // 상점 코드
+    private String storeId;
     private String menuName;        // 080 번호
     private String regDate;         // 등록일시
 
-    public static BlockedSenderResponse from(BlockedSender entity, String decryptedAni) {
+    public static BlockedSenderResponse from(BlockedSender entity, String decryptedAni,
+        String storeId) {
         if (entity == null) return null;
 
         return BlockedSenderResponse.builder()
                 .ani(decryptedAni)
                 .storeCode(entity.getDtmf1())
+            .storeId(storeId)
                 .menuName(entity.getMenuName())
                 .regDate(entity.getTTime())
                 .build();

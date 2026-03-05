@@ -108,4 +108,9 @@ public interface UserMapper {
    * 상점코드 중복 확인
    */
   boolean existsByStoreCode(@Param("storeCode") String storeCode);
+
+  /**
+   * 상점코드로 사용자ID(가게ID) 조회
+   */
+  String findUserIdByStoreCode(@Param("storeCode") String storeCode);
 }

@@ -180,7 +180,12 @@ public class EventParticipantService {
         String cleanDecryptedPhone = decryptedPhone.replace("-", "");
         if (requestPhone.equals(cleanDecryptedPhone)) {
           // 일치하는 참가자 발견
-          String qrCodeUrl = wiseadUrl + "/event/check/" + candidate.getCheckCode();
+          String qrCodeUrl =
+              wiseadUrl
+                  + "/event/"
+                  + candidate.getEventSeq()
+                  + "/check/"
+                  + candidate.getCheckCode();
 
           VerifyParticipantResponse.ParticipantInfo info =
               VerifyParticipantResponse.ParticipantInfo.builder()
@@ -413,7 +418,8 @@ public class EventParticipantService {
         EventParticipant p = participantsToInsert.get(idx);
         String code = p.getCheckCode();
         int retryCount = 0;
-        while (usedCodes.contains(code) || participantMapper.existsByCheckCode(code)) {
+        while (usedCodes.contains(code)
+            || participantMapper.existsByEventSeqAndCheckCode(eventSeq, code)) {
           if (++retryCount > 10) {
             throw new BusinessException(
                 ErrorCode.INTERNAL_ERROR, "체크코드 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
@@ -700,10 +706,11 @@ public class EventParticipantService {
 
   /** 체크코드로 참가자 상태 조회 */
   @Transactional(readOnly = true)
-  public ParticipantStatusResponse getParticipantStatusByCheckCode(String checkCode) {
+  public ParticipantStatusResponse getParticipantStatusByCheckCode(
+      Integer eventSeq, String checkCode) {
     EventParticipant participant =
         participantMapper
-            .selectByCheckCode(checkCode)
+            .selectByEventSeqAndCheckCode(eventSeq, checkCode)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
@@ -969,7 +976,8 @@ public class EventParticipantService {
   /** 참가자 INSERT (체크코드 충돌 시 재생성) */
   private void insertWithUniqueCheckCode(EventParticipant participant) {
     for (int i = 0; i < 10; i++) {
-      if (!participantMapper.existsByCheckCode(participant.getCheckCode())) {
+      if (!participantMapper.existsByEventSeqAndCheckCode(
+          participant.getEventSeq(), participant.getCheckCode())) {
         participantMapper.insert(participant);
         return;
       }

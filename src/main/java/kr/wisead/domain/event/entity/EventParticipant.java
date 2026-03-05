@@ -1,5 +1,6 @@
 package kr.wisead.domain.event.entity;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import lombok.*;
 
@@ -15,7 +16,7 @@ public class EventParticipant {
   // 혼동 문자(O/0/I/1/L) 제외한 대문자+숫자
   private static final String CHECK_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   private static final int CHECK_CODE_LENGTH = 5;
-  private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+  private static final SecureRandom RANDOM = new SecureRandom();
 
   private Long seq; // 참가자 시퀀스
   private Integer surveyUserSeq; // SURVEY_USER 시퀀스 (1:1)

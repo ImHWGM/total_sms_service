@@ -18,35 +18,39 @@ public class EventCheckController {
   private final EventParticipantService participantService;
   private final NametagService nametagService;
 
-  /** QR 스캔으로 체크인 (참가자용) URL: /api/events/check/{checkCode} */
-  @PostMapping("/check/{checkCode}")
+  /** QR 스캔으로 체크인 (참가자용) URL: /api/events/{eventSeq}/check/{checkCode} */
+  @PostMapping("/{eventSeq}/check/{checkCode}")
   public ApiResponse<EventCheckResponse> checkIn(
+      @PathVariable Integer eventSeq,
       @PathVariable String checkCode,
       @RequestHeader(value = "X-Device-Info", required = false) String deviceInfo) {
-    EventCheckResponse response = checkService.checkIn(checkCode, deviceInfo);
+    EventCheckResponse response = checkService.checkIn(eventSeq, checkCode, deviceInfo);
     return ApiResponse.success(response, response.getMessage());
   }
 
   /** QR 스캔으로 참가자 정보 조회 (체크인 전 확인용) */
-  @GetMapping("/check/{checkCode}")
+  @GetMapping("/{eventSeq}/check/{checkCode}")
   public ApiResponse<ParticipantStatusResponse> getParticipantByCheckCode(
-      @PathVariable String checkCode) {
-    return ApiResponse.success(participantService.getParticipantStatusByCheckCode(checkCode));
+      @PathVariable Integer eventSeq, @PathVariable String checkCode) {
+    return ApiResponse.success(
+        participantService.getParticipantStatusByCheckCode(eventSeq, checkCode));
   }
 
   /** QR 스캔으로 명찰 데이터 조회 (checkCode 기반) */
-  @GetMapping("/check/{checkCode}/nametag")
-  public ApiResponse<NametagResponse> getNametagByCheckCode(@PathVariable String checkCode) {
-    return ApiResponse.success(nametagService.getNametagDataByCheckCode(checkCode));
+  @GetMapping("/{eventSeq}/check/{checkCode}/nametag")
+  public ApiResponse<NametagResponse> getNametagByCheckCode(
+      @PathVariable Integer eventSeq, @PathVariable String checkCode) {
+    return ApiResponse.success(nametagService.getNametagDataByCheckCode(eventSeq, checkCode));
   }
 
   /** QR 스캔으로 명찰 출력 로그 기록 (checkCode 기반) */
-  @PostMapping("/check/{checkCode}/nametag/print")
+  @PostMapping("/{eventSeq}/check/{checkCode}/nametag/print")
   public ApiResponse<Void> recordNametagPrintByCheckCode(
+      @PathVariable Integer eventSeq,
       @PathVariable String checkCode,
       @RequestBody NametagPrintRequest request,
       @RequestHeader(value = "X-Device-Info", required = false) String deviceInfo) {
-    nametagService.recordPrintByCheckCode(checkCode, request, deviceInfo);
+    nametagService.recordPrintByCheckCode(eventSeq, checkCode, request, deviceInfo);
     return ApiResponse.success("명찰 출력이 기록되었습니다.");
   }
 }

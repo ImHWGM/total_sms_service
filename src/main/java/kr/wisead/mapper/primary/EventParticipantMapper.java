@@ -14,8 +14,9 @@ public interface EventParticipantMapper {
   /** 시퀀스로 조회 */
   Optional<EventParticipant> selectBySeq(@Param("seq") Long seq);
 
-  /** 체크코드로 조회 */
-  Optional<EventParticipant> selectByCheckCode(@Param("checkCode") String checkCode);
+  /** 이벤트 + 체크코드로 조회 */
+  Optional<EventParticipant> selectByEventSeqAndCheckCode(
+      @Param("eventSeq") Integer eventSeq, @Param("checkCode") String checkCode);
 
   /** SURVEY_USER 시퀀스로 조회 */
   Optional<EventParticipant> selectBySurveyUserSeq(@Param("surveyUserSeq") Integer surveyUserSeq);
@@ -56,11 +57,19 @@ public interface EventParticipantMapper {
   /** 체크코드 존재 여부 확인 */
   boolean existsByCheckCode(@Param("checkCode") String checkCode);
 
+  /** 이벤트 내 체크코드 존재 여부 확인 */
+  boolean existsByEventSeqAndCheckCode(
+      @Param("eventSeq") Integer eventSeq, @Param("checkCode") String checkCode);
+
   /** 참가자 상세 조회 (SURVEY_USER, SURVEY_MASTER JOIN) */
   Optional<EventParticipant> selectDetailBySeq(@Param("seq") Long seq);
 
   /** 참가자 상세 조회 by 체크코드 (SURVEY_USER, SURVEY_MASTER JOIN) */
   Optional<EventParticipant> selectDetailByCheckCode(@Param("checkCode") String checkCode);
+
+  /** 참가자 상세 조회 by 이벤트 + 체크코드 (SURVEY_USER, SURVEY_MASTER JOIN) */
+  Optional<EventParticipant> selectDetailByEventSeqAndCheckCode(
+      @Param("eventSeq") Integer eventSeq, @Param("checkCode") String checkCode);
 
   /** 이벤트의 참가자 유형별 통계 */
   List<Map<String, Object>> selectParticipantTypeStats(@Param("eventSeq") Integer eventSeq);

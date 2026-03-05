@@ -54,7 +54,7 @@ public class SecurityConfig {
     "/api/front/**",
 
     // 행사 체크인 (비로그인 허용 - QR 스캔)
-    "/api/events/check/**",
+    "/api/events/*/check/**",
 
     // 문의 등록 (비로그인 허용)
     "/api/inquiry",

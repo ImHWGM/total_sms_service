@@ -13,6 +13,7 @@ import lombok.*;
 public class OnsiteRegistrationResponse {
 
   private Long seq;
+  private Integer eventSeq;
   private String checkCode;
   private String userName;
   private String userPhone;
@@ -30,6 +31,7 @@ public class OnsiteRegistrationResponse {
       EventParticipant entity, String plainPhone, LocalDateTime attendTime) {
     return OnsiteRegistrationResponse.builder()
         .seq(entity.getSeq())
+        .eventSeq(entity.getEventSeq())
         .checkCode(entity.getCheckCode())
         .userName(entity.getUserName())
         .userPhone(plainPhone)
@@ -45,7 +47,7 @@ public class OnsiteRegistrationResponse {
 
   /** QR 코드 URL 설정 */
   public OnsiteRegistrationResponse withQrCodeUrl(String baseUrl) {
-    this.qrCodeUrl = baseUrl + "/event/check/" + this.checkCode;
+    this.qrCodeUrl = baseUrl + "/event/" + this.eventSeq + "/check/" + this.checkCode;
     return this;
   }
 }

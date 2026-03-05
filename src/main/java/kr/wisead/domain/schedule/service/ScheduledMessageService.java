@@ -62,6 +62,23 @@ public class ScheduledMessageService {
     return PageResponse.of(responses, request.getPage(), request.getSize(), total);
   }
 
+  /**
+   * 예약 메시지 전체 조회 (다운로드용)
+   */
+  @Transactional(readOnly = true)
+  public List<ScheduledMessageResponse> getScheduledMessagesForDownload(
+      ScheduledMessageSearchRequest request) {
+    String convertedMsgType = request.getConvertedMsgType();
+    List<ScheduledMessage> messages =
+        scheduledMessageMapper.selectScheduledMessagesForDownload(
+            request.getUserId(),
+            convertedMsgType,
+            request.getSearchText());
+    return messages.stream()
+        .map(ScheduledMessageResponse::from)
+        .toList();
+  }
+
   /** 예약 메시지 상세 조회 */
   @Transactional(readOnly = true)
   public ScheduledMessageResponse getMessageById(int mSeq, String userId) {

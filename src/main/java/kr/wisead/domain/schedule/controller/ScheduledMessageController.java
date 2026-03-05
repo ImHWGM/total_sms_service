@@ -109,7 +109,7 @@ public class ScheduledMessageController {
         Workbook wb = new SXSSFWorkbook();
         Sheet sheet = wb.createSheet("예약 메시지 내역");
         // 헤더 생성 및 스타일 설정
-        String[] headers = {"문자 타입", "제목/내용", "발신번호", "예약시간", "요청건수", "등록자"};
+        String[] headers = {"문자 타입", "수신번호", "제목", "내용", "발신번호", "예약시간", "요청건수", "등록자"};
         Row headerRow = sheet.createRow(0);
         for (int i = 0; i < headers.length; i++) {
             headerRow.createCell(i).setCellValue(headers[i]);
@@ -119,13 +119,20 @@ public class ScheduledMessageController {
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         for (ScheduledMessageResponse item : list) {
             Row row = sheet.createRow(rowNum++);
-            row.createCell(0).setCellValue(item.getMsgType());
-            row.createCell(1)
-                .setCellValue(item.getSubject() != null ? item.getSubject() : item.getText());
-            row.createCell(2).setCellValue(item.getCallBack());
-            row.createCell(3).setCellValue(item.getRequestTime().format(dtf));
-            row.createCell(4).setCellValue(item.getMessageCount());
-            row.createCell(5).setCellValue(item.getUserId());
+            row.createCell(0).setCellValue(item.getMsgTypeName());
+            row.createCell(1).setCellValue(item.getRawDstAddr());
+            row.createCell(1).setCellValue(item.getSubject());      // 제목 출력 (없으면 빈칸)
+            row.createCell(2).setCellValue(item.getText());         // 내용 출력
+            row.createCell(3).setCellValue(item.getCallBack());
+            row.createCell(4).setCellValue(
+                item.getRequestTime() != null ? item.getRequestTime().format(dtf) : "");
+            // 요청건수 null 체크
+            if (item.getMessageCount() != null) {
+                row.createCell(5).setCellValue(item.getMessageCount());
+            } else {
+                row.createCell(5).setCellValue(0);
+            }
+            row.createCell(6).setCellValue(item.getUserId());
         }
         // 4. 파일 다운로드 응답 설정
         String fileName =

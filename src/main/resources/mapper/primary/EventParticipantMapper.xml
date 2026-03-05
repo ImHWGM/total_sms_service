@@ -39,12 +39,13 @@
         WHERE P.SEQ = #{seq}
     </select>
 
-    <!-- 체크코드로 조회 -->
-    <select id="selectByCheckCode" resultType="kr.wisead.domain.event.entity.EventParticipant">
+    <!-- 이벤트 + 체크코드로 조회 -->
+    <select id="selectByEventSeqAndCheckCode" resultType="kr.wisead.domain.event.entity.EventParticipant">
         SELECT
             <include refid="selectColumns"/>
         FROM EVENT_PARTICIPANT P
-        WHERE P.CHECK_CODE = #{checkCode}
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND P.CHECK_CODE = #{checkCode}
     </select>
 
     <!-- SURVEY_USER 시퀀스로 조회 -->
@@ -212,6 +213,14 @@
         )
     </select>
 
+    <!-- 이벤트 내 체크코드 존재 여부 확인 -->
+    <select id="existsByEventSeqAndCheckCode" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM EVENT_PARTICIPANT
+            WHERE EVENT_SEQ = #{eventSeq} AND CHECK_CODE = #{checkCode}
+        )
+    </select>
+
     <!-- 참가자 상세 조회 -->
     <select id="selectDetailBySeq" resultType="kr.wisead.domain.event.entity.EventParticipant">
         SELECT
@@ -231,6 +240,18 @@
         INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
         INNER JOIN SURVEY_MASTER M ON P.EVENT_SEQ = M.EVENT_SEQ
         WHERE P.CHECK_CODE = #{checkCode}
+        AND U.DEL_YN = 'N'
+    </select>
+
+    <!-- 참가자 상세 조회 by 이벤트 + 체크코드 -->
+    <select id="selectDetailByEventSeqAndCheckCode" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectDetailColumns"/>
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        INNER JOIN SURVEY_MASTER M ON P.EVENT_SEQ = M.EVENT_SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND P.CHECK_CODE = #{checkCode}
         AND U.DEL_YN = 'N'
     </select>
 

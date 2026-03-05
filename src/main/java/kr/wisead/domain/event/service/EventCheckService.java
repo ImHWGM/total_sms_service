@@ -33,11 +33,11 @@ public class EventCheckService {
 
   /** QR 스캔으로 체크인 처리 (참가자용) */
   @Transactional
-  public EventCheckResponse checkIn(String checkCode, String deviceInfo) {
+  public EventCheckResponse checkIn(Integer eventSeq, String checkCode, String deviceInfo) {
     // 1. 참가자 조회
     EventParticipant participant =
         participantMapper
-            .selectDetailByCheckCode(checkCode)
+            .selectDetailByEventSeqAndCheckCode(eventSeq, checkCode)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 

@@ -62,7 +62,7 @@ public class EventParticipantResponse {
 
   /** QR 코드 URL 설정 */
   public EventParticipantResponse withQrCodeUrl(String baseUrl) {
-    this.qrCodeUrl = baseUrl + "/event/check/" + this.checkCode;
+    this.qrCodeUrl = baseUrl + "/event/" + this.eventSeq + "/check/" + this.checkCode;
     return this;
   }
 }

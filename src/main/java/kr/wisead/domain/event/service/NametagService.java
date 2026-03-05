@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.event.dto.NametagPrintRequest;
 import kr.wisead.domain.event.entity.*;
 import kr.wisead.mapper.primary.*;
@@ -11,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import kr.wisead.common.util.CryptoUtils;
 
 /** 명찰 서비스 */
 @Slf4j
@@ -77,10 +77,11 @@ public class NametagService {
 
   /** 명찰 데이터 조회 - checkCode 기반 (QR 스캔용) */
   @Transactional(readOnly = true)
-  public kr.wisead.domain.event.dto.NametagResponse getNametagDataByCheckCode(String checkCode) {
+  public kr.wisead.domain.event.dto.NametagResponse getNametagDataByCheckCode(
+      Integer eventSeq, String checkCode) {
     EventParticipant participant =
         participantMapper
-            .selectDetailByCheckCode(checkCode)
+            .selectDetailByEventSeqAndCheckCode(eventSeq, checkCode)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
@@ -89,17 +90,17 @@ public class NametagService {
     String decryptedName = decryptField(participant.getUserName());
     String decryptedPhone = decryptField(participant.getUserPhone());
 
-    return kr.wisead.domain.event.dto.NametagResponse.from(participant, decryptedName,
-        decryptedPhone);
+    return kr.wisead.domain.event.dto.NametagResponse.from(
+        participant, decryptedName, decryptedPhone);
   }
 
   /** 명찰 출력 로그 기록 - checkCode 기반 (QR 스캔용) */
   @Transactional
   public void recordPrintByCheckCode(
-      String checkCode, NametagPrintRequest request, String deviceInfo) {
+      Integer eventSeq, String checkCode, NametagPrintRequest request, String deviceInfo) {
     EventParticipant participant =
         participantMapper
-            .selectByCheckCode(checkCode)
+            .selectByEventSeqAndCheckCode(eventSeq, checkCode)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
@@ -121,9 +122,7 @@ public class NametagService {
         printBy);
   }
 
-  /**
-   * 암호화된 필드 복호화 (AES256 + Base64)
-   */
+  /** 암호화된 필드 복호화 (AES256 + Base64) */
   private String decryptField(String encryptedValue) {
     if (encryptedValue == null || encryptedValue.isEmpty()) {
       return null;

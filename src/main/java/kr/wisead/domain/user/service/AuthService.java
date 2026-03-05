@@ -7,6 +7,7 @@ import java.util.List;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.common.util.MemberUtil;
 import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.payment.entity.UserServiceRate;
 import kr.wisead.domain.payment.service.StandardRateService;
@@ -250,6 +251,18 @@ public class AuthService {
       log.error("담당자 암호화 실패: {}", e.getMessage());
       throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "담당자 암호화에 실패했습니다.");
     }
+    // 4-2. 고유한 상점코드 생성
+    String storeCode = null;
+    int attempts = 0;
+    while (attempts < 5) {
+      String tempCode = MemberUtil.generateStoreCode();
+      if (!userMapper.existsByStoreCode(tempCode)) {
+        storeCode = tempCode;
+        break;
+      }
+      attempts++;
+      log.warn("상점코드 중복 발생 (시도 {}회): {}", attempts, tempCode);
+    }
 
     // 5. 사용자 생성
     User user =
@@ -268,6 +281,7 @@ public class AuthService {
             .useYn("Y")
             .status("미승인") // 가입 후 관리자 승인 필요
             .regId(request.getUserId())
+            .storeCode(storeCode) // 스토어코드 추가
             .build();
 
     userMapper.insert(user);

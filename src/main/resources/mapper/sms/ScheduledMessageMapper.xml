@@ -138,7 +138,12 @@
         MSG_TYPE ORDER BY MSEQ) as rn,
         -- 그룹별 전체 건수를 계산하는 줄을 추가함
         COUNT(*) OVER (PARTITION BY
-        CASE WHEN EXT_COL0 IS NULL THEN EXT_COL1 ELSE ... END, MSG_TYPE
+        CASE
+        WHEN EXT_COL0 IS NULL THEN EXT_COL1
+        ELSE CONCAT(EXT_COL0, '_', DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
+        LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0'), '_', REQUEST_TIME)
+        END,
+        MSG_TYPE
         ) as message_count
         FROM msg_queue
         <where>

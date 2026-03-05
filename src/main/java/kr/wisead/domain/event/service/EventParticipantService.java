@@ -140,7 +140,7 @@ public class EventParticipantService {
             "현장등록",
             null);
 
-    participantMapper.insert(participant);
+    insertWithUniqueCheckCode(participant);
 
     // 5. 응답 반환
     EventParticipant saved =
@@ -246,7 +246,7 @@ public class EventParticipantService {
             "사전등록",
             null);
 
-    participantMapper.insert(participant);
+    insertWithUniqueCheckCode(participant);
 
     // 3. 응답 반환
     EventParticipant saved =
@@ -406,8 +406,25 @@ public class EventParticipantService {
       successCount++;
     }
 
-    // ===== 6단계: EventParticipant 일괄 INSERT =====
+    // ===== 6단계: EventParticipant 일괄 INSERT (체크코드 중복 방지) =====
     if (!participantsToInsert.isEmpty()) {
+      Set<String> usedCodes = new HashSet<>();
+      for (int idx = 0; idx < participantsToInsert.size(); idx++) {
+        EventParticipant p = participantsToInsert.get(idx);
+        String code = p.getCheckCode();
+        int retryCount = 0;
+        while (usedCodes.contains(code) || participantMapper.existsByCheckCode(code)) {
+          if (++retryCount > 10) {
+            throw new BusinessException(
+                ErrorCode.INTERNAL_ERROR, "체크코드 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
+          }
+          code = EventParticipant.generateCheckCode();
+        }
+        usedCodes.add(code);
+        if (!code.equals(p.getCheckCode())) {
+          participantsToInsert.set(idx, p.withCheckCode(code));
+        }
+      }
       participantMapper.insertBatch(participantsToInsert);
     }
     // ===== 7단계: 결과 반환 =====
@@ -496,7 +513,7 @@ public class EventParticipantService {
     EventParticipant participant =
         EventParticipant.create(
             surveyUser.getSeq(), eventSeq, null, null, "일반", "문자발송 시 자동등록", "사전등록", null);
-    participantMapper.insert(participant);
+    insertWithUniqueCheckCode(participant);
 
     return ParticipantForMessageResponse.builder()
         .participantSeq(participant.getSeq())
@@ -947,6 +964,19 @@ public class EventParticipantService {
       month = month.plusMonths(1);
     }
     return tableNames;
+  }
+
+  /** 참가자 INSERT (체크코드 충돌 시 재생성) */
+  private void insertWithUniqueCheckCode(EventParticipant participant) {
+    for (int i = 0; i < 10; i++) {
+      if (!participantMapper.existsByCheckCode(participant.getCheckCode())) {
+        participantMapper.insert(participant);
+        return;
+      }
+      // 충돌 시 새 코드로 재설정
+      participant = participant.withCheckCode(EventParticipant.generateCheckCode());
+    }
+    throw new BusinessException(ErrorCode.INTERNAL_ERROR, "체크코드 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
   }
 
   private String formatPhone(String phone) {

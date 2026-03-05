@@ -1,7 +1,6 @@
 package kr.wisead.domain.event.entity;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 import lombok.*;
 
 /** 행사 참가자 확장 정보 Entity (EVENT_PARTICIPANT) SURVEY_USER와 1:1 관계 */
@@ -13,10 +12,15 @@ public class EventParticipant {
 
   private static final String DEFAULT_REGIST_TYPE = "미등록";
 
+  // 혼동 문자(O/0/I/1/L) 제외한 대문자+숫자
+  private static final String CHECK_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  private static final int CHECK_CODE_LENGTH = 5;
+  private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
   private Long seq; // 참가자 시퀀스
   private Integer surveyUserSeq; // SURVEY_USER 시퀀스 (1:1)
   private Integer eventSeq; // 이벤트 시퀀스 (SURVEY_MASTER)
-  private String checkCode; // QR용 고유 코드 (UUID)
+  private String checkCode; // QR용 고유 코드 (5자리 영숫자)
   private String department; // 소속/부서
   private String position; // 직책
   private String participantType; // 참가자 유형 (VIP, 일반, 스태프 등)
@@ -52,7 +56,7 @@ public class EventParticipant {
     return EventParticipant.builder()
         .surveyUserSeq(surveyUserSeq)
         .eventSeq(eventSeq)
-        .checkCode(UUID.randomUUID().toString().replace("-", ""))
+        .checkCode(generateCheckCode())
         .department(department)
         .position(position)
         .participantType(participantType)
@@ -61,6 +65,15 @@ public class EventParticipant {
         .registType(registType)
         .attendTime(attendTime)
         .build();
+  }
+
+  /** 5자리 체크코드 생성 (대문자+숫자, 혼동 문자 제외) */
+  public static String generateCheckCode() {
+    StringBuilder sb = new StringBuilder(CHECK_CODE_LENGTH);
+    for (int i = 0; i < CHECK_CODE_LENGTH; i++) {
+      sb.append(CHECK_CODE_CHARS.charAt(RANDOM.nextInt(CHECK_CODE_CHARS.length())));
+    }
+    return sb.toString();
   }
 
   /** 명찰 출력 처리 */
@@ -77,6 +90,22 @@ public class EventParticipant {
   /** 등록구분 반환 (null이면 "미등록") */
   public String getRegistTypeOrDefault() {
     return registType != null ? registType : DEFAULT_REGIST_TYPE;
+  }
+
+  /** 체크코드만 교체한 복사본 생성 */
+  public EventParticipant withCheckCode(String newCheckCode) {
+    return EventParticipant.builder()
+        .surveyUserSeq(this.surveyUserSeq)
+        .eventSeq(this.eventSeq)
+        .checkCode(newCheckCode)
+        .department(this.department)
+        .position(this.position)
+        .participantType(this.participantType)
+        .memo(this.memo)
+        .nametagPrinted(this.nametagPrinted)
+        .registType(this.registType)
+        .attendTime(this.attendTime)
+        .build();
   }
 
   /** 정보 수정 */

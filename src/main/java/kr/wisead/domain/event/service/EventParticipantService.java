@@ -858,6 +858,7 @@ public class EventParticipantService {
               row.put("소속", p.getDepartment());
               row.put("직책", p.getPosition());
               row.put("참가자 유형", p.getParticipantType());
+              row.put("체크코드", p.getCheckCode());
               row.put("등록구분", p.getRegistType() != null ? p.getRegistType() : "미등록");
               row.put("명찰 출력", "Y".equals(p.getNametagPrinted()) ? "출력완료" : "미출력");
               row.put("액션 현황", p.getActionSummary());

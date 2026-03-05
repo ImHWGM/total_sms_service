@@ -53,8 +53,8 @@ public class EventExcelService {
       // 헤더 생성
       List<String> headers =
           Arrays.asList(
-              "번호", "이름", "연락처", "이메일", "소속", "직책", "참가자 유형", "등록구분", "명찰 출력", "액션 현황", "메모",
-              "등록일");
+              "번호", "이름", "연락처", "이메일", "소속", "직책", "참가자 유형", "체크코드", "등록구분", "명찰 출력", "액션 현황",
+              "메모", "등록일");
       excelService.createHeaderRow(sheet, 0, headers, headerStyle);
 
       // 데이터 행 생성
@@ -69,6 +69,7 @@ public class EventExcelService {
                 participant.get("소속"),
                 participant.get("직책"),
                 participant.get("참가자 유형"),
+                participant.get("체크코드"),
                 participant.get("등록구분"),
                 participant.get("명찰 출력"),
                 participant.get("액션 현황"),
@@ -279,14 +280,16 @@ public class EventExcelService {
       case 6:
         return 4000; // 참가자 유형
       case 7:
-        return 4000; // 등록구분
+        return 9000; // 체크코드
       case 8:
-        return 3500; // 명찰 출력
+        return 4000; // 등록구분
       case 9:
-        return 10000; // 액션 현황
+        return 3500; // 명찰 출력
       case 10:
-        return 6000; // 메모
+        return 10000; // 액션 현황
       case 11:
+        return 6000; // 메모
+      case 12:
         return 5000; // 등록일
       default:
         return 3000;

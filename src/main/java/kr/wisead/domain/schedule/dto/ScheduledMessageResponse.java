@@ -18,7 +18,8 @@ public class ScheduledMessageResponse {
   private Integer mSeq;
   private String msgType;
   private String msgTypeName;
-  private String dstAddr;
+  private String dstAddr; // 마스킹된 번호 (화면용)
+  private String rawDstAddr; // 원본 번호 (엑셀용)
   private String callBack;
   private Integer stat;
   private String statName;
@@ -42,6 +43,7 @@ public class ScheduledMessageResponse {
         .msgType(entity.getMsgType())
         .msgTypeName(translateMsgType(entity.getMsgType()))
         .dstAddr(maskPhoneNumber(entity.getDstAddr()))
+        .rawDstAddr(entity.getDstAddr()) // 원본 번호 그대로 저장
         .callBack(entity.getCallBack())
         .stat(entity.getStat())
         .statName(translateStat(entity.getStat()))

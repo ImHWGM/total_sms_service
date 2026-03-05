@@ -1,5 +1,6 @@
 package kr.wisead.domain.event.controller;
 
+import jakarta.validation.Valid;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.domain.event.dto.*;
 import kr.wisead.domain.event.service.*;
@@ -25,6 +26,17 @@ public class EventCheckController {
       @PathVariable String checkCode,
       @RequestHeader(value = "X-Device-Info", required = false) String deviceInfo) {
     EventCheckResponse response = checkService.checkIn(eventSeq, checkCode, deviceInfo);
+    return ApiResponse.success(response, response.getMessage());
+  }
+
+  /** 전화번호로 체크인 (키오스크용) URL: /api/events/{eventSeq}/check-phone */
+  @PostMapping("/{eventSeq}/check-phone")
+  public ApiResponse<EventCheckResponse> checkInByPhone(
+      @PathVariable Integer eventSeq,
+      @Valid @RequestBody PhoneCheckRequest request,
+      @RequestHeader(value = "X-Device-Info", required = false) String deviceInfo) {
+    EventCheckResponse response =
+        checkService.checkInByPhone(eventSeq, request.getPhone(), deviceInfo);
     return ApiResponse.success(response, response.getMessage());
   }
 

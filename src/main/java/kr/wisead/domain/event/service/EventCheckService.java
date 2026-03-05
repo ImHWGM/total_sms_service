@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.event.dto.*;
 import kr.wisead.domain.event.entity.*;
 import kr.wisead.mapper.primary.*;
@@ -34,14 +35,33 @@ public class EventCheckService {
   /** QR 스캔으로 체크인 처리 (참가자용) */
   @Transactional
   public EventCheckResponse checkIn(Integer eventSeq, String checkCode, String deviceInfo) {
-    // 1. 참가자 조회
     EventParticipant participant =
         participantMapper
             .selectDetailByEventSeqAndCheckCode(eventSeq, checkCode)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    // 1.5. 행사 상태 검증
+    return processCheckIn(participant, deviceInfo);
+  }
+
+  /** 전화번호로 체크인 처리 (키오스크용) */
+  @Transactional
+  public EventCheckResponse checkInByPhone(Integer eventSeq, String phone, String deviceInfo) {
+    String cleanPhone = phone.replace("-", "");
+    String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(cleanPhone));
+
+    EventParticipant participant =
+        participantMapper
+            .selectDetailByEventSeqAndPhone(eventSeq, encryptedPhone)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "등록되지 않은 전화번호입니다."));
+
+    return processCheckIn(participant, deviceInfo);
+  }
+
+  /** 체크인 공통 처리 로직 */
+  private EventCheckResponse processCheckIn(EventParticipant participant, String deviceInfo) {
+    // 1. 행사 상태 검증
     var event =
         surveyMasterMapper
             .selectByEventSeq(participant.getEventSeq())

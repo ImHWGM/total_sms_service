@@ -100,6 +100,10 @@ public interface EventParticipantMapper {
   Optional<EventParticipant> selectByEventSeqAndPhone(
       @Param("eventSeq") Integer eventSeq, @Param("encryptedPhone") String encryptedPhone);
 
+  /** 참가자 상세 조회 by 이벤트 + 전화번호 (SURVEY_USER, SURVEY_MASTER JOIN) */
+  Optional<EventParticipant> selectDetailByEventSeqAndPhone(
+      @Param("eventSeq") Integer eventSeq, @Param("encryptedPhone") String encryptedPhone);
+
   /** 참석시간 업데이트 (체크인 시 사용) */
   int updateAttendTime(@Param("seq") Long seq, @Param("attendTime") String attendTime);
 

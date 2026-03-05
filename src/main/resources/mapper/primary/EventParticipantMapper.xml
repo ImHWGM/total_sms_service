@@ -367,6 +367,19 @@
         LIMIT 1
     </select>
 
+    <!-- 참가자 상세 조회 by 이벤트 + 전화번호 (체크인용) -->
+    <select id="selectDetailByEventSeqAndPhone" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectDetailColumns"/>
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        INNER JOIN SURVEY_MASTER M ON P.EVENT_SEQ = M.EVENT_SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.USER_PHONE = #{encryptedPhone}
+        AND U.DEL_YN = 'N'
+        LIMIT 1
+    </select>
+
     <!-- 참석시간 업데이트 (체크인 시) -->
     <update id="updateAttendTime">
         UPDATE EVENT_PARTICIPANT

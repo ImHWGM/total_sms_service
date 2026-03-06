@@ -1,6 +1,7 @@
 package kr.wisead.domain.schedule.dto;
 
 import java.time.LocalDateTime;
+import kr.wisead.common.util.PhoneUtils;
 import kr.wisead.common.util.UrlUtils;
 import kr.wisead.domain.schedule.entity.ScheduledMessage;
 import lombok.AllArgsConstructor;
@@ -36,14 +37,15 @@ public class ScheduledMessageResponse {
   private String fileLoc3;
 
   public static ScheduledMessageResponse from(ScheduledMessage entity) {
-    if (entity == null) return null;
+    if (entity == null)
+      return null;
 
     return ScheduledMessageResponse.builder()
         .mSeq(entity.getMSeq())
         .msgType(entity.getMsgType())
         .msgTypeName(translateMsgType(entity.getMsgType()))
-        .dstAddr(maskPhoneNumber(entity.getDstAddr()))
-        .rawDstAddr(entity.getDstAddr()) // 원본 번호 그대로 저장
+        .dstAddr(PhoneUtils.mask(entity.getDstAddr()))
+        .rawDstAddr(entity.getDstAddr()) // 원본 번호
         .callBack(entity.getCallBack())
         .stat(entity.getStat())
         .statName(translateStat(entity.getStat()))
@@ -85,7 +87,8 @@ public class ScheduledMessageResponse {
 
   /** 전화번호 마스킹 */
   private static String maskPhoneNumber(String phone) {
-    if (phone == null || phone.length() < 7) return phone;
+    if (phone == null || phone.length() < 7)
+      return phone;
 
     // 010-1234-5678 -> 010-****-5678
     if (phone.length() == 11) {

@@ -106,4 +106,52 @@
         </foreach>
     </select>
 
+    <!-- 수신거부 검색 조회 (페이징) -->
+    <select id="selectBlockedSendersWithSearch" resultMap="blockedSenderResultMap">
+        SELECT bs.T_TIME, bs.ANI, bs.DTMF_1, bs.MENU_NAME
+        FROM blocked_senders bs
+        <if test="senderId != null and senderId != ''">
+            INNER JOIN user u ON bs.DTMF_1 = u.STORE_CODE
+        </if>
+        <where>
+            <if test="storeCodes != null and storeCodes.size() > 0">
+                bs.DTMF_1 IN
+                <foreach collection="storeCodes" item="code" open="(" separator="," close=")">
+                    #{code}
+                </foreach>
+            </if>
+            <if test="senderId != null and senderId != ''">
+                AND u.USER_ID LIKE CONCAT('%', #{senderId}, '%')
+            </if>
+            <if test="encryptedAni != null and encryptedAni != ''">
+                AND bs.ANI = #{encryptedAni}
+            </if>
+        </where>
+        ORDER BY bs.T_TIME DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 수신거부 검색 건수 -->
+    <select id="countBlockedSendersWithSearch" resultType="int">
+        SELECT COUNT(*)
+        FROM blocked_senders bs
+        <if test="senderId != null and senderId != ''">
+            INNER JOIN user u ON bs.DTMF_1 = u.STORE_CODE
+        </if>
+        <where>
+            <if test="storeCodes != null and storeCodes.size() > 0">
+                bs.DTMF_1 IN
+                <foreach collection="storeCodes" item="code" open="(" separator="," close=")">
+                    #{code}
+                </foreach>
+            </if>
+            <if test="senderId != null and senderId != ''">
+                AND u.USER_ID LIKE CONCAT('%', #{senderId}, '%')
+            </if>
+            <if test="encryptedAni != null and encryptedAni != ''">
+                AND bs.ANI = #{encryptedAni}
+            </if>
+        </where>
+    </select>
+
 </mapper>

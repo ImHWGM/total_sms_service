@@ -104,13 +104,12 @@ public interface UserMapper {
   /** 모든 활성 사용자 아이디 목록 조회 */
   List<String> findAllUserIds();
 
-  /**
-   * 상점코드 중복 확인
-   */
+  /** 상점코드 중복 확인 */
   boolean existsByStoreCode(@Param("storeCode") String storeCode);
 
-  /**
-   * 상점코드로 사용자ID(가게ID) 조회
-   */
+  /** 상점코드로 사용자ID(가게ID) 조회 */
   String findUserIdByStoreCode(@Param("storeCode") String storeCode);
+
+  /** 사용자ID 목록으로 상점코드 목록 조회 */
+  List<String> selectStoreCodesByUserIds(@Param("userIds") List<String> userIds);
 }

@@ -84,6 +84,7 @@ public class ScheduledMessageController {
      */
     @PostMapping("/download")
     public void downloadScheduledMessages(
+        @RequestParam(required = false) List<Integer> mSeqs, // 체크항목들의 식별자를 받기 위한 param
         @RequestParam(required = false) String msgType,
         @RequestParam(required = false) String searchText,
         @RequestParam String reason,
@@ -96,24 +97,29 @@ public class ScheduledMessageController {
         Integer userLevel = adminService.getUserLevel(userId);
         // 1. 다운로드 로그 기록
         actionLogService.logDownloadAction(userId, userName, "예약 리스트 다운로드", "D", reason, request);
+
         // 2. 데이터 조회
         String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
         ScheduledMessageSearchRequest searchRequest = ScheduledMessageSearchRequest.builder()
+            .mSeqs(mSeqs) // 체크항목들의 식별자
             .msgType(msgType)
             .searchText(searchText)
             .userId(queryUserId)
             .build();
         List<ScheduledMessageResponse> list = scheduledMessageService.getScheduledMessagesForDownload(
             searchRequest);
+
         // 3. 엑셀 생성 (POI 사용)
         Workbook wb = new SXSSFWorkbook();
         Sheet sheet = wb.createSheet("예약 메시지 내역");
+
         // 헤더 생성 및 스타일 설정
         String[] headers = {"문자 타입", "수신번호", "제목", "내용", "발신번호", "예약시간", "요청건수", "등록자"};
         Row headerRow = sheet.createRow(0);
         for (int i = 0; i < headers.length; i++) {
             headerRow.createCell(i).setCellValue(headers[i]);
         }
+
         // 데이터 채우기
         int rowNum = 1;
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -134,6 +140,7 @@ public class ScheduledMessageController {
             }
             row.createCell(7).setCellValue(item.getUserId());
         }
+
         // 4. 파일 다운로드 응답 설정
         String fileName =
             "예약_메시지_내역_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))

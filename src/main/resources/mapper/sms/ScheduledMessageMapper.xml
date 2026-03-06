@@ -122,6 +122,21 @@
         </if>
     </select>
 
+    <!-- 예약 메시지 특정항목 상세 조회 (다운로드용) -->
+    <select id="selectExpandedScheduledMessages" resultMap="ScheduledMessageResultMap">
+        SELECT *
+        FROM msg_queue
+        WHERE EXT_COL1 IN (
+        SELECT DISTINCT EXT_COL1
+        FROM msg_queue
+        WHERE MSEQ IN
+        <foreach collection="mSeqs" item="mSeq" open="(" separator="," close=")">
+            #{mSeq}
+        </foreach>
+        )
+        ORDER BY INSERT_TIME DESC, MSEQ ASC
+    </select>
+
     <!-- 예약 메시지 전체 조회 (다운로드용) -->
     <select id="selectScheduledMessagesForDownload" resultMap="scheduledMessageResultMap">
         WITH grouped_data AS (

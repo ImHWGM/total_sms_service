@@ -64,6 +64,13 @@ public interface ScheduledMessageMapper {
             @Param("insertTime") LocalDateTime insertTime);
 
     /**
+     * [신규 추가] 예약 메시지 상세 확장 조회 (선택된 그룹의 모든 내역)
+     *
+     * @param mSeqs 체크된 메시지 시퀀스 리스트
+     */
+    List<ScheduledMessage> selectExpandedScheduledMessages(@Param("mSeqs") List<Integer> mSeqs);
+
+    /**
      * 예약 메시지 전체 조회 (다운로드용)
      */
     List<ScheduledMessage> selectScheduledMessagesForDownload(

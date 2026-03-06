@@ -298,4 +298,17 @@
         WHERE STORE_CODE = #{storeCode} LIMIT 1
     </select>
 
+    <!-- 사용자ID 목록으로 상점코드 목록 조회 -->
+    <select id="selectStoreCodesByUserIds" resultType="string">
+        SELECT STORE_CODE
+        FROM user
+        WHERE USER_ID IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+        AND STORE_CODE IS NOT NULL
+        AND STORE_CODE != ''
+        AND USE_YN = 'Y'
+    </select>
+
 </mapper>

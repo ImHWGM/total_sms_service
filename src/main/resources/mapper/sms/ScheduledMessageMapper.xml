@@ -123,16 +123,32 @@
     </select>
 
     <!-- 예약 메시지 특정항목 상세 조회 (다운로드용) -->
-    <select id="selectExpandedScheduledMessages" resultMap="ScheduledMessageResultMap">
+    <select id="selectExpandedScheduledMessages" resultMap="scheduledMessageResultMap">
         SELECT *
         FROM msg_queue
-        WHERE EXT_COL1 IN (
-        SELECT DISTINCT EXT_COL1
-        FROM msg_queue
-        WHERE MSEQ IN
-        <foreach collection="mSeqs" item="mSeq" open="(" separator="," close=")">
-            #{mSeq}
-        </foreach>
+        WHERE (
+            CASE
+                WHEN EXT_COL0 IS NULL THEN EXT_COL1
+                ELSE CONCAT(EXT_COL0, '_',
+                    DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
+                    LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0'),
+                    '_', REQUEST_TIME)
+            END
+        ) IN (
+            SELECT DISTINCT (
+                CASE
+                    WHEN EXT_COL0 IS NULL THEN EXT_COL1
+                    ELSE CONCAT(EXT_COL0, '_',
+                        DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
+                        LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0'),
+                        '_', REQUEST_TIME)
+                END
+            )
+            FROM msg_queue
+            WHERE MSEQ IN
+            <foreach collection="mSeqs" item="mSeq" open="(" separator="," close=")">
+                #{mSeq}
+            </foreach>
         )
         ORDER BY INSERT_TIME DESC, MSEQ ASC
     </select>

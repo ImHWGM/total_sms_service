@@ -124,7 +124,25 @@
 
     <!-- 예약 메시지 특정항목 상세 조회 (다운로드용) -->
     <select id="selectExpandedScheduledMessages" resultMap="scheduledMessageResultMap">
-        SELECT *
+        SELECT
+            MSEQ as mSeq,
+            MSG_TYPE as msgType,
+            DSTADDR as dstAddr,
+            CALLBACK as callBack,
+            STAT as stat,
+            SUBJECT as subject,
+            TEXT as text,
+            INSERT_TIME as insertTime,
+            REQUEST_TIME as requestTime,
+            SENDER_CODE as senderCode,
+            EXT_COL0 as extCol0,
+            EXT_COL1 as extCol1,
+            EXT_COL2 as extCol2,
+            EXT_COL3 as extCol3,
+            FILECNT as fileCnt,
+            FILELOC1 as fileLoc1,
+            FILELOC2 as fileLoc2,
+            FILELOC3 as fileLoc3
         FROM msg_queue
         WHERE (
             CASE

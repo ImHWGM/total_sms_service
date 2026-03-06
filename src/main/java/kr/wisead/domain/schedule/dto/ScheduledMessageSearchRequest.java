@@ -1,5 +1,6 @@
 package kr.wisead.domain.schedule.dto;
 
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,6 +15,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class ScheduledMessageSearchRequest {
 
+    private List<Integer> mSeqs;    // 체크항목들을 위한 식별자
     private String msgType;         // 메시지 타입 (SMS, LMS, MMS)
     private String searchText;      // 검색어
     private String userId;          // 조회 대상 사용자 ID

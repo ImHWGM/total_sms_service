@@ -68,12 +68,23 @@ public class ScheduledMessageService {
   @Transactional(readOnly = true)
   public List<ScheduledMessageResponse> getScheduledMessagesForDownload(
       ScheduledMessageSearchRequest request) {
-    String convertedMsgType = request.getConvertedMsgType();
-    List<ScheduledMessage> messages =
-        scheduledMessageMapper.selectScheduledMessagesForDownload(
-            request.getUserId(),
-            convertedMsgType,
-            request.getSearchText());
+
+    List<ScheduledMessage> messages;
+
+    // [신규 로직] 1. 체크된 항목(mSeqs)이 있는지 먼저 확인
+    if (request.getMSeqs() != null && !request.getMSeqs().isEmpty()) {
+      // 체크된 항목이 있다면 -> 배치의 모든 상세 내역을 가져오는 신규 매퍼 메서드 호출
+      messages = scheduledMessageMapper.selectExpandedScheduledMessages(request.getMSeqs());
+    } else {
+      // 체크된 항목이 없다면(전체 다운로드) -> 기존처럼 그룹화된 요약본 조회
+      String convertedMsgType = request.getConvertedMsgType();
+      messages = scheduledMessageMapper.selectScheduledMessagesForDownload(
+          request.getUserId(),
+          convertedMsgType,
+          request.getSearchText());
+    }
+
+    // 2. 조회된 결과(List<ScheduledMessage>)를 결과 DTO로 변환하여 반환
     return messages.stream()
         .map(ScheduledMessageResponse::from)
         .toList();

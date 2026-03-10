@@ -3,6 +3,7 @@ package kr.wisead.domain.history.service;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.ars.dto.BlockedSenderResponse;
 import kr.wisead.domain.ars.service.ArsService;
@@ -153,6 +154,22 @@ public class SendHistoryService {
   @Transactional
   public int deleteBlockedSenders(List<Map<String, String>> keyList) {
     return arsService.deleteBlockedSenders(keyList);
+  }
+
+  /** 권한 범위 내 store code만 필터링 */
+  public List<Map<String, String>> filterKeyListByPermission(
+      List<Map<String, String>> keyList, String queryUserIds) {
+    if ("ALL".equals(queryUserIds)) {
+      return keyList;
+    }
+
+    List<String> userIds = Arrays.asList(queryUserIds.split(","));
+    Set<String> allowedStoreCodes =
+        new HashSet<>(arsService.getStoreCodesByUserIds(userIds));
+
+    return keyList.stream()
+        .filter(key -> allowedStoreCodes.contains(key.get("dtmf1")))
+        .collect(Collectors.toList());
   }
 
   /** 상태 코드를 명칭으로 변환 */

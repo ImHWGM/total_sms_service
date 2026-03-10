@@ -106,7 +106,7 @@ public class AdminController {
 
     String accessToken = extractToken(token);
     String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-    String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
+    String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
 
     // 다운로드 로그 기록
     actionLogService.logDownloadAction(userId, userName, "로그관리 엑셀다운로드", "D", "업무용", httpRequest);
@@ -185,7 +185,7 @@ public class AdminController {
 
     String accessToken = extractToken(token);
     String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-    String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
+    String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
 
     try {
       actionLogService.logPhoneMasking(
@@ -214,7 +214,7 @@ public class AdminController {
 
     String accessToken = extractToken(token);
     String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-    String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
+    String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
 
     actionLogService.logDownloadAction(userId, userName, menuName, "D", reason, httpRequest);
 
@@ -272,14 +272,4 @@ public class AdminController {
     return authHeader.replace(BEARER_PREFIX, "");
   }
 
-  private String decryptName(String encryptedName) {
-    if (encryptedName == null) {
-      return null;
-    }
-    try {
-      return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedName));
-    } catch (Exception e) {
-      return encryptedName;
-    }
-  }
 }

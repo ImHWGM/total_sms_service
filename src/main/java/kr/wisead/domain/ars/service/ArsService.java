@@ -1,7 +1,8 @@
 package kr.wisead.domain.ars.service;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import kr.wisead.common.response.PageResponse;
@@ -99,14 +100,20 @@ public class ArsService {
     return blockedNumberService.filterBlockedNumbers(storeCode, phoneNumbers);
   }
 
+  /** 사용자 ID 목록으로 상점코드 목록 조회 */
+  @Transactional(readOnly = true)
+  public List<String> getStoreCodesByUserIds(List<String> userIds) {
+    return userMapper.selectStoreCodesByUserIds(userIds);
+  }
+
   /** 현재 날짜 문자열 (yyyyMMdd) */
   public String getTodayString() {
-    return new SimpleDateFormat("yyyyMMdd").format(new Date());
+    return LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
   }
 
   /** 현재 시간 문자열 (yyyyMMddHHmmss) */
   public String getNowString() {
-    return new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
+    return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
   }
 
   // ==================== Private Methods ====================

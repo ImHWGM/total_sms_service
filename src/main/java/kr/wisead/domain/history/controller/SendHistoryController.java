@@ -32,6 +32,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class SendHistoryController {
 
+  private static final int MAX_DOWNLOAD_SIZE = 100_000;
+
   private final SendHistoryService sendHistoryService;
   private final ActionLogService actionLogService;
   private final AdminService adminService;
@@ -89,7 +91,7 @@ public class SendHistoryController {
 
     String accessToken = token.replace("Bearer ", "");
     String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-    String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
+    String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
     Integer userLevel = adminService.getUserLevel(userId);
 
     // 다운로드 로그 기록
@@ -142,8 +144,6 @@ public class SendHistoryController {
     for (SendHistoryResponse history : historyList) {
       Row row = sheet.createRow(rowNum++);
       row.createCell(0).setCellValue(history.getMsgType() != null ? history.getMsgType() : "");
-      //            row.createCell(1).setCellValue(history.getReceiver() != null ?
-      // history.getReceiver() : "");
       row.createCell(1)
           .setCellValue(history.getRawReceiver() != null ? history.getRawReceiver() : "");
       row.createCell(2).setCellValue(history.getCallback() != null ? history.getCallback() : "");
@@ -209,13 +209,19 @@ public class SendHistoryController {
 
     String accessToken = token.replace("Bearer ", "");
     String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-    String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
+    String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
+    Integer userLevel = adminService.getUserLevel(userId);
+    String queryUserIds = adminService.determineQueryUserIds(userId, userLevel);
+
+    // 소유권 검증: 삭제 대상 store code가 사용자 권한 범위 내인지 확인
+    List<Map<String, String>> filteredKeyList =
+        sendHistoryService.filterKeyListByPermission(keyList, queryUserIds);
 
     // 삭제 로그 기록
     actionLogService.logDownloadAction(
-        userId, userName, "수신거부 삭제", "D", "삭제 건수: " + keyList.size(), request);
+        userId, userName, "수신거부 삭제", "D", "삭제 건수: " + filteredKeyList.size(), request);
 
-    int deleteCount = sendHistoryService.deleteBlockedSenders(keyList);
+    int deleteCount = sendHistoryService.deleteBlockedSenders(filteredKeyList);
     return ApiResponse.success(deleteCount, deleteCount + "건이 삭제되었습니다.");
   }
 
@@ -231,17 +237,17 @@ public class SendHistoryController {
 
     String accessToken = token.replace("Bearer ", "");
     String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-    String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
+    String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
     Integer userLevel = adminService.getUserLevel(userId);
     String queryUserIds = adminService.determineQueryUserIds(userId, userLevel);
 
     // 다운로드 로그 기록
     actionLogService.logDownloadAction(userId, userName, "수신거부 내역 다운로드", "D", "업무용", request);
 
-    // 전체 조회 (페이징 없이, 검색 조건 적용)
+    // 전체 조회 (상한 제한 적용, 검색 조건 적용)
     PageResponse<BlockedSenderResponse> pageResponse =
         sendHistoryService.searchBlockedSenders(
-            queryUserIds, senderId, unsubscribeNumber, 1, Integer.MAX_VALUE);
+            queryUserIds, senderId, unsubscribeNumber, 1, MAX_DOWNLOAD_SIZE);
     List<BlockedSenderResponse> blockedList = pageResponse.getContent();
 
     // 엑셀 생성
@@ -293,14 +299,4 @@ public class SendHistoryController {
     log.info("수신거부 엑셀 다운로드 완료: userId={}, 건수={}", userId, blockedList.size());
   }
 
-  private String decryptName(String encryptedName) {
-    if (encryptedName == null) {
-      return null;
-    }
-    try {
-      return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedName));
-    } catch (Exception e) {
-      return encryptedName;
-    }
-  }
 }

@@ -1,10 +1,12 @@
 package kr.wisead.domain.ars.service;
 
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.ars.dto.BlockedSenderResponse;
@@ -51,7 +53,7 @@ public class BlockedNumberService {
     // 중복 확인
     int exists = blockedSenderMapper.countBlockedSender(encryptedPhone, storeCode);
     if (exists > 0) {
-      log.info("이미 등록된 수신거부: phone={}, storeCode={}", maskPhone(phoneNumber), storeCode);
+      log.info("이미 등록된 수신거부: phone={}, storeCode={}", CommonUtils.maskingPhone(phoneNumber), storeCode);
       return false;
     }
 
@@ -66,7 +68,7 @@ public class BlockedNumberService {
             .build();
 
     blockedSenderMapper.insertBlockedSender(blockedSender);
-    log.info("수신거부 등록 완료: phone={}, storeCode={}", maskPhone(phoneNumber), storeCode);
+    log.info("수신거부 등록 완료: phone={}, storeCode={}", CommonUtils.maskingPhone(phoneNumber), storeCode);
     return true;
   }
 
@@ -91,7 +93,7 @@ public class BlockedNumberService {
           registeredCount++;
         }
       } catch (Exception e) {
-        log.warn("수신거부 등록 실패: phone={}, error={}", maskPhone(phoneNumber), e.getMessage());
+        log.warn("수신거부 등록 실패: phone={}, error={}", CommonUtils.maskingPhone(phoneNumber), e.getMessage());
       }
     }
 
@@ -149,18 +151,22 @@ public class BlockedNumberService {
     int total =
         blockedSenderMapper.countBlockedSendersWithSearch(storeCodes, senderId, encryptedAni);
 
-    // storeCode → userId 매핑
-    Map<String, String> storeCodeToUserId =
-        results.stream()
-            .map(BlockedSender::getDtmf1)
-            .distinct()
-            .collect(
-                Collectors.toMap(
-                    code -> code,
-                    code -> {
-                      String uid = userMapper.findUserIdByStoreCode(code);
-                      return uid != null ? uid : "";
-                    }));
+    // storeCode → userId 매핑 (배치 조회)
+    List<String> distinctStoreCodes =
+        results.stream().map(BlockedSender::getDtmf1).distinct().collect(Collectors.toList());
+    Map<String, String> storeCodeToUserId;
+    if (distinctStoreCodes.isEmpty()) {
+      storeCodeToUserId = Collections.emptyMap();
+    } else {
+      Map<String, Map<String, String>> rawMap =
+          userMapper.findUserIdsByStoreCodesRaw(distinctStoreCodes);
+      storeCodeToUserId = new HashMap<>();
+      if (rawMap != null) {
+        rawMap.forEach(
+            (key, row) ->
+                storeCodeToUserId.put(key, row.getOrDefault("USER_ID", "")));
+      }
+    }
 
     List<BlockedSenderResponse> responses =
         results.stream()
@@ -209,7 +215,7 @@ public class BlockedNumberService {
     int deleted = blockedSenderMapper.deleteBlockedSender(encryptedPhone, storeCode);
 
     if (deleted > 0) {
-      log.info("수신거부 삭제 완료: phone={}, storeCode={}", maskPhone(phoneNumber), storeCode);
+      log.info("수신거부 삭제 완료: phone={}, storeCode={}", CommonUtils.maskingPhone(phoneNumber), storeCode);
       return true;
     }
     return false;
@@ -351,13 +357,11 @@ public class BlockedNumberService {
     }
     // 하이픈 제거
     String cleaned = phoneNumber.replaceAll("-", "");
-    try {
-      return CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(cleaned));
-    } catch (Exception e) {
-      log.error("전화번호 암호화 실패: {}", e.getMessage());
-      // 실패 시 Base64만 적용
-      return Base64.getEncoder().encodeToString(cleaned.getBytes());
+    String encrypted = CryptoUtils.encryptAES256(cleaned);
+    if (encrypted.isEmpty()) {
+      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "전화번호 암호화 실패");
     }
+    return CryptoUtils.encodeBase64(encrypted);
   }
 
   /** 전화번호 복호화 */
@@ -365,29 +369,11 @@ public class BlockedNumberService {
     if (encryptedPhone == null) {
       return null;
     }
-    try {
-      return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedPhone));
-    } catch (Exception e) {
-      // AES 복호화 실패 시 Base64 디코딩 시도
-      try {
-        return new String(Base64.getDecoder().decode(encryptedPhone));
-      } catch (Exception e2) {
-        log.debug("전화번호 복호화 실패: {}", e.getMessage());
-        return encryptedPhone;
-      }
-    }
-  }
-
-  /** 전화번호 마스킹 */
-  private String maskPhone(String phone) {
-    if (phone == null || phone.length() < 7) {
-      return phone;
-    }
-    return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
+    return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedPhone));
   }
 
   /** 현재 시간 문자열 (yyyyMMddHHmmss) */
   private String getCurrentTimeString() {
-    return new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
+    return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
   }
 }

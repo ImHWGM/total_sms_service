@@ -238,6 +238,18 @@ public class CryptoUtils {
     return raw;
   }
 
+  /** 암호화된 이름 복호화 (Base64 디코딩 후 AES256 복호화, 실패 시 원본 반환) */
+  public static String decryptName(String encryptedName) {
+    if (encryptedName == null || encryptedName.isEmpty()) {
+      return encryptedName;
+    }
+    try {
+      return decryptAES256(decodeBase64(encryptedName));
+    } catch (Exception e) {
+      return encryptedName;
+    }
+  }
+
   /** Base64 형식 여부 확인 */
   private static boolean isBase64(String s) {
     return B64.matcher(s).matches();

@@ -3,6 +3,7 @@ package kr.wisead.domain.ars.controller;
 import java.util.List;
 import java.util.Map;
 import kr.wisead.common.response.ApiResponse;
+import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.ars.dto.ArsResponse;
 import kr.wisead.domain.ars.dto.BlockedSenderResponse;
@@ -33,20 +34,20 @@ public class ArsController {
       @RequestParam("MENU_NAME") String menuName,
       @RequestParam("ANI") String ani,
       @RequestParam("DTMF_CNT") String dtmfCnt) {
-    log.info("ARS 자동등록형 수신거부 요청: ani={}, menuName={}", maskPhone(ani), menuName);
+    log.info("ARS 자동등록형 수신거부 요청: ani={}, menuName={}", CommonUtils.maskingPhone(ani), menuName);
 
     String effectiveTime = tTime != null ? tTime : arsService.getNowString();
 
     // 휴대폰 번호 유효성 검사
     if (!arsService.isCellPhone(ani)) {
-      log.warn("휴대폰 번호가 아님: {}", maskPhone(ani));
+      log.warn("휴대폰 번호가 아님: {}", CommonUtils.maskingPhone(ani));
       return ArsResponse.failNotCellPhone(tId, effectiveTime, menuName).toHtml();
     }
 
     // 최근 발송 이력에서 상점코드 조회
     String storeCode = arsService.getStoreCodeByAni(ani, effectiveTime);
     if (storeCode == null) {
-      log.warn("발송 이력 없음: {}", maskPhone(ani));
+      log.warn("발송 이력 없음: {}", CommonUtils.maskingPhone(ani));
       return ArsResponse.failInvalidStoreCode(tId, effectiveTime, menuName).toHtml();
     }
 
@@ -70,13 +71,13 @@ public class ArsController {
       @RequestParam("DTMF_CNT") String dtmfCnt,
       @RequestParam(value = "DTMF_1", required = false) String dtmf1) {
     log.info(
-        "ARS 상점코드 입력형 수신거부 요청: ani={}, storeCode={}, menuName={}", maskPhone(ani), dtmf1, menuName);
+        "ARS 상점코드 입력형 수신거부 요청: ani={}, storeCode={}, menuName={}", CommonUtils.maskingPhone(ani), dtmf1, menuName);
 
     String effectiveTime = tTime != null ? tTime : arsService.getNowString();
 
     // 휴대폰 번호 유효성 검사
     if (!arsService.isCellPhone(ani)) {
-      log.warn("휴대폰 번호가 아님: {}", maskPhone(ani));
+      log.warn("휴대폰 번호가 아님: {}", CommonUtils.maskingPhone(ani));
       return ArsResponse.failNotCellPhone(tId, effectiveTime, menuName).toHtml();
     }
 
@@ -137,10 +138,4 @@ public class ArsController {
     return ResponseEntity.ok(ApiResponse.success(blockedNumbers));
   }
 
-  // ==================== Private Methods ====================
-
-  private String maskPhone(String phone) {
-    if (phone == null || phone.length() < 7) return phone;
-    return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
-  }
 }

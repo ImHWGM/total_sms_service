@@ -112,4 +112,9 @@ public interface UserMapper {
 
   /** 사용자ID 목록으로 상점코드 목록 조회 */
   List<String> selectStoreCodesByUserIds(@Param("userIds") List<String> userIds);
+
+  /** 상점코드 목록으로 {storeCode → userId} 매핑 조회 */
+  @org.apache.ibatis.annotations.MapKey("STORE_CODE")
+  java.util.Map<String, java.util.Map<String, String>> findUserIdsByStoreCodesRaw(
+      @Param("storeCodes") List<String> storeCodes);
 }

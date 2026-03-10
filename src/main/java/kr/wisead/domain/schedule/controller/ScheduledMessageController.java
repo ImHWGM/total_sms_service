@@ -93,7 +93,7 @@ public class ScheduledMessageController {
         HttpServletResponse response) throws Exception {
         String accessToken = token.replace("Bearer ", "");
         String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-        String userName = decryptName(jwtTokenProvider.getUserName(accessToken));
+        String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
         Integer userLevel = adminService.getUserLevel(userId);
         // 1. 다운로드 로그 기록
         actionLogService.logDownloadAction(userId, userName, "예약 리스트 다운로드", "D", reason, request);
@@ -260,19 +260,4 @@ public class ScheduledMessageController {
         return ApiResponse.success("삭제되었습니다.");
     }
 
-    /**
-     * 암호화된 관리자명 복호화
-     */
-    private String decryptName(String encryptedName) {
-        if (encryptedName == null || encryptedName.isEmpty()) {
-            return encryptedName;
-        }
-        try {
-            // Base64 디코딩 후 AES256 복호화
-            return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedName));
-        } catch (Exception e) {
-            log.warn("사용자명 복호화 실패: {}", e.getMessage());
-            return encryptedName; // 실패 시 원본(암호문) 반환
-        }
-    }
 }

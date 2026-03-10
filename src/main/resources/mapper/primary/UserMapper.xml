@@ -288,7 +288,7 @@
 
     <!-- 상점코드 중복 확인 -->
     <select id="existsByStoreCode" resultType="boolean">
-        SELECT EXISTS(SELECT 1 FROM user WHERE STORE_CODE = ${storeCode})
+        SELECT EXISTS(SELECT 1 FROM user WHERE STORE_CODE = #{storeCode})
     </select>
 
     <!-- 상점코드로 사용자 ID 조회 (추가) -->
@@ -308,6 +308,17 @@
         </foreach>
         AND STORE_CODE IS NOT NULL
         AND STORE_CODE != ''
+        AND USE_YN = 'Y'
+    </select>
+
+    <!-- 상점코드 목록으로 {storeCode → userId} 매핑 조회 -->
+    <select id="findUserIdsByStoreCodesRaw" resultType="map">
+        SELECT STORE_CODE, USER_ID
+        FROM user
+        WHERE STORE_CODE IN
+        <foreach collection="storeCodes" item="storeCode" open="(" separator="," close=")">
+            #{storeCode}
+        </foreach>
         AND USE_YN = 'Y'
     </select>
 

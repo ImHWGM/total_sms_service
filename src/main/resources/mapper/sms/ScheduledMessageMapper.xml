@@ -124,51 +124,51 @@
 
     <!-- 예약 메시지 특정항목 상세 조회 (다운로드용) -->
     <select id="selectExpandedScheduledMessages" resultMap="scheduledMessageResultMap">
-        SELECT
-            MSEQ as mSeq,
-            MSG_TYPE as msgType,
-            DSTADDR as dstAddr,
-            CALLBACK as callBack,
-            STAT as stat,
-            SUBJECT as subject,
-            TEXT as text,
-            INSERT_TIME as insertTime,
-            REQUEST_TIME as requestTime,
-            SENDER_CODE as senderCode,
-            EXT_COL0 as extCol0,
-            EXT_COL1 as extCol1,
-            EXT_COL2 as extCol2,
-            EXT_COL3 as extCol3,
-            FILECNT as fileCnt,
-            FILELOC1 as fileLoc1,
-            FILELOC2 as fileLoc2,
-            FILELOC3 as fileLoc3
-        FROM msg_queue
-        WHERE (
-            CASE
-                WHEN EXT_COL0 IS NULL THEN EXT_COL1
-                ELSE CONCAT(EXT_COL0, '_',
-                    DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
-                    LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0'),
-                    '_', REQUEST_TIME)
-            END
-        ) IN (
-            SELECT DISTINCT (
+        WITH group_keys AS (
+            SELECT DISTINCT
                 CASE
                     WHEN EXT_COL0 IS NULL THEN EXT_COL1
                     ELSE CONCAT(EXT_COL0, '_',
                         DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
                         LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0'),
                         '_', REQUEST_TIME)
-                END
-            )
+                END AS grp_key
             FROM msg_queue
             WHERE MSEQ IN
             <foreach collection="mSeqs" item="mSeq" open="(" separator="," close=")">
                 #{mSeq}
             </foreach>
         )
-        ORDER BY INSERT_TIME DESC, MSEQ ASC
+        SELECT
+            mq.MSEQ as mSeq,
+            mq.MSG_TYPE as msgType,
+            mq.DSTADDR as dstAddr,
+            mq.CALLBACK as callBack,
+            mq.STAT as stat,
+            mq.SUBJECT as subject,
+            mq.TEXT as text,
+            mq.INSERT_TIME as insertTime,
+            mq.REQUEST_TIME as requestTime,
+            mq.SENDER_CODE as senderCode,
+            mq.EXT_COL0 as extCol0,
+            mq.EXT_COL1 as extCol1,
+            mq.EXT_COL2 as extCol2,
+            mq.EXT_COL3 as extCol3,
+            mq.FILECNT as fileCnt,
+            mq.FILELOC1 as fileLoc1,
+            mq.FILELOC2 as fileLoc2,
+            mq.FILELOC3 as fileLoc3
+        FROM msg_queue mq
+        INNER JOIN group_keys gk ON (
+            CASE
+                WHEN mq.EXT_COL0 IS NULL THEN mq.EXT_COL1
+                ELSE CONCAT(mq.EXT_COL0, '_',
+                    DATE_FORMAT(mq.INSERT_TIME, '%Y%m%d%H'),
+                    LPAD(FLOOR(MINUTE(mq.INSERT_TIME)/2)*2, 2, '0'),
+                    '_', mq.REQUEST_TIME)
+            END
+        ) = gk.grp_key
+        ORDER BY mq.INSERT_TIME DESC, mq.MSEQ ASC
     </select>
 
     <!-- 예약 메시지 전체 조회 (다운로드용) -->

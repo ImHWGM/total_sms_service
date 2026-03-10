@@ -163,7 +163,7 @@ public class ExcelController {
 
     // 활동 로그 기록
     actionLogService.logDownloadAction(
-        currentUserId, decryptName(user.getPerson()), "과금통계 엑셀다운로드", "R", reason, httpRequest);
+        currentUserId, CryptoUtils.decryptName(user.getPerson()), "과금통계 엑셀다운로드", "R", reason, httpRequest);
 
     // 기본 날짜 설정
     LocalDate now = LocalDate.now();
@@ -303,7 +303,7 @@ public class ExcelController {
 
     // 활동 로그 기록
     actionLogService.logDownloadAction(
-        userId, decryptName(user.getPerson()), "설문조사 참여현황 엑셀다운로드", "R", reason, request);
+        userId, CryptoUtils.decryptName(user.getPerson()), "설문조사 참여현황 엑셀다운로드", "R", reason, request);
 
     // 검색 조건 설정
     Map<String, Object> params = new HashMap<>();
@@ -388,7 +388,7 @@ public class ExcelController {
 
     // 활동 로그 기록
     actionLogService.logDownloadAction(
-        userId, decryptName(user.getPerson()), "개인정보취합 참여현황 엑셀다운로드", "R", reason, request);
+        userId, CryptoUtils.decryptName(user.getPerson()), "개인정보취합 참여현황 엑셀다운로드", "R", reason, request);
 
     // 검색 조건 설정
     Map<String, Object> params = new HashMap<>();
@@ -502,7 +502,7 @@ public class ExcelController {
         String.format("%s 참여현황 엑셀다운로드 (%s)", menuName, getDownloadTypeText(downloadType));
     actionLogService.logDownloadAction(
         userId,
-        decryptName(user.getPerson()),
+        CryptoUtils.decryptName(user.getPerson()),
         logMenuName,
         "R",
         downloadRequest.getReason(),
@@ -780,14 +780,4 @@ public class ExcelController {
     return dateTime.toString();
   }
 
-  private String decryptName(String encryptedName) {
-    if (encryptedName == null) {
-      return null;
-    }
-    try {
-      return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(encryptedName));
-    } catch (Exception e) {
-      return encryptedName;
-    }
-  }
 }

@@ -178,6 +178,9 @@ public class EventService {
             .privacyPolicyYn(request.getPrivacyPolicyYn())
             .privacyPolicyTtl(request.getPrivacyPolicyTtl())
             .privacyPolicyDesc(request.getPrivacyPolicyDesc())
+            .thirdPartyYn(request.getThirdPartyYn())
+            .thirdPartyTtl(request.getThirdPartyTtl())
+            .thirdPartyDesc(request.getThirdPartyDesc())
             .auth(request.getAuth())
             .qrCode(request.getQrCode())
             .authCodeUrl(authCodeUrl)
@@ -416,6 +419,9 @@ public class EventService {
         request.getPrivacyPolicyYn(),
         request.getPrivacyPolicyTtl(),
         request.getPrivacyPolicyDesc(),
+        request.getThirdPartyYn(),
+        request.getThirdPartyTtl(),
+        request.getThirdPartyDesc(),
         request.getAuth(),
         request.getQrCode(),
         request.getEndMessage(),
@@ -484,6 +490,9 @@ public class EventService {
             .privacyPolicyYn(sourceEvent.getPrivacyPolicyYn())
             .privacyPolicyTtl(sourceEvent.getPrivacyPolicyTtl())
             .privacyPolicyDesc(sourceEvent.getPrivacyPolicyDesc())
+            .thirdPartyYn(sourceEvent.getThirdPartyYn())
+            .thirdPartyTtl(sourceEvent.getThirdPartyTtl())
+            .thirdPartyDesc(sourceEvent.getThirdPartyDesc())
             .auth(sourceEvent.getAuth())
             .qrCode("N")
             .qrCodeImgPath(null)
@@ -945,7 +954,8 @@ public class EventService {
 
   private void copyEventParticipants(
       Integer sourceEventSeq, Integer targetEventSeq, String actualUserId) {
-    List<EventParticipant> sourceParticipants = eventParticipantMapper.selectByEventSeq(sourceEventSeq);
+    List<EventParticipant> sourceParticipants =
+        eventParticipantMapper.selectByEventSeq(sourceEventSeq);
     if (sourceParticipants.isEmpty()) {
       return;
     }
@@ -1008,7 +1018,8 @@ public class EventService {
   }
 
   private void copyEventActionTypes(Integer sourceEventSeq, Integer targetEventSeq) {
-    List<EventActionType> sourceActionTypes = eventActionTypeMapper.selectByEventSeq(sourceEventSeq);
+    List<EventActionType> sourceActionTypes =
+        eventActionTypeMapper.selectByEventSeq(sourceEventSeq);
     if (sourceActionTypes == null || sourceActionTypes.isEmpty()) {
       eventActionTypeService.createDefaultActionTypes(targetEventSeq);
       return;

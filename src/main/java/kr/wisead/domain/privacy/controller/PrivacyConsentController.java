@@ -39,8 +39,8 @@ public class PrivacyConsentController {
       @RequestParam(value = "language", defaultValue = "ko") String language,
       @RequestHeader("Authorization") String token) {
 
-    String requestUserId = userIdResolver.resolveUserId(
-        jwtTokenProvider.getUserId(extractToken(token)));
+    String requestUserId =
+        userIdResolver.resolveUserId(jwtTokenProvider.getUserId(extractToken(token)));
 
     try {
       log.info(
@@ -105,8 +105,8 @@ public class PrivacyConsentController {
       @RequestParam(value = "language", defaultValue = "ko") String language,
       @RequestHeader("Authorization") String token) {
 
-    String requestUserId = userIdResolver.resolveUserId(
-        jwtTokenProvider.getUserId(extractToken(token)));
+    String requestUserId =
+        userIdResolver.resolveUserId(jwtTokenProvider.getUserId(extractToken(token)));
 
     try {
       log.info(
@@ -157,8 +157,8 @@ public class PrivacyConsentController {
   public ResponseEntity<byte[]> previewPrivacyConsent(
       @RequestBody PrivacyPreviewRequest request, @RequestHeader("Authorization") String token) {
 
-    String requestUserId = userIdResolver.resolveUserId(
-        jwtTokenProvider.getUserId(extractToken(token)));
+    String requestUserId =
+        userIdResolver.resolveUserId(jwtTokenProvider.getUserId(extractToken(token)));
     String previewTitle = request.getTitle() != null ? request.getTitle() : "Unknown";
 
     try {
@@ -167,7 +167,12 @@ public class PrivacyConsentController {
       String language = request.getLanguage() != null ? request.getLanguage() : "ko";
       byte[] pdfContent =
           privacyConsentPdfService.generatePreviewPdf(
-              request.getTitle(), request.getContent(), language);
+              request.getTitle(),
+              request.getContent(),
+              language,
+              request.getThirdPartyYn(),
+              request.getThirdPartyTtl(),
+              request.getThirdPartyContent());
 
       log.info(
           "개인정보제공동의서 미리보기 생성 성공 - 요청자: {}, 제목: {}, PDF 크기: {} bytes",

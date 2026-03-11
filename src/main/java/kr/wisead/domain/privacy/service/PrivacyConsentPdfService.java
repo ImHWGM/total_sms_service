@@ -46,16 +46,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class PrivacyConsentPdfService {
 
   private static final String PDF_TITLE = "개인정보 수집·이용 동의서";
+  private static final String PDF_TITLE_THIRD_PARTY = "개인정보 제3자 제공 동의서";
   private static final String CONSENT_METHOD_NOTICE = "※ 동의 방식: 온라인 설문 참여 시 체크박스를 통한 동의";
-  private static final String AGREE_CHECKBOX_TEXT = "위 개인정보 수집ㆍ이용 안내를 확인하였습니다.       확인함 ☑";
 
   // English constants
   private static final String PDF_TITLE_EN =
       "Consent for Collection and Use of Personal Information";
+  private static final String PDF_TITLE_THIRD_PARTY_EN =
+      "Consent for Third-Party Provision of Personal Information";
   private static final String CONSENT_METHOD_NOTICE_EN =
       "* Consent method: Consent via checkbox during online survey participation";
-  private static final String AGREE_CHECKBOX_TEXT_EN =
-      "I have read and agree to the above.       Agreed V";
 
   // PDF 설정 상수
   private static final float PAGE_WIDTH = PDRectangle.A4.getWidth();
@@ -266,8 +266,20 @@ public class PrivacyConsentPdfService {
     return destroyedResult.getDisplayName();
   }
 
-  /** 미리보기용 개인정보제공동의서 PDF 생성 */
-  public byte[] generatePreviewPdf(String title, String content, String language) throws Exception {
+  /** 미리보기용 개인정보제공동의서 PDF 생성 (제3자 제공 동의 포함) */
+  public byte[] generatePreviewPdf(
+      String title,
+      String content,
+      String language,
+      String thirdPartyYn,
+      String thirdPartyTtl,
+      String thirdPartyContent)
+      throws Exception {
+    boolean hasThirdParty =
+        "Y".equals(thirdPartyYn)
+            && thirdPartyContent != null
+            && !thirdPartyContent.isEmpty();
+
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
     try (PDDocument document = new PDDocument()) {
@@ -303,13 +315,13 @@ public class PrivacyConsentPdfService {
         contentStream.endText();
         yPosition -= LINE_HEIGHT * 2;
 
-        // 내용
+        // 내용 (bold 태그 지원)
         if (content != null && !content.isEmpty()) {
           PageState pageState =
-              writeTextWithWrappingAndPaging(
+              writeTextWithBoldAndPaging(
                   document,
                   contentStream,
-                  fonts.getRegularFont(),
+                  fonts,
                   FONT_SIZE,
                   MARGIN,
                   yPosition,
@@ -324,7 +336,8 @@ public class PrivacyConsentPdfService {
         yPosition -= LINE_HEIGHT;
 
         // 동의 확인 문구
-        writeAgreeCheckboxText(contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language);
+        writeAgreeCheckboxText(
+            contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language, false);
         yPosition -= LINE_HEIGHT;
 
         // 동의 방식 안내 문구
@@ -378,6 +391,89 @@ public class PrivacyConsentPdfService {
         contentStream.close();
       }
 
+      // 제3자 제공 동의 페이지 추가 (같은 document에 바로 추가)
+      if (hasThirdParty) {
+        PDPage tpPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
+        document.addPage(tpPage);
+        PDPageContentStream tpContentStream = new PDPageContentStream(document, tpPage);
+        float tpYPosition = PAGE_HEIGHT - MARGIN;
+
+        try {
+          // 제3자 제공 동의 제목
+          String tpTitle =
+              "en".equals(language) ? PDF_TITLE_THIRD_PARTY_EN : PDF_TITLE_THIRD_PARTY;
+          float tpTitleWidth = getStringWidth(tpTitle, fonts.getBoldFont(), TITLE_FONT_SIZE);
+          float tpTitleX = (PAGE_WIDTH - tpTitleWidth) / 2;
+          tpContentStream.beginText();
+          tpContentStream.setFont(fonts.getBoldFont(), TITLE_FONT_SIZE);
+          tpContentStream.newLineAtOffset(tpTitleX, tpYPosition);
+          tpContentStream.showText(ensureSafeText(tpTitle, fonts.getBoldFont()));
+          tpContentStream.endText();
+          tpYPosition -= LINE_HEIGHT;
+
+          // 이벤트명
+          String tpEventNameText =
+              "("
+                  + (thirdPartyTtl != null && !thirdPartyTtl.trim().isEmpty()
+                      ? thirdPartyTtl
+                      : (title != null && !title.trim().isEmpty() ? title : "[이벤트명]"))
+                  + ")";
+          float tpEventNameWidth =
+              getStringWidth(tpEventNameText, fonts.getRegularFont(), FONT_SIZE);
+          float tpEventNameX = (PAGE_WIDTH - tpEventNameWidth) / 2;
+          tpContentStream.beginText();
+          tpContentStream.setFont(fonts.getRegularFont(), FONT_SIZE);
+          tpContentStream.newLineAtOffset(tpEventNameX, tpYPosition);
+          tpContentStream.showText(ensureSafeText(tpEventNameText, fonts.getRegularFont()));
+          tpContentStream.endText();
+          tpYPosition -= LINE_HEIGHT * 2;
+
+          // 제3자 제공 동의 내용 (bold 태그 지원)
+          PageState tpPageState =
+              writeTextWithBoldAndPaging(
+                  document,
+                  tpContentStream,
+                  fonts,
+                  FONT_SIZE,
+                  MARGIN,
+                  tpYPosition,
+                  LINE_HEIGHT,
+                  thirdPartyContent,
+                  CONTENT_WIDTH,
+                  PAGE_HEIGHT,
+                  PAGE_WIDTH);
+          tpContentStream = tpPageState.getContentStream();
+          tpYPosition = tpPageState.getYPosition();
+          tpYPosition -= LINE_HEIGHT;
+
+          // 체크박스
+          if (tpYPosition < MARGIN + LINE_HEIGHT) {
+            tpContentStream.close();
+            PDPage newPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
+            document.addPage(newPage);
+            tpContentStream = new PDPageContentStream(document, newPage);
+            tpYPosition = PAGE_HEIGHT - MARGIN;
+          }
+          writeAgreeCheckboxText(
+              tpContentStream, fonts, FONT_SIZE, PAGE_WIDTH, tpYPosition, language, true);
+          tpYPosition -= LINE_HEIGHT;
+
+          // 미리보기 안내
+          String tpPreviewNotice = getPreviewNotice(language);
+          float tpPreviewNoticeWidth =
+              getStringWidth(tpPreviewNotice, fonts.getRegularFont(), SMALL_FONT_SIZE);
+          float tpPreviewNoticeX = PAGE_WIDTH - MARGIN - tpPreviewNoticeWidth;
+          tpContentStream.beginText();
+          tpContentStream.setFont(fonts.getRegularFont(), SMALL_FONT_SIZE);
+          tpContentStream.setNonStrokingColor(Color.GRAY);
+          tpContentStream.newLineAtOffset(tpPreviewNoticeX, tpYPosition);
+          tpContentStream.showText(ensureSafeText(tpPreviewNotice, fonts.getRegularFont()));
+          tpContentStream.endText();
+        } finally {
+          tpContentStream.close();
+        }
+      }
+
       document.save(baos);
     }
 
@@ -427,14 +523,14 @@ public class PrivacyConsentPdfService {
         contentStream.endText();
         yPosition -= LINE_HEIGHT * 2;
 
-        // 개인정보 처리방침 내용
+        // 개인정보 처리방침 내용 (bold 태그 지원)
         String policyDesc = event.getPrivacyPolicyDesc();
         if (policyDesc != null && !policyDesc.isEmpty()) {
           PageState pageState =
-              writeTextWithWrappingAndPaging(
+              writeTextWithBoldAndPaging(
                   document,
                   contentStream,
-                  fonts.getRegularFont(),
+                  fonts,
                   FONT_SIZE,
                   MARGIN,
                   yPosition,
@@ -458,8 +554,77 @@ public class PrivacyConsentPdfService {
         }
 
         // 동의 체크박스 출력
-        writeAgreeCheckboxText(contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language);
+        writeAgreeCheckboxText(
+            contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language, false);
         yPosition -= LINE_HEIGHT;
+
+        // 제3자 제공 동의 섹션 (별도)
+        if ("Y".equals(event.getThirdPartyYn())) {
+          // 새 페이지에서 시작
+          contentStream.close();
+          PDPage thirdPartyPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
+          document.addPage(thirdPartyPage);
+          contentStream = new PDPageContentStream(document, thirdPartyPage);
+          yPosition = PAGE_HEIGHT - MARGIN;
+
+          // 제3자 제공 동의 제목
+          String thirdPartyTitle =
+              "en".equals(language) ? PDF_TITLE_THIRD_PARTY_EN : PDF_TITLE_THIRD_PARTY;
+          float tpTitleWidth =
+              getStringWidth(thirdPartyTitle, fonts.getBoldFont(), TITLE_FONT_SIZE);
+          float tpTitleX = (PAGE_WIDTH - tpTitleWidth) / 2;
+          contentStream.beginText();
+          contentStream.setFont(fonts.getBoldFont(), TITLE_FONT_SIZE);
+          contentStream.newLineAtOffset(tpTitleX, yPosition);
+          contentStream.showText(ensureSafeText(thirdPartyTitle, fonts.getBoldFont()));
+          contentStream.endText();
+          yPosition -= LINE_HEIGHT;
+
+          // 이벤트명
+          contentStream.beginText();
+          contentStream.setFont(fonts.getRegularFont(), FONT_SIZE);
+          float tpEventNameWidth = getStringWidth(eventNameText, fonts.getRegularFont(), FONT_SIZE);
+          float tpEventNameX = (PAGE_WIDTH - tpEventNameWidth) / 2;
+          contentStream.newLineAtOffset(tpEventNameX, yPosition);
+          contentStream.showText(ensureSafeText(eventNameText, fonts.getRegularFont()));
+          contentStream.endText();
+          yPosition -= LINE_HEIGHT * 2;
+
+          // 제3자 제공 동의 내용 (bold 태그 지원)
+          String thirdPartyDesc = event.getThirdPartyDesc();
+          if (thirdPartyDesc != null && !thirdPartyDesc.isEmpty()) {
+            PageState tpPageState =
+                writeTextWithBoldAndPaging(
+                    document,
+                    contentStream,
+                    fonts,
+                    FONT_SIZE,
+                    MARGIN,
+                    yPosition,
+                    LINE_HEIGHT,
+                    thirdPartyDesc,
+                    CONTENT_WIDTH,
+                    PAGE_HEIGHT,
+                    PAGE_WIDTH);
+            contentStream = tpPageState.getContentStream();
+            yPosition = tpPageState.getYPosition();
+          }
+          yPosition -= LINE_HEIGHT;
+
+          // 페이지 하단 체크
+          if (yPosition < MARGIN + LINE_HEIGHT) {
+            contentStream.close();
+            PDPage newPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
+            document.addPage(newPage);
+            contentStream = new PDPageContentStream(document, newPage);
+            yPosition = PAGE_HEIGHT - MARGIN;
+          }
+
+          // 제3자 제공 동의 체크박스
+          writeAgreeCheckboxText(
+              contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language, true);
+          yPosition -= LINE_HEIGHT;
+        }
 
         // 서명 없는 버전일 때 동의 방식 안내 문구
         if (!includeSignature) {
@@ -638,12 +803,21 @@ public class PrivacyConsentPdfService {
       float fontSize,
       float pageWidth,
       float yPosition,
-      String language)
+      String language,
+      boolean isThirdParty)
       throws IOException {
-    String textBeforeCheckbox =
-        "en".equals(language)
-            ? "I have read and agree to the above.       Agreed "
-            : "위 개인정보 수집ㆍ이용 안내를 확인하였습니다.       확인함 ";
+    String textBeforeCheckbox;
+    if (isThirdParty) {
+      textBeforeCheckbox =
+          "en".equals(language)
+              ? "I have read and agree to the above third-party provision.       Agreed "
+              : "위 개인정보 제3자 제공 안내를 확인하였습니다.       확인함 ";
+    } else {
+      textBeforeCheckbox =
+          "en".equals(language)
+              ? "I have read and agree to the above.       Agreed "
+              : "위 개인정보 수집ㆍ이용 안내를 확인하였습니다.       확인함 ";
+    }
     String checkboxChar = "V";
 
     String safeTextBefore = ensureSafeText(textBeforeCheckbox, fonts.getBoldFont());
@@ -664,6 +838,194 @@ public class PrivacyConsentPdfService {
     contentStream.newLineAtOffset(startX + beforeWidth, yPosition);
     contentStream.showText(checkboxChar);
     contentStream.endText();
+  }
+
+  /**
+   * HTML &lt;b&gt; 태그를 파싱하여 bold/regular 세그먼트로 분리
+   *
+   * @param text HTML bold 태그가 포함될 수 있는 텍스트
+   * @return TextSegment 리스트 (각 세그먼트에 bold 여부 포함)
+   */
+  private List<TextSegment> parseBoldSegments(String text) {
+    List<TextSegment> segments = new ArrayList<>();
+    if (text == null || text.isEmpty()) return segments;
+
+    int pos = 0;
+    while (pos < text.length()) {
+      int boldStart = text.indexOf("<b>", pos);
+      if (boldStart == -1) {
+        // 남은 텍스트는 일반 텍스트
+        if (pos < text.length()) {
+          segments.add(new TextSegment(text.substring(pos), false));
+        }
+        break;
+      }
+
+      // bold 시작 전 일반 텍스트
+      if (boldStart > pos) {
+        segments.add(new TextSegment(text.substring(pos, boldStart), false));
+      }
+
+      int boldEnd = text.indexOf("</b>", boldStart + 3);
+      if (boldEnd == -1) {
+        // 닫는 태그 없으면 나머지를 bold로 처리
+        segments.add(new TextSegment(text.substring(boldStart + 3), true));
+        break;
+      }
+
+      segments.add(new TextSegment(text.substring(boldStart + 3, boldEnd), true));
+      pos = boldEnd + 4;
+    }
+
+    return segments;
+  }
+
+  /** bold 태그를 지원하는 텍스트 줄바꿈 및 페이징 처리 */
+  private PageState writeTextWithBoldAndPaging(
+      PDDocument document,
+      PDPageContentStream contentStream,
+      FontSet fonts,
+      float fontSize,
+      float margin,
+      float yPosition,
+      float lineHeight,
+      String text,
+      float contentWidth,
+      float pageHeight,
+      float pageWidth)
+      throws IOException {
+    if (text == null || text.isEmpty()) {
+      return new PageState(contentStream, yPosition);
+    }
+
+    // bold 태그가 없으면 기존 방식으로 처리
+    if (!text.contains("<b>")) {
+      return writeTextWithWrappingAndPaging(
+          document,
+          contentStream,
+          fonts.getRegularFont(),
+          fontSize,
+          margin,
+          yPosition,
+          lineHeight,
+          text,
+          contentWidth,
+          pageHeight,
+          pageWidth);
+    }
+
+    // 줄 단위로 분리 후 각 줄에서 bold 세그먼트 처리
+    String[] paragraphs = text.split("\n");
+    for (String paragraph : paragraphs) {
+      if (paragraph.trim().isEmpty()) {
+        yPosition -= lineHeight;
+        if (yPosition < margin + lineHeight) {
+          contentStream.close();
+          PDPage newPage = new PDPage(new PDRectangle(pageWidth, pageHeight));
+          document.addPage(newPage);
+          contentStream = new PDPageContentStream(document, newPage);
+          yPosition = pageHeight - margin;
+        }
+        continue;
+      }
+
+      // 세그먼트 파싱
+      List<TextSegment> segments = parseBoldSegments(paragraph);
+
+      // 줄바꿈 처리: 세그먼트를 순회하며 한 줄의 너비를 계산
+      List<List<TextSegment>> wrappedLines =
+          wrapSegmentedText(segments, fonts, fontSize, contentWidth);
+
+      for (List<TextSegment> lineSegments : wrappedLines) {
+        if (yPosition < margin + lineHeight) {
+          contentStream.close();
+          PDPage newPage = new PDPage(new PDRectangle(pageWidth, pageHeight));
+          document.addPage(newPage);
+          contentStream = new PDPageContentStream(document, newPage);
+          yPosition = pageHeight - margin;
+        }
+
+        float xPosition = margin;
+        for (TextSegment seg : lineSegments) {
+          PDFont font = seg.isBold() ? fonts.getBoldFont() : fonts.getRegularFont();
+          String safeText = ensureSafeText(seg.text(), font);
+          contentStream.beginText();
+          contentStream.setFont(font, fontSize);
+          contentStream.newLineAtOffset(xPosition, yPosition);
+          contentStream.showText(safeText);
+          contentStream.endText();
+          xPosition += getStringWidth(safeText, font, fontSize);
+        }
+
+        yPosition -= lineHeight;
+      }
+    }
+
+    return new PageState(contentStream, yPosition);
+  }
+
+  /** 세그먼트 텍스트를 줄바꿈 처리 */
+  private List<List<TextSegment>> wrapSegmentedText(
+      List<TextSegment> segments, FontSet fonts, float fontSize, float maxWidth)
+      throws IOException {
+    List<List<TextSegment>> result = new ArrayList<>();
+    List<TextSegment> currentLine = new ArrayList<>();
+    float currentWidth = 0;
+
+    for (TextSegment segment : segments) {
+      PDFont font = segment.isBold() ? fonts.getBoldFont() : fonts.getRegularFont();
+      String text = segment.text();
+      StringBuilder pending = new StringBuilder();
+
+      for (int i = 0; i < text.length(); i++) {
+        char c = text.charAt(i);
+        String testStr = pending.toString() + c;
+        float testWidth = getStringWidth(testStr, font, fontSize);
+        float charWidth = testWidth - getStringWidth(pending.toString(), font, fontSize);
+
+        if (currentWidth + charWidth > maxWidth && !currentLine.isEmpty()) {
+          // 현재 pending 텍스트를 현재 줄에 flush
+          if (!pending.isEmpty()) {
+            appendToLine(currentLine, pending.toString(), segment.isBold());
+            pending.setLength(0);
+          }
+          result.add(currentLine);
+          currentLine = new ArrayList<>();
+          currentWidth = 0;
+        }
+
+        pending.append(c);
+        currentWidth += charWidth;
+      }
+
+      // flush remaining pending text
+      if (!pending.isEmpty()) {
+        appendToLine(currentLine, pending.toString(), segment.isBold());
+      }
+    }
+
+    if (!currentLine.isEmpty()) {
+      result.add(currentLine);
+    }
+
+    return result;
+  }
+
+  /** 현재 줄의 마지막 세그먼트와 같은 bold 속성이면 텍스트를 이어붙이고, 아니면 새 세그먼트 추가 */
+  private void appendToLine(List<TextSegment> line, String text, boolean bold) {
+    if (!line.isEmpty() && line.getLast().isBold() == bold) {
+      TextSegment last = line.getLast();
+      line.set(line.size() - 1, new TextSegment(last.text() + text, bold));
+    } else {
+      line.add(new TextSegment(text, bold));
+    }
+  }
+
+  /** 텍스트 세그먼트 (bold 여부 포함) */
+  private record TextSegment(String text, boolean bold) {
+    boolean isBold() {
+      return bold;
+    }
   }
 
   private List<String> wrapText(String text, PDFont font, float fontSize, float maxWidth)

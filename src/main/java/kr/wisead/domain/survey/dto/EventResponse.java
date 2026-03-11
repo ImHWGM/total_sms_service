@@ -26,6 +26,9 @@ public class EventResponse {
   private String privacyPolicyYn; // 개인정보취합 안내 노출여부
   private String privacyPolicyTtl; // 개인정보 취합 타이틀
   private String privacyPolicyDesc; // 개인정보 취합 안내
+  private String thirdPartyYn; // 개인정보 제3자 제공 동의 사용여부
+  private String thirdPartyTtl; // 개인정보 제3자 제공 동의 타이틀
+  private String thirdPartyDesc; // 개인정보 제3자 제공 동의 내용
   private String auth; // 인증 종류
   private String authKeyDesc; // 범용인증키 설명
   private String qrCode; // QR코드 사용여부
@@ -80,6 +83,9 @@ public class EventResponse {
         .privacyPolicyYn(entity.getPrivacyPolicyYn())
         .privacyPolicyTtl(entity.getPrivacyPolicyTtl())
         .privacyPolicyDesc(entity.getPrivacyPolicyDesc())
+        .thirdPartyYn(entity.getThirdPartyYn())
+        .thirdPartyTtl(entity.getThirdPartyTtl())
+        .thirdPartyDesc(entity.getThirdPartyDesc())
         .auth(entity.getAuth())
         .authKeyDesc(entity.getAuthKeyDesc())
         .qrCode(entity.getQrCode())

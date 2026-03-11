@@ -8,4 +8,7 @@ public class PrivacyPreviewRequest {
   private String title;
   private String content;
   private String language;
+  private String thirdPartyYn; // 제3자 제공 동의 사용여부
+  private String thirdPartyTtl; // 제3자 제공 동의 타이틀
+  private String thirdPartyContent; // 제3자 제공 동의 내용
 }

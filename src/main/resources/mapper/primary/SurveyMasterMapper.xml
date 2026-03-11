@@ -17,6 +17,9 @@
         M.PRIVACY_POLICY_YN as privacyPolicyYn,
         M.PRIVACY_POLICY_TTL as privacyPolicyTtl,
         M.PRIVACY_POLICY_DESC as privacyPolicyDesc,
+        M.THIRD_PARTY_YN as thirdPartyYn,
+        M.THIRD_PARTY_TTL as thirdPartyTtl,
+        M.THIRD_PARTY_DESC as thirdPartyDesc,
         M.AUTH as auth,
         M.AUTH_KEY_DESC as authKeyDesc,
         M.QR_CODE as qrCode,
@@ -138,12 +141,14 @@
             USER_SEQ, EVENT_CODE, EVENT_NAME, EVENT_EMPHASIS_YN,
             EVENT_DESC_IMG, EVENT_DESC, EVENT_TYPE, START_DATE, END_DATE,
             STATUS, PRIVACY_POLICY_YN, PRIVACY_POLICY_TTL, PRIVACY_POLICY_DESC,
+            THIRD_PARTY_YN, THIRD_PARTY_TTL, THIRD_PARTY_DESC,
             AUTH, QR_CODE, QR_CODE_IMG_PATH, AUTH_CODE_URL,
             END_MESSAGE, EVENT_END_IMG, VENUE, ORGANIZER, BADGE_PRINT_TYPE, NAMETAG_CONFIG, REG_DATE, REG_ID
         ) VALUES (
             #{userSeq}, #{eventCode}, #{eventName}, #{eventEmphasisYn},
             #{eventDescImg}, #{eventDesc}, #{eventType}, #{startDate}, #{endDate},
             #{status}, #{privacyPolicyYn}, #{privacyPolicyTtl}, #{privacyPolicyDesc},
+            #{thirdPartyYn}, #{thirdPartyTtl}, #{thirdPartyDesc},
             #{auth}, #{qrCode}, #{qrCodeImgPath}, #{authCodeUrl},
             #{endMessage}, #{eventEndImg}, #{venue}, #{organizer}, #{badgePrintType}, #{nametagConfig}, NOW(),
             #{regId}
@@ -165,6 +170,11 @@
             <if test="privacyPolicyYn != null and privacyPolicyYn == 'Y'.toString()">
                 PRIVACY_POLICY_TTL = #{privacyPolicyTtl},
                 PRIVACY_POLICY_DESC = #{privacyPolicyDesc},
+            </if>
+            THIRD_PARTY_YN = #{thirdPartyYn},
+            <if test="thirdPartyYn != null and thirdPartyYn == 'Y'.toString()">
+                THIRD_PARTY_TTL = #{thirdPartyTtl},
+                THIRD_PARTY_DESC = #{thirdPartyDesc},
             </if>
             AUTH = #{auth},
             QR_CODE = #{qrCode},

@@ -24,6 +24,9 @@ public class SurveyMaster {
   private String privacyPolicyYn; // 개인정보취합 안내 노출여부
   private String privacyPolicyTtl; // 개인정보 취합 타이틀
   private String privacyPolicyDesc; // 개인정보 취합 안내
+  private String thirdPartyYn; // 개인정보 제3자 제공 동의 사용여부
+  private String thirdPartyTtl; // 개인정보 제3자 제공 동의 타이틀
+  private String thirdPartyDesc; // 개인정보 제3자 제공 동의 내용
   private String auth; // 사용인증 종류
   private String authKeyDesc; // 범용인증키 설명 문구
   private String qrCode; // QR코드 사용여부
@@ -87,6 +90,9 @@ public class SurveyMaster {
       String privacyPolicyYn,
       String privacyPolicyTtl,
       String privacyPolicyDesc,
+      String thirdPartyYn,
+      String thirdPartyTtl,
+      String thirdPartyDesc,
       String auth,
       String qrCode,
       String endMessage,
@@ -107,6 +113,9 @@ public class SurveyMaster {
     this.privacyPolicyYn = privacyPolicyYn;
     this.privacyPolicyTtl = privacyPolicyTtl;
     this.privacyPolicyDesc = privacyPolicyDesc;
+    this.thirdPartyYn = thirdPartyYn;
+    this.thirdPartyTtl = thirdPartyTtl;
+    this.thirdPartyDesc = thirdPartyDesc;
     this.auth = auth;
     this.qrCode = qrCode;
     this.endMessage = endMessage;

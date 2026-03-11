@@ -11,6 +11,8 @@ import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.QrCodeUtils;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.AdminService;
+import kr.wisead.domain.event.entity.EventActionType;
+import kr.wisead.domain.event.entity.EventParticipant;
 import kr.wisead.domain.event.service.EventActionTypeService;
 import kr.wisead.domain.excel.service.ExcelService;
 import kr.wisead.domain.file.service.FileStorageService;
@@ -44,6 +46,8 @@ public class EventService {
   private final SurveyAnswerMapper surveyAnswerMapper;
   private final AuthUserMappingMapper authUserMappingMapper;
   private final UserMapper userMapper;
+  private final EventParticipantMapper eventParticipantMapper;
+  private final EventActionTypeMapper eventActionTypeMapper;
   private final ExcelService excelService;
   private final AdminService adminService;
   private final FileStorageService fileStorageService;
@@ -441,6 +445,73 @@ public class EventService {
     }
 
     return getEventDetail(eventSeq);
+  }
+
+  /** 행사 복사 */
+  @Transactional
+  public EventResponse copyEvent(Integer sourceEventSeq, String userId) {
+    SurveyMaster sourceEvent =
+        surveyMasterMapper
+            .selectByEventSeq(sourceEventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "복사할 행사를 찾을 수 없습니다."));
+
+    if (!"E".equals(sourceEvent.getEventType())) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "행사 타입(E)만 복사할 수 있습니다.");
+    }
+
+    Integer userLevel = adminService.getUserLevel(userId);
+    String actualUserId = userIdResolver.resolveUserId(userId);
+    adminService.validateModifyPermission(userId, userLevel, sourceEvent.getRegId());
+
+    Integer userSeq = userIdResolver.fromJwtUsername(userId);
+    if (userSeq == null) {
+      throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자를 찾을 수 없습니다.");
+    }
+
+    SurveyMaster copiedEvent =
+        SurveyMaster.builder()
+            .userSeq(userSeq)
+            .eventCode(generateEventCode())
+            .eventName(sourceEvent.getEventName())
+            .eventEmphasisYn(sourceEvent.getEventEmphasisYn())
+            .eventDescImg(sourceEvent.getEventDescImg())
+            .eventDesc(sourceEvent.getEventDesc())
+            .eventType(sourceEvent.getEventType())
+            .startDate(sourceEvent.getStartDate())
+            .endDate(sourceEvent.getEndDate())
+            .status("A")
+            .privacyPolicyYn(sourceEvent.getPrivacyPolicyYn())
+            .privacyPolicyTtl(sourceEvent.getPrivacyPolicyTtl())
+            .privacyPolicyDesc(sourceEvent.getPrivacyPolicyDesc())
+            .auth(sourceEvent.getAuth())
+            .qrCode("N")
+            .qrCodeImgPath(null)
+            .authCodeUrl(null)
+            .endMessage(sourceEvent.getEndMessage())
+            .eventEndImg(sourceEvent.getEventEndImg())
+            .venue(sourceEvent.getVenue())
+            .organizer(sourceEvent.getOrganizer())
+            .badgePrintType(null)
+            .nametagConfig(null)
+            .regId(actualUserId)
+            .build();
+
+    surveyMasterMapper.insert(copiedEvent);
+
+    if (sourceEvent.getAuthKeyDesc() != null && !sourceEvent.getAuthKeyDesc().isBlank()) {
+      surveyMasterMapper.updateAuthKeyDesc(copiedEvent.getEventSeq(), sourceEvent.getAuthKeyDesc());
+    }
+
+    copyEventActionTypes(sourceEventSeq, copiedEvent.getEventSeq());
+    copyEventParticipants(sourceEventSeq, copiedEvent.getEventSeq(), actualUserId);
+
+    log.info(
+        "행사 복사 완료 - sourceEventSeq: {}, copiedEventSeq: {}",
+        sourceEventSeq,
+        copiedEvent.getEventSeq());
+
+    return getEventDetail(copiedEvent.getEventSeq());
   }
 
   /** 이벤트 상태 변경 */
@@ -870,6 +941,109 @@ public class EventService {
   /** 이벤트 코드 생성 */
   private String generateEventCode() {
     return UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
+  }
+
+  private void copyEventParticipants(
+      Integer sourceEventSeq, Integer targetEventSeq, String actualUserId) {
+    List<EventParticipant> sourceParticipants = eventParticipantMapper.selectByEventSeq(sourceEventSeq);
+    if (sourceParticipants.isEmpty()) {
+      return;
+    }
+
+    Map<Integer, SurveyUser> sourceUserMap =
+        surveyUserMapper.selectByEventSeq(sourceEventSeq).stream()
+            .collect(Collectors.toMap(SurveyUser::getSeq, user -> user));
+
+    Map<Integer, Integer> surveyUserSeqMap = new HashMap<>();
+    for (EventParticipant sourceParticipant : sourceParticipants) {
+      SurveyUser sourceUser = sourceUserMap.get(sourceParticipant.getSurveyUserSeq());
+      if (sourceUser == null) {
+        continue;
+      }
+
+      SurveyUser copiedUser =
+          SurveyUser.builder()
+              .eventSeq(targetEventSeq)
+              .userKey(UUID.randomUUID().toString().replace("-", ""))
+              .userName(sourceUser.getUserName())
+              .userPhone(sourceUser.getUserPhone())
+              .resendUserPhone(
+                  sourceUser.getResendUserPhone() != null
+                      ? sourceUser.getResendUserPhone()
+                      : sourceUser.getUserPhone())
+              .userEmail(sourceUser.getUserEmail())
+              .regId(actualUserId)
+              .build();
+      surveyUserMapper.insertForParticipant(copiedUser);
+      surveyUserSeqMap.put(sourceUser.getSeq(), copiedUser.getSeq());
+    }
+
+    List<EventParticipant> copiedParticipants = new ArrayList<>();
+    Set<String> usedCheckCodes = new HashSet<>();
+    for (EventParticipant sourceParticipant : sourceParticipants) {
+      Integer copiedSurveyUserSeq = surveyUserSeqMap.get(sourceParticipant.getSurveyUserSeq());
+      if (copiedSurveyUserSeq == null) {
+        continue;
+      }
+
+      String checkCode = generateUniqueCheckCode(usedCheckCodes);
+      copiedParticipants.add(
+          EventParticipant.builder()
+              .surveyUserSeq(copiedSurveyUserSeq)
+              .eventSeq(targetEventSeq)
+              .checkCode(checkCode)
+              .department(sourceParticipant.getDepartment())
+              .position(sourceParticipant.getPosition())
+              .participantType(sourceParticipant.getParticipantType())
+              .memo(sourceParticipant.getMemo())
+              .nametagPrinted("N")
+              .attendTime(null)
+              .registType(sourceParticipant.getRegistType())
+              .build());
+    }
+
+    if (!copiedParticipants.isEmpty()) {
+      eventParticipantMapper.insertBatch(copiedParticipants);
+    }
+  }
+
+  private void copyEventActionTypes(Integer sourceEventSeq, Integer targetEventSeq) {
+    List<EventActionType> sourceActionTypes = eventActionTypeMapper.selectByEventSeq(sourceEventSeq);
+    if (sourceActionTypes == null || sourceActionTypes.isEmpty()) {
+      eventActionTypeService.createDefaultActionTypes(targetEventSeq);
+      return;
+    }
+
+    List<EventActionType> copiedActionTypes =
+        sourceActionTypes.stream()
+            .map(
+                actionType ->
+                    EventActionType.builder()
+                        .eventSeq(targetEventSeq)
+                        .actionCode(actionType.getActionCode())
+                        .actionName(actionType.getActionName())
+                        .requireAdminAuth(actionType.getRequireAdminAuth())
+                        .allowMultiple(actionType.getAllowMultiple())
+                        .sortOrder(actionType.getSortOrder())
+                        .useYn(actionType.getUseYn())
+                        .build())
+            .collect(Collectors.toList());
+
+    eventActionTypeMapper.insertBatch(copiedActionTypes);
+  }
+
+  private String generateUniqueCheckCode(Set<String> usedCheckCodes) {
+    String checkCode = EventParticipant.generateCheckCode();
+    int retryCount = 0;
+    while (usedCheckCodes.contains(checkCode)) {
+      if (++retryCount > 10) {
+        throw new BusinessException(
+            ErrorCode.INTERNAL_ERROR, "참가자 체크코드 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      }
+      checkCode = EventParticipant.generateCheckCode();
+    }
+    usedCheckCodes.add(checkCode);
+    return checkCode;
   }
 
   /** 만료된 이벤트 상태 업데이트 (배치용) */

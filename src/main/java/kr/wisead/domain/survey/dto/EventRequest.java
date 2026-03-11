@@ -36,6 +36,12 @@ public class EventRequest {
 
   private String privacyPolicyDesc; // 개인정보 취합 안내
 
+  private String thirdPartyYn; // 개인정보 제3자 제공 동의 사용여부
+
+  private String thirdPartyTtl; // 개인정보 제3자 제공 동의 타이틀
+
+  private String thirdPartyDesc; // 개인정보 제3자 제공 동의 내용
+
   @NotBlank(message = "인증 종류는 필수입니다.")
   private String auth; // 인증 종류
 

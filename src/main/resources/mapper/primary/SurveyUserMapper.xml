@@ -648,6 +648,9 @@
             M.PRIVACY_POLICY_YN as privacyPolicyYn,
             M.PRIVACY_POLICY_TTL as privacyPolicyTtl,
             M.PRIVACY_POLICY_DESC as privacyPolicyDesc,
+            M.THIRD_PARTY_YN as thirdPartyYn,
+            M.THIRD_PARTY_TTL as thirdPartyTtl,
+            M.THIRD_PARTY_DESC as thirdPartyDesc,
         USR.CORP_NAME as corpName,
         EP.DEPARTMENT as department,
         EP.POSITION as position

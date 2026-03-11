@@ -41,6 +41,9 @@ public class SurveyUserResponse {
   private String privacyPolicyYn; // 개인정보취합 안내 노출여부
   private String privacyPolicyTtl; // 개인정보 취합 타이틀
   private String privacyPolicyDesc; // 개인정보 취합 안내
+  private String thirdPartyYn; // 개인정보 제3자 제공 동의 사용여부
+  private String thirdPartyTtl; // 개인정보 제3자 제공 동의 타이틀
+  private String thirdPartyDesc; // 개인정보 제3자 제공 동의 내용
   private String corpName; // 고객사명
   // 추가
   private String department; // 소속

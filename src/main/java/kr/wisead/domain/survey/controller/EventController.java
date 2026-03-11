@@ -119,6 +119,15 @@ public class EventController {
     return ApiResponse.success(Map.of("qrCodeImgPath", qrCodeImgPath), "QR 코드가 생성되었습니다.");
   }
 
+  /** 행사 복사 */
+  @PostMapping("/{eventSeq}/copy")
+  public ApiResponse<EventResponse> copyEvent(
+      @AuthenticationPrincipal UserDetails userDetails, @PathVariable Integer eventSeq) {
+    String userId = userDetails.getUsername();
+    EventResponse response = eventService.copyEvent(eventSeq, userId);
+    return ApiResponse.success(response, "행사가 복사되었습니다.");
+  }
+
   /** 설문 통계 조회 */
   @GetMapping("/{eventSeq}/statistics")
   public ApiResponse<SurveyStatisticsResponse> getStatistics(@PathVariable Integer eventSeq) {

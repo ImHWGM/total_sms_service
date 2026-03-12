@@ -276,9 +276,7 @@ public class PrivacyConsentPdfService {
       String thirdPartyContent)
       throws Exception {
     boolean hasThirdParty =
-        "Y".equals(thirdPartyYn)
-            && thirdPartyContent != null
-            && !thirdPartyContent.isEmpty();
+        "Y".equals(thirdPartyYn) && thirdPartyContent != null && !thirdPartyContent.isEmpty();
 
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -340,6 +338,82 @@ public class PrivacyConsentPdfService {
             contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language, false);
         yPosition -= LINE_HEIGHT;
 
+        // 제3자 제공 동의 섹션 (같은 페이지 흐름으로 이어서 출력)
+        if (hasThirdParty) {
+          PageState sepState = drawSeparatorOrNewPage(document, contentStream, yPosition);
+          contentStream = sepState.getContentStream();
+          yPosition = sepState.getYPosition();
+
+          // 제3자 제공 동의 제목
+          String tpTitle = "en".equals(language) ? PDF_TITLE_THIRD_PARTY_EN : PDF_TITLE_THIRD_PARTY;
+          float tpTitleWidth = getStringWidth(tpTitle, fonts.getBoldFont(), TITLE_FONT_SIZE);
+          float tpTitleX = (PAGE_WIDTH - tpTitleWidth) / 2;
+          contentStream.beginText();
+          contentStream.setFont(fonts.getBoldFont(), TITLE_FONT_SIZE);
+          contentStream.newLineAtOffset(tpTitleX, yPosition);
+          contentStream.showText(ensureSafeText(tpTitle, fonts.getBoldFont()));
+          contentStream.endText();
+          yPosition -= LINE_HEIGHT;
+
+          // 이벤트명
+          String tpEventNameText =
+              "("
+                  + (thirdPartyTtl != null && !thirdPartyTtl.trim().isEmpty()
+                      ? thirdPartyTtl
+                      : (title != null && !title.trim().isEmpty() ? title : "[이벤트명]"))
+                  + ")";
+          float tpEventNameWidth =
+              getStringWidth(tpEventNameText, fonts.getRegularFont(), FONT_SIZE);
+          float tpEventNameX = (PAGE_WIDTH - tpEventNameWidth) / 2;
+          contentStream.beginText();
+          contentStream.setFont(fonts.getRegularFont(), FONT_SIZE);
+          contentStream.newLineAtOffset(tpEventNameX, yPosition);
+          contentStream.showText(ensureSafeText(tpEventNameText, fonts.getRegularFont()));
+          contentStream.endText();
+          yPosition -= LINE_HEIGHT * 2;
+
+          // 제3자 제공 동의 내용 (bold 태그 지원)
+          PageState tpPageState =
+              writeTextWithBoldAndPaging(
+                  document,
+                  contentStream,
+                  fonts,
+                  FONT_SIZE,
+                  MARGIN,
+                  yPosition,
+                  LINE_HEIGHT,
+                  thirdPartyContent,
+                  CONTENT_WIDTH,
+                  PAGE_HEIGHT,
+                  PAGE_WIDTH);
+          contentStream = tpPageState.getContentStream();
+          yPosition = tpPageState.getYPosition();
+          yPosition -= LINE_HEIGHT;
+
+          // 페이지 하단 체크
+          if (yPosition < MARGIN + LINE_HEIGHT) {
+            contentStream.close();
+            PDPage newPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
+            document.addPage(newPage);
+            contentStream = new PDPageContentStream(document, newPage);
+            yPosition = PAGE_HEIGHT - MARGIN;
+          }
+
+          // 제3자 제공 동의 체크박스
+          writeAgreeCheckboxText(
+              contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language, true);
+          yPosition -= LINE_HEIGHT;
+        }
+
+        // 페이지 하단 체크: 안내문구(1) + 여백(2) + 날짜(1) + 이름(1) = 최소 4줄 필요
+        if (yPosition < MARGIN + LINE_HEIGHT * 4) {
+          contentStream.close();
+          PDPage newPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
+          document.addPage(newPage);
+          contentStream = new PDPageContentStream(document, newPage);
+          yPosition = PAGE_HEIGHT - MARGIN;
+        }
+
         // 동의 방식 안내 문구
         String consentMethodNotice = getConsentMethodNotice(language);
         float noticeWidth =
@@ -389,89 +463,6 @@ public class PrivacyConsentPdfService {
 
       } finally {
         contentStream.close();
-      }
-
-      // 제3자 제공 동의 페이지 추가 (같은 document에 바로 추가)
-      if (hasThirdParty) {
-        PDPage tpPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
-        document.addPage(tpPage);
-        PDPageContentStream tpContentStream = new PDPageContentStream(document, tpPage);
-        float tpYPosition = PAGE_HEIGHT - MARGIN;
-
-        try {
-          // 제3자 제공 동의 제목
-          String tpTitle =
-              "en".equals(language) ? PDF_TITLE_THIRD_PARTY_EN : PDF_TITLE_THIRD_PARTY;
-          float tpTitleWidth = getStringWidth(tpTitle, fonts.getBoldFont(), TITLE_FONT_SIZE);
-          float tpTitleX = (PAGE_WIDTH - tpTitleWidth) / 2;
-          tpContentStream.beginText();
-          tpContentStream.setFont(fonts.getBoldFont(), TITLE_FONT_SIZE);
-          tpContentStream.newLineAtOffset(tpTitleX, tpYPosition);
-          tpContentStream.showText(ensureSafeText(tpTitle, fonts.getBoldFont()));
-          tpContentStream.endText();
-          tpYPosition -= LINE_HEIGHT;
-
-          // 이벤트명
-          String tpEventNameText =
-              "("
-                  + (thirdPartyTtl != null && !thirdPartyTtl.trim().isEmpty()
-                      ? thirdPartyTtl
-                      : (title != null && !title.trim().isEmpty() ? title : "[이벤트명]"))
-                  + ")";
-          float tpEventNameWidth =
-              getStringWidth(tpEventNameText, fonts.getRegularFont(), FONT_SIZE);
-          float tpEventNameX = (PAGE_WIDTH - tpEventNameWidth) / 2;
-          tpContentStream.beginText();
-          tpContentStream.setFont(fonts.getRegularFont(), FONT_SIZE);
-          tpContentStream.newLineAtOffset(tpEventNameX, tpYPosition);
-          tpContentStream.showText(ensureSafeText(tpEventNameText, fonts.getRegularFont()));
-          tpContentStream.endText();
-          tpYPosition -= LINE_HEIGHT * 2;
-
-          // 제3자 제공 동의 내용 (bold 태그 지원)
-          PageState tpPageState =
-              writeTextWithBoldAndPaging(
-                  document,
-                  tpContentStream,
-                  fonts,
-                  FONT_SIZE,
-                  MARGIN,
-                  tpYPosition,
-                  LINE_HEIGHT,
-                  thirdPartyContent,
-                  CONTENT_WIDTH,
-                  PAGE_HEIGHT,
-                  PAGE_WIDTH);
-          tpContentStream = tpPageState.getContentStream();
-          tpYPosition = tpPageState.getYPosition();
-          tpYPosition -= LINE_HEIGHT;
-
-          // 체크박스
-          if (tpYPosition < MARGIN + LINE_HEIGHT) {
-            tpContentStream.close();
-            PDPage newPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
-            document.addPage(newPage);
-            tpContentStream = new PDPageContentStream(document, newPage);
-            tpYPosition = PAGE_HEIGHT - MARGIN;
-          }
-          writeAgreeCheckboxText(
-              tpContentStream, fonts, FONT_SIZE, PAGE_WIDTH, tpYPosition, language, true);
-          tpYPosition -= LINE_HEIGHT;
-
-          // 미리보기 안내
-          String tpPreviewNotice = getPreviewNotice(language);
-          float tpPreviewNoticeWidth =
-              getStringWidth(tpPreviewNotice, fonts.getRegularFont(), SMALL_FONT_SIZE);
-          float tpPreviewNoticeX = PAGE_WIDTH - MARGIN - tpPreviewNoticeWidth;
-          tpContentStream.beginText();
-          tpContentStream.setFont(fonts.getRegularFont(), SMALL_FONT_SIZE);
-          tpContentStream.setNonStrokingColor(Color.GRAY);
-          tpContentStream.newLineAtOffset(tpPreviewNoticeX, tpYPosition);
-          tpContentStream.showText(ensureSafeText(tpPreviewNotice, fonts.getRegularFont()));
-          tpContentStream.endText();
-        } finally {
-          tpContentStream.close();
-        }
       }
 
       document.save(baos);
@@ -558,14 +549,11 @@ public class PrivacyConsentPdfService {
             contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language, false);
         yPosition -= LINE_HEIGHT;
 
-        // 제3자 제공 동의 섹션 (별도)
+        // 제3자 제공 동의 섹션 (같은 페이지 흐름으로 이어서 출력)
         if ("Y".equals(event.getThirdPartyYn())) {
-          // 새 페이지에서 시작
-          contentStream.close();
-          PDPage thirdPartyPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
-          document.addPage(thirdPartyPage);
-          contentStream = new PDPageContentStream(document, thirdPartyPage);
-          yPosition = PAGE_HEIGHT - MARGIN;
+          PageState sepState = drawSeparatorOrNewPage(document, contentStream, yPosition);
+          contentStream = sepState.getContentStream();
+          yPosition = sepState.getYPosition();
 
           // 제3자 제공 동의 제목
           String thirdPartyTitle =
@@ -731,6 +719,28 @@ public class PrivacyConsentPdfService {
     }
 
     return baos.toByteArray();
+  }
+
+  /** 구분선을 그리거나, 공간 부족 시 새 페이지로 이동. 제3자 제공 동의 섹션 앞에 사용. */
+  private PageState drawSeparatorOrNewPage(
+      PDDocument document, PDPageContentStream contentStream, float yPosition) throws IOException {
+    yPosition -= LINE_HEIGHT / 2;
+    // 제목(1) + 이벤트명(1) + 여백(1) + 내용 최소(1) + 체크박스(1) = 5줄 필요
+    if (yPosition < MARGIN + LINE_HEIGHT * 5) {
+      contentStream.close();
+      PDPage newPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
+      document.addPage(newPage);
+      contentStream = new PDPageContentStream(document, newPage);
+      yPosition = PAGE_HEIGHT - MARGIN;
+    } else {
+      contentStream.setStrokingColor(Color.LIGHT_GRAY);
+      contentStream.moveTo(MARGIN, yPosition);
+      contentStream.lineTo(PAGE_WIDTH - MARGIN, yPosition);
+      contentStream.stroke();
+      contentStream.setStrokingColor(Color.BLACK);
+    }
+    yPosition -= LINE_HEIGHT;
+    return new PageState(contentStream, yPosition);
   }
 
   private FontSet loadFonts(PDDocument document) throws Exception {

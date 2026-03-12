@@ -46,14 +46,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class PrivacyConsentPdfService {
 
   private static final String PDF_TITLE = "개인정보 수집·이용 동의서";
-  private static final String PDF_TITLE_THIRD_PARTY = "개인정보 제3자 제공 동의서";
+
   private static final String CONSENT_METHOD_NOTICE = "※ 동의 방식: 온라인 설문 참여 시 체크박스를 통한 동의";
 
   // English constants
   private static final String PDF_TITLE_EN =
       "Consent for Collection and Use of Personal Information";
-  private static final String PDF_TITLE_THIRD_PARTY_EN =
-      "Consent for Third-Party Provision of Personal Information";
+
   private static final String CONSENT_METHOD_NOTICE_EN =
       "* Consent method: Consent via checkbox during online survey participation";
 
@@ -301,16 +300,11 @@ public class PrivacyConsentPdfService {
         contentStream.endText();
         yPosition -= LINE_HEIGHT;
 
-        // 이벤트명
-        String eventNameText =
-            "(" + (title != null && !title.trim().isEmpty() ? title : "[이벤트명]") + ")";
-        float eventNameWidth = getStringWidth(eventNameText, fonts.getRegularFont(), FONT_SIZE);
-        float eventNameX = (PAGE_WIDTH - eventNameWidth) / 2;
-        contentStream.beginText();
-        contentStream.setFont(fonts.getRegularFont(), FONT_SIZE);
-        contentStream.newLineAtOffset(eventNameX, yPosition);
-        contentStream.showText(ensureSafeText(eventNameText, fonts.getRegularFont()));
-        contentStream.endText();
+        // 섹션 번호 + 제목
+        String previewSectionNumber = hasThirdParty ? "1. " : "";
+        String previewSectionTitle =
+            previewSectionNumber + (title != null && !title.trim().isEmpty() ? title : "[제목]");
+        writeSectionTitle(contentStream, fonts, previewSectionTitle, yPosition);
         yPosition -= LINE_HEIGHT * 2;
 
         // 내용 (bold 태그 지원)
@@ -338,38 +332,23 @@ public class PrivacyConsentPdfService {
             contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language, false);
         yPosition -= LINE_HEIGHT;
 
+        // 동의 방식 안내 문구
+        writeConsentMethodNotice(contentStream, fonts, yPosition, language);
+        yPosition -= LINE_HEIGHT;
+
         // 제3자 제공 동의 섹션 (같은 페이지 흐름으로 이어서 출력)
         if (hasThirdParty) {
           PageState sepState = drawSeparatorOrNewPage(document, contentStream, yPosition);
           contentStream = sepState.getContentStream();
           yPosition = sepState.getYPosition();
 
-          // 제3자 제공 동의 제목
-          String tpTitle = "en".equals(language) ? PDF_TITLE_THIRD_PARTY_EN : PDF_TITLE_THIRD_PARTY;
-          float tpTitleWidth = getStringWidth(tpTitle, fonts.getBoldFont(), TITLE_FONT_SIZE);
-          float tpTitleX = (PAGE_WIDTH - tpTitleWidth) / 2;
-          contentStream.beginText();
-          contentStream.setFont(fonts.getBoldFont(), TITLE_FONT_SIZE);
-          contentStream.newLineAtOffset(tpTitleX, yPosition);
-          contentStream.showText(ensureSafeText(tpTitle, fonts.getBoldFont()));
-          contentStream.endText();
-          yPosition -= LINE_HEIGHT;
-
-          // 이벤트명
-          String tpEventNameText =
-              "("
+          // 2. 제3자 제공 동의 제목
+          String tpPreviewTitle =
+              "2. "
                   + (thirdPartyTtl != null && !thirdPartyTtl.trim().isEmpty()
                       ? thirdPartyTtl
-                      : (title != null && !title.trim().isEmpty() ? title : "[이벤트명]"))
-                  + ")";
-          float tpEventNameWidth =
-              getStringWidth(tpEventNameText, fonts.getRegularFont(), FONT_SIZE);
-          float tpEventNameX = (PAGE_WIDTH - tpEventNameWidth) / 2;
-          contentStream.beginText();
-          contentStream.setFont(fonts.getRegularFont(), FONT_SIZE);
-          contentStream.newLineAtOffset(tpEventNameX, yPosition);
-          contentStream.showText(ensureSafeText(tpEventNameText, fonts.getRegularFont()));
-          contentStream.endText();
+                      : "[제목]");
+          writeSectionTitle(contentStream, fonts, tpPreviewTitle, yPosition);
           yPosition -= LINE_HEIGHT * 2;
 
           // 제3자 제공 동의 내용 (bold 태그 지원)
@@ -403,28 +382,21 @@ public class PrivacyConsentPdfService {
           writeAgreeCheckboxText(
               contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language, true);
           yPosition -= LINE_HEIGHT;
+
+          // 동의 방식 안내 문구
+          writeConsentMethodNotice(contentStream, fonts, yPosition, language);
+          yPosition -= LINE_HEIGHT;
         }
 
-        // 페이지 하단 체크: 안내문구(1) + 여백(2) + 날짜(1) + 이름(1) = 최소 4줄 필요
-        if (yPosition < MARGIN + LINE_HEIGHT * 4) {
+        // 페이지 하단 체크: 여백(1) + 날짜(1) + 이름(1) = 최소 3줄 필요
+        if (yPosition < MARGIN + LINE_HEIGHT * 3) {
           contentStream.close();
           PDPage newPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
           document.addPage(newPage);
           contentStream = new PDPageContentStream(document, newPage);
           yPosition = PAGE_HEIGHT - MARGIN;
         }
-
-        // 동의 방식 안내 문구
-        String consentMethodNotice = getConsentMethodNotice(language);
-        float noticeWidth =
-            getStringWidth(consentMethodNotice, fonts.getRegularFont(), SMALL_FONT_SIZE);
-        float noticeX = (PAGE_WIDTH - noticeWidth) / 2;
-        contentStream.beginText();
-        contentStream.setFont(fonts.getRegularFont(), SMALL_FONT_SIZE);
-        contentStream.newLineAtOffset(noticeX, yPosition);
-        contentStream.showText(ensureSafeText(consentMethodNotice, fonts.getRegularFont()));
-        contentStream.endText();
-        yPosition -= LINE_HEIGHT * 2;
+        yPosition -= LINE_HEIGHT;
 
         // 날짜 및 이름
         SimpleDateFormat sdf =
@@ -503,15 +475,10 @@ public class PrivacyConsentPdfService {
         contentStream.endText();
         yPosition -= LINE_HEIGHT;
 
-        // 이벤트 정보
-        String eventNameText = "(" + event.getEventName() + ")";
-        float eventNameWidth = getStringWidth(eventNameText, fonts.getRegularFont(), FONT_SIZE);
-        float eventNameX = (PAGE_WIDTH - eventNameWidth) / 2;
-        contentStream.beginText();
-        contentStream.setFont(fonts.getRegularFont(), FONT_SIZE);
-        contentStream.newLineAtOffset(eventNameX, yPosition);
-        contentStream.showText(ensureSafeText(eventNameText, fonts.getRegularFont()));
-        contentStream.endText();
+        // 섹션 번호 + 제목
+        String sectionNumber = "Y".equals(event.getThirdPartyYn()) ? "1. " : "";
+        String sectionTitle = sectionNumber + event.getPrivacyPolicyTtl();
+        writeSectionTitle(contentStream, fonts, sectionTitle, yPosition);
         yPosition -= LINE_HEIGHT * 2;
 
         // 개인정보 처리방침 내용 (bold 태그 지원)
@@ -549,33 +516,19 @@ public class PrivacyConsentPdfService {
             contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language, false);
         yPosition -= LINE_HEIGHT;
 
+        // 동의 방식 안내 문구
+        writeConsentMethodNotice(contentStream, fonts, yPosition, language);
+        yPosition -= LINE_HEIGHT;
+
         // 제3자 제공 동의 섹션 (같은 페이지 흐름으로 이어서 출력)
         if ("Y".equals(event.getThirdPartyYn())) {
           PageState sepState = drawSeparatorOrNewPage(document, contentStream, yPosition);
           contentStream = sepState.getContentStream();
           yPosition = sepState.getYPosition();
 
-          // 제3자 제공 동의 제목
-          String thirdPartyTitle =
-              "en".equals(language) ? PDF_TITLE_THIRD_PARTY_EN : PDF_TITLE_THIRD_PARTY;
-          float tpTitleWidth =
-              getStringWidth(thirdPartyTitle, fonts.getBoldFont(), TITLE_FONT_SIZE);
-          float tpTitleX = (PAGE_WIDTH - tpTitleWidth) / 2;
-          contentStream.beginText();
-          contentStream.setFont(fonts.getBoldFont(), TITLE_FONT_SIZE);
-          contentStream.newLineAtOffset(tpTitleX, yPosition);
-          contentStream.showText(ensureSafeText(thirdPartyTitle, fonts.getBoldFont()));
-          contentStream.endText();
-          yPosition -= LINE_HEIGHT;
-
-          // 이벤트명
-          contentStream.beginText();
-          contentStream.setFont(fonts.getRegularFont(), FONT_SIZE);
-          float tpEventNameWidth = getStringWidth(eventNameText, fonts.getRegularFont(), FONT_SIZE);
-          float tpEventNameX = (PAGE_WIDTH - tpEventNameWidth) / 2;
-          contentStream.newLineAtOffset(tpEventNameX, yPosition);
-          contentStream.showText(ensureSafeText(eventNameText, fonts.getRegularFont()));
-          contentStream.endText();
+          // 2. 제3자 제공 동의 제목
+          String tpSectionTitle = "2. " + event.getThirdPartyTtl();
+          writeSectionTitle(contentStream, fonts, tpSectionTitle, yPosition);
           yPosition -= LINE_HEIGHT * 2;
 
           // 제3자 제공 동의 내용 (bold 태그 지원)
@@ -612,20 +565,10 @@ public class PrivacyConsentPdfService {
           writeAgreeCheckboxText(
               contentStream, fonts, FONT_SIZE, PAGE_WIDTH, yPosition, language, true);
           yPosition -= LINE_HEIGHT;
-        }
 
-        // 서명 없는 버전일 때 동의 방식 안내 문구
-        if (!includeSignature) {
-          String consentMethodNotice = getConsentMethodNotice(language);
-          float noticeWidth =
-              getStringWidth(consentMethodNotice, fonts.getRegularFont(), SMALL_FONT_SIZE);
-          float noticeX = (PAGE_WIDTH - noticeWidth) / 2;
-          contentStream.beginText();
-          contentStream.setFont(fonts.getRegularFont(), SMALL_FONT_SIZE);
-          contentStream.newLineAtOffset(noticeX, yPosition);
-          contentStream.showText(ensureSafeText(consentMethodNotice, fonts.getRegularFont()));
-          contentStream.endText();
-          yPosition -= LINE_HEIGHT * 2;
+          // 동의 방식 안내 문구
+          writeConsentMethodNotice(contentStream, fonts, yPosition, language);
+          yPosition -= LINE_HEIGHT;
         }
 
         // 서명란
@@ -805,6 +748,31 @@ public class PrivacyConsentPdfService {
     if (codePoint == 0x00B7 || codePoint == 0x2022) return "-";
     if (codePoint < 128) return String.valueOf(c);
     return "?";
+  }
+
+  /** 섹션 번호 + 제목을 왼쪽 정렬 bold로 출력 */
+  private void writeSectionTitle(
+      PDPageContentStream contentStream, FontSet fonts, String title, float yPosition)
+      throws IOException {
+    contentStream.beginText();
+    contentStream.setFont(fonts.getBoldFont(), FONT_SIZE);
+    contentStream.newLineAtOffset(MARGIN, yPosition);
+    contentStream.showText(ensureSafeText(title, fonts.getBoldFont()));
+    contentStream.endText();
+  }
+
+  /** 동의 방식 안내 문구를 중앙 정렬 소폰트로 출력 */
+  private void writeConsentMethodNotice(
+      PDPageContentStream contentStream, FontSet fonts, float yPosition, String language)
+      throws IOException {
+    String notice = getConsentMethodNotice(language);
+    float noticeWidth = getStringWidth(notice, fonts.getRegularFont(), SMALL_FONT_SIZE);
+    float noticeX = (PAGE_WIDTH - noticeWidth) / 2;
+    contentStream.beginText();
+    contentStream.setFont(fonts.getRegularFont(), SMALL_FONT_SIZE);
+    contentStream.newLineAtOffset(noticeX, yPosition);
+    contentStream.showText(ensureSafeText(notice, fonts.getRegularFont()));
+    contentStream.endText();
   }
 
   private void writeAgreeCheckboxText(

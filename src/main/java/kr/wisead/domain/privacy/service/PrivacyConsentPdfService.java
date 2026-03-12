@@ -184,8 +184,7 @@ public class PrivacyConsentPdfService {
         }
 
         // 수집한 개인정보 항목 중 파기 여부 확인
-        PrivacyDestroyedResult destroyedResult =
-            checkPrivacyDestroyed(user, privacyTypes);
+        PrivacyDestroyedResult destroyedResult = checkPrivacyDestroyed(user, privacyTypes);
         if (destroyedResult.isDestroyed()) {
           destroyedDataCount++;
           continue;
@@ -260,8 +259,7 @@ public class PrivacyConsentPdfService {
     }
 
     // 수집한 개인정보 항목 중 파기 여부 확인
-    PrivacyDestroyedResult destroyedResult =
-        checkPrivacyDestroyed(user, privacyTypes);
+    PrivacyDestroyedResult destroyedResult = checkPrivacyDestroyed(user, privacyTypes);
     if (destroyedResult.isDestroyed()) {
       throw new IllegalArgumentException("개인정보가 파기된 데이터입니다.");
     }
@@ -302,12 +300,10 @@ public class PrivacyConsentPdfService {
         contentStream.newLineAtOffset(titleX, yPosition);
         contentStream.showText(ensureSafeText(pdfTitle, fonts.getBoldFont()));
         contentStream.endText();
-        yPosition -= LINE_HEIGHT;
+        yPosition -= LINE_HEIGHT * 3;
 
-        // 섹션 번호 + 제목
-        String previewSectionNumber = hasThirdParty ? "1. " : "";
-        String previewSectionTitle =
-            previewSectionNumber + (title != null && !title.trim().isEmpty() ? title : "[제목]");
+        // 섹션 제목
+        String previewSectionTitle = title != null && !title.trim().isEmpty() ? title : "[제목]";
         writeSectionTitle(contentStream, fonts, previewSectionTitle, yPosition);
         yPosition -= LINE_HEIGHT * 2;
 
@@ -346,12 +342,9 @@ public class PrivacyConsentPdfService {
           contentStream = sepState.getContentStream();
           yPosition = sepState.getYPosition();
 
-          // 2. 제3자 제공 동의 제목
+          // 제3자 제공 동의 제목
           String tpPreviewTitle =
-              "2. "
-                  + (thirdPartyTtl != null && !thirdPartyTtl.trim().isEmpty()
-                      ? thirdPartyTtl
-                      : "[제목]");
+              thirdPartyTtl != null && !thirdPartyTtl.trim().isEmpty() ? thirdPartyTtl : "[제목]";
           writeSectionTitle(contentStream, fonts, tpPreviewTitle, yPosition);
           yPosition -= LINE_HEIGHT * 2;
 
@@ -392,15 +385,15 @@ public class PrivacyConsentPdfService {
           yPosition -= LINE_HEIGHT;
         }
 
-        // 페이지 하단 체크: 여백(1) + 날짜(1) + 이름(1) = 최소 3줄 필요
-        if (yPosition < MARGIN + LINE_HEIGHT * 3) {
+        // 페이지 하단 체크: 여백(2) + 날짜(1) + 이름(1) = 최소 5줄 필요
+        if (yPosition < MARGIN + LINE_HEIGHT * 5) {
           contentStream.close();
           PDPage newPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
           document.addPage(newPage);
           contentStream = new PDPageContentStream(document, newPage);
           yPosition = PAGE_HEIGHT - MARGIN;
         }
-        yPosition -= LINE_HEIGHT;
+        yPosition -= LINE_HEIGHT * 3;
 
         // 날짜 및 이름
         SimpleDateFormat sdf =
@@ -477,11 +470,10 @@ public class PrivacyConsentPdfService {
         contentStream.newLineAtOffset(titleX, yPosition);
         contentStream.showText(ensureSafeText(pdfTitle, fonts.getBoldFont()));
         contentStream.endText();
-        yPosition -= LINE_HEIGHT;
+        yPosition -= LINE_HEIGHT * 3;
 
-        // 섹션 번호 + 제목
-        String sectionNumber = "Y".equals(event.getThirdPartyYn()) ? "1. " : "";
-        String sectionTitle = sectionNumber + event.getPrivacyPolicyTtl();
+        // 섹션 제목
+        String sectionTitle = event.getPrivacyPolicyTtl();
         writeSectionTitle(contentStream, fonts, sectionTitle, yPosition);
         yPosition -= LINE_HEIGHT * 2;
 
@@ -530,8 +522,8 @@ public class PrivacyConsentPdfService {
           contentStream = sepState.getContentStream();
           yPosition = sepState.getYPosition();
 
-          // 2. 제3자 제공 동의 제목
-          String tpSectionTitle = "2. " + event.getThirdPartyTtl();
+          // 제3자 제공 동의 제목
+          String tpSectionTitle = event.getThirdPartyTtl();
           writeSectionTitle(contentStream, fonts, tpSectionTitle, yPosition);
           yPosition -= LINE_HEIGHT * 2;
 
@@ -587,14 +579,15 @@ public class PrivacyConsentPdfService {
           consentDate = sdf.format(new Date());
         }
 
-        // 페이지 하단 체크
-        if (yPosition < MARGIN + LINE_HEIGHT * 3) {
+        // 페이지 하단 체크: 여백(2) + 날짜(1) + 이름(1) = 최소 5줄 필요
+        if (yPosition < MARGIN + LINE_HEIGHT * 5) {
           contentStream.close();
           PDPage newPage = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
           document.addPage(newPage);
           contentStream = new PDPageContentStream(document, newPage);
           yPosition = PAGE_HEIGHT - MARGIN;
         }
+        yPosition -= LINE_HEIGHT * 2;
 
         // 날짜 (오른쪽 정렬)
         float dateWidth = getStringWidth(consentDate, fonts.getRegularFont(), FONT_SIZE);
@@ -679,12 +672,6 @@ public class PrivacyConsentPdfService {
       document.addPage(newPage);
       contentStream = new PDPageContentStream(document, newPage);
       yPosition = PAGE_HEIGHT - MARGIN;
-    } else {
-      contentStream.setStrokingColor(Color.LIGHT_GRAY);
-      contentStream.moveTo(MARGIN, yPosition);
-      contentStream.lineTo(PAGE_WIDTH - MARGIN, yPosition);
-      contentStream.stroke();
-      contentStream.setStrokingColor(Color.BLACK);
     }
     yPosition -= LINE_HEIGHT;
     return new PageState(contentStream, yPosition);

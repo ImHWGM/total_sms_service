@@ -141,4 +141,15 @@
         </foreach>
     </insert>
 
+    <!-- 사용자의 특정 개인정보 타입 답변 조회 -->
+    <select id="selectAnswerByTypeDetail" resultType="String">
+        SELECT ANSWER
+        FROM SURVEY_ANSWER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND USER_SEQ = #{userSeq}
+        AND QUESTION_TYPE_DETAIL = #{questionTypeDetail}
+        ORDER BY ANSWER_SEQ DESC
+        LIMIT 1
+    </select>
+
 </mapper>

@@ -21,6 +21,7 @@ import kr.wisead.domain.privacy.dto.FontSet;
 import kr.wisead.domain.privacy.dto.PageState;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
+import kr.wisead.mapper.primary.SurveyAnswerMapper;
 import kr.wisead.mapper.primary.SurveyMasterMapper;
 import kr.wisead.mapper.primary.SurveyQuestionMapper;
 import kr.wisead.mapper.primary.SurveyUserMapper;
@@ -66,6 +67,7 @@ public class PrivacyConsentPdfService {
   private static final float LINE_HEIGHT = 18;
   private static final float CONTENT_WIDTH = PAGE_WIDTH - (MARGIN * 2);
 
+  private final SurveyAnswerMapper surveyAnswerMapper;
   private final SurveyMasterMapper surveyMasterMapper;
   private final SurveyQuestionMapper surveyQuestionMapper;
   private final SurveyUserMapper surveyUserMapper;
@@ -182,7 +184,8 @@ public class PrivacyConsentPdfService {
         }
 
         // 수집한 개인정보 항목 중 파기 여부 확인
-        PrivacyDestroyedResult destroyedResult = checkPrivacyDestroyed(user, privacyTypes);
+        PrivacyDestroyedResult destroyedResult =
+            checkPrivacyDestroyed(user, privacyTypes);
         if (destroyedResult.isDestroyed()) {
           destroyedDataCount++;
           continue;
@@ -257,7 +260,8 @@ public class PrivacyConsentPdfService {
     }
 
     // 수집한 개인정보 항목 중 파기 여부 확인
-    PrivacyDestroyedResult destroyedResult = checkPrivacyDestroyed(user, privacyTypes);
+    PrivacyDestroyedResult destroyedResult =
+        checkPrivacyDestroyed(user, privacyTypes);
     if (destroyedResult.isDestroyed()) {
       throw new IllegalArgumentException("개인정보가 파기된 데이터입니다.");
     }
@@ -1195,6 +1199,15 @@ public class PrivacyConsentPdfService {
       switch (type) {
         case "NE": // 이름
           decryptedValue = CryptoUtils.decryptAES256(user.getUserName());
+          // survey_user에 이름이 없으면 survey_answer에서 NE 타입 답변 조회 (QR 설문 등)
+          if (!isValidPrivacyData(decryptedValue)) {
+            String answerName =
+                surveyAnswerMapper.selectAnswerByTypeDetail(
+                    user.getEventSeq(), user.getSeq(), "NE");
+            if (answerName != null && !answerName.trim().isEmpty()) {
+              decryptedValue = answerName.trim();
+            }
+          }
           if (isValidPrivacyData(decryptedValue)) {
             hasAnyValidData = true;
             displayName = decryptedValue; // 이름을 표시용으로 우선 사용

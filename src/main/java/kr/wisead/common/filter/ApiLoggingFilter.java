@@ -69,6 +69,8 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
 
+    log.debug("[Filter Entry] {} {} contentType={}", request.getMethod(), request.getRequestURI(), request.getContentType());
+
     // 제외 경로 체크
     if (shouldExclude(request.getRequestURI())) {
       filterChain.doFilter(request, response);

@@ -55,6 +55,9 @@ public class EventService {
   private final EventActionTypeService eventActionTypeService;
   private final UserIdResolver userIdResolver;
 
+  @Value("${api.base.url:}")
+  private String apiBaseUrl;
+
   @Value("${upload.dir:./uploads}")
   private String uploadDir;
 
@@ -72,6 +75,11 @@ public class EventService {
 
     List<EventResponse> content =
         events.stream().map(EventResponse::from).collect(Collectors.toList());
+
+    // 이미지 URL을 절대 경로로 변환 (레거시 절대경로 정규화 포함)
+    if (apiBaseUrl != null && !apiBaseUrl.isEmpty()) {
+      content.forEach(r -> r.withFullImageUrls(apiBaseUrl));
+    }
 
     return PageResponse.of(content, request.getPageNum(), request.getAmount(), total);
   }
@@ -109,7 +117,14 @@ public class EventService {
                 })
             .collect(Collectors.toList());
 
-    return response.withQuestions(questionResponses);
+    response = response.withQuestions(questionResponses);
+
+    // 이미지 URL을 절대 경로로 변환 (레거시 절대경로 정규화 포함)
+    if (apiBaseUrl != null && !apiBaseUrl.isEmpty()) {
+      response.withFullImageUrls(apiBaseUrl);
+    }
+
+    return response;
   }
 
   /**

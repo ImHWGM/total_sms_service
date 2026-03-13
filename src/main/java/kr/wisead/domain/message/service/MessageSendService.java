@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import kr.wisead.common.exception.BusinessException;
@@ -904,13 +906,55 @@ public class MessageSendService {
     for (SurveyMessageRequest.Receiver receiver : receivers) {
       try {
         String phone = receiver.getNormalizedPhone();
+        Integer userSeq = receiver.getUserSeq();
+        String userKey = receiver.getUserKey();
+
+        // SURVEY_USER 자동 등록 (userSeq가 없는 경우)
+        if (userSeq == null && phone != null) {
+          try {
+            String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(phone));
+            // 기존 SURVEY_USER 조회 (같은 이벤트 + 같은 전화번호)
+            Optional<SurveyUser> existing =
+                surveyUserMapper.selectByResendUserPhone(request.getEventSeq(), encryptedPhone);
+            if (existing.isPresent()) {
+              userSeq = existing.get().getSeq();
+              if (userKey == null || userKey.isEmpty()) {
+                userKey = existing.get().getUserKey();
+              }
+            } else {
+              // 신규 SURVEY_USER 생성
+              String newUserKey =
+                  UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+              SurveyUser surveyUser =
+                  SurveyUser.builder()
+                      .eventSeq(request.getEventSeq())
+                      .userKey(newUserKey)
+                      .userPhone(encryptedPhone)
+                      .resendUserPhone(encryptedPhone)
+                      .delYn("N")
+                      .regId(regId)
+                      .build();
+              surveyUserMapper.insert(surveyUser);
+              userSeq = surveyUser.getSeq();
+              userKey = newUserKey;
+              log.info(
+                  "설문 대상자 자동 등록 - eventSeq: {}, phone: {}, userSeq: {}",
+                  request.getEventSeq(),
+                  phone,
+                  userSeq);
+            }
+          } catch (Exception e) {
+            log.warn("설문 대상자 자동 등록 실패 - phone: {}, error: {}", phone, e.getMessage());
+          }
+        }
+
         String text = request.getText();
 
         // 대치문자 및 유저키 처리
         text =
             applyReplaceChars(
                 text, receiver.getRepChar01(), receiver.getRepChar02(), receiver.getRepChar03());
-        text = applyUserKey(text, receiver.getUserKey());
+        text = applyUserKey(text, userKey);
 
         // URL 패턴을 찾아서 단축 URL로 변환
         text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);
@@ -924,7 +968,7 @@ public class MessageSendService {
                 request.getSubject(),
                 text,
                 request.getEventSeq(),
-                receiver.getUserSeq(),
+                userSeq,
                 txGroupId,
                 realUserId);
 
@@ -937,7 +981,7 @@ public class MessageSendService {
         msgQueueMapper.insertLms(msgQueue);
         recordSmsSend(
             request.getEventSeq(),
-            receiver.getUserSeq(),
+            userSeq,
             request.getSubject(),
             text,
             "1",

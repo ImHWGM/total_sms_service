@@ -69,18 +69,18 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
 
-    log.debug("[Filter Entry] {} {} contentType={}", request.getMethod(), request.getRequestURI(), request.getContentType());
-
     // 제외 경로 체크
     if (shouldExclude(request.getRequestURI())) {
       filterChain.doFilter(request, response);
       return;
     }
 
-    // Multipart 요청은 ContentCachingRequestWrapper로 감싸지 않음
-    // (스트림 소비 충돌로 파일 업로드 hang/timeout 발생 방지)
+    // OPTIONS(CORS preflight), Multipart 요청은 래핑하지 않음
+    // - OPTIONS: ContentCachingResponseWrapper가 CORS 응답 헤더 전달을 방해
+    // - Multipart: ContentCachingRequestWrapper가 InputStream 소비하여 파일 파싱 hang
     String contentType = request.getContentType();
-    if (contentType != null && contentType.regionMatches(true, 0, "multipart/", 0, 10)) {
+    if ("OPTIONS".equalsIgnoreCase(request.getMethod())
+        || (contentType != null && contentType.regionMatches(true, 0, "multipart/", 0, 10))) {
       filterChain.doFilter(request, response);
       return;
     }

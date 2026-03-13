@@ -75,6 +75,14 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
       return;
     }
 
+    // Multipart 요청은 ContentCachingRequestWrapper로 감싸지 않음
+    // (스트림 소비 충돌로 파일 업로드 hang/timeout 발생 방지)
+    String contentType = request.getContentType();
+    if (contentType != null && contentType.regionMatches(true, 0, "multipart/", 0, 10)) {
+      filterChain.doFilter(request, response);
+      return;
+    }
+
     // 요청/응답 래핑 (body 재사용 가능하도록)
     ContentCachingRequestWrapper wrappedRequest = new ContentCachingRequestWrapper(request);
     ContentCachingResponseWrapper wrappedResponse = new ContentCachingResponseWrapper(response);

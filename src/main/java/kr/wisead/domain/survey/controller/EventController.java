@@ -8,8 +8,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import kr.wisead.common.dto.DownloadVerifyRequest;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.service.DownloadVerifyService;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
@@ -36,6 +38,7 @@ public class EventController {
   private final AdminService adminService;
   private final UserIdResolver userIdResolver;
   private final ActionLogService actionLogService;
+  private final DownloadVerifyService downloadVerifyService;
 
   /** 이벤트 목록 조회 */
   @GetMapping
@@ -235,18 +238,18 @@ public class EventController {
   public ResponseEntity<byte[]> downloadEventResultExcel(
       @AuthenticationPrincipal UserDetails userDetails,
       @PathVariable Integer eventSeq,
-      @RequestBody(required = false) Map<String, String> body,
+      @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       HttpServletRequest httpRequest) {
 
-    String userId = userIdResolver.resolveUserId(userDetails.getUsername());
+    // 비밀번호 검증
+    String userId = downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
     String userName = userIdResolver.resolveUserName(userId);
 
     log.info("이벤트 결과 엑셀 다운로드 요청 - eventSeq: {}, 사용자: {}", eventSeq, userId);
 
     // 활동 로그 기록
-    String reason = body != null ? body.get("reason") : null;
     actionLogService.logDownloadAction(
-        userId, userName, "이벤트 결과 엑셀다운로드", "R", reason, httpRequest);
+        userId, userName, "이벤트 결과 엑셀다운로드", "R", verifyRequest.getReason(), httpRequest);
 
     byte[] content = eventService.generateEventResultExcel(eventSeq);
 

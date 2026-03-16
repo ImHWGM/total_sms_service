@@ -2,14 +2,17 @@ package kr.wisead.domain.history.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import kr.wisead.common.dto.DownloadVerifyRequest;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.service.DownloadVerifyService;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.ActionLogService;
@@ -39,6 +42,7 @@ public class SendHistoryController {
   private final AdminService adminService;
   private final JwtTokenProvider jwtTokenProvider;
   private final UserIdResolver userIdResolver;
+  private final DownloadVerifyService downloadVerifyService;
 
   /** 발송 이력 목록 조회 GET /api/history/send */
   @GetMapping("/send")
@@ -83,19 +87,23 @@ public class SendHistoryController {
       @RequestParam(required = false) String type,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String sendFailure,
-      @RequestParam String reason,
+      @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       @RequestHeader("Authorization") String token,
       HttpServletRequest request,
       HttpServletResponse response)
       throws Exception {
 
     String accessToken = token.replace("Bearer ", "");
-    String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+    String userSeq = jwtTokenProvider.getUserId(accessToken);
+
+    // 비밀번호 검증
+    String userId = downloadVerifyService.verifyByJwtSubject(userSeq, verifyRequest.getPassword());
     String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
     Integer userLevel = adminService.getUserLevel(userId);
 
     // 다운로드 로그 기록
-    actionLogService.logDownloadAction(userId, userName, "발송 이력 다운로드", "D", reason, request);
+    actionLogService.logDownloadAction(
+        userId, userName, "발송 이력 다운로드", "D", verifyRequest.getReason(), request);
 
     // 권한에 따른 조회 대상 설정
     String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
@@ -225,24 +233,29 @@ public class SendHistoryController {
     return ApiResponse.success(deleteCount, deleteCount + "건이 삭제되었습니다.");
   }
 
-  /** 수신거부 엑셀 다운로드 GET /api/history/optout/download */
-  @GetMapping("/optout/download")
+  /** 수신거부 엑셀 다운로드 POST /api/history/optout/download */
+  @PostMapping("/optout/download")
   public void downloadOptOut(
       @RequestParam(required = false) String senderId,
       @RequestParam(required = false) String unsubscribeNumber,
+      @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       @RequestHeader("Authorization") String token,
       HttpServletRequest request,
       HttpServletResponse response)
       throws Exception {
 
     String accessToken = token.replace("Bearer ", "");
-    String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+    String userSeq = jwtTokenProvider.getUserId(accessToken);
+
+    // 비밀번호 검증
+    String userId = downloadVerifyService.verifyByJwtSubject(userSeq, verifyRequest.getPassword());
     String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
     Integer userLevel = adminService.getUserLevel(userId);
     String queryUserIds = adminService.determineQueryUserIds(userId, userLevel);
 
     // 다운로드 로그 기록
-    actionLogService.logDownloadAction(userId, userName, "수신거부 내역 다운로드", "D", "업무용", request);
+    actionLogService.logDownloadAction(
+        userId, userName, "수신거부 내역 다운로드", "D", verifyRequest.getReason(), request);
 
     // 전체 조회 (상한 제한 적용, 검색 조건 적용)
     PageResponse<BlockedSenderResponse> pageResponse =
@@ -298,5 +311,4 @@ public class SendHistoryController {
 
     log.info("수신거부 엑셀 다운로드 완료: userId={}, 건수={}", userId, blockedList.size());
   }
-
 }

@@ -8,9 +8,11 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import kr.wisead.common.dto.DownloadVerifyRequest;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.service.DownloadVerifyService;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.dto.*;
@@ -44,6 +46,7 @@ public class AdminController {
   private final ExcelService excelService;
   private final JwtTokenProvider jwtTokenProvider;
   private final UserIdResolver userIdResolver;
+  private final DownloadVerifyService downloadVerifyService;
 
   /** 관리자 계정 생성 POST /api/admin/account */
   @PostMapping("/account")
@@ -92,8 +95,8 @@ public class AdminController {
     return ApiResponse.success(response);
   }
 
-  /** 액션 로그 엑셀 다운로드 GET /api/admin/logs/download */
-  @GetMapping("/logs/download")
+  /** 액션 로그 엑셀 다운로드 POST /api/admin/logs/excel */
+  @PostMapping("/logs/excel")
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<byte[]> downloadActionLogsExcel(
       @RequestParam(required = false) String startDate,
@@ -101,15 +104,20 @@ public class AdminController {
       @RequestParam(required = false) String searchField,
       @RequestParam(required = false) String searchKeyword,
       @RequestParam(required = false) String actionType,
+      @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       @RequestHeader("Authorization") String token,
       HttpServletRequest httpRequest) {
 
     String accessToken = extractToken(token);
-    String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+    String userSeq = jwtTokenProvider.getUserId(accessToken);
+
+    // 비밀번호 검증
+    String userId = downloadVerifyService.verifyByJwtSubject(userSeq, verifyRequest.getPassword());
     String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
 
     // 다운로드 로그 기록
-    actionLogService.logDownloadAction(userId, userName, "로그관리 엑셀다운로드", "D", "업무용", httpRequest);
+    actionLogService.logDownloadAction(
+        userId, userName, "로그관리 엑셀다운로드", "D", verifyRequest.getReason(), httpRequest);
 
     ActionLogSearchRequest request =
         ActionLogSearchRequest.builder()
@@ -271,5 +279,4 @@ public class AdminController {
   private String extractToken(String authHeader) {
     return authHeader.replace(BEARER_PREFIX, "");
   }
-
 }

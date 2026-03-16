@@ -1,13 +1,16 @@
 package kr.wisead.domain.excel.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import kr.wisead.common.dto.DownloadVerifyRequest;
 import kr.wisead.common.response.ApiResponse;
+import kr.wisead.common.service.DownloadVerifyService;
 import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.UserIdResolver;
@@ -51,6 +54,7 @@ public class ExcelController {
   private final UserIdResolver userIdResolver;
   private final ActionLogService actionLogService;
   private final AdminService adminService;
+  private final DownloadVerifyService downloadVerifyService;
 
   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
   private static final DateTimeFormatter DATETIME_FORMATTER =
@@ -65,15 +69,17 @@ public class ExcelController {
     return userIdResolver.toUserId(userSeq);
   }
 
-  /** 통계 Excel 다운로드 GET /api/excel/statistics/download?startDate=2025-01-01&endDate=2025-01-31 */
-  @GetMapping("/statistics/download")
+  /** 통계 Excel 다운로드 POST /api/excel/statistics/download */
+  @PostMapping("/statistics/download")
   public ResponseEntity<byte[]> downloadStatisticsExcel(
       @AuthenticationPrincipal UserDetails userDetails,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
-      @RequestParam(required = false) String serviceType) {
+      @RequestParam(required = false) String serviceType,
+      @RequestBody @Valid DownloadVerifyRequest verifyRequest) {
 
-    String userId = extractUserId(userDetails);
+    // 비밀번호 검증
+    String userId = downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
 
     // 기본 날짜 설정
     LocalDate now = LocalDate.now();
@@ -142,18 +148,18 @@ public class ExcelController {
     }
   }
 
-  /**
-   * 과금 통계 Excel 다운로드 (다중 시트) GET
-   * /api/excel/billing/download?startDate=2025-01-01&endDate=2025-01-31
-   */
-  @GetMapping("/billing/download")
+  /** 과금 통계 Excel 다운로드 (다중 시트) POST /api/excel/billing/download */
+  @PostMapping("/billing/download")
   public ResponseEntity<byte[]> downloadBillingExcel(
       @AuthenticationPrincipal UserDetails userDetails,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
       @RequestParam(required = false) String userId,
-      @RequestParam(required = false) String reason,
+      @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       HttpServletRequest httpRequest) {
+
+    // 비밀번호 검증
+    downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
 
     String currentUserId = extractUserId(userDetails);
     User user = userMapper.findByUserId(currentUserId).orElseThrow();
@@ -163,7 +169,12 @@ public class ExcelController {
 
     // 활동 로그 기록
     actionLogService.logDownloadAction(
-        currentUserId, CryptoUtils.decryptName(user.getPerson()), "과금통계 엑셀다운로드", "R", reason, httpRequest);
+        currentUserId,
+        CryptoUtils.decryptName(user.getPerson()),
+        "과금통계 엑셀다운로드",
+        "R",
+        verifyRequest.getReason(),
+        httpRequest);
 
     // 기본 날짜 설정
     LocalDate now = LocalDate.now();
@@ -283,8 +294,8 @@ public class ExcelController {
     }
   }
 
-  /** 설문조사 참여현황 Excel 다운로드 GET /api/excel/survey/download */
-  @GetMapping("/survey/download")
+  /** 설문조사 참여현황 Excel 다운로드 POST /api/excel/survey/download */
+  @PostMapping("/survey/download")
   public ResponseEntity<byte[]> downloadSurveyExcel(
       @AuthenticationPrincipal UserDetails userDetails,
       @RequestParam(required = false) Integer eventSeq,
@@ -293,17 +304,23 @@ public class ExcelController {
       @RequestParam(required = false) String submissionStatus,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
-      @RequestParam(required = false) String reason,
+      @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       HttpServletRequest request) {
 
-    String userId = extractUserId(userDetails);
+    // 비밀번호 검증
+    String userId = downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
     User user = userMapper.findByUserId(userId).orElseThrow();
 
     log.info("[엑셀 다운로드 시작] 설문조사 참여현황 - 사용자: {}", userId);
 
     // 활동 로그 기록
     actionLogService.logDownloadAction(
-        userId, CryptoUtils.decryptName(user.getPerson()), "설문조사 참여현황 엑셀다운로드", "R", reason, request);
+        userId,
+        CryptoUtils.decryptName(user.getPerson()),
+        "설문조사 참여현황 엑셀다운로드",
+        "R",
+        verifyRequest.getReason(),
+        request);
 
     // 검색 조건 설정
     Map<String, Object> params = new HashMap<>();
@@ -368,8 +385,8 @@ public class ExcelController {
     }
   }
 
-  /** 개인정보취합 참여현황 Excel 다운로드 GET /api/excel/privacy/download */
-  @GetMapping("/privacy/download")
+  /** 개인정보취합 참여현황 Excel 다운로드 POST /api/excel/privacy/download */
+  @PostMapping("/privacy/download")
   public ResponseEntity<byte[]> downloadPrivacyExcel(
       @AuthenticationPrincipal UserDetails userDetails,
       @RequestParam(required = false) Integer eventSeq,
@@ -378,17 +395,23 @@ public class ExcelController {
       @RequestParam(required = false) String submissionStatus,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
-      @RequestParam(required = false) String reason,
+      @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       HttpServletRequest request) {
 
-    String userId = extractUserId(userDetails);
+    // 비밀번호 검증
+    String userId = downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
     User user = userMapper.findByUserId(userId).orElseThrow();
 
     log.info("[엑셀 다운로드 시작] 개인정보취합 참여현황 - 사용자: {}", userId);
 
     // 활동 로그 기록
     actionLogService.logDownloadAction(
-        userId, CryptoUtils.decryptName(user.getPerson()), "개인정보취합 참여현황 엑셀다운로드", "R", reason, request);
+        userId,
+        CryptoUtils.decryptName(user.getPerson()),
+        "개인정보취합 참여현황 엑셀다운로드",
+        "R",
+        verifyRequest.getReason(),
+        request);
 
     // 검색 조건 설정
     Map<String, Object> params = new HashMap<>();
@@ -486,7 +509,8 @@ public class ExcelController {
       @RequestBody SurveyExcelDownloadRequest downloadRequest,
       HttpServletRequest request) {
 
-    String userId = extractUserId(userDetails);
+    // 비밀번호 검증
+    String userId = downloadVerifyService.verify(userDetails, downloadRequest.getPassword());
     User user = userMapper.findByUserId(userId).orElseThrow();
 
     SurveyExcelDownloadRequest.DownloadType downloadType = downloadRequest.getDownloadType();
@@ -779,5 +803,4 @@ public class ExcelController {
     }
     return dateTime.toString();
   }
-
 }

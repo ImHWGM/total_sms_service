@@ -5,11 +5,18 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import kr.wisead.common.dto.DownloadVerifyRequest;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.service.DownloadVerifyService;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.ActionLogService;
@@ -27,237 +34,220 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-/**
- * 예약 메시지 Controller
- */
+/** 예약 메시지 Controller */
 @Slf4j
 @RestController
 @RequestMapping("/api/scheduled-messages")
 @RequiredArgsConstructor
 public class ScheduledMessageController {
 
-    private final ScheduledMessageService scheduledMessageService;
-    private final AdminService adminService;
-    private final JwtTokenProvider jwtTokenProvider;
-    private final UserIdResolver userIdResolver;
-    private final ActionLogService actionLogService;
+  private final ScheduledMessageService scheduledMessageService;
+  private final AdminService adminService;
+  private final JwtTokenProvider jwtTokenProvider;
+  private final UserIdResolver userIdResolver;
+  private final ActionLogService actionLogService;
+  private final DownloadVerifyService downloadVerifyService;
 
-    /**
-     * 예약 메시지 목록 조회
-     * GET /api/scheduled-messages
-     */
-    @GetMapping
-    public ApiResponse<PageResponse<ScheduledMessageResponse>> getScheduledMessages(
-            @RequestParam(required = false) String msgType,
-            @RequestParam(required = false) String searchText,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestHeader("Authorization") String token) {
+  /** 예약 메시지 목록 조회 GET /api/scheduled-messages */
+  @GetMapping
+  public ApiResponse<PageResponse<ScheduledMessageResponse>> getScheduledMessages(
+      @RequestParam(required = false) String msgType,
+      @RequestParam(required = false) String searchText,
+      @RequestParam(defaultValue = "1") int page,
+      @RequestParam(defaultValue = "10") int size,
+      @RequestHeader("Authorization") String token) {
 
-        String accessToken = token.replace("Bearer ", "");
-        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-        Integer userLevel = adminService.getUserLevel(userId);
+    String accessToken = token.replace("Bearer ", "");
+    String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+    Integer userLevel = adminService.getUserLevel(userId);
 
-        // 권한에 따른 조회 대상 설정
-        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
+    // 권한에 따른 조회 대상 설정
+    String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 
-        ScheduledMessageSearchRequest request = ScheduledMessageSearchRequest.builder()
-                .msgType(msgType)
-                .searchText(searchText)
-                .userId(queryUserId)
-                .page(page)
-                .size(size)
-                .build();
+    ScheduledMessageSearchRequest request =
+        ScheduledMessageSearchRequest.builder()
+            .msgType(msgType)
+            .searchText(searchText)
+            .userId(queryUserId)
+            .page(page)
+            .size(size)
+            .build();
 
-        PageResponse<ScheduledMessageResponse> response = scheduledMessageService.getScheduledMessages(request);
-        return ApiResponse.success(response);
-    }
+    PageResponse<ScheduledMessageResponse> response =
+        scheduledMessageService.getScheduledMessages(request);
+    return ApiResponse.success(response);
+  }
 
-    /**
-     * 예약 메시지 엑셀 다운로드
-     */
-    @PostMapping("/download")
-    public void downloadScheduledMessages(
-        @RequestParam(required = false) List<Integer> mSeqs, // 체크항목들의 식별자를 받기 위한 param
-        @RequestParam(required = false) String msgType,
-        @RequestParam(required = false) String searchText,
-        @RequestParam String reason,
-        @RequestHeader("Authorization") String token,
-        HttpServletRequest request,
-        HttpServletResponse response) throws Exception {
-        String accessToken = token.replace("Bearer ", "");
-        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-        String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
-        Integer userLevel = adminService.getUserLevel(userId);
-        // 1. 다운로드 로그 기록
-        actionLogService.logDownloadAction(userId, userName, "예약 리스트 다운로드", "D", reason, request);
+  /** 예약 메시지 엑셀 다운로드 */
+  @PostMapping("/download")
+  public void downloadScheduledMessages(
+      @RequestParam(required = false) List<Integer> mSeqs,
+      @RequestParam(required = false) String msgType,
+      @RequestParam(required = false) String searchText,
+      @RequestBody @Valid DownloadVerifyRequest verifyRequest,
+      @RequestHeader("Authorization") String token,
+      HttpServletRequest request,
+      HttpServletResponse response)
+      throws Exception {
+    String accessToken = token.replace("Bearer ", "");
+    String userSeq = jwtTokenProvider.getUserId(accessToken);
 
-        // 2. 데이터 조회
-        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
-        ScheduledMessageSearchRequest searchRequest = ScheduledMessageSearchRequest.builder()
+    // 비밀번호 검증
+    String userId = downloadVerifyService.verifyByJwtSubject(userSeq, verifyRequest.getPassword());
+    String userName = CryptoUtils.decryptName(jwtTokenProvider.getUserName(accessToken));
+    Integer userLevel = adminService.getUserLevel(userId);
+    // 1. 다운로드 로그 기록
+    actionLogService.logDownloadAction(
+        userId, userName, "예약 리스트 다운로드", "D", verifyRequest.getReason(), request);
+
+    // 2. 데이터 조회
+    String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
+    ScheduledMessageSearchRequest searchRequest =
+        ScheduledMessageSearchRequest.builder()
             .mSeqs(mSeqs) // 체크항목들의 식별자
             .msgType(msgType)
             .searchText(searchText)
             .userId(queryUserId)
             .build();
-        List<ScheduledMessageResponse> list = scheduledMessageService.getScheduledMessagesForDownload(
-            searchRequest);
+    List<ScheduledMessageResponse> list =
+        scheduledMessageService.getScheduledMessagesForDownload(searchRequest);
 
-        // 3. 엑셀 생성 (POI 사용)
-        Workbook wb = new SXSSFWorkbook();
-        Sheet sheet = wb.createSheet("예약 메시지 내역");
+    // 3. 엑셀 생성 (POI 사용)
+    Workbook wb = new SXSSFWorkbook();
+    Sheet sheet = wb.createSheet("예약 메시지 내역");
 
-        // 헤더 생성 및 스타일 설정
-        String[] headers = {"문자 타입", "수신번호", "제목", "내용", "발신번호", "예약시간", "요청건수", "등록자"};
-        Row headerRow = sheet.createRow(0);
-        for (int i = 0; i < headers.length; i++) {
-            headerRow.createCell(i).setCellValue(headers[i]);
-        }
-
-        // 데이터 채우기
-        int rowNum = 1;
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        for (ScheduledMessageResponse item : list) {
-            Row row = sheet.createRow(rowNum++);
-            row.createCell(0).setCellValue(item.getMsgTypeName());
-            row.createCell(1).setCellValue(item.getRawDstAddr());
-            row.createCell(2).setCellValue(item.getSubject());      // 제목 출력 (없으면 빈칸)
-            row.createCell(3).setCellValue(item.getText());         // 내용 출력
-            row.createCell(4).setCellValue(item.getCallBack());
-            row.createCell(5).setCellValue(
-                item.getRequestTime() != null ? item.getRequestTime().format(dtf) : "");
-            // 요청건수 null 체크
-            if (item.getMessageCount() != null) {
-                row.createCell(6).setCellValue(item.getMessageCount());
-            } else {
-                row.createCell(6).setCellValue(0);
-            }
-            row.createCell(7).setCellValue(item.getUserId());
-        }
-
-        // 4. 파일 다운로드 응답 설정
-        String fileName =
-            "예약_메시지_내역_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
-                + ".xlsx";
-        response.setContentType(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        response.setHeader("Content-Disposition",
-            "attachment; filename=\"" + URLEncoder.encode(fileName, StandardCharsets.UTF_8) + "\"");
-        wb.write(response.getOutputStream());
-        wb.close();
+    // 헤더 생성 및 스타일 설정
+    String[] headers = {"문자 타입", "수신번호", "제목", "내용", "발신번호", "예약시간", "요청건수", "등록자"};
+    Row headerRow = sheet.createRow(0);
+    for (int i = 0; i < headers.length; i++) {
+      headerRow.createCell(i).setCellValue(headers[i]);
     }
 
-    /**
-     * 예약 메시지 상세 조회
-     * GET /api/scheduled-messages/{mSeq}
-     */
-    @GetMapping("/{mSeq}")
-    public ApiResponse<ScheduledMessageResponse> getScheduledMessageById(
-            @PathVariable int mSeq,
-            @RequestHeader("Authorization") String token) {
-
-        String accessToken = token.replace("Bearer ", "");
-        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-        Integer userLevel = adminService.getUserLevel(userId);
-        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
-
-        ScheduledMessageResponse response = scheduledMessageService.getMessageById(mSeq, queryUserId);
-        if (response == null) {
-            throw new BusinessException(ErrorCode.MESSAGE_NOT_FOUND, "예약 메시지를 찾을 수 없습니다.");
-        }
-
-        return ApiResponse.success(response);
+    // 데이터 채우기
+    int rowNum = 1;
+    DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    for (ScheduledMessageResponse item : list) {
+      Row row = sheet.createRow(rowNum++);
+      row.createCell(0).setCellValue(item.getMsgTypeName());
+      row.createCell(1).setCellValue(item.getRawDstAddr());
+      row.createCell(2).setCellValue(item.getSubject()); // 제목 출력 (없으면 빈칸)
+      row.createCell(3).setCellValue(item.getText()); // 내용 출력
+      row.createCell(4).setCellValue(item.getCallBack());
+      row.createCell(5)
+          .setCellValue(item.getRequestTime() != null ? item.getRequestTime().format(dtf) : "");
+      // 요청건수 null 체크
+      if (item.getMessageCount() != null) {
+        row.createCell(6).setCellValue(item.getMessageCount());
+      } else {
+        row.createCell(6).setCellValue(0);
+      }
+      row.createCell(7).setCellValue(item.getUserId());
     }
 
-    /**
-     * 예약 시간 변경
-     * PUT /api/scheduled-messages/{mSeq}/reschedule
-     */
-    @PutMapping("/{mSeq}/reschedule")
-    public ApiResponse<Void> rescheduleMessage(
-            @PathVariable int mSeq,
-            @Valid @RequestBody RescheduleRequest request,
-            @RequestHeader("Authorization") String token) {
+    // 4. 파일 다운로드 응답 설정
+    String fileName =
+        "예약_메시지_내역_"
+            + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+            + ".xlsx";
+    response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    response.setHeader(
+        "Content-Disposition",
+        "attachment; filename=\"" + URLEncoder.encode(fileName, StandardCharsets.UTF_8) + "\"");
+    wb.write(response.getOutputStream());
+    wb.close();
+  }
 
-        String accessToken = token.replace("Bearer ", "");
-        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-        Integer userLevel = adminService.getUserLevel(userId);
-        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
+  /** 예약 메시지 상세 조회 GET /api/scheduled-messages/{mSeq} */
+  @GetMapping("/{mSeq}")
+  public ApiResponse<ScheduledMessageResponse> getScheduledMessageById(
+      @PathVariable int mSeq, @RequestHeader("Authorization") String token) {
 
-        // 10분 이내 예약 불가
-        LocalDateTime minTime = LocalDateTime.now().plusMinutes(10);
-        if (request.getNewScheduleTime().isBefore(minTime)) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "예약일시는 현재 시각으로부터 최소 10분 이후여야 합니다.");
-        }
+    String accessToken = token.replace("Bearer ", "");
+    String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+    Integer userLevel = adminService.getUserLevel(userId);
+    String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 
-        // 메시지 조회
-        ScheduledMessageResponse message = scheduledMessageService.getMessageById(mSeq, queryUserId);
-        if (message == null) {
-            throw new BusinessException(ErrorCode.MESSAGE_NOT_FOUND, "예약 메시지를 찾을 수 없습니다.");
-        }
-
-        // 예약 시간 변경
-        scheduledMessageService.rescheduleMessageGroup(
-                message.getUserId(),  // 실제 메시지 소유자
-                message.getMsgType(),
-                message.getInsertTime(),
-                request.getNewScheduleTime()
-        );
-
-        return ApiResponse.success("예약 시간이 변경되었습니다.");
+    ScheduledMessageResponse response = scheduledMessageService.getMessageById(mSeq, queryUserId);
+    if (response == null) {
+      throw new BusinessException(ErrorCode.MESSAGE_NOT_FOUND, "예약 메시지를 찾을 수 없습니다.");
     }
 
-    /**
-     * 예약 메시지 삭제 (일괄)
-     * DELETE /api/scheduled-messages
-     */
-    @DeleteMapping
-    public ApiResponse<Void> cancelScheduledMessages(
-            @RequestBody List<Integer> mSeqs,
-            @RequestHeader("Authorization") String token) {
+    return ApiResponse.success(response);
+  }
 
-        String accessToken = token.replace("Bearer ", "");
-        String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
-        Integer userLevel = adminService.getUserLevel(userId);
-        String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
+  /** 예약 시간 변경 PUT /api/scheduled-messages/{mSeq}/reschedule */
+  @PutMapping("/{mSeq}/reschedule")
+  public ApiResponse<Void> rescheduleMessage(
+      @PathVariable int mSeq,
+      @Valid @RequestBody RescheduleRequest request,
+      @RequestHeader("Authorization") String token) {
 
-        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+    String accessToken = token.replace("Bearer ", "");
+    String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+    Integer userLevel = adminService.getUserLevel(userId);
+    String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
 
-        // 중복 그룹 삭제 방지용 Map
-        Map<String, ScheduledMessageResponse> groupMap = new HashMap<>();
-
-        for (Integer mSeq : mSeqs) {
-            ScheduledMessageResponse message = scheduledMessageService.getMessageById(mSeq, queryUserId);
-            if (message == null) {
-                throw new BusinessException(ErrorCode.MESSAGE_NOT_FOUND, "예약 메시지를 찾을 수 없습니다: " + mSeq);
-            }
-
-            // 10분 이내 발송 예정 메시지 삭제 불가
-            if (message.getRequestTime().isBefore(now.plusMinutes(10))) {
-                throw new BusinessException(ErrorCode.INVALID_INPUT, "전송 10분 이내인 메시지는 삭제할 수 없습니다.");
-            }
-
-            // 그룹 키 생성 (msgType + requestTime)
-            String key = message.getMsgType() + "_" + message.getRequestTime().toString();
-            groupMap.put(key, message);
-        }
-
-        // 그룹별로 예약 취소
-        for (ScheduledMessageResponse message : groupMap.values()) {
-            scheduledMessageService.cancelMessageGroup(
-                    message.getUserId(),  // 실제 메시지 소유자
-                    message.getMsgType(),
-                    message.getInsertTime()
-            );
-        }
-
-        return ApiResponse.success("삭제되었습니다.");
+    // 10분 이내 예약 불가
+    LocalDateTime minTime = LocalDateTime.now().plusMinutes(10);
+    if (request.getNewScheduleTime().isBefore(minTime)) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "예약일시는 현재 시각으로부터 최소 10분 이후여야 합니다.");
     }
 
+    // 메시지 조회
+    ScheduledMessageResponse message = scheduledMessageService.getMessageById(mSeq, queryUserId);
+    if (message == null) {
+      throw new BusinessException(ErrorCode.MESSAGE_NOT_FOUND, "예약 메시지를 찾을 수 없습니다.");
+    }
+
+    // 예약 시간 변경
+    scheduledMessageService.rescheduleMessageGroup(
+        message.getUserId(), // 실제 메시지 소유자
+        message.getMsgType(),
+        message.getInsertTime(),
+        request.getNewScheduleTime());
+
+    return ApiResponse.success("예약 시간이 변경되었습니다.");
+  }
+
+  /** 예약 메시지 삭제 (일괄) DELETE /api/scheduled-messages */
+  @DeleteMapping
+  public ApiResponse<Void> cancelScheduledMessages(
+      @RequestBody List<Integer> mSeqs, @RequestHeader("Authorization") String token) {
+
+    String accessToken = token.replace("Bearer ", "");
+    String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+    Integer userLevel = adminService.getUserLevel(userId);
+    String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
+
+    LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+
+    // 중복 그룹 삭제 방지용 Map
+    Map<String, ScheduledMessageResponse> groupMap = new HashMap<>();
+
+    for (Integer mSeq : mSeqs) {
+      ScheduledMessageResponse message = scheduledMessageService.getMessageById(mSeq, queryUserId);
+      if (message == null) {
+        throw new BusinessException(ErrorCode.MESSAGE_NOT_FOUND, "예약 메시지를 찾을 수 없습니다: " + mSeq);
+      }
+
+      // 10분 이내 발송 예정 메시지 삭제 불가
+      if (message.getRequestTime().isBefore(now.plusMinutes(10))) {
+        throw new BusinessException(ErrorCode.INVALID_INPUT, "전송 10분 이내인 메시지는 삭제할 수 없습니다.");
+      }
+
+      // 그룹 키 생성 (msgType + requestTime)
+      String key = message.getMsgType() + "_" + message.getRequestTime().toString();
+      groupMap.put(key, message);
+    }
+
+    // 그룹별로 예약 취소
+    for (ScheduledMessageResponse message : groupMap.values()) {
+      scheduledMessageService.cancelMessageGroup(
+          message.getUserId(), // 실제 메시지 소유자
+          message.getMsgType(),
+          message.getInsertTime());
+    }
+
+    return ApiResponse.success("삭제되었습니다.");
+  }
 }

@@ -6,8 +6,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
+import kr.wisead.common.dto.DownloadVerifyRequest;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.service.DownloadVerifyService;
 import kr.wisead.domain.event.dto.*;
 import kr.wisead.domain.event.service.*;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,7 @@ public class EventParticipantController {
   private final NametagService nametagService;
   private final EventActionTypeService actionTypeService;
   private final EventExcelService excelService;
+  private final DownloadVerifyService downloadVerifyService;
 
   /** 참가자 등록 */
   @PostMapping
@@ -159,8 +162,15 @@ public class EventParticipantController {
   }
 
   /** 참가자 목록 엑셀 다운로드 */
-  @GetMapping("/excel")
-  public ResponseEntity<byte[]> downloadParticipantExcel(@PathVariable Integer eventSeq) {
+  @PostMapping("/excel")
+  public ResponseEntity<byte[]> downloadParticipantExcel(
+      @PathVariable Integer eventSeq,
+      @RequestBody @Valid DownloadVerifyRequest verifyRequest,
+      @AuthenticationPrincipal UserDetails userDetails) {
+
+    // 비밀번호 검증
+    downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
+
     byte[] excelData = excelService.createParticipantExcel(eventSeq);
     String fileName =
         "참가자목록_"
@@ -179,8 +189,15 @@ public class EventParticipantController {
   }
 
   /** 통계 엑셀 다운로드 */
-  @GetMapping("/statistics/excel")
-  public ResponseEntity<byte[]> downloadStatisticsExcel(@PathVariable Integer eventSeq) {
+  @PostMapping("/statistics/excel")
+  public ResponseEntity<byte[]> downloadStatisticsExcel(
+      @PathVariable Integer eventSeq,
+      @RequestBody @Valid DownloadVerifyRequest verifyRequest,
+      @AuthenticationPrincipal UserDetails userDetails) {
+
+    // 비밀번호 검증
+    downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
+
     byte[] excelData = excelService.createStatisticsExcel(eventSeq);
     String fileName =
         "행사통계_"

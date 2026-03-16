@@ -1,5 +1,6 @@
 package kr.wisead.domain.survey.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -10,6 +11,7 @@ import java.util.Map;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.UserIdResolver;
+import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.survey.dto.*;
 import kr.wisead.domain.survey.service.EventService;
@@ -33,6 +35,7 @@ public class EventController {
   private final EventService eventService;
   private final AdminService adminService;
   private final UserIdResolver userIdResolver;
+  private final ActionLogService actionLogService;
 
   /** 이벤트 목록 조회 */
   @GetMapping
@@ -53,20 +56,21 @@ public class EventController {
     Integer userLevel = adminService.getUserLevel(userId);
     String actualRegId = userIdResolver.resolveUserId(userId);
 
-    EventSearchRequest request = EventSearchRequest.builder()
-        .regId(actualRegId)
-        .userLevel(userLevel)
-        .eventType(eventType)
-        .eventTypes(eventTypes)
-        .surveyStatus(surveyStatus)
-        .startDate(startDate)
-        .endDate(endDate)
-        .searchKeyword(searchKeyword)
-        .sortField(sortField)
-        .sortOrder(sortOrder)
-        .pageNum(page)
-        .amount(size)
-        .build();
+    EventSearchRequest request =
+        EventSearchRequest.builder()
+            .regId(actualRegId)
+            .userLevel(userLevel)
+            .eventType(eventType)
+            .eventTypes(eventTypes)
+            .surveyStatus(surveyStatus)
+            .startDate(startDate)
+            .endDate(endDate)
+            .searchKeyword(searchKeyword)
+            .sortField(sortField)
+            .sortOrder(sortOrder)
+            .pageNum(page)
+            .amount(size)
+            .build();
 
     PageResponse<EventResponse> response = eventService.getEventList(request);
     return ApiResponse.success(response);
@@ -95,7 +99,8 @@ public class EventController {
       @PathVariable Integer eventSeq,
       @RequestBody @Valid EventRequest request) {
     String uptId = userDetails.getUsername();
-    EventResponse response = eventService.updateEvent(eventSeq, request, uptId, null, null, null, null);
+    EventResponse response =
+        eventService.updateEvent(eventSeq, request, uptId, null, null, null, null);
     return ApiResponse.success(response);
   }
 
@@ -143,11 +148,12 @@ public class EventController {
     Integer userLevel = adminService.getUserLevel(userId);
     String actualRegId = userIdResolver.resolveUserId(userId);
 
-    EventSearchRequest request = EventSearchRequest.builder()
-        .regId(actualRegId)
-        .userLevel(userLevel)
-        .searchKeyword(keyword)
-        .build();
+    EventSearchRequest request =
+        EventSearchRequest.builder()
+            .regId(actualRegId)
+            .userLevel(userLevel)
+            .searchKeyword(keyword)
+            .build();
     List<String> names = eventService.searchEventNames(request);
     return ApiResponse.success(names);
   }
@@ -224,18 +230,30 @@ public class EventController {
     return ApiResponse.success(result);
   }
 
-  /** 이벤트 결과 엑셀 다운로드 GET /api/event/{eventSeq}/excel */
-  @GetMapping("/{eventSeq}/excel")
+  /** 이벤트 결과 엑셀 다운로드 POST /api/event/{eventSeq}/excel */
+  @PostMapping("/{eventSeq}/excel")
   public ResponseEntity<byte[]> downloadEventResultExcel(
-      @AuthenticationPrincipal UserDetails userDetails, @PathVariable Integer eventSeq) {
+      @AuthenticationPrincipal UserDetails userDetails,
+      @PathVariable Integer eventSeq,
+      @RequestBody(required = false) Map<String, String> body,
+      HttpServletRequest httpRequest) {
 
-    log.info("이벤트 결과 엑셀 다운로드 요청 - eventSeq: {}, 사용자: {}", eventSeq, userDetails.getUsername());
+    String userId = userIdResolver.resolveUserId(userDetails.getUsername());
+    String userName = userIdResolver.resolveUserName(userId);
+
+    log.info("이벤트 결과 엑셀 다운로드 요청 - eventSeq: {}, 사용자: {}", eventSeq, userId);
+
+    // 활동 로그 기록
+    String reason = body != null ? body.get("reason") : null;
+    actionLogService.logDownloadAction(
+        userId, userName, "이벤트 결과 엑셀다운로드", "R", reason, httpRequest);
 
     byte[] content = eventService.generateEventResultExcel(eventSeq);
 
     String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
     String fileName = "이벤트_참여_관리_" + timestamp + ".xlsx";
-    String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+    String encodedFileName =
+        URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
 
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFileName + "\"")

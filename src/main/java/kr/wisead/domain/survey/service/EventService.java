@@ -1283,12 +1283,16 @@ public class EventService {
     // 모든 응답 조회
     List<SurveyAnswer> allAnswers = surveyAnswerMapper.selectByEventSeq(eventSeq);
 
-    // 사용자별 응답 맵 구성
+    // 사용자별 응답 맵 구성 (MCM 복수선택은 "##"로 연결)
     Map<Integer, Map<Integer, String>> userAnswersMap = new HashMap<>();
     for (SurveyAnswer answer : allAnswers) {
-      userAnswersMap
-          .computeIfAbsent(answer.getUserSeq(), k -> new HashMap<>())
-          .put(answer.getQuestionSeq(), answer.getAnswer());
+      if (answer.getAnswer() == null) continue;
+      Map<Integer, String> questionMap =
+          userAnswersMap.computeIfAbsent(answer.getUserSeq(), k -> new HashMap<>());
+      questionMap.merge(
+          answer.getQuestionSeq(),
+          answer.getAnswer(),
+          (existing, newVal) -> existing + "##" + newVal);
     }
 
     // 통계 정보
@@ -1622,10 +1626,13 @@ public class EventService {
           if (answer.startsWith("RSA:")) {
             // RSA 암호화 데이터: 세션 키 소멸로 직접 복호화 불가 → SURVEY_USER 필드에서 복호화
             displayAnswer = decryptUserFieldByType(participant, question.getQuestionTypeDetail());
+          } else if ("MC".equals(question.getQuestionType())) {
+            // 객관식 답변은 평문 숫자이므로 복호화 불필요
+            displayAnswer = answer.replace("##", ", ");
           } else {
-            // AES256+Base64 암호화된 답변 복호화
+            // 암호화된 답변(개인정보 등) 복호화
             String decrypted = decryptDataSafe(answer);
-            displayAnswer = (decrypted != null ? decrypted : answer).replaceAll("##", " ");
+            displayAnswer = decrypted != null ? decrypted : answer;
           }
         }
         createCell(dataRow, 4 + i, displayAnswer, normalStyle);

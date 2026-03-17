@@ -26,6 +26,35 @@
         <result property="fileLoc5" column="fileLoc5"/>
     </resultMap>
 
+    <!-- 공통 검색 조건 (날짜범위 + 문자타입 + 검색조건/검색어) -->
+    <sql id="searchCondition">
+        <if test="startDate != null and startDate != ''">
+            AND REQUEST_TIME >= CONCAT(#{startDate}, ' 00:00:00')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND REQUEST_TIME &lt;= CONCAT(#{endDate}, ' 23:59:59')
+        </if>
+        <if test="msgType != null and msgType != ''">
+            AND MSG_TYPE = #{msgType}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            <choose>
+                <when test="searchType == 'dstAddr'">
+                    AND DSTADDR LIKE CONCAT('%', #{keyword}, '%')
+                </when>
+                <when test="searchType == 'callBack'">
+                    AND CALLBACK LIKE CONCAT('%', #{keyword}, '%')
+                </when>
+                <when test="searchType == 'subject'">
+                    AND SUBJECT LIKE CONCAT('%', #{keyword}, '%')
+                </when>
+                <otherwise>
+                    AND TEXT LIKE CONCAT('%', #{keyword}, '%')
+                </otherwise>
+            </choose>
+        </if>
+    </sql>
+
     <!-- 예약 메시지 목록 조회 (Window Function으로 그룹핑) -->
     <select id="selectScheduledMessages" resultMap="scheduledMessageResultMap">
         WITH grouped_data AS (
@@ -86,12 +115,7 @@
                     </otherwise>
                 </choose>
                 AND REQUEST_TIME > current_timestamp
-                <if test="msgType != null and msgType != ''">
-                    AND MSG_TYPE = #{msgType}
-                </if>
-                <if test="searchText != null and searchText != ''">
-                    AND TEXT LIKE CONCAT('%', #{searchText}, '%')
-                </if>
+                <include refid="searchCondition"/>
             </where>
         )
         SELECT
@@ -209,10 +233,7 @@
                 <otherwise>1=0</otherwise>
             </choose>
             AND REQUEST_TIME > current_timestamp
-            <if test="msgType != null and msgType != ''">AND MSG_TYPE = #{msgType}</if>
-            <if test="searchText != null and searchText != ''">AND TEXT LIKE CONCAT('%',
-                #{searchText}, '%')
-            </if>
+            <include refid="searchCondition"/>
         </where>
         )
         SELECT MSEQ as mSeq, MSG_TYPE as msgType, DSTADDR as dstAddr, CALLBACK as callBack,
@@ -263,12 +284,7 @@
                     </otherwise>
                 </choose>
                 AND REQUEST_TIME > current_timestamp
-                <if test="msgType != null and msgType != ''">
-                    AND MSG_TYPE = #{msgType}
-                </if>
-                <if test="searchText != null and searchText != ''">
-                    AND TEXT LIKE CONCAT('%', #{searchText}, '%')
-                </if>
+                <include refid="searchCondition"/>
             </where>
         )
         SELECT COUNT(*) FROM grouped_data WHERE rn = 1

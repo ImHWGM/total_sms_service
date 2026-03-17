@@ -52,7 +52,10 @@ public class ScheduledMessageController {
   @GetMapping
   public ApiResponse<PageResponse<ScheduledMessageResponse>> getScheduledMessages(
       @RequestParam(required = false) String msgType,
-      @RequestParam(required = false) String searchText,
+      @RequestParam(required = false) String startDate,
+      @RequestParam(required = false) String endDate,
+      @RequestParam(required = false) String searchType,
+      @RequestParam(required = false) String keyword,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size,
       @RequestHeader("Authorization") String token) {
@@ -67,7 +70,10 @@ public class ScheduledMessageController {
     ScheduledMessageSearchRequest request =
         ScheduledMessageSearchRequest.builder()
             .msgType(msgType)
-            .searchText(searchText)
+            .startDate(startDate)
+            .endDate(endDate)
+            .searchType(searchType)
+            .keyword(keyword)
             .userId(queryUserId)
             .page(page)
             .size(size)
@@ -83,7 +89,10 @@ public class ScheduledMessageController {
   public void downloadScheduledMessages(
       @RequestParam(required = false) List<Integer> mSeqs,
       @RequestParam(required = false) String msgType,
-      @RequestParam(required = false) String searchText,
+      @RequestParam(required = false) String startDate,
+      @RequestParam(required = false) String endDate,
+      @RequestParam(required = false) String searchType,
+      @RequestParam(required = false) String keyword,
       @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       @RequestHeader("Authorization") String token,
       HttpServletRequest request,
@@ -106,7 +115,10 @@ public class ScheduledMessageController {
         ScheduledMessageSearchRequest.builder()
             .mSeqs(mSeqs) // 체크항목들의 식별자
             .msgType(msgType)
-            .searchText(searchText)
+            .startDate(startDate)
+            .endDate(endDate)
+            .searchType(searchType)
+            .keyword(keyword)
             .userId(queryUserId)
             .build();
     List<ScheduledMessageResponse> list =

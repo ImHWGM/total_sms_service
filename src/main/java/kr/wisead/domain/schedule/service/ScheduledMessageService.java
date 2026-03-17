@@ -44,13 +44,21 @@ public class ScheduledMessageService {
         scheduledMessageMapper.selectScheduledMessages(
             request.getUserId(),
             convertedMsgType,
-            request.getSearchText(),
+            request.getStartDate(),
+            request.getEndDate(),
+            request.getSearchType(),
+            request.getKeyword(),
             request.getOffset(),
             request.getSize());
 
     int total =
         scheduledMessageMapper.countScheduledMessages(
-            request.getUserId(), convertedMsgType, request.getSearchText());
+            request.getUserId(),
+            convertedMsgType,
+            request.getStartDate(),
+            request.getEndDate(),
+            request.getSearchType(),
+            request.getKeyword());
 
     List<ScheduledMessageResponse> responses =
         messages.stream().map(ScheduledMessageResponse::from).toList();
@@ -62,9 +70,7 @@ public class ScheduledMessageService {
     return PageResponse.of(responses, request.getPage(), request.getSize(), total);
   }
 
-  /**
-   * 예약 메시지 전체 조회 (다운로드용)
-   */
+  /** 예약 메시지 전체 조회 (다운로드용) */
   @Transactional(readOnly = true)
   public List<ScheduledMessageResponse> getScheduledMessagesForDownload(
       ScheduledMessageSearchRequest request) {
@@ -78,16 +84,18 @@ public class ScheduledMessageService {
     } else {
       // 체크된 항목이 없다면(전체 다운로드) -> 기존처럼 그룹화된 요약본 조회
       String convertedMsgType = request.getConvertedMsgType();
-      messages = scheduledMessageMapper.selectScheduledMessagesForDownload(
-          request.getUserId(),
-          convertedMsgType,
-          request.getSearchText());
+      messages =
+          scheduledMessageMapper.selectScheduledMessagesForDownload(
+              request.getUserId(),
+              convertedMsgType,
+              request.getStartDate(),
+              request.getEndDate(),
+              request.getSearchType(),
+              request.getKeyword());
     }
 
     // 2. 조회된 결과(List<ScheduledMessage>)를 결과 DTO로 변환하여 반환
-    return messages.stream()
-        .map(ScheduledMessageResponse::from)
-        .toList();
+    return messages.stream().map(ScheduledMessageResponse::from).toList();
   }
 
   /** 예약 메시지 상세 조회 */

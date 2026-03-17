@@ -50,7 +50,7 @@ public class EventCheckService {
   @Transactional
   public EventCheckResponse staffCheckIn(
       Integer eventSeq, String checkCode, String staffUserSeq, String deviceInfo) {
-    // 1. 행사 소유자 검증
+    // 1. 권한 검증: 행사 소유자 또는 스태프 참가자
     var event =
         surveyMasterMapper
             .selectByEventSeq(eventSeq)
@@ -58,7 +58,7 @@ public class EventCheckService {
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사 정보를 찾을 수 없습니다."));
 
     String staffUserId = userIdResolver.resolveUserId(staffUserSeq);
-    if (!staffUserId.equals(event.getRegId())) {
+    if (!staffUserId.equals(event.getRegId()) && !isStaffParticipant(eventSeq, staffUserId)) {
       throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 행사의 체크인 권한이 없습니다.");
     }
 
@@ -73,6 +73,17 @@ public class EventCheckService {
         "스태프 체크인 요청: eventSeq={}, checkCode={}, staffUserId={}", eventSeq, checkCode, staffUserId);
 
     return processCheckIn(participant, deviceInfo);
+  }
+
+  /** 로그인한 사용자가 해당 행사의 스태프 참가자인지 확인 (전화번호 매칭) */
+  private boolean isStaffParticipant(Integer eventSeq, String userId) {
+    // USER.PHONE은 이미 암호화된 값, SURVEY_USER.USER_PHONE도 동일 암호화
+    return userMapper
+        .findByUserId(userId)
+        .filter(u -> u.getPhone() != null && !u.getPhone().isBlank())
+        .flatMap(u -> participantMapper.selectByEventSeqAndPhone(eventSeq, u.getPhone()))
+        .filter(p -> "스태프".equals(p.getParticipantType()))
+        .isPresent();
   }
 
   /** 전화번호로 체크인 처리 (키오스크용) */

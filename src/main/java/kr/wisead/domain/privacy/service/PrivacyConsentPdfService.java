@@ -780,12 +780,12 @@ public class PrivacyConsentPdfService {
       textBeforeCheckbox =
           "en".equals(language)
               ? "I have read and agree to the above third-party provision.       Agreed "
-              : "위 개인정보 제3자 제공 안내를 확인하였습니다.       확인함 ";
+              : "개인정보 제3자 제공에 동의합니다.        동의함 ";
     } else {
       textBeforeCheckbox =
           "en".equals(language)
               ? "I have read and agree to the above.       Agreed "
-              : "위 개인정보 수집ㆍ이용 안내를 확인하였습니다.       확인함 ";
+              : "개인정보 수집 이용에 동의합니다.        동의함 ";
     }
     String checkboxChar = "V";
 

@@ -52,17 +52,21 @@ public class CryptoUtils {
     if (CommonUtils.isNullOrEmpty(str)) {
       return "";
     }
+    String trimmed = str.trim();
+    if (trimmed.length() < 4 || trimmed.length() % 4 != 0 || !isBase64(trimmed)) {
+      return str;
+    }
     try {
       byte[] keyData = KEY_128.getBytes(StandardCharsets.UTF_8);
       Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
       cipher.init(
           Cipher.DECRYPT_MODE, new SecretKeySpec(keyData, "AES"), new IvParameterSpec(keyData));
 
-      byte[] decoded = Base64.getDecoder().decode(str);
+      byte[] decoded = Base64.getDecoder().decode(trimmed);
       byte[] decrypted = cipher.doFinal(decoded);
       return new String(decrypted, StandardCharsets.UTF_8);
     } catch (Exception e) {
-      log.warn("AES128 복호화 실패, 원본 데이터 반환: {}", e.getMessage());
+      log.debug("AES128 복호화 실패, 원본 데이터 반환: {}", e.getMessage());
       return str;
     }
   }
@@ -95,6 +99,10 @@ public class CryptoUtils {
     if (CommonUtils.isNullOrEmpty(str)) {
       return "";
     }
+    String trimmed = str.trim();
+    if (trimmed.length() < 4 || trimmed.length() % 4 != 0 || !isBase64(trimmed)) {
+      return str;
+    }
     try {
       byte[] key256Data = KEY_256.getBytes(StandardCharsets.UTF_8);
       byte[] key128Data = KEY_128.getBytes(StandardCharsets.UTF_8);
@@ -105,11 +113,11 @@ public class CryptoUtils {
           new SecretKeySpec(key256Data, "AES"),
           new IvParameterSpec(key128Data));
 
-      byte[] decoded = Base64.getDecoder().decode(str);
+      byte[] decoded = Base64.getDecoder().decode(trimmed);
       byte[] decrypted = cipher.doFinal(decoded);
       return new String(decrypted, StandardCharsets.UTF_8);
     } catch (Exception e) {
-      log.warn("AES256 복호화 실패, 원본 데이터 반환: {}", e.getMessage());
+      log.debug("AES256 복호화 실패, 원본 데이터 반환: {}", e.getMessage());
       return str;
     }
   }
@@ -205,7 +213,7 @@ public class CryptoUtils {
     }
 
     String trimmed = data.trim();
-    if (trimmed.length() % 4 != 0 || !isBase64(trimmed)) {
+    if (trimmed.length() < 4 || trimmed.length() % 4 != 0 || !isBase64(trimmed)) {
       return data;
     }
 

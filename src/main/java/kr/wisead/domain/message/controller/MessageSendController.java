@@ -124,6 +124,13 @@ public class MessageSendController {
   public ApiResponse<ResendResponse> resendSurveyMessageBatch(
       @AuthenticationPrincipal UserDetails userDetails, @RequestBody ResendRequest request) {
     String regId = userDetails.getUsername();
+
+    // duplicateReceivers가 있으면 대치문자 지원되는 resendToDuplicates 경로 사용
+    if (request.getDuplicateReceivers() != null && !request.getDuplicateReceivers().isEmpty()) {
+      ResendResponse response = messageSendService.resendToDuplicates(request, regId);
+      return ApiResponse.success(response);
+    }
+
     ResendResponse response =
         messageSendService.resendSurveyMessageBatch(
             request.getUserSeqList(),

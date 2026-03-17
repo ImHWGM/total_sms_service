@@ -508,6 +508,35 @@ public class MessageSendService {
       String reqDate,
       String useUrlYn,
       String regId) {
+    return resendSurveyMessage(
+        userSeq,
+        subject,
+        text,
+        callback,
+        useOriginal,
+        reqType,
+        reqDate,
+        useUrlYn,
+        regId,
+        null,
+        null,
+        null);
+  }
+
+  /** 설문 문자 재발송 (단건) - 대치문자 지원 */
+  public int resendSurveyMessage(
+      Integer userSeq,
+      String subject,
+      String text,
+      String callback,
+      boolean useOriginal,
+      String reqType,
+      String reqDate,
+      String useUrlYn,
+      String regId,
+      String repChar01,
+      String repChar02,
+      String repChar03) {
     // SURVEY_USER에서 사용자 정보 조회
     SurveyUser surveyUser =
         surveyUserMapper
@@ -586,6 +615,9 @@ public class MessageSendService {
       finalSubject = subject;
       finalCallback = callback;
     }
+
+    // 대치문자 처리 (#대치문자1#, #대치문자2#, #대치문자3# 치환)
+    finalText = applyReplaceChars(finalText, repChar01, repChar02, repChar03);
 
     // 설문 요금 차감
     String txGroupId = deductForMessage(regId, "survey", 1, "L");

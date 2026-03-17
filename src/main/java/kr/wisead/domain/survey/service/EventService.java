@@ -1629,10 +1629,15 @@ public class EventService {
           } else if ("MC".equals(question.getQuestionType())) {
             // 객관식 답변은 평문 숫자이므로 복호화 불필요
             displayAnswer = answer.replace("##", ", ");
+          } else if ("SAA".equals(question.getQuestionType())) {
+            // SAA 타입: 서버 AES 암호화된 답변 → 복호화 필요
+            // 중복 제출 시 첫 번째 답변만 복호화
+            String firstAnswer = getFirstPart(answer);
+            String decrypted = decryptDataSafe(firstAnswer);
+            displayAnswer = decrypted != null ? decrypted : firstAnswer;
           } else {
-            // 암호화된 답변(개인정보 등) 복호화
-            String decrypted = decryptDataSafe(answer);
-            displayAnswer = decrypted != null ? decrypted : answer;
+            // SA 타입: 평문 답변 → 복호화 불필요 (중복 제출 시 첫 번째만)
+            displayAnswer = getFirstPart(answer);
           }
         }
         createCell(dataRow, 4 + i, displayAnswer, normalStyle);
@@ -1792,6 +1797,12 @@ public class EventService {
     }
     double rate = numerator * 100.0 / denominator;
     return String.format("%.1f%%", rate);
+  }
+
+  /** "##" 구분자 이전의 첫 번째 값 추출 (구분자 없으면 원본 반환) */
+  private String getFirstPart(String value) {
+    int idx = value.indexOf("##");
+    return idx == -1 ? value : value.substring(0, idx);
   }
 
   /** 데이터 복호화 (예외 발생 시 원본 반환) */

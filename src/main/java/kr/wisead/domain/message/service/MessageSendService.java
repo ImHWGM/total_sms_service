@@ -923,8 +923,7 @@ public class MessageSendService {
               }
             } else {
               // 신규 SURVEY_USER 생성
-              String newUserKey =
-                  UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+              String newUserKey = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
               SurveyUser surveyUser =
                   SurveyUser.builder()
                       .eventSeq(request.getEventSeq())
@@ -1070,6 +1069,8 @@ public class MessageSendService {
         Long participantSeq = receiver.getParticipantSeq();
         Integer surveyUserSeq = receiver.getSurveyUserSeq();
 
+        String checkCode = receiver.getCheckCode();
+
         if (participantSeq == null && phone != null) {
           try {
             String receiverName = receiver.getName() != null ? receiver.getName() : "";
@@ -1078,6 +1079,7 @@ public class MessageSendService {
                     request.getEventSeq(), receiverName, phone, regId);
             participantSeq = registered.getParticipantSeq();
             surveyUserSeq = registered.getSurveyUserSeq();
+            checkCode = registered.getCheckCode();
             log.info("비참여자 자동 등록 - phone: {}, participantSeq: {}", phone, participantSeq);
           } catch (Exception e) {
             log.warn("비참여자 자동 등록 실패 - phone: {}, error: {}", phone, e.getMessage());
@@ -1128,6 +1130,11 @@ public class MessageSendService {
         if (receiver.getAccessLink() != null && !receiver.getAccessLink().isEmpty()) {
           String shortenedAccessLink = ShortUrlUtils.shortenUrl(receiver.getAccessLink());
           text = text.replace("#접속링크#", shortenedAccessLink);
+        }
+
+        // 체크코드 치환 (#check# → 참가자 checkCode)
+        if (checkCode != null && !checkCode.isEmpty()) {
+          text = text.replace("#check#", checkCode);
         }
 
         // /qrcode/ 패턴 URL도 단축 처리

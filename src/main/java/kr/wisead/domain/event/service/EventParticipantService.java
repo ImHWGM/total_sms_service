@@ -179,34 +179,53 @@ public class EventParticipantService {
       if (decryptedPhone != null) {
         String cleanDecryptedPhone = decryptedPhone.replace("-", "");
         if (requestPhone.equals(cleanDecryptedPhone)) {
-          // 일치하는 참가자 발견
-          String qrCodeUrl =
-              wiseadUrl
-                  + "/event/"
-                  + candidate.getEventSeq()
-                  + "/check/"
-                  + candidate.getCheckCode();
-
-          VerifyParticipantResponse.ParticipantInfo info =
-              VerifyParticipantResponse.ParticipantInfo.builder()
-                  .seq(candidate.getSeq())
-                  .name(candidate.getUserName())
-                  .phone(requestPhone)
-                  .department(candidate.getDepartment())
-                  .position(candidate.getPosition())
-                  .participantType(candidate.getParticipantType())
-                  .checkCode(candidate.getCheckCode())
-                  .eventName(candidate.getEventName())
-                  .qrCodeUrl(qrCodeUrl)
-                  .build();
-
-          return VerifyParticipantResponse.verified(info);
+          return VerifyParticipantResponse.verified(
+              buildParticipantInfo(candidate, requestPhone));
         }
       }
     }
 
     // 일치하는 참가자 없음
     return VerifyParticipantResponse.notVerified();
+  }
+
+  /** 참가자 QR 조회 by checkCode (인증 불필요, 문자 링크용) */
+  @Transactional(readOnly = true)
+  public VerifyParticipantResponse verifyParticipantByCheckCode(
+      String eventCode, String checkCode) {
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventCode(eventCode)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "존재하지 않는 행사입니다."));
+
+    EventParticipant participant =
+        participantMapper.selectByEventSeqAndCheckCode(event.getEventSeq(), checkCode).orElse(null);
+
+    if (participant == null) {
+      return VerifyParticipantResponse.notVerified();
+    }
+
+    return VerifyParticipantResponse.verified(buildParticipantInfo(participant, null));
+  }
+
+  /** EventParticipant → ParticipantInfo 변환 (QR URL 포함) */
+  private VerifyParticipantResponse.ParticipantInfo buildParticipantInfo(
+      EventParticipant participant, String phone) {
+    String qrCodeUrl =
+        wiseadUrl + "/event/" + participant.getEventSeq() + "/check/" + participant.getCheckCode();
+
+    return VerifyParticipantResponse.ParticipantInfo.builder()
+        .seq(participant.getSeq())
+        .name(participant.getUserName())
+        .phone(phone)
+        .department(participant.getDepartment())
+        .position(participant.getPosition())
+        .participantType(participant.getParticipantType())
+        .checkCode(participant.getCheckCode())
+        .eventName(participant.getEventName())
+        .qrCodeUrl(qrCodeUrl)
+        .build();
   }
 
   /** 참가자 등록 */

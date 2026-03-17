@@ -48,4 +48,13 @@ public class FrontEventController {
     VerifyParticipantResponse response = participantService.verifyParticipant(eventCode, request);
     return ApiResponse.success(response);
   }
+
+  /** 참가자 QR코드 조회 by checkCode (인증 불필요) */
+  @GetMapping("/{eventCode}/verify/{checkCode}")
+  public ApiResponse<VerifyParticipantResponse> getParticipantQr(
+      @PathVariable String eventCode, @PathVariable String checkCode) {
+    VerifyParticipantResponse response =
+        participantService.verifyParticipantByCheckCode(eventCode, checkCode);
+    return ApiResponse.success(response);
+  }
 }

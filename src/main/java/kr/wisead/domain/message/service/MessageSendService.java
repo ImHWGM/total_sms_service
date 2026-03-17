@@ -940,6 +940,7 @@ public class MessageSendService {
         String phone = receiver.getNormalizedPhone();
         Integer userSeq = receiver.getUserSeq();
         String userKey = receiver.getUserKey();
+        boolean newlyCreatedUser = false;
 
         // SURVEY_USER 자동 등록 (userSeq가 없는 경우)
         if (userSeq == null && phone != null) {
@@ -968,6 +969,7 @@ public class MessageSendService {
               surveyUserMapper.insert(surveyUser);
               userSeq = surveyUser.getSeq();
               userKey = newUserKey;
+              newlyCreatedUser = true;
               log.info(
                   "설문 대상자 자동 등록 - eventSeq: {}, phone: {}, userSeq: {}",
                   request.getEventSeq(),
@@ -1008,8 +1010,21 @@ public class MessageSendService {
           msgQueue = msgQueue.withRequestTime(request.getRequestTime());
         }
 
-        // LMS로 발송
-        msgQueueMapper.insertLms(msgQueue);
+        try {
+          // LMS로 발송
+          msgQueueMapper.insertLms(msgQueue);
+        } catch (Exception e) {
+          // 발송 실패 시 신규 등록된 설문유저 보상 삭제 (다른 DB 트랜잭션이라 자동 롤백 안됨)
+          if (newlyCreatedUser && userSeq != null) {
+            try {
+              surveyUserMapper.softDelete(userSeq, regId);
+              log.info("발송 실패로 설문 대상자 보상 삭제 - userSeq: {}", userSeq);
+            } catch (Exception deleteEx) {
+              log.warn("설문 대상자 보상 삭제 실패 - userSeq: {}, error: {}", userSeq, deleteEx.getMessage());
+            }
+          }
+          throw e;
+        }
         recordSmsSend(
             request.getEventSeq(),
             userSeq,

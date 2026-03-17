@@ -34,6 +34,27 @@ public final class UrlUtils {
   }
 
   /**
+   * 레거시 절대 파일경로만 상대 경로로 정규화 (baseUrl 결합 없음)
+   *
+   * <p>이미 http/https URL이면 그대로 반환, 레거시 경로(C:/...)면 상대경로 추출, 상대경로면 그대로 반환
+   *
+   * @param path 이미지 경로
+   * @return 정규화된 상대 경로 또는 원본
+   */
+  public static String toNormalizedPath(String path) {
+    if (path == null || path.isEmpty()) {
+      return path;
+    }
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+      return path;
+    }
+    if (path.length() > 2 && Character.isLetter(path.charAt(0)) && (path.charAt(1) == ':')) {
+      return extractRelativePath(path);
+    }
+    return path;
+  }
+
+  /**
    * 절대 파일경로에서 상대 URL 경로 추출
    *
    * @param absolutePath 절대 경로 (예: C:/project/monkeys/upload/survey/564/Desc.jpg)

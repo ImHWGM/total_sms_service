@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.event.dto.*;
 import kr.wisead.domain.event.entity.*;
 import kr.wisead.mapper.primary.*;
@@ -28,6 +29,7 @@ public class EventCheckService {
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final SurveyMasterMapper surveyMasterMapper;
+  private final UserIdResolver userIdResolver;
 
   @Value("${wisead.url:http://localhost:8080}")
   private String wiseadUrl;
@@ -40,6 +42,35 @@ public class EventCheckService {
             .selectDetailByEventSeqAndCheckCode(eventSeq, checkCode)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+
+    return processCheckIn(participant, deviceInfo);
+  }
+
+  /** 스태프 QR 스캔으로 체크인 처리 (로그인 필요) */
+  @Transactional
+  public EventCheckResponse staffCheckIn(
+      Integer eventSeq, String checkCode, String staffUserSeq, String deviceInfo) {
+    // 1. 행사 소유자 검증
+    var event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사 정보를 찾을 수 없습니다."));
+
+    String staffUserId = userIdResolver.resolveUserId(staffUserSeq);
+    if (!staffUserId.equals(event.getRegId())) {
+      throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 행사의 체크인 권한이 없습니다.");
+    }
+
+    // 2. 참가자 조회
+    EventParticipant participant =
+        participantMapper
+            .selectDetailByEventSeqAndCheckCode(eventSeq, checkCode)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+
+    log.info(
+        "스태프 체크인 요청: eventSeq={}, checkCode={}, staffUserId={}", eventSeq, checkCode, staffUserId);
 
     return processCheckIn(participant, deviceInfo);
   }

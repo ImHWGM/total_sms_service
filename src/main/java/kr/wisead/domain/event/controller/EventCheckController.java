@@ -6,6 +6,8 @@ import kr.wisead.domain.event.dto.*;
 import kr.wisead.domain.event.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 /** 행사 체크인 Controller (참가자용 - 인증 불필요) */
@@ -64,5 +66,29 @@ public class EventCheckController {
       @RequestHeader(value = "X-Device-Info", required = false) String deviceInfo) {
     nametagService.recordPrintByCheckCode(eventSeq, checkCode, request, deviceInfo);
     return ApiResponse.success("명찰 출력이 기록되었습니다.");
+  }
+
+  // ==================== 스태프 체크인 (인증 필요) ====================
+
+  /** 스태프 QR 스캔으로 체크인 (로그인 필요) */
+  @PostMapping("/{eventSeq}/staff-checkin/{checkCode}")
+  public ApiResponse<EventCheckResponse> staffCheckIn(
+      @PathVariable Integer eventSeq,
+      @PathVariable String checkCode,
+      @AuthenticationPrincipal UserDetails userDetails,
+      @RequestHeader(value = "X-Device-Info", required = false) String deviceInfo) {
+    EventCheckResponse response =
+        checkService.staffCheckIn(eventSeq, checkCode, userDetails.getUsername(), deviceInfo);
+    return ApiResponse.success(response, response.getMessage());
+  }
+
+  /** 스태프 QR 스캔으로 참가자 정보 조회 (로그인 필요) */
+  @GetMapping("/{eventSeq}/staff-checkin/{checkCode}")
+  public ApiResponse<ParticipantStatusResponse> staffGetParticipant(
+      @PathVariable Integer eventSeq,
+      @PathVariable String checkCode,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    return ApiResponse.success(
+        participantService.getParticipantStatusByCheckCode(eventSeq, checkCode));
   }
 }

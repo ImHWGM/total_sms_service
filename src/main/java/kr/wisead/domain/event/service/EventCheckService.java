@@ -134,9 +134,12 @@ public class EventCheckService {
             participant.getSeq(), checkInType.getSeq());
 
     EventParticipantResponse participantResponse = EventParticipantResponse.from(participant);
+    String nametagUrl =
+        wiseadUrl + "/api/events/" + participant.getEventSeq() + "/nametag/" + participant.getSeq();
 
     if (alreadyCheckedIn) {
-      return EventCheckResponse.alreadyCheckedIn(participantResponse, event.getBadgePrintType());
+      return EventCheckResponse.alreadyCheckedIn(
+          participantResponse, nametagUrl, event.getBadgePrintType());
     }
 
     // 4. 체크인 로그 등록
@@ -147,10 +150,6 @@ public class EventCheckService {
     // 5. attendTime 업데이트 (체크인 시점 = 참석시간)
     String attendTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
     participantMapper.updateAttendTime(participant.getSeq(), attendTime);
-
-    // 6. 명찰 URL 생성
-    String nametagUrl =
-        wiseadUrl + "/api/events/" + participant.getEventSeq() + "/nametag/" + participant.getSeq();
 
     log.info(
         "참가자 체크인 완료: eventSeq={}, participantSeq={}, name={}",

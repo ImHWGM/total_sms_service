@@ -54,9 +54,9 @@ public class EventCheckResponse {
         .build();
   }
 
-  /** 이미 체크인한 경우 응답 */
+  /** 이미 체크인한 경우 응답 (명찰 재출력용 nametagUrl 포함) */
   public static EventCheckResponse alreadyCheckedIn(
-      EventParticipantResponse participant, String badgePrintType) {
+      EventParticipantResponse participant, String nametagUrl, String badgePrintType) {
     return EventCheckResponse.builder()
         .action("ALREADY_CHECKED_IN")
         .actionName("입장 완료")
@@ -68,6 +68,7 @@ public class EventCheckResponse {
                 .position(participant.getPosition())
                 .participantType(participant.getParticipantType())
                 .build())
+        .nametagUrl(nametagUrl)
         .badgePrintType(badgePrintType)
         .message("이미 입장 처리된 참가자입니다.")
         .build();

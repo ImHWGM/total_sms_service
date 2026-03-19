@@ -811,9 +811,122 @@ public class MessageSendService {
   public ResendResponse sendNewToDuplicates(ResendRequest request, String regId) {
     log.info("중복 번호 신규 발송 시작 - eventSeq: {}, regId: {}", request.getEventSeq(), regId);
 
-    // resendToDuplicates와 동일한 로직 사용
-    // 차이점: useOriginalContent = false, 새로운 text 사용
-    return resendToDuplicates(request, regId);
+    List<ResendRequest.DuplicateReceiver> receivers = request.getDuplicateReceivers();
+    if (receivers == null || receivers.isEmpty()) {
+      log.warn("중복 수신자 목록이 비어있음");
+      return ResendResponse.fail("발송할 수신자가 없습니다.");
+    }
+
+    // 이벤트 코드 조회
+    String eventCode = request.getEventCode();
+    if (eventCode == null || eventCode.isEmpty()) {
+      eventCode =
+          surveyMasterMapper
+              .selectByEventSeq(request.getEventSeq())
+              .map(SurveyMaster::getEventCode)
+              .orElse(null);
+    }
+
+    if (eventCode == null || eventCode.isEmpty()) {
+      log.error("이벤트 코드를 찾을 수 없음 - eventSeq: {}", request.getEventSeq());
+      return ResendResponse.fail("이벤트 정보를 찾을 수 없습니다.");
+    }
+
+    // 설문 요금 차감
+    String txGroupId = deductForMessage(regId, "survey", receivers.size(), "L");
+
+    int successCount = 0;
+    int failCount = 0;
+    List<String> failedList = new ArrayList<>();
+    String realUserId = userIdResolver.resolveUserId(regId);
+
+    for (ResendRequest.DuplicateReceiver receiver : receivers) {
+      try {
+        String phone = normalizePhoneNumber(receiver.getPhone());
+
+        // 새 SURVEY_USER 생성 (새 userKey로 새 설문 링크 발급)
+        String encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(phone));
+        String newUserKey = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        SurveyUser surveyUser =
+            SurveyUser.builder()
+                .eventSeq(request.getEventSeq())
+                .userKey(newUserKey)
+                .userPhone(encryptedPhone)
+                .resendUserPhone(encryptedPhone)
+                .delYn("N")
+                .regId(regId)
+                .build();
+        surveyUserMapper.insert(surveyUser);
+        Integer newUserSeq = surveyUser.getSeq();
+
+        log.info(
+            "중복 번호 신규 설문 대상자 등록 - eventSeq: {}, phone: {}, newUserSeq: {}, newUserKey: {}",
+            request.getEventSeq(),
+            phone,
+            newUserSeq,
+            newUserKey);
+
+        String text = request.getText();
+
+        // 대치문자 및 새 유저키 처리
+        text =
+            applyReplaceChars(
+                text, receiver.getRepChar01(), receiver.getRepChar02(), receiver.getRepChar03());
+        text = applyUserKey(text, newUserKey);
+
+        // URL 패턴을 찾아서 단축 URL로 변환
+        text = ShortUrlUtils.shortenUrlsInText(text, wiseadUrl);
+
+        // MSG_QUEUE에 등록
+        MsgQueue msgQueue =
+            MsgQueue.createForSurvey(
+                "L", // LMS로 발송
+                phone,
+                request.getCallback(),
+                request.getSubject(),
+                text,
+                request.getEventSeq(),
+                newUserSeq,
+                txGroupId,
+                realUserId);
+
+        try {
+          msgQueueMapper.insertLms(msgQueue);
+        } catch (Exception e) {
+          // 발송 실패 시 신규 등록된 설문유저 보상 삭제 (다른 DB 트랜잭션이라 자동 롤백 안됨)
+          try {
+            surveyUserMapper.softDelete(newUserSeq, regId);
+            log.info("발송 실패로 설문 대상자 보상 삭제 - userSeq: {}", newUserSeq);
+          } catch (Exception deleteEx) {
+            log.warn("설문 대상자 보상 삭제 실패 - userSeq: {}, error: {}", newUserSeq, deleteEx.getMessage());
+          }
+          throw e;
+        }
+        recordSmsSend(
+            request.getEventSeq(),
+            newUserSeq,
+            request.getSubject(),
+            text,
+            "1",
+            phone,
+            request.getCallback(),
+            regId);
+        successCount++;
+
+      } catch (Exception e) {
+        failCount++;
+        failedList.add(receiver.getPhone());
+        log.warn("중복 번호 신규 발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+      }
+    }
+
+    log.info("중복 번호 신규 발송 완료 - 성공: {}, 실패: {}", successCount, failCount);
+
+    if (failCount == 0) {
+      return ResendResponse.success(successCount);
+    } else {
+      return ResendResponse.partial(successCount, failCount, failedList);
+    }
   }
 
   /** 이벤트 시퀀스 기반으로 조회할 msg_result 테이블명 목록 생성 설문 시작일 -1개월부터 현재 월까지, 실제 존재하는 테이블만 반환 */

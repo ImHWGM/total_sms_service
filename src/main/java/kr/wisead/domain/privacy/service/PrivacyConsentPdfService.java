@@ -1185,7 +1185,7 @@ public class PrivacyConsentPdfService {
       String decryptedValue = null;
       switch (type) {
         case "NE": // 이름
-          decryptedValue = CryptoUtils.decryptAES256(user.getUserName());
+          decryptedValue = CryptoUtils.decryptName(user.getUserName());
           // survey_user에 이름이 없으면 survey_answer에서 NE 타입 답변 조회 (QR 설문 등)
           if (!isValidPrivacyData(decryptedValue)) {
             String answerName =
@@ -1201,7 +1201,7 @@ public class PrivacyConsentPdfService {
           }
           break;
         case "CU": // 전화번호
-          decryptedValue = CryptoUtils.decryptAES256(user.getUserPhone());
+          decryptedValue = CryptoUtils.getDecryptedAES256Data(user.getUserPhone());
           if (isValidPrivacyData(decryptedValue)) {
             hasAnyValidData = true;
             if (displayName == null) {
@@ -1211,19 +1211,19 @@ public class PrivacyConsentPdfService {
           }
           break;
         case "SO": // 주민번호
-          decryptedValue = CryptoUtils.decryptAES256(user.getJuminNum());
+          decryptedValue = CryptoUtils.getDecryptedAES256Data(user.getJuminNum());
           if (isValidPrivacyData(decryptedValue)) {
             hasAnyValidData = true;
           }
           break;
         case "EM": // 이메일
-          decryptedValue = CryptoUtils.decryptAES256(user.getUserEmail());
+          decryptedValue = CryptoUtils.getDecryptedAES256Data(user.getUserEmail());
           if (isValidPrivacyData(decryptedValue)) {
             hasAnyValidData = true;
           }
           break;
         case "AD": // 주소
-          decryptedValue = CryptoUtils.decryptAES256(user.getAddress());
+          decryptedValue = CryptoUtils.getDecryptedAES256Data(user.getAddress());
           if (isValidPrivacyData(decryptedValue)) {
             hasAnyValidData = true;
           }

@@ -49,8 +49,22 @@ public class SecurityConfig {
     "/api/unsubscribe", // 이메일 수신거부
     "/unsubscribe", // 이메일 수신거부 (레거시 호환)
 
-    // 설문 참여 (비로그인 허용)
-    "/api/survey/**",
+    // 설문 참여 (비로그인 허용) - /api/survey/users 관리자 엔드포인트 제외
+    "/api/survey/code/**", // 이벤트코드로 설문 조회
+    "/api/survey/qr/**", // QR코드로 설문 조회
+    "/api/survey/key/**", // 사용자키로 설문 조회
+    "/api/survey/auth/**", // 범용인증
+    "/api/survey/*/submit", // 설문 제출
+    "/api/survey/*/participants", // 참여자 목록 조회
+    "/api/survey/*/absentees", // 미참여자 조회
+    "/api/survey/answers/**", // 설문 응답/통계
+    // 설문 참여자 프론트 엔드포인트 (비로그인 허용)
+    "/api/survey/users/key/**", // 사용자키로 참여자 조회
+    "/api/survey/users/validate-key", // 사용자키 유효성 검증
+    "/api/survey/users/start-time", // 설문 접속시간 기록
+    "/api/survey/users/auth-time", // 설문 인증시간 기록
+    "/api/survey/users/check-phone", // 전화번호 중복확인
+    "/api/survey/users/auth/**", // 범용인증 상태/조회
     "/api/front/**",
 
     // 행사 체크인 (비로그인 허용 - QR 스캔)
@@ -113,7 +127,17 @@ public class SecurityConfig {
         // 요청 인가 설정
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(PUBLIC_ENDPOINTS)
+                // 관리자 설문 엔드포인트 보호 (PUBLIC_ENDPOINTS 와일드카드 패턴과 충돌 방지)
+                // /api/survey/*/absentees 등이 /api/survey/users/absentees를 매칭하는 것을 방지
+                auth.requestMatchers("/api/survey/users").authenticated()
+                    .requestMatchers("/api/survey/users/completed").authenticated()
+                    .requestMatchers("/api/survey/users/absentees").authenticated()
+                    .requestMatchers("/api/survey/users/count").authenticated()
+                    .requestMatchers("/api/survey/users/batch").authenticated()
+                    .requestMatchers(HttpMethod.PUT, "/api/survey/users/*").authenticated()
+                    .requestMatchers(HttpMethod.PATCH, "/api/survey/users/**").authenticated()
+                    .requestMatchers(HttpMethod.DELETE, "/api/survey/users/**").authenticated()
+                    .requestMatchers(PUBLIC_ENDPOINTS)
                     .permitAll()
                     // 인증된 사용자면 접근 가능 (내부 비즈니스 로직에서 권한별 분기)
                     .requestMatchers("/api/admin/selectable-user-ids")

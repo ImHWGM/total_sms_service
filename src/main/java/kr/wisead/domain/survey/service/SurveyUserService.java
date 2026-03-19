@@ -157,6 +157,7 @@ public class SurveyUserService {
       String reason,
       String userId,
       Integer userLevel,
+      List<String> queryUserIds,
       HttpServletRequest httpRequest) {
 
     // 마스킹 해제 요청인 경우 사유 검증 및 로그 기록
@@ -185,6 +186,7 @@ public class SurveyUserService {
     params.put("size", size);
     params.put("regId", userId);
     params.put("userLevel", userLevel);
+    params.put("queryUserIds", queryUserIds);
 
     // 검색 키워드 처리 (암호화 필요한 필드)
     if (!CommonUtils.isNullOrEmpty(keyword) && !CommonUtils.isNullOrEmpty(searchType)) {

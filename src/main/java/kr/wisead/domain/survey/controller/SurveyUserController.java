@@ -67,6 +67,7 @@ public class SurveyUserController {
     String rawUserId = userDetails != null ? userDetails.getUsername() : "ANONYMOUS";
     String userId = userIdResolver.resolveUserId(rawUserId);
     Integer userLevel = adminService.getUserLevel(rawUserId);
+    List<String> queryUserIds = adminService.resolveQueryUserIds(userId, userLevel);
 
     log.info(
         "[발송조회 검색] userId={}, eventType={}, searchType={}, keyword={}, startDate={}, endDate={},"
@@ -95,6 +96,7 @@ public class SurveyUserController {
             reason,
             userId,
             userLevel,
+            queryUserIds,
             httpRequest);
     return ApiResponse.success(response);
   }

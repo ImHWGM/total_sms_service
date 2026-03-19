@@ -46,8 +46,11 @@
     <sql id="whereCondition">
         <where>
             1=1
-            <if test="userLevel != null and userLevel lt 50">
-                AND M.REG_ID = #{regId}
+            <if test="queryUserIds != null and queryUserIds.size() > 0">
+                AND M.REG_ID IN
+                <foreach collection="queryUserIds" item="quid" open="(" separator="," close=")">
+                    #{quid}
+                </foreach>
             </if>
             <if test="eventType != null and eventType != ''">
                 AND M.EVENT_TYPE = #{eventType}
@@ -237,8 +240,11 @@
         SELECT DISTINCT EVENT_NAME
         FROM SURVEY_MASTER
         WHERE 1=1
-        <if test="userLevel != null and userLevel lt 50">
-            AND REG_ID = #{regId}
+        <if test="queryUserIds != null and queryUserIds.size() > 0">
+            AND REG_ID IN
+            <foreach collection="queryUserIds" item="quid" open="(" separator="," close=")">
+                #{quid}
+            </foreach>
         </if>
         <if test="searchKeyword != null and searchKeyword != ''">
             AND EVENT_NAME LIKE CONCAT('%', #{searchKeyword}, '%')

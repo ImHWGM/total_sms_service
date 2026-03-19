@@ -8,6 +8,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.file.service.FileStorageService;
 import kr.wisead.domain.message.dto.MultiMessageRequest;
@@ -151,7 +152,10 @@ public class MultiMessageService {
         insertMsgQueue(request.getMsgTypeCode(), msgQueue);
         successCount++;
       } catch (Exception e) {
-        log.error("메시지 등록 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+        log.error(
+            "메시지 등록 실패 - phone: {}, error: {}",
+            CommonUtils.maskingPhone(receiver.getPhone()),
+            e.getMessage());
       }
     }
 

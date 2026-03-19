@@ -86,7 +86,7 @@ public class AuthService {
       if (!isLoggedInToday(user)) {
         // 오늘 로그인한 적이 없으면 이메일 인증 필요
         String email = decryptField(user.getEmail());
-        log.info("[이메일 인증 필요] userId={}, email={}", user.getUserId(), email);
+        log.info("[이메일 인증 필요] userId={}, email={}", user.getUserId(), maskEmail(email));
 
         if (!StringUtils.hasText(email)) {
           throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다. 관리자에게 문의하세요.");
@@ -96,20 +96,20 @@ public class AuthService {
         var verificationStatus = emailAuthService.getVerificationStatus(email);
         if (!verificationStatus.codeSent()) {
           // 인증 코드가 발송되지 않은 경우에만 발송
-          log.info("[인증 코드 발송 시도] userId={}, email={}", user.getUserId(), email);
+          log.info("[인증 코드 발송 시도] userId={}, email={}", user.getUserId(), maskEmail(email));
           try {
             emailAuthService.sendVerificationCode(email);
-            log.info("[인증 코드 발송 성공] userId={}, email={}", user.getUserId(), email);
+            log.info("[인증 코드 발송 성공] userId={}, email={}", user.getUserId(), maskEmail(email));
           } catch (BusinessException e) {
             log.warn(
                 "[인증 코드 발송 실패] userId={}, email={}, 사유={}",
                 user.getUserId(),
-                email,
+                maskEmail(email),
                 e.getMessage());
             throw e;
           }
         } else {
-          log.info("[인증 코드 이미 발송됨 (재사용)] userId={}, email={}", user.getUserId(), email);
+          log.info("[인증 코드 이미 발송됨 (재사용)] userId={}, email={}", user.getUserId(), maskEmail(email));
         }
 
         // 이메일 인증 필요 응답 반환

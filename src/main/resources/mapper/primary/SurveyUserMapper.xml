@@ -390,8 +390,11 @@
             <if test="eventType != null and eventType != ''">
                 AND M.EVENT_TYPE = #{eventType}
             </if>
-            <if test="userLevel != null and userLevel lt 50">
-                AND M.REG_ID = #{regId}
+            <if test="queryUserIds != null and queryUserIds.size() > 0">
+                AND M.REG_ID IN
+                <foreach collection="queryUserIds" item="quid" open="(" separator="," close=")">
+                    #{quid}
+                </foreach>
             </if>
             <if test="keyword != null and keyword != ''">
                 <choose>
@@ -444,8 +447,11 @@
             <if test="eventType != null and eventType != ''">
                 AND M.EVENT_TYPE = #{eventType}
             </if>
-            <if test="userLevel != null and userLevel lt 50">
-                AND M.REG_ID = #{regId}
+            <if test="queryUserIds != null and queryUserIds.size() > 0">
+                AND M.REG_ID IN
+                <foreach collection="queryUserIds" item="quid" open="(" separator="," close=")">
+                    #{quid}
+                </foreach>
             </if>
             <if test="keyword != null and keyword != ''">
                 <choose>
@@ -555,8 +561,11 @@
     <sql id="searchCondition">
         <where>
             U.DEL_YN = 'N'
-            <if test="userLevel != null and userLevel lt 50">
-                AND M.REG_ID = #{regId}
+            <if test="queryUserIds != null and queryUserIds.size() > 0">
+                AND M.REG_ID IN
+                <foreach collection="queryUserIds" item="quid" open="(" separator="," close=")">
+                    #{quid}
+                </foreach>
             </if>
             <if test="eventSeq != null">
                 AND U.EVENT_SEQ = #{eventSeq}

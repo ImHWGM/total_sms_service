@@ -274,6 +274,31 @@ public class AdminService {
     }
   }
 
+  /**
+   * 권한별 조회 대상 사용자 ID 목록 반환 (List)
+   *
+   * @return 조회 대상 ID 목록 (최고관리자는 null → 전체 조회)
+   */
+  public List<String> resolveQueryUserIds(String userId, Integer userLevel) {
+    if (userLevel == null) return List.of(userId);
+
+    if (userLevel >= 90) {
+      return null;
+    } else if (userLevel >= 50) {
+      List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(userId);
+      if (managedUserIds == null || managedUserIds.isEmpty()) {
+        return List.of(userId);
+      }
+      List<String> result = new java.util.ArrayList<>(managedUserIds);
+      if (!result.contains(userId)) {
+        result.add(userId);
+      }
+      return result;
+    } else {
+      return List.of(userId);
+    }
+  }
+
   /** SEQ로 USER_ID 조회 */
   public String getUserIdBySeq(String userSeq) {
     try {

@@ -58,11 +58,11 @@ public class EventController {
     String userId = userDetails.getUsername();
     Integer userLevel = adminService.getUserLevel(userId);
     String actualRegId = userIdResolver.resolveUserId(userId);
-
     EventSearchRequest request =
         EventSearchRequest.builder()
             .regId(actualRegId)
             .userLevel(userLevel)
+            .queryUserIds(adminService.resolveQueryUserIds(actualRegId, userLevel))
             .eventType(eventType)
             .eventTypes(eventTypes)
             .surveyStatus(surveyStatus)
@@ -150,11 +150,11 @@ public class EventController {
     String userId = userDetails.getUsername();
     Integer userLevel = adminService.getUserLevel(userId);
     String actualRegId = userIdResolver.resolveUserId(userId);
-
     EventSearchRequest request =
         EventSearchRequest.builder()
             .regId(actualRegId)
             .userLevel(userLevel)
+            .queryUserIds(adminService.resolveQueryUserIds(actualRegId, userLevel))
             .searchKeyword(keyword)
             .build();
     List<String> names = eventService.searchEventNames(request);

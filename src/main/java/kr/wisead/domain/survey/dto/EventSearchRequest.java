@@ -14,6 +14,7 @@ public class EventSearchRequest {
   private Integer userSeq; // 관리자 시퀀스
   private String regId; // 등록자 ID
   private Integer userLevel; // 사용자 레벨
+  private List<String> queryUserIds; // 권한별 조회 대상 사용자 ID 목록 (null이면 전체 조회)
 
   private String eventType; // 이벤트 타입 (단일)
   private List<String> eventTypes; // 이벤트 타입 목록 (복수, 예: S,P)

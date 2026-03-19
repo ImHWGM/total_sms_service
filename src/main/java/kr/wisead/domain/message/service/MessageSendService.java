@@ -782,7 +782,7 @@ public class MessageSendService {
       } catch (Exception e) {
         failCount++;
         failedList.add(receiver.getPhone());
-        log.warn("중복 번호 재발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+        log.warn("중복 번호 재발송 실패 - phone: {}, error: {}", maskPhone(receiver.getPhone()), e.getMessage());
       }
     }
 
@@ -862,7 +862,7 @@ public class MessageSendService {
         log.info(
             "중복 번호 신규 설문 대상자 등록 - eventSeq: {}, phone: {}, newUserSeq: {}, newUserKey: {}",
             request.getEventSeq(),
-            phone,
+            maskPhone(phone),
             newUserSeq,
             newUserKey);
 
@@ -916,7 +916,7 @@ public class MessageSendService {
       } catch (Exception e) {
         failCount++;
         failedList.add(receiver.getPhone());
-        log.warn("중복 번호 신규 발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+        log.warn("중복 번호 신규 발송 실패 - phone: {}, error: {}", maskPhone(receiver.getPhone()), e.getMessage());
       }
     }
 
@@ -1086,11 +1086,11 @@ public class MessageSendService {
               log.info(
                   "설문 대상자 자동 등록 - eventSeq: {}, phone: {}, userSeq: {}",
                   request.getEventSeq(),
-                  phone,
+                  maskPhone(phone),
                   userSeq);
             }
           } catch (Exception e) {
-            log.warn("설문 대상자 자동 등록 실패 - phone: {}, error: {}", phone, e.getMessage());
+            log.warn("설문 대상자 자동 등록 실패 - phone: {}, error: {}", maskPhone(phone), e.getMessage());
           }
         }
 
@@ -1154,7 +1154,7 @@ public class MessageSendService {
       } catch (Exception e) {
         failCount++;
         failedPhones.add(receiver.getPhone());
-        log.warn("설문 문자 발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+        log.warn("설문 문자 발송 실패 - phone: {}, error: {}", maskPhone(receiver.getPhone()), e.getMessage());
       }
     }
 
@@ -1240,9 +1240,9 @@ public class MessageSendService {
             participantSeq = registered.getParticipantSeq();
             surveyUserSeq = registered.getSurveyUserSeq();
             checkCode = registered.getCheckCode();
-            log.info("비참여자 자동 등록 - phone: {}, participantSeq: {}", phone, participantSeq);
+            log.info("비참여자 자동 등록 - phone: {}, participantSeq: {}", maskPhone(phone), participantSeq);
           } catch (Exception e) {
-            log.warn("비참여자 자동 등록 실패 - phone: {}, error: {}", phone, e.getMessage());
+            log.warn("비참여자 자동 등록 실패 - phone: {}, error: {}", maskPhone(phone), e.getMessage());
           }
         }
 
@@ -1336,7 +1336,7 @@ public class MessageSendService {
       } catch (Exception e) {
         failCount++;
         failedPhones.add(receiver.getPhone());
-        log.warn("행사참여자 문자 발송 실패 - phone: {}, error: {}", receiver.getPhone(), e.getMessage());
+        log.warn("행사참여자 문자 발송 실패 - phone: {}, error: {}", maskPhone(receiver.getPhone()), e.getMessage());
       }
     }
 
@@ -1408,5 +1408,10 @@ public class MessageSendService {
       return text;
     }
     return text.replace("#유저키#", userKey).replace("#userKey#", userKey);
+  }
+
+  /** 전화번호 마스킹 (로그용) */
+  private String maskPhone(String phone) {
+    return kr.wisead.common.util.CommonUtils.maskingPhone(phone);
   }
 }

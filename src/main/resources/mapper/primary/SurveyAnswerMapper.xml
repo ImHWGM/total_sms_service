@@ -52,6 +52,7 @@
             QUESTION_TYPE as questionType,
             QUESTION_TYPE_DETAIL as questionTypeDetail,
             ANSWER as answer,
+            OTHER_TEXT as otherText,
             FILE_PATH as filePath,
             REG_DATE as regDate
         FROM SURVEY_ANSWER
@@ -65,11 +66,11 @@
             useGeneratedKeys="true" keyProperty="answerSeq" keyColumn="ANSWER_SEQ">
         INSERT INTO SURVEY_ANSWER (
             EVENT_SEQ, QUESTION_SEQ, USER_SEQ, ITEM_SEQ,
-            QUESTION_TYPE, QUESTION_TYPE_DETAIL, ANSWER, FILE_PATH,
+            QUESTION_TYPE, QUESTION_TYPE_DETAIL, ANSWER, OTHER_TEXT, FILE_PATH,
             REG_DATE
         ) VALUES (
             #{eventSeq}, #{questionSeq}, #{userSeq}, #{itemSeq},
-            #{questionType}, #{questionTypeDetail}, #{answer}, #{filePath},
+            #{questionType}, #{questionTypeDetail}, #{answer}, #{otherText}, #{filePath},
             NOW()
         )
     </insert>
@@ -101,6 +102,7 @@
             QUESTION_TYPE as questionType,
             QUESTION_TYPE_DETAIL as questionTypeDetail,
             ANSWER as answer,
+            OTHER_TEXT as otherText,
             FILE_PATH as filePath,
             REG_DATE as regDate
         FROM SURVEY_ANSWER
@@ -119,6 +121,7 @@
             QUESTION_TYPE as questionType,
             QUESTION_TYPE_DETAIL as questionTypeDetail,
             ANSWER as answer,
+            OTHER_TEXT as otherText,
             FILE_PATH as filePath,
             REG_DATE as regDate
         FROM SURVEY_ANSWER
@@ -131,12 +134,12 @@
     <insert id="insertBatch" parameterType="list">
         INSERT INTO SURVEY_ANSWER (
             EVENT_SEQ, QUESTION_SEQ, USER_SEQ, ITEM_SEQ,
-            QUESTION_TYPE, QUESTION_TYPE_DETAIL, ANSWER, FILE_PATH,
+            QUESTION_TYPE, QUESTION_TYPE_DETAIL, ANSWER, OTHER_TEXT, FILE_PATH,
             REG_DATE
         ) VALUES
         <foreach collection="list" item="item" separator=",">
             (#{item.eventSeq}, #{item.questionSeq}, #{item.userSeq}, #{item.itemSeq},
-             #{item.questionType}, #{item.questionTypeDetail}, #{item.answer}, #{item.filePath},
+             #{item.questionType}, #{item.questionTypeDetail}, #{item.answer}, #{item.otherText}, #{item.filePath},
              NOW())
         </foreach>
     </insert>

@@ -18,6 +18,7 @@ public class SurveyAnswer {
   private String questionType; // 문항 종류
   private String questionTypeDetail; // 문항 종류 상세
   private String answer; // 답변 내용
+  private String otherText; // 기타 항목 텍스트
   private String filePath; // 파일 경로 (파일업로드 문항)
   private LocalDateTime regDate; // 등록일
 
@@ -72,6 +73,11 @@ public class SurveyAnswer {
         .questionTypeDetail("FE")
         .filePath(filePath)
         .build();
+  }
+
+  /** 기타 텍스트 설정 */
+  public void setOtherText(String otherText) {
+    this.otherText = otherText;
   }
 
   /** 파일 업로드 답변인지 확인 */

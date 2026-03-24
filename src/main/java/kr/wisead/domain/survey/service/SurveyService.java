@@ -188,6 +188,11 @@ public class SurveyService {
 
     // 답변 저장
     if (request.getAnswers() != null) {
+      // 기타 항목 판별을 위해 이벤트 전체 항목을 사전 조회 (N+1 방지)
+      Map<Integer, List<SurveyItem>> itemsByQuestion =
+          surveyItemMapper.selectByEventSeq(eventSeq).stream()
+              .collect(java.util.stream.Collectors.groupingBy(SurveyItem::getQuestionSeq));
+
       for (SurveySubmitRequest.AnswerRequest answerReq : request.getAnswers()) {
         SurveyAnswer answer;
         String answerValue = answerReq.getAnswer();
@@ -210,7 +215,7 @@ public class SurveyService {
         Integer itemSeq = answerReq.getItemSeq();
         if (itemSeq == null) {
           itemSeq =
-              surveyItemMapper.selectByQuestionSeq(eventSeq, answerReq.getQuestionSeq()).stream()
+              itemsByQuestion.getOrDefault(answerReq.getQuestionSeq(), List.of()).stream()
                   .findFirst()
                   .map(SurveyItem::getItemSeq)
                   .orElse(null);
@@ -236,6 +241,33 @@ public class SurveyService {
                   answerReq.getQuestionType(),
                   answerReq.getQuestionTypeDetail(),
                   answerValue);
+
+          // 기타 항목 처리: otherText 유효성 검증 및 저장
+          List<SurveyItem> questionItems =
+              itemsByQuestion.getOrDefault(answerReq.getQuestionSeq(), List.of());
+          boolean hasOtherSelected = false;
+
+          // MCS: itemSeq로 직접 기타 항목 확인
+          if (itemSeq != null) {
+            final Integer selectedItemSeq = itemSeq;
+            SurveyItem selectedItem = questionItems.stream()
+                .filter(i -> i.getItemSeq().equals(selectedItemSeq))
+                .findFirst()
+                .orElse(null);
+            if (selectedItem != null && selectedItem.isOther()) {
+              hasOtherSelected = true;
+            }
+          }
+
+          // MCM: 문항에 기타 항목이 있고 answer에 해당 itemValue가 포함되어 있는지 확인
+          if (!hasOtherSelected && "MCM".equals(answerReq.getQuestionTypeDetail())) {
+            hasOtherSelected = questionItems.stream().anyMatch(SurveyItem::isOther);
+          }
+
+          if (hasOtherSelected) {
+            validateOtherText(answerReq.getOtherText());
+            answer.setOtherText(answerReq.getOtherText());
+          }
         } else {
           // 주관식
           answer =
@@ -267,6 +299,16 @@ public class SurveyService {
   }
 
   /** SO 답변을 평문 주민번호로 정규화 (RSA/FOREIGN/평문 지원) */
+  /** 기타 텍스트 유효성 검증 */
+  private void validateOtherText(String otherText) {
+    if (otherText == null || otherText.isBlank()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "기타 항목 선택 시 텍스트 입력은 필수입니다.");
+    }
+    if (otherText.length() > 2000) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "기타 텍스트는 2000자를 초과할 수 없습니다.");
+    }
+  }
+
   private String resolveSoAnswer(SurveySubmitRequest.AnswerRequest answerReq) {
     String answer = answerReq.getAnswer();
     if (CommonUtils.isNullOrEmpty(answer)) {

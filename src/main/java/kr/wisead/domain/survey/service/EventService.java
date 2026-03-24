@@ -742,6 +742,7 @@ public class EventService {
 
       // 항목 저장
       if (qReq.getItems() != null && !qReq.getItems().isEmpty()) {
+        validateMcmOtherItemLimit(qReq.getQuestionTypeDetail(), qReq.getItems());
         int itemOrder = 1;
         for (ItemRequest iReq : qReq.getItems()) {
           int currentItemOrder = iReq.getOrder() != null ? iReq.getOrder() : itemOrder;
@@ -755,6 +756,8 @@ public class EventService {
                   currentItemOrder,
                   regId);
 
+          applyOptionalItemFields(item, iReq);
+
           // JSON 방식: 항목 이미지 경로 변환 후 저장
           if (iReq.getItemImg() != null && !iReq.getItemImg().isEmpty()) {
             String newItemImgPath = convertTempPathToEventPath(iReq.getItemImg(), eventSeqStr);
@@ -764,10 +767,6 @@ public class EventService {
                 questionOrder,
                 currentItemOrder,
                 newItemImgPath);
-          }
-
-          if (iReq.getJumpQuestion() != null) {
-            item.setJumpQuestion(iReq.getJumpQuestion());
           }
           surveyItemMapper.insert(item);
 
@@ -865,6 +864,7 @@ public class EventService {
 
       // 항목 저장
       if (qReq.getItems() != null && !qReq.getItems().isEmpty()) {
+        validateMcmOtherItemLimit(qReq.getQuestionTypeDetail(), qReq.getItems());
         int itemOrder = 1;
         for (ItemRequest iReq : qReq.getItems()) {
           int currentItemOrder = iReq.getOrder() != null ? iReq.getOrder() : itemOrder;
@@ -877,9 +877,7 @@ public class EventService {
                   iReq.getItemValue(),
                   currentItemOrder,
                   regId);
-          if (iReq.getJumpQuestion() != null) {
-            item.setJumpQuestion(iReq.getJumpQuestion());
-          }
+          applyOptionalItemFields(item, iReq);
           surveyItemMapper.insert(item);
 
           // 항목 이미지 저장
@@ -928,6 +926,7 @@ public class EventService {
 
       // 항목 저장
       if (qReq.getItems() != null && !qReq.getItems().isEmpty()) {
+        validateMcmOtherItemLimit(qReq.getQuestionTypeDetail(), qReq.getItems());
         int itemOrder = 1;
         for (ItemRequest iReq : qReq.getItems()) {
           SurveyItem item =
@@ -941,9 +940,7 @@ public class EventService {
           if (iReq.getItemImg() != null) {
             item.setItemImg(iReq.getItemImg());
           }
-          if (iReq.getJumpQuestion() != null) {
-            item.setJumpQuestion(iReq.getJumpQuestion());
-          }
+          applyOptionalItemFields(item, iReq);
           surveyItemMapper.insert(item);
           itemOrder++;
         }
@@ -951,6 +948,30 @@ public class EventService {
         insertDefaultSubjectiveItem(eventSeq, question, qReq.getQuestionTypeDetail(), regId);
       }
       order++;
+    }
+  }
+
+  /** ItemRequest의 선택적 필드를 SurveyItem에 적용 */
+  private void applyOptionalItemFields(SurveyItem item, ItemRequest iReq) {
+    if (iReq.getOtherYn() != null) {
+      item.setOtherYn(iReq.getOtherYn());
+    }
+    if (iReq.getOtherPlaceholder() != null) {
+      item.setOtherPlaceholder(iReq.getOtherPlaceholder());
+    }
+    if (iReq.getJumpQuestion() != null) {
+      item.setJumpQuestion(iReq.getJumpQuestion());
+    }
+  }
+
+  /** MCM 문항의 기타 항목 수 검증 (최대 1개) */
+  private void validateMcmOtherItemLimit(String questionTypeDetail, List<ItemRequest> items) {
+    if ("MCM".equals(questionTypeDetail) && items != null) {
+      long otherCount = items.stream().filter(i -> "Y".equals(i.getOtherYn())).count();
+      if (otherCount > 1) {
+        throw new BusinessException(
+            ErrorCode.INVALID_INPUT, "복수선택(MCM) 문항에는 기타 항목을 최대 1개만 설정할 수 있습니다.");
+      }
     }
   }
 
@@ -1285,6 +1306,8 @@ public class EventService {
 
     // 사용자별 응답 맵 구성 (MCM 복수선택은 "##"로 연결)
     Map<Integer, Map<Integer, String>> userAnswersMap = new HashMap<>();
+    // 사용자별 기타 텍스트 맵 구성
+    Map<Integer, Map<Integer, String>> userOtherTextMap = new HashMap<>();
     for (SurveyAnswer answer : allAnswers) {
       if (answer.getAnswer() == null) continue;
       Map<Integer, String> questionMap =
@@ -1293,6 +1316,12 @@ public class EventService {
           answer.getQuestionSeq(),
           answer.getAnswer(),
           (existing, newVal) -> existing + "##" + newVal);
+      // 기타 텍스트 저장
+      if (answer.getOtherText() != null && !answer.getOtherText().isEmpty()) {
+        Map<Integer, String> otherTextMap =
+            userOtherTextMap.computeIfAbsent(answer.getUserSeq(), k -> new HashMap<>());
+        otherTextMap.put(answer.getQuestionSeq(), answer.getOtherText());
+      }
     }
 
     // 통계 정보
@@ -1316,7 +1345,8 @@ public class EventService {
       addSurveyResponsesSheet(workbook, eventSeq, questions, allItems);
 
       // 시트3: 개별전체(응답자)
-      addSurveyParticipantsSheet(workbook, event, questions, participants, userAnswersMap);
+      addSurveyParticipantsSheet(
+          workbook, event, questions, participants, userAnswersMap, userOtherTextMap);
 
       // 시트4: 개별전체(비응답자)
       addSurveyAbsenteesSheet(workbook, absentees);
@@ -1538,7 +1568,8 @@ public class EventService {
       SurveyMaster event,
       List<SurveyQuestion> questions,
       List<SurveyUser> participants,
-      Map<Integer, Map<Integer, String>> userAnswersMap) {
+      Map<Integer, Map<Integer, String>> userAnswersMap,
+      Map<Integer, Map<Integer, String>> userOtherTextMap) {
     Sheet sheet = workbook.createSheet("개별전체(응답자)");
     sheet.setDefaultColumnWidth(15);
 
@@ -1618,6 +1649,8 @@ public class EventService {
       // 문항별 응답
       Map<Integer, String> userAnswers =
           userAnswersMap.getOrDefault(participant.getSeq(), new HashMap<>());
+      Map<Integer, String> userOtherTexts =
+          userOtherTextMap.getOrDefault(participant.getSeq(), new HashMap<>());
       for (int i = 0; i < questions.size(); i++) {
         SurveyQuestion question = questions.get(i);
         String answer = userAnswers.get(question.getQuestionSeq());
@@ -1629,6 +1662,11 @@ public class EventService {
           } else if ("MC".equals(question.getQuestionType())) {
             // 객관식 답변은 평문 숫자이므로 복호화 불필요
             displayAnswer = answer.replace("##", ", ");
+            // 기타 텍스트가 있으면 추가 표시
+            String otherText = userOtherTexts.get(question.getQuestionSeq());
+            if (otherText != null && !otherText.isEmpty()) {
+              displayAnswer += " (기타: " + otherText + ")";
+            }
           } else if ("SAA".equals(question.getQuestionType())
               || "SO".equals(question.getQuestionTypeDetail())) {
             // SAA 타입 또는 SO(주민번호) 타입: 서버 AES 암호화된 답변 → 복호화 필요

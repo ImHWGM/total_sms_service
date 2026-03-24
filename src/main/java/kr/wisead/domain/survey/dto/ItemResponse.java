@@ -18,6 +18,8 @@ public class ItemResponse {
   private String itemImg; // 항목 이미지
   private Integer order; // 순서
   private Integer jumpQuestion; // 분기 문항 시퀀스
+  private String otherYn; // 기타 항목 여부 (Y/N)
+  private String otherPlaceholder; // 기타 항목 입력 안내 문구
 
   // 통계용
   private Integer answerCount; // 해당 보기 선택 수
@@ -34,6 +36,8 @@ public class ItemResponse {
         .itemImg(entity.getItemImg())
         .order(entity.getOrder())
         .jumpQuestion(entity.getJumpQuestion())
+        .otherYn(entity.getOtherYn())
+        .otherPlaceholder(entity.getOtherPlaceholder())
         .build();
   }
 

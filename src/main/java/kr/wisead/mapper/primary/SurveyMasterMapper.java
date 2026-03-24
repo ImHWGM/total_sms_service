@@ -49,6 +49,10 @@ public interface SurveyMasterMapper {
   /** 이벤트명 검색 (자동완성) */
   List<String> searchEventNames(EventSearchRequest request);
 
+  /** 스태프 인증코드 수정 */
+  int updateStaffAuthCode(
+      @Param("eventSeq") Integer eventSeq, @Param("staffAuthCode") String staffAuthCode);
+
   /** 범용인증키 설명 조회 */
   String selectAuthKeyDesc(@Param("eventSeq") Integer eventSeq);
 

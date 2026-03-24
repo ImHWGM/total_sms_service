@@ -69,6 +69,8 @@ public class SecurityConfig {
 
     // 행사 체크인 (비로그인 허용 - QR 스캔)
     "/api/events/*/check/**",
+    "/api/events/*/staff-auth", // 스태프 인증코드 검증 (비로그인 허용)
+    "/api/events/*/staff-checkin/**", // 스태프 체크인 (쿠키 인증으로 전환)
 
     // 문의 등록 (비로그인 허용)
     "/api/inquiry",
@@ -129,14 +131,22 @@ public class SecurityConfig {
             auth ->
                 // 관리자 설문 엔드포인트 보호 (PUBLIC_ENDPOINTS 와일드카드 패턴과 충돌 방지)
                 // /api/survey/*/absentees 등이 /api/survey/users/absentees를 매칭하는 것을 방지
-                auth.requestMatchers("/api/survey/users").authenticated()
-                    .requestMatchers("/api/survey/users/completed").authenticated()
-                    .requestMatchers("/api/survey/users/absentees").authenticated()
-                    .requestMatchers("/api/survey/users/count").authenticated()
-                    .requestMatchers("/api/survey/users/batch").authenticated()
-                    .requestMatchers(HttpMethod.PUT, "/api/survey/users/*").authenticated()
-                    .requestMatchers(HttpMethod.PATCH, "/api/survey/users/**").authenticated()
-                    .requestMatchers(HttpMethod.DELETE, "/api/survey/users/**").authenticated()
+                auth.requestMatchers("/api/survey/users")
+                    .authenticated()
+                    .requestMatchers("/api/survey/users/completed")
+                    .authenticated()
+                    .requestMatchers("/api/survey/users/absentees")
+                    .authenticated()
+                    .requestMatchers("/api/survey/users/count")
+                    .authenticated()
+                    .requestMatchers("/api/survey/users/batch")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.PUT, "/api/survey/users/*")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.PATCH, "/api/survey/users/**")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.DELETE, "/api/survey/users/**")
+                    .authenticated()
                     .requestMatchers(PUBLIC_ENDPOINTS)
                     .permitAll()
                     // 인증된 사용자면 접근 가능 (내부 비즈니스 로직에서 권한별 분기)

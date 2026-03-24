@@ -42,6 +42,7 @@ public class SurveyMaster {
   private String organizer; // 주최/주관
   private String badgePrintType; // 출입증 출력 여부
   private String nametagConfig; // 명찰 템플릿 설정 (JSON 문자열)
+  private String staffAuthCode; // 스태프 체크인 인증코드
 
   // 집계 정보 (조회용)
   private Integer totSurveyUser; // 설문 대상자 수
@@ -157,5 +158,24 @@ public class SurveyMaster {
   public void setQrCodeInfo(String qrCodeImgPath, String authCodeUrl) {
     this.qrCodeImgPath = qrCodeImgPath;
     this.authCodeUrl = authCodeUrl;
+  }
+
+  /** 스태프 인증코드 설정 */
+  public void setStaffAuthCode(String staffAuthCode) {
+    this.staffAuthCode = staffAuthCode;
+  }
+
+  private static final String AUTH_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  private static final int AUTH_CODE_LENGTH = 6;
+  private static final java.security.SecureRandom AUTH_CODE_RANDOM =
+      new java.security.SecureRandom();
+
+  /** 스태프 인증코드 자동 생성 (6자리 영숫자, 혼동 문자 제외) */
+  public static String generateStaffAuthCode() {
+    StringBuilder sb = new StringBuilder(AUTH_CODE_LENGTH);
+    for (int i = 0; i < AUTH_CODE_LENGTH; i++) {
+      sb.append(AUTH_CODE_CHARS.charAt(AUTH_CODE_RANDOM.nextInt(AUTH_CODE_CHARS.length())));
+    }
+    return sb.toString();
   }
 }

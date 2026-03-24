@@ -179,8 +179,7 @@ public class EventParticipantService {
       if (decryptedPhone != null) {
         String cleanDecryptedPhone = decryptedPhone.replace("-", "");
         if (requestPhone.equals(cleanDecryptedPhone)) {
-          return VerifyParticipantResponse.verified(
-              buildParticipantInfo(candidate, requestPhone));
+          return VerifyParticipantResponse.verified(buildParticipantInfo(candidate, requestPhone));
         }
       }
     }
@@ -267,7 +266,7 @@ public class EventParticipantService {
             request.getPosition(),
             request.getParticipantType(),
             request.getMemo(),
-            "사전등록",
+            EventParticipant.DEFAULT_REGIST_TYPE,
             null);
 
     insertWithUniqueCheckCode(participant);
@@ -424,7 +423,7 @@ public class EventParticipantService {
               position != null ? position.trim() : null,
               participantType,
               null, // memo
-              "사전등록", // registType
+              EventParticipant.DEFAULT_REGIST_TYPE, // registType
               null); // attendTime
       participantsToInsert.add(participant);
       successCount++;
@@ -537,7 +536,14 @@ public class EventParticipantService {
     // 3. EVENT_PARTICIPANT 생성 (이름/전화번호만, 소속/직급은 참여자 관리에서 수정)
     EventParticipant participant =
         EventParticipant.create(
-            surveyUser.getSeq(), eventSeq, null, null, "일반", "문자발송 시 자동등록", "사전등록", null);
+            surveyUser.getSeq(),
+            eventSeq,
+            null,
+            null,
+            "일반",
+            "문자발송 시 자동등록",
+            EventParticipant.DEFAULT_REGIST_TYPE,
+            null);
     insertWithUniqueCheckCode(participant);
 
     return ParticipantForMessageResponse.builder()
@@ -547,7 +553,7 @@ public class EventParticipantService {
         .phone(phone)
         .checkCode(participant.getCheckCode())
         .participantType("일반")
-        .registType("사전등록")
+        .registType(EventParticipant.DEFAULT_REGIST_TYPE)
         .build();
   }
 

@@ -206,6 +206,8 @@ public class EventService {
             //        .badgePrintYn(request.getBadgePrintYn())
             .badgePrintType(badgePrintType) // request에서 바로 가져오지 않고, 유효성 검사를 거친 값을 저장한다.
             .nametagConfig(request.getNametagConfig())
+            .staffAuthCode(
+                "E".equals(request.getEventType()) ? SurveyMaster.generateStaffAuthCode() : null)
             .eventEndImg(null) // 임시 경로 대신 null로 저장, 이동 후 업데이트
             .regId(actualUserId)
             .build();
@@ -449,6 +451,12 @@ public class EventService {
         actualUptId);
 
     surveyMasterMapper.update(event);
+
+    // 스태프 인증코드 수정 (요청에 값이 있으면 업데이트)
+    if (request.getStaffAuthCode() != null) {
+      surveyMasterMapper.updateStaffAuthCode(eventSeq, request.getStaffAuthCode());
+    }
+
     log.info("이벤트 수정 완료 - eventSeq: {}", eventSeq);
 
     // 문항 갱신: 응답이 존재하면 문항을 보호하고 메타데이터 변경만 허용
@@ -518,6 +526,10 @@ public class EventService {
             .organizer(sourceEvent.getOrganizer())
             .badgePrintType(null)
             .nametagConfig(null)
+            .staffAuthCode(
+                "E".equals(sourceEvent.getEventType())
+                    ? SurveyMaster.generateStaffAuthCode()
+                    : null)
             .regId(actualUserId)
             .build();
 

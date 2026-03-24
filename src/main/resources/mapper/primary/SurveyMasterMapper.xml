@@ -34,7 +34,8 @@
         M.VENUE as venue,
         M.ORGANIZER as organizer,
         M.BADGE_PRINT_TYPE as badgePrintType,
-        M.NAMETAG_CONFIG as nametagConfig
+        M.NAMETAG_CONFIG as nametagConfig,
+        M.STAFF_AUTH_CODE as staffAuthCode
     </sql>
 
     <sql id="selectWithCounts">
@@ -146,14 +147,14 @@
             STATUS, PRIVACY_POLICY_YN, PRIVACY_POLICY_TTL, PRIVACY_POLICY_DESC,
             THIRD_PARTY_YN, THIRD_PARTY_TTL, THIRD_PARTY_DESC,
             AUTH, QR_CODE, QR_CODE_IMG_PATH, AUTH_CODE_URL,
-            END_MESSAGE, EVENT_END_IMG, VENUE, ORGANIZER, BADGE_PRINT_TYPE, NAMETAG_CONFIG, REG_DATE, REG_ID
+            END_MESSAGE, EVENT_END_IMG, VENUE, ORGANIZER, BADGE_PRINT_TYPE, NAMETAG_CONFIG, STAFF_AUTH_CODE, REG_DATE, REG_ID
         ) VALUES (
             #{userSeq}, #{eventCode}, #{eventName}, #{eventEmphasisYn},
             #{eventDescImg}, #{eventDesc}, #{eventType}, #{startDate}, #{endDate},
             #{status}, #{privacyPolicyYn}, #{privacyPolicyTtl}, #{privacyPolicyDesc},
             #{thirdPartyYn}, #{thirdPartyTtl}, #{thirdPartyDesc},
             #{auth}, #{qrCode}, #{qrCodeImgPath}, #{authCodeUrl},
-            #{endMessage}, #{eventEndImg}, #{venue}, #{organizer}, #{badgePrintType}, #{nametagConfig}, NOW(),
+            #{endMessage}, #{eventEndImg}, #{venue}, #{organizer}, #{badgePrintType}, #{nametagConfig}, #{staffAuthCode}, NOW(),
             #{regId}
         )
     </insert>
@@ -252,6 +253,13 @@
         ORDER BY EVENT_NAME
         LIMIT 10
     </select>
+
+    <!-- 스태프 인증코드 수정 -->
+    <update id="updateStaffAuthCode">
+        UPDATE SURVEY_MASTER
+        SET STAFF_AUTH_CODE = #{staffAuthCode}, UPT_DATE = NOW()
+        WHERE EVENT_SEQ = #{eventSeq}
+    </update>
 
     <!-- 범용인증키 설명 조회 -->
     <select id="selectAuthKeyDesc" resultType="string">

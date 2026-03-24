@@ -61,6 +61,8 @@ public class EventRequest {
 
   private String nametagConfig; // 명찰 템플릿 설정 (JSON 문자열)
 
+  private String staffAuthCode; // 스태프 체크인 인증코드
+
   // 문항 목록 (설문 생성 시)
   private List<QuestionRequest> questions;
 

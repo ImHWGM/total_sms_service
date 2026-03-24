@@ -11,7 +11,7 @@ import lombok.*;
 @Builder
 public class EventParticipant {
 
-  private static final String DEFAULT_REGIST_TYPE = "미등록";
+  public static final String DEFAULT_REGIST_TYPE = "미등록";
 
   // 혼동 문자(O/0/I/1/L) 제외한 대문자+숫자
   private static final String CHECK_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";

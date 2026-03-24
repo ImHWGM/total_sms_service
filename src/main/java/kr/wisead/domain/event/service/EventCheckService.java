@@ -5,7 +5,6 @@ import java.time.format.DateTimeFormatter;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
-import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.event.dto.*;
 import kr.wisead.domain.event.entity.*;
 import kr.wisead.mapper.primary.*;
@@ -29,7 +28,8 @@ public class EventCheckService {
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final SurveyMasterMapper surveyMasterMapper;
-  private final UserIdResolver userIdResolver;
+
+  private static final long STAFF_COOKIE_MAX_AGE_MS = 86400_000L; // 24시간
 
   @Value("${wisead.url:http://localhost:8080}")
   private String wiseadUrl;
@@ -46,44 +46,82 @@ public class EventCheckService {
     return processCheckIn(participant, deviceInfo);
   }
 
-  /** 스태프 QR 스캔으로 체크인 처리 (로그인 필요) */
+  /** 스태프 QR 스캔으로 체크인 처리 (쿠키 인증) */
   @Transactional
-  public EventCheckResponse staffCheckIn(
-      Integer eventSeq, String checkCode, String staffUserSeq, String deviceInfo) {
-    // 1. 권한 검증: 행사 소유자 또는 스태프 참가자
-    var event =
-        surveyMasterMapper
-            .selectByEventSeq(eventSeq)
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사 정보를 찾을 수 없습니다."));
-
-    String staffUserId = userIdResolver.resolveUserId(staffUserSeq);
-    if (!staffUserId.equals(event.getRegId()) && !isStaffParticipant(eventSeq, staffUserId)) {
-      throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 행사의 체크인 권한이 없습니다.");
-    }
-
-    // 2. 참가자 조회
+  public EventCheckResponse staffCheckIn(Integer eventSeq, String checkCode, String deviceInfo) {
     EventParticipant participant =
         participantMapper
             .selectDetailByEventSeqAndCheckCode(eventSeq, checkCode)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    log.info(
-        "스태프 체크인 요청: eventSeq={}, checkCode={}, staffUserId={}", eventSeq, checkCode, staffUserId);
+    log.info("스태프 체크인 요청: eventSeq={}, checkCode={}", eventSeq, checkCode);
 
     return processCheckIn(participant, deviceInfo);
   }
 
-  /** 로그인한 사용자가 해당 행사의 스태프 참가자인지 확인 (전화번호 매칭) */
-  private boolean isStaffParticipant(Integer eventSeq, String userId) {
-    // USER.PHONE은 이미 암호화된 값, SURVEY_USER.USER_PHONE도 동일 암호화
-    return userMapper
-        .findByUserId(userId)
-        .filter(u -> u.getPhone() != null && !u.getPhone().isBlank())
-        .flatMap(u -> participantMapper.selectByEventSeqAndPhone(eventSeq, u.getPhone()))
-        .filter(p -> "스태프".equals(p.getParticipantType()))
-        .isPresent();
+  /** 인증코드 검증 + HMAC 서명 쿠키 값 생성 */
+  public String verifyAndGenerateCookie(Integer eventSeq, String authCode) {
+    var event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사 정보를 찾을 수 없습니다."));
+
+    if (event.getStaffAuthCode() == null || !event.getStaffAuthCode().equals(authCode)) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "인증코드가 일치하지 않습니다.");
+    }
+
+    long timestamp = System.currentTimeMillis();
+    String data = eventSeq + ":" + timestamp;
+    String signature = CryptoUtils.asHex(CryptoUtils.hmacSha256(data, authCode));
+    return eventSeq + ":" + timestamp + ":" + signature;
+  }
+
+  /** 쿠키 값 검증 (eventSeq 일치 + 24시간 만료 + HMAC 서명 검증) */
+  public void validateStaffCookie(Integer eventSeq, String cookieValue) {
+    if (cookieValue == null || cookieValue.isBlank()) {
+      throw new BusinessException(ErrorCode.UNAUTHORIZED, "스태프 인증이 필요합니다.");
+    }
+
+    String[] parts = cookieValue.split(":");
+    if (parts.length != 3) {
+      throw new BusinessException(ErrorCode.UNAUTHORIZED, "잘못된 인증 정보입니다.");
+    }
+
+    // 1. eventSeq 일치 확인
+    if (!String.valueOf(eventSeq).equals(parts[0])) {
+      throw new BusinessException(ErrorCode.UNAUTHORIZED, "다른 행사의 인증 정보입니다.");
+    }
+
+    // 2. 24시간 만료 확인
+    long timestamp;
+    try {
+      timestamp = Long.parseLong(parts[1]);
+    } catch (NumberFormatException e) {
+      throw new BusinessException(ErrorCode.UNAUTHORIZED, "잘못된 인증 정보입니다.");
+    }
+    if (System.currentTimeMillis() - timestamp > STAFF_COOKIE_MAX_AGE_MS) {
+      throw new BusinessException(ErrorCode.UNAUTHORIZED, "인증이 만료되었습니다. 다시 인증해주세요.");
+    }
+
+    // 3. HMAC 서명 검증 (DB에서 authCode 조회)
+    var event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사 정보를 찾을 수 없습니다."));
+
+    if (event.getStaffAuthCode() == null) {
+      throw new BusinessException(ErrorCode.UNAUTHORIZED, "이 행사에는 스태프 인증코드가 설정되지 않았습니다.");
+    }
+
+    String expectedSignature =
+        CryptoUtils.asHex(
+            CryptoUtils.hmacSha256(parts[0] + ":" + parts[1], event.getStaffAuthCode()));
+    if (!java.security.MessageDigest.isEqual(expectedSignature.getBytes(), parts[2].getBytes())) {
+      throw new BusinessException(ErrorCode.UNAUTHORIZED, "인증 정보가 유효하지 않습니다.");
+    }
   }
 
   /** 전화번호로 체크인 처리 (키오스크용) */

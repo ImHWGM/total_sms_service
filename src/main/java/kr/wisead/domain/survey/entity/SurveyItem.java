@@ -37,6 +37,7 @@ public class SurveyItem {
         .item(item)
         .itemValue(itemValue)
         .order(order)
+        .otherYn("N")
         .regId(regId)
         .build();
   }

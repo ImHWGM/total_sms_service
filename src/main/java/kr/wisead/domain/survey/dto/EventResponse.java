@@ -40,6 +40,7 @@ public class EventResponse {
   private String organizer; // 주최/주관
   private String badgePrintType; // 서비스 옵션
   private String nametagConfig; // 명찰 템플릿 설정 (JSON 문자열)
+  private String staffAuthCode; // 스태프 체크인 인증코드
   private LocalDateTime regDate; // 등록일
   private String regId; // 등록 ID
 
@@ -97,6 +98,7 @@ public class EventResponse {
         .organizer(entity.getOrganizer())
         .badgePrintType(entity.getBadgePrintType())
         .nametagConfig(entity.getNametagConfig())
+        .staffAuthCode(entity.getStaffAuthCode())
         .regDate(entity.getRegDate())
         .regId(entity.getRegId())
         .totSurveyUser(entity.getTotSurveyUser())

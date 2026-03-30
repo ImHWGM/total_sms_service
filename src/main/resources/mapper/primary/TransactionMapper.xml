@@ -266,4 +266,25 @@
         WHERE user_seq = #{userSeq}
     </select>
 
+    <!-- QR 과금 사용량 집계 (사용내역 시트용) -->
+    <select id="selectQrUsageSummary" resultType="java.util.Map">
+        SELECT
+            CASE
+                WHEN comment LIKE '%QR 코드 신청%' THEN 'QR코드'
+                WHEN comment LIKE '%QR 코드 추가%' THEN 'QR코드 추가과금'
+                ELSE 'QR코드'
+            END AS category,
+            COUNT(*) AS cnt
+        FROM transaction
+        WHERE service_id = 'qr_code'
+          AND tx_type = 'DEDUCT'
+        <if test="startDate != null and startDate != ''">
+            AND DATE(reg_date) >= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND DATE(reg_date) <![CDATA[<=]]> #{endDate}
+        </if>
+        GROUP BY category
+    </select>
+
 </mapper>

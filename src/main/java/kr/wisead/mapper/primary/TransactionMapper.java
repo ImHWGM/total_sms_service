@@ -84,4 +84,8 @@ public interface TransactionMapper {
 
   /** 최근 거래일 조회 */
   LocalDateTime selectLastTransactionDate(@Param("userSeq") Integer userSeq);
+
+  /** QR 과금 사용량 집계 (사용내역 시트용) */
+  List<Map<String, Object>> selectQrUsageSummary(
+      @Param("startDate") String startDate, @Param("endDate") String endDate);
 }

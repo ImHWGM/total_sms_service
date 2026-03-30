@@ -45,6 +45,12 @@ public class BillingExcelService {
   private static final Pattern COMMENT_COUNT_PATTERN =
       Pattern.compile("^(.+?):\\s*(\\d+)건(?:\\s+(.+))?$");
 
+  /** 핑크 배경색 적용 대상 회사명 */
+  private static final String PINK_HIGHLIGHT_CORP = "모바일이앤엠애드";
+
+  /** QR코드 추가과금 단위 (방문횟수 기준) */
+  private static final int QR_VISITS_PER_BLOCK = 3000;
+
   /** 과금 통계 Excel 생성 */
   public byte[] generateBillingExcel(
       BillingStatsSearchRequest request, String userId, List<String> targetUserIds) {
@@ -214,7 +220,7 @@ public class BillingExcelService {
 
       // 회사명 조회
       String corpName = findCorpName(stat.getUserId());
-      boolean isPink = corpName != null && corpName.contains("모바일이앤엠애드");
+      boolean isPink = corpName != null && corpName.contains(PINK_HIGHLIGHT_CORP);
       CellStyle ts = isPink ? pinkStyle : borderStyle;
       CellStyle ns = isPink ? pinkNumStyle : numBorderStyle;
 
@@ -275,6 +281,8 @@ public class BillingExcelService {
     CellStyle headerStyle = headerStyle(workbook);
     CellStyle borderStyle = borderStyle(workbook);
     CellStyle numBorderStyle = numBorderStyle(workbook);
+    CellStyle pinkStyle = pinkBorderStyle(workbook);
+    CellStyle pinkNumStyle = pinkNumBorderStyle(workbook);
 
     // 제목 (0~1행, 0~6열 병합)
     Row r0 = sheet.createRow(0);
@@ -320,6 +328,7 @@ public class BillingExcelService {
     // 단가 조회
     BigDecimal surveyRate = standardRateService.getStandardRateWithVat("survey");
     BigDecimal qrRate = standardRateService.getStandardRateWithVat("qr_code");
+    BigDecimal qrExtraRate = standardRateService.getStandardRateWithVat("qr_code_extra");
 
     // 설문 통계
     StatsSearchRequest surveyReq =
@@ -381,19 +390,27 @@ public class BillingExcelService {
       int eventCount = qr != null ? qr.getEventCount() : 0;
       int visitCount = qr != null ? qr.getVisitCount() : 0;
 
-      setCellWithStyle(row, 0, nvl(corpName), borderStyle);
-      setCellWithStyle(row, 1, nvl(uid), borderStyle);
-      makeNumberCell(row, 2, surveyTotal, numBorderStyle);
-      makeNumberCell(row, 3, surveySucc, numBorderStyle);
-      makeNumberCell(row, 4, eventCount, numBorderStyle);
-      makeNumberCell(row, 5, visitCount, numBorderStyle);
+      boolean isPink = corpName != null && corpName.contains(PINK_HIGHLIGHT_CORP);
+      CellStyle ts = isPink ? pinkStyle : borderStyle;
+      CellStyle ns = isPink ? pinkNumStyle : numBorderStyle;
 
-      // 사용금액 = 설문 성공 × 설문단가 + QR 방문횟수 × QR단가
+      setCellWithStyle(row, 0, nvl(corpName), ts);
+      setCellWithStyle(row, 1, nvl(uid), ts);
+      makeNumberCell(row, 2, surveyTotal, ns);
+      makeNumberCell(row, 3, surveySucc, ns);
+      makeNumberCell(row, 4, eventCount, ns);
+      makeNumberCell(row, 5, visitCount, ns);
+
+      // 사용금액 = 설문 성공 × 설문단가 + QR 이벤트수 × QR기본단가 + QR 추가과금블록 × QR추가단가
+      // QR 추가과금: 기본 3,000건 포함, 이후 3,000건당 추가과금
+      int extraBlocks =
+          visitCount <= 0 ? 0 : ((visitCount + QR_VISITS_PER_BLOCK - 1) / QR_VISITS_PER_BLOCK - 1);
       BigDecimal amount =
           surveyRate
               .multiply(BigDecimal.valueOf(surveySucc))
-              .add(qrRate.multiply(BigDecimal.valueOf(visitCount)));
-      makeMoneyCell(row, 6, amount, numBorderStyle);
+              .add(qrRate.multiply(BigDecimal.valueOf(eventCount)))
+              .add(qrExtraRate.multiply(BigDecimal.valueOf(extraBlocks)));
+      makeMoneyCell(row, 6, amount, ns);
 
       sumSurveyTotal += surveyTotal;
       sumSurveySucc += surveySucc;
@@ -428,7 +445,11 @@ public class BillingExcelService {
 
   private void addUserHistorySheets(
       SXSSFWorkbook workbook, BillingStatsSearchRequest request, List<String> targetUserIds) {
-    if (targetUserIds == null || targetUserIds.isEmpty()) return;
+    // targetUserIds가 null이면 전체 사용자 조회 (관리자)
+    if (targetUserIds == null) {
+      targetUserIds = userMapper.findAllUserIds();
+    }
+    if (targetUserIds.isEmpty()) return;
 
     CellStyle headerStyle = headerStyle(workbook);
     CellStyle borderStyle = borderStyle(workbook);

@@ -6,8 +6,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
-import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.ars.dto.BlockedSenderResponse;
 import kr.wisead.domain.ars.entity.BlockedSender;
@@ -53,7 +53,8 @@ public class BlockedNumberService {
     // 중복 확인
     int exists = blockedSenderMapper.countBlockedSender(encryptedPhone, storeCode);
     if (exists > 0) {
-      log.info("이미 등록된 수신거부: phone={}, storeCode={}", CommonUtils.maskingPhone(phoneNumber), storeCode);
+      log.info(
+          "이미 등록된 수신거부: phone={}, storeCode={}", CommonUtils.maskingPhone(phoneNumber), storeCode);
       return false;
     }
 
@@ -68,7 +69,8 @@ public class BlockedNumberService {
             .build();
 
     blockedSenderMapper.insertBlockedSender(blockedSender);
-    log.info("수신거부 등록 완료: phone={}, storeCode={}", CommonUtils.maskingPhone(phoneNumber), storeCode);
+    log.info(
+        "수신거부 등록 완료: phone={}, storeCode={}", CommonUtils.maskingPhone(phoneNumber), storeCode);
     return true;
   }
 
@@ -93,7 +95,10 @@ public class BlockedNumberService {
           registeredCount++;
         }
       } catch (Exception e) {
-        log.warn("수신거부 등록 실패: phone={}, error={}", CommonUtils.maskingPhone(phoneNumber), e.getMessage());
+        log.warn(
+            "수신거부 등록 실패: phone={}, error={}",
+            CommonUtils.maskingPhone(phoneNumber),
+            e.getMessage());
       }
     }
 
@@ -162,9 +167,7 @@ public class BlockedNumberService {
           userMapper.findUserIdsByStoreCodesRaw(distinctStoreCodes);
       storeCodeToUserId = new HashMap<>();
       if (rawMap != null) {
-        rawMap.forEach(
-            (key, row) ->
-                storeCodeToUserId.put(key, row.getOrDefault("USER_ID", "")));
+        rawMap.forEach((key, row) -> storeCodeToUserId.put(key, row.getOrDefault("USER_ID", "")));
       }
     }
 
@@ -215,7 +218,8 @@ public class BlockedNumberService {
     int deleted = blockedSenderMapper.deleteBlockedSender(encryptedPhone, storeCode);
 
     if (deleted > 0) {
-      log.info("수신거부 삭제 완료: phone={}, storeCode={}", CommonUtils.maskingPhone(phoneNumber), storeCode);
+      log.info(
+          "수신거부 삭제 완료: phone={}, storeCode={}", CommonUtils.maskingPhone(phoneNumber), storeCode);
       return true;
     }
     return false;
@@ -231,6 +235,24 @@ public class BlockedNumberService {
     int deletedCount = blockedSenderMapper.deleteBlockedSenders(keyList);
     log.info("수신거부 일괄 삭제 완료: {}건", deletedCount);
     return deletedCount;
+  }
+
+  /** 수신거부 삭제 (일괄 - 평문/포맷된 번호 → 암호화 후 삭제) */
+  @Transactional
+  public int deleteBlockedNumbersWithPlainAni(List<Map<String, String>> keyList) {
+    if (keyList == null || keyList.isEmpty()) {
+      return 0;
+    }
+
+    keyList.forEach(
+        key -> {
+          String ani = key.get("ani");
+          if (ani != null) {
+            key.put("ani", encryptPhoneNumber(ani));
+          }
+        });
+
+    return deleteBlockedNumbers(keyList);
   }
 
   /** 수신거부 삭제 (일괄 - 평문 번호) */

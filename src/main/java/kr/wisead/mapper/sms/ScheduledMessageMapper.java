@@ -59,6 +59,12 @@ public interface ScheduledMessageMapper {
    */
   List<ScheduledMessage> selectExpandedScheduledMessages(@Param("mSeqs") List<Integer> mSeqs);
 
+  /** 취소 대상 설문 메시지의 eventSeq, userSeq 조회 */
+  List<ScheduledMessage> selectSurveyMessagesForCancellation(
+      @Param("userId") String userId,
+      @Param("msgType") String msgType,
+      @Param("insertTime") LocalDateTime insertTime);
+
   /** 예약 메시지 전체 조회 (다운로드용) */
   List<ScheduledMessage> selectScheduledMessagesForDownload(
       @Param("userId") String userId,

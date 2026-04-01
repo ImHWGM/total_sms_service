@@ -464,4 +464,38 @@
             )
     </select>
 
+    <!-- 취소 대상 설문 메시지의 eventSeq, userSeq 조회 (EXT_COL0 IS NOT NULL = 설문 메시지) -->
+    <select id="selectSurveyMessagesForCancellation" resultMap="scheduledMessageResultMap">
+        SELECT EXT_COL0 as extCol0, EXT_COL1 as extCol1
+        FROM msg_queue
+        WHERE
+            EXT_COL3 = #{userId}
+            AND MSG_TYPE = #{msgType}
+            AND EXT_COL0 IS NOT NULL
+            AND EXT_COL0 = (
+                SELECT EXT_COL0 FROM (
+                    SELECT EXT_COL0 FROM msg_queue m2
+                    WHERE m2.EXT_COL3 = #{userId}
+                    AND m2.MSG_TYPE = #{msgType}
+                    AND m2.INSERT_TIME = #{insertTime}
+                    AND m2.EXT_COL0 IS NOT NULL
+                    LIMIT 1
+                ) AS temp2
+            )
+            AND CONCAT(DATE_FORMAT(INSERT_TIME, '%Y%m%d%H'),
+                LPAD(FLOOR(MINUTE(INSERT_TIME)/2)*2, 2, '0')) =
+                CONCAT(DATE_FORMAT(#{insertTime}, '%Y%m%d%H'),
+                LPAD(FLOOR(MINUTE(#{insertTime})/2)*2, 2, '0'))
+            AND REQUEST_TIME = (
+                SELECT REQUEST_TIME FROM (
+                    SELECT REQUEST_TIME FROM msg_queue m3
+                    WHERE m3.EXT_COL3 = #{userId}
+                    AND m3.MSG_TYPE = #{msgType}
+                    AND m3.INSERT_TIME = #{insertTime}
+                    AND m3.EXT_COL0 IS NOT NULL
+                    LIMIT 1
+                ) AS temp3
+            )
+    </select>
+
 </mapper>

@@ -88,6 +88,12 @@ public class ArsService {
     return blockedNumberService.deleteBlockedNumbers(keyList);
   }
 
+  /** 수신거부 삭제 (평문 ANI → 암호화 후 삭제) */
+  @Transactional
+  public int deleteBlockedSendersWithPlainAni(List<Map<String, String>> keyList) {
+    return blockedNumberService.deleteBlockedNumbersWithPlainAni(keyList);
+  }
+
   /** 수신거부 여부 확인 (발송 시 체크용) */
   @Transactional(readOnly = true)
   public boolean isBlocked(String ani, String storeCode) {

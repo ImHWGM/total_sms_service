@@ -150,10 +150,10 @@ public class SendHistoryService {
     return arsService.searchBlockedSenders(queryUserIds, senderId, unsubscribeNumber, page, size);
   }
 
-  /** 수신거부 삭제 (ArsService 위임) */
+  /** 수신거부 삭제 (평문 ANI 암호화 후 삭제, ArsService 위임) */
   @Transactional
   public int deleteBlockedSenders(List<Map<String, String>> keyList) {
-    return arsService.deleteBlockedSenders(keyList);
+    return arsService.deleteBlockedSendersWithPlainAni(keyList);
   }
 
   /** 권한 범위 내 store code만 필터링 */
@@ -164,8 +164,7 @@ public class SendHistoryService {
     }
 
     List<String> userIds = Arrays.asList(queryUserIds.split(","));
-    Set<String> allowedStoreCodes =
-        new HashSet<>(arsService.getStoreCodesByUserIds(userIds));
+    Set<String> allowedStoreCodes = new HashSet<>(arsService.getStoreCodesByUserIds(userIds));
 
     return keyList.stream()
         .filter(key -> allowedStoreCodes.contains(key.get("dtmf1")))

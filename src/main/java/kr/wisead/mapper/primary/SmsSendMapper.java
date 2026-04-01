@@ -18,4 +18,8 @@ public interface SmsSendMapper {
   /** 단건 존재 확인 */
   boolean existsByEventSeqAndUserSeq(
       @Param("eventSeq") Integer eventSeq, @Param("userSeq") Integer userSeq);
+
+  /** 이벤트+사용자 시퀀스로 발송 이력 삭제 */
+  int deleteByEventSeqAndUserSeq(
+      @Param("eventSeq") Integer eventSeq, @Param("userSeq") Integer userSeq);
 }

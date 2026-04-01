@@ -25,4 +25,11 @@
         )
     </select>
 
+    <!-- 이벤트+사용자 시퀀스로 발송 이력 삭제 -->
+    <delete id="deleteByEventSeqAndUserSeq">
+        DELETE FROM sms_send
+        WHERE EVENT_SEQ = #{eventSeq}
+          AND USER_SEQ = #{userSeq}
+    </delete>
+
 </mapper>

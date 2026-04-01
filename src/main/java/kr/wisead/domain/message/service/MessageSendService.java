@@ -308,12 +308,21 @@ public class MessageSendService {
     String msgType = msgQueue.getMsgType();
     String txGroupId = msgQueue.getTxGroupId();
 
+    // 설문 메시지인 경우 eventSeq, userSeq 미리 저장
+    Integer eventSeq = msgQueue.getExtCol0();
+    String extCol1 = msgQueue.getExtCol1();
+
     // 2. 메시지 삭제 (SMS DB)
     int deleted = deleteMsgQueue(mseq);
 
     // 3. 환불 처리 (Primary DB) - 단건은 부분 환불
     if (deleted > 0 && txGroupId != null) {
       refundPartial(regId, msgType, 1, txGroupId);
+    }
+
+    // 4. 설문 메시지인 경우 survey_user soft delete + sms_send 삭제
+    if (deleted > 0 && eventSeq != null && extCol1 != null) {
+      cleanupSurveyDataOnCancel(eventSeq, extCol1, regId);
     }
 
     log.info(
@@ -348,10 +357,15 @@ public class MessageSendService {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "취소 가능한 대기 중인 발송이 없습니다.");
     }
 
+    // 설문 메시지 정리를 위해 삭제 전 extCol 정보 수집
+    List<MsgQueue> surveyMessages =
+        pendingMessages.stream()
+            .filter(m -> m.getExtCol0() != null && m.getExtCol1() != null)
+            .toList();
+
     String msgType = firstMsg.getMsgType();
     String txGroupId = firstMsg.getTxGroupId();
     int totalCount = messages.size();
-    int pendingCount = pendingMessages.size();
 
     // 2. 메시지 삭제 (SMS DB)
     int deleted = deleteMsgQueueByUserKey(userKey);
@@ -364,6 +378,13 @@ public class MessageSendService {
       } else {
         // 부분 취소: 취소 건수만큼 부분 환불
         refundPartial(regId, msgType, deleted, txGroupId);
+      }
+    }
+
+    // 4. 설문 메시지인 경우 survey_user soft delete + sms_send 삭제
+    if (deleted > 0) {
+      for (MsgQueue msg : surveyMessages) {
+        cleanupSurveyDataOnCancel(msg.getExtCol0(), msg.getExtCol1(), regId);
       }
     }
 
@@ -782,7 +803,8 @@ public class MessageSendService {
       } catch (Exception e) {
         failCount++;
         failedList.add(receiver.getPhone());
-        log.warn("중복 번호 재발송 실패 - phone: {}, error: {}", maskPhone(receiver.getPhone()), e.getMessage());
+        log.warn(
+            "중복 번호 재발송 실패 - phone: {}, error: {}", maskPhone(receiver.getPhone()), e.getMessage());
       }
     }
 
@@ -916,7 +938,10 @@ public class MessageSendService {
       } catch (Exception e) {
         failCount++;
         failedList.add(receiver.getPhone());
-        log.warn("중복 번호 신규 발송 실패 - phone: {}, error: {}", maskPhone(receiver.getPhone()), e.getMessage());
+        log.warn(
+            "중복 번호 신규 발송 실패 - phone: {}, error: {}",
+            maskPhone(receiver.getPhone()),
+            e.getMessage());
       }
     }
 
@@ -1154,7 +1179,8 @@ public class MessageSendService {
       } catch (Exception e) {
         failCount++;
         failedPhones.add(receiver.getPhone());
-        log.warn("설문 문자 발송 실패 - phone: {}, error: {}", maskPhone(receiver.getPhone()), e.getMessage());
+        log.warn(
+            "설문 문자 발송 실패 - phone: {}, error: {}", maskPhone(receiver.getPhone()), e.getMessage());
       }
     }
 
@@ -1240,7 +1266,8 @@ public class MessageSendService {
             participantSeq = registered.getParticipantSeq();
             surveyUserSeq = registered.getSurveyUserSeq();
             checkCode = registered.getCheckCode();
-            log.info("비참여자 자동 등록 - phone: {}, participantSeq: {}", maskPhone(phone), participantSeq);
+            log.info(
+                "비참여자 자동 등록 - phone: {}, participantSeq: {}", maskPhone(phone), participantSeq);
           } catch (Exception e) {
             log.warn("비참여자 자동 등록 실패 - phone: {}, error: {}", maskPhone(phone), e.getMessage());
           }
@@ -1336,7 +1363,10 @@ public class MessageSendService {
       } catch (Exception e) {
         failCount++;
         failedPhones.add(receiver.getPhone());
-        log.warn("행사참여자 문자 발송 실패 - phone: {}, error: {}", maskPhone(receiver.getPhone()), e.getMessage());
+        log.warn(
+            "행사참여자 문자 발송 실패 - phone: {}, error: {}",
+            maskPhone(receiver.getPhone()),
+            e.getMessage());
       }
     }
 
@@ -1357,7 +1387,27 @@ public class MessageSendService {
 
   // ==================== Private Helper Methods ====================
 
-  /** sms_send 발송 이력 기록 (실패 시 로그만 남기고 발송 자체는 성공 처리) */
+  /** 예약 발송 취소 시 설문 관련 데이터 정리 (survey_user soft delete + sms_send 삭제) */
+  private void cleanupSurveyDataOnCancel(Integer eventSeq, String extCol1, String regId) {
+    if (eventSeq == null || extCol1 == null) {
+      return;
+    }
+    try {
+      Integer userSeq = Integer.parseInt(extCol1);
+      surveyUserMapper.softDelete(userSeq, regId);
+      smsSendMapper.deleteByEventSeqAndUserSeq(eventSeq, userSeq);
+      log.info("설문 발송 취소 데이터 정리 완료 - eventSeq: {}, userSeq: {}", eventSeq, userSeq);
+    } catch (NumberFormatException e) {
+      log.warn("설문 발송 취소 데이터 정리 실패 - extCol1이 숫자가 아닙니다: {}", extCol1);
+    } catch (Exception e) {
+      log.warn(
+          "설문 발송 취소 데이터 정리 실패 - eventSeq: {}, extCol1: {}, error: {}",
+          eventSeq,
+          extCol1,
+          e.getMessage());
+    }
+  }
+
   private void recordSmsSend(
       Integer eventSeq,
       Integer userSeq,

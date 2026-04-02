@@ -3,13 +3,16 @@ package kr.wisead.domain.message.service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -19,6 +22,7 @@ import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.ShortUrlUtils;
 import kr.wisead.common.util.UserIdResolver;
+import kr.wisead.domain.ars.service.BlockedNumberService;
 import kr.wisead.domain.event.dto.ParticipantForMessageResponse;
 import kr.wisead.domain.event.service.EventParticipantService;
 import kr.wisead.domain.message.dto.*;
@@ -29,9 +33,11 @@ import kr.wisead.domain.message.entity.SmsSend;
 import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
+import kr.wisead.domain.user.entity.User;
 import kr.wisead.mapper.primary.SmsSendMapper;
 import kr.wisead.mapper.primary.SurveyMasterMapper;
 import kr.wisead.mapper.primary.SurveyUserMapper;
+import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.mapper.sms.MsgQueueMapper;
 import kr.wisead.mapper.sms.MsgResultMapper;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +60,8 @@ public class MessageSendService {
   private final WalletService walletService;
   private final UserIdResolver userIdResolver;
   private final EventParticipantService eventParticipantService;
+  private final BlockedNumberService blockedNumberService;
+  private final UserMapper userMapper;
 
   @Value("${wisead.url:https://wisead.kr}")
   private String wiseadUrl;
@@ -1065,7 +1073,48 @@ public class MessageSendService {
           receivers.size());
     }
 
-    // 잔액 확인 및 차감 (설문 요금 적용)
+    // 광고 옵션: 야간발송제한 체크 (즉시 발송일 경우만)
+    if (request.isAdYn() && request.isImmediate()) {
+      LocalTime now = LocalTime.now();
+      if (now.isAfter(LocalTime.of(20, 0)) || now.isBefore(LocalTime.of(9, 0))) {
+        return SurveyMessageResponse.nightTimeRestricted();
+      }
+    }
+
+    // 광고 옵션: 수신거부 필터링
+    int blockedCount = 0;
+    List<String> maskedBlockedNumbers = List.of();
+    if (request.isAdYn()) {
+      Integer userSeqForAd;
+      try {
+        userSeqForAd = Integer.parseInt(regId);
+      } catch (NumberFormatException e) {
+        log.warn("잘못된 사용자 식별자 - regId: {}", regId);
+        return SurveyMessageResponse.fail("사용자 정보를 찾을 수 없습니다.");
+      }
+      String storeCode = userMapper.findBySeq(userSeqForAd).map(User::getStoreCode).orElse(null);
+      if (storeCode == null || storeCode.isBlank()) {
+        storeCode = "DEFAULT";
+      }
+
+      List<String> phoneList =
+          receivers.stream().map(SurveyMessageRequest.Receiver::getNormalizedPhone).toList();
+      List<String> blockedPhones = blockedNumberService.filterBlockedNumbers(storeCode, phoneList);
+      Set<String> blockedSet = new HashSet<>(blockedPhones);
+      blockedCount = blockedPhones.size();
+      maskedBlockedNumbers = blockedPhones.stream().map(this::maskPhone).toList();
+
+      receivers =
+          receivers.stream().filter(r -> !blockedSet.contains(r.getNormalizedPhone())).toList();
+
+      log.info("수신거부 필터링 - 제외: {}건", blockedCount);
+
+      if (receivers.isEmpty()) {
+        return SurveyMessageResponse.allBlocked(blockedCount, maskedBlockedNumbers);
+      }
+    }
+
+    // 잔액 확인 및 차감 (설문 요금 적용 - 필터링 후 수량 기준)
     String txGroupId = deductForMessage(regId, "survey", receivers.size(), "L");
     int successCount = 0;
     int failCount = 0;
@@ -1185,17 +1234,25 @@ public class MessageSendService {
     }
 
     log.info(
-        "설문 문자 발송 완료 - 성공: {}, 실패: {}, 중복: {}, txGroupId: {}",
+        "설문 문자 발송 완료 - 성공: {}, 실패: {}, 중복: {}, 수신거부: {}, txGroupId: {}",
         successCount,
         failCount,
         duplicateCount,
+        blockedCount,
         txGroupId);
 
-    if (failCount == 0 && duplicateCount == 0) {
+    if (failCount == 0 && duplicateCount == 0 && blockedCount == 0) {
       return SurveyMessageResponse.success(successCount, mseqList, txGroupId, LocalDateTime.now());
     } else {
       return SurveyMessageResponse.partial(
-          successCount, failCount, duplicateCount, failedPhones, mseqList, txGroupId);
+          successCount,
+          failCount,
+          duplicateCount,
+          blockedCount,
+          failedPhones,
+          maskedBlockedNumbers,
+          mseqList,
+          txGroupId);
     }
   }
 

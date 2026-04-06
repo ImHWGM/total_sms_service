@@ -12,6 +12,7 @@ import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.payment.dto.BillingStatsSearchRequest;
 import kr.wisead.domain.payment.entity.Transaction;
 import kr.wisead.domain.payment.service.StandardRateService;
+import kr.wisead.domain.payment.service.UserServiceRateService;
 import kr.wisead.domain.statistics.dto.*;
 import kr.wisead.domain.statistics.service.StatisticsService;
 import kr.wisead.domain.statistics.service.UserStatisticsService;
@@ -34,6 +35,7 @@ public class BillingExcelService {
   private final StatisticsService statisticsService;
   private final UserStatisticsService userStatisticsService;
   private final StandardRateService standardRateService;
+  private final UserServiceRateService userServiceRateService;
   private final TransactionMapper transactionMapper;
   private final UserMapper userMapper;
   private final UserIdResolver userIdResolver;
@@ -51,13 +53,45 @@ public class BillingExcelService {
   /** QR코드 추가과금 단위 (방문횟수 기준) */
   private static final int QR_VISITS_PER_BLOCK = 3000;
 
+  private static final String[] ALL_SERVICE_IDS =
+      {"msg_sms", "msg_lms", "msg_mms", "survey", "qr_code", "qr_code_extra"};
+
   /** 과금 통계 Excel 생성 */
   public byte[] generateBillingExcel(
       BillingStatsSearchRequest request, String userId, List<String> targetUserIds) {
     try (SXSSFWorkbook workbook = new SXSSFWorkbook()) {
-      addUsageSummarySheet(workbook, request);
-      addMessageDetailSheet(workbook, request);
-      addSurveyDetailSheet(workbook, request);
+      // 공유 데이터 한번만 조회
+      StatsSearchRequest msgReq =
+          StatsSearchRequest.builder()
+              .startDate(request.getStartDate())
+              .endDate(request.getEndDate())
+              .serviceType("M")
+              .build();
+      List<UserMsgStatsResponse> msgStats = userStatisticsService.findMsgStats(msgReq);
+
+      StatsSearchRequest surveyReq =
+          StatsSearchRequest.builder()
+              .startDate(request.getStartDate())
+              .endDate(request.getEndDate())
+              .serviceType("S")
+              .build();
+      List<UserSurveyStatsResponse> surveyStats = userStatisticsService.findSurveyStats(surveyReq);
+
+      StatsSearchRequest qrReq =
+          StatsSearchRequest.builder()
+              .startDate(request.getStartDate())
+              .endDate(request.getEndDate())
+              .serviceType("Q")
+              .build();
+      List<UserQrStatsResponse> qrStats = userStatisticsService.findQrStats(qrReq);
+
+      // 유저별 요금 캐시 구축 (N+1 방지)
+      Map<String, Map<String, BigDecimal>> rateCache =
+          buildUserRateCache(msgStats, surveyStats, qrStats);
+
+      addUsageSummarySheet(workbook, request, msgStats, surveyStats, qrStats, rateCache);
+      addMessageDetailSheet(workbook, request, msgStats, rateCache);
+      addSurveyDetailSheet(workbook, request, surveyStats, qrStats, rateCache);
       addUserHistorySheets(workbook, request, targetUserIds);
       return toByteArray(workbook);
     } catch (Exception e) {
@@ -66,9 +100,52 @@ public class BillingExcelService {
     }
   }
 
+  /** 모든 유저의 서비스별 요금을 한번에 캐시 */
+  private Map<String, Map<String, BigDecimal>> buildUserRateCache(
+      List<UserMsgStatsResponse> msgStats,
+      List<UserSurveyStatsResponse> surveyStats,
+      List<UserQrStatsResponse> qrStats) {
+    Set<String> allUserIds = new LinkedHashSet<>();
+    for (UserMsgStatsResponse s : msgStats) allUserIds.add(s.getUserId());
+    for (UserSurveyStatsResponse s : surveyStats) allUserIds.add(s.getUserId());
+    for (UserQrStatsResponse s : qrStats) allUserIds.add(s.getUserId());
+
+    Map<String, Map<String, BigDecimal>> cache = new HashMap<>();
+    for (String uid : allUserIds) {
+      Integer userSeq = resolveUserSeq(uid);
+      Map<String, BigDecimal> rates = new HashMap<>();
+      for (String sid : ALL_SERVICE_IDS) {
+        rates.put(
+            sid,
+            userSeq != null
+                ? userServiceRateService.getEffectiveRate(userSeq, sid)
+                : standardRateService.getStandardRateWithVat(sid));
+      }
+      cache.put(uid, rates);
+    }
+    return cache;
+  }
+
+  /** 캐시에서 유저별 요금 조회 */
+  private BigDecimal getCachedRate(
+      Map<String, Map<String, BigDecimal>> rateCache, String userId, String serviceId) {
+    Map<String, BigDecimal> userRates = rateCache.get(userId);
+    if (userRates != null) {
+      BigDecimal rate = userRates.get(serviceId);
+      if (rate != null) return rate;
+    }
+    return getEffectiveRate(userId, serviceId);
+  }
+
   // ==================== Sheet 1: 사용내역 ====================
 
-  private void addUsageSummarySheet(SXSSFWorkbook workbook, BillingStatsSearchRequest request) {
+  private void addUsageSummarySheet(
+      SXSSFWorkbook workbook,
+      BillingStatsSearchRequest request,
+      List<UserMsgStatsResponse> msgStats,
+      List<UserSurveyStatsResponse> surveyStats,
+      List<UserQrStatsResponse> qrStats,
+      Map<String, Map<String, BigDecimal>> rateCache) {
     Sheet sheet = workbook.createSheet("사용내역");
 
     CellStyle titleStyle = titleStyle(workbook);
@@ -105,40 +182,148 @@ public class BillingExcelService {
       c.setCellStyle(headerStyle);
     }
 
-    // 데이터 - UsageSummaryResponse 사용
-    StatsSearchRequest statsReq =
-        StatsSearchRequest.builder()
-            .userId(request.getUserId())
-            .startDate(request.getStartDate())
-            .endDate(request.getEndDate())
-            .build();
-    List<UsageSummaryResponse> summaries = statisticsService.getUsageSummary(statsReq);
+    // 표준 단가 조회 (단가 컬럼 표시용)
+    Map<String, BigDecimal> stdRateMap = new LinkedHashMap<>();
+    stdRateMap.put("SMS", standardRateService.getStandardRateWithVat("msg_sms"));
+    stdRateMap.put("LMS", standardRateService.getStandardRateWithVat("msg_lms"));
+    stdRateMap.put("MMS", standardRateService.getStandardRateWithVat("msg_mms"));
+    stdRateMap.put("설문", standardRateService.getStandardRateWithVat("survey"));
+    stdRateMap.put("QR코드", standardRateService.getStandardRateWithVat("qr_code"));
+    stdRateMap.put("QR코드 추가과금", standardRateService.getStandardRateWithVat("qr_code_extra"));
+
+    // 유저별 메시지 통계로 건수/사용료 합산
+    Map<String, Integer> countMap = new LinkedHashMap<>();
+    Map<String, BigDecimal> amountMap = new LinkedHashMap<>();
+
+    for (UserMsgStatsResponse stat : msgStats) {
+      BigDecimal userSmsRate = getCachedRate(rateCache, stat.getUserId(), "msg_sms");
+      BigDecimal userLmsRate = getCachedRate(rateCache, stat.getUserId(), "msg_lms");
+      BigDecimal userMmsRate = getCachedRate(rateCache, stat.getUserId(), "msg_mms");
+      countMap.merge("SMS", (int) stat.getSmsSucc(), Integer::sum);
+      countMap.merge("LMS", (int) stat.getLmsSucc(), Integer::sum);
+      countMap.merge("MMS", (int) stat.getMmsSucc(), Integer::sum);
+      amountMap.merge("SMS", userSmsRate.multiply(BigDecimal.valueOf(stat.getSmsSucc())), BigDecimal::add);
+      amountMap.merge("LMS", userLmsRate.multiply(BigDecimal.valueOf(stat.getLmsSucc())), BigDecimal::add);
+      amountMap.merge("MMS", userMmsRate.multiply(BigDecimal.valueOf(stat.getMmsSucc())), BigDecimal::add);
+    }
+
+    // 유저별 설문/QR 통계로 건수/사용료 합산
+    for (UserSurveyStatsResponse stat : surveyStats) {
+      BigDecimal userSurveyRate = getCachedRate(rateCache, stat.getUserId(), "survey");
+      countMap.merge("설문", stat.getSurveySucc(), Integer::sum);
+      amountMap.merge("설문", userSurveyRate.multiply(BigDecimal.valueOf(stat.getSurveySucc())), BigDecimal::add);
+    }
+
+    // QR 통계를 userId별로 합산
+    Map<String, int[]> qrByUser = new LinkedHashMap<>();
+    for (UserQrStatsResponse qr : qrStats) {
+      qrByUser.merge(qr.getUserId(), new int[] {qr.getEventCount(), qr.getVisitCount()},
+          (a, b) -> new int[] {a[0] + b[0], a[1] + b[1]});
+    }
+    for (Map.Entry<String, int[]> entry : qrByUser.entrySet()) {
+      String uid = entry.getKey();
+      int eventCount = entry.getValue()[0];
+      int visitCount = entry.getValue()[1];
+      BigDecimal userQrRate = getCachedRate(rateCache, uid, "qr_code");
+      BigDecimal userQrExtraRate = getCachedRate(rateCache, uid, "qr_code_extra");
+      int extraBlocks =
+          visitCount <= 0 ? 0 : ((visitCount + QR_VISITS_PER_BLOCK - 1) / QR_VISITS_PER_BLOCK - 1);
+      countMap.merge("QR코드", eventCount, Integer::sum);
+      countMap.merge("QR코드 추가과금", extraBlocks, Integer::sum);
+      amountMap.merge("QR코드", userQrRate.multiply(BigDecimal.valueOf(eventCount)), BigDecimal::add);
+      amountMap.merge("QR코드 추가과금", userQrExtraRate.multiply(BigDecimal.valueOf(extraBlocks)), BigDecimal::add);
+    }
+
+    // 카테고리별 비고 정의: {그룹, 카테고리명, 비고}
+    String[][] categories = {
+        {"문자메시지", "SMS", ""},
+        {"문자메시지", "LMS", ""},
+        {"문자메시지", "MMS", ""},
+        {"설문조사", "설문", ""},
+        {"설문조사", "QR코드", "기본조회 3,000건, 이후 3,000건당 추가과금"},
+        {"설문조사", "QR코드 추가과금", ""},
+    };
+
+    CellStyle sumStyle = sumStyle(workbook);
+    CellStyle sumNumStyle = sumNumStyle(workbook);
 
     int rowIdx = 5;
-    for (UsageSummaryResponse s : summaries) {
+    String currentGroup = "";
+    BigDecimal groupAmount = BigDecimal.ZERO;
+    BigDecimal grandTotal = BigDecimal.ZERO;
+
+    for (String[] cat : categories) {
+      String group = cat[0];
+      String category = cat[1];
+      String remarks = cat[2];
+      int count = countMap.getOrDefault(category, 0);
+      BigDecimal unitPrice = stdRateMap.getOrDefault(category, BigDecimal.ZERO);
+      BigDecimal amount = amountMap.getOrDefault(category, BigDecimal.ZERO);
+
+      // 그룹 변경 시 이전 그룹 소계 출력
+      if (!group.equals(currentGroup) && !currentGroup.isEmpty()) {
+        Row subRow = sheet.createRow(rowIdx++);
+        setCellWithStyle(subRow, 0, "", sumStyle);
+        setCellWithStyle(subRow, 1, "소계", sumStyle);
+        setCellWithStyle(subRow, 2, "", sumStyle);
+        setCellWithStyle(subRow, 3, "", sumStyle);
+        makeMoneyCell(subRow, 4, groupAmount, sumNumStyle);
+        setCellWithStyle(subRow, 5, "", sumStyle);
+        grandTotal = grandTotal.add(groupAmount);
+        groupAmount = BigDecimal.ZERO;
+      }
+
       Row row = sheet.createRow(rowIdx++);
-      setCellWithStyle(row, 0, nvl(s.getServiceTypeName()), borderStyle);
-      setCellWithStyle(row, 1, nvl(s.getCategory()), borderStyle);
-      makeNumberCell(row, 2, s.getCount(), numBorderStyle);
-      makeNumberCell(
-          row, 3, s.getUnitPrice() != null ? s.getUnitPrice().longValue() : 0, numBorderStyle);
-      BigDecimal amt = s.getAmount() != null ? s.getAmount() : s.calculateAmount();
-      makeNumberCell(row, 4, amt.longValue(), numBorderStyle);
-      setCellWithStyle(row, 5, nvl(s.getRemarks()), borderStyle);
+      // 서비스 종류는 그룹 첫 행에만 표시
+      String displayGroup = !group.equals(currentGroup) ? group : "";
+      setCellWithStyle(row, 0, displayGroup, borderStyle);
+      setCellWithStyle(row, 1, category, borderStyle);
+      makeNumberCell(row, 2, count, numBorderStyle);
+      makeMoneyCell(row, 3, unitPrice, numBorderStyle);
+      makeMoneyCell(row, 4, amount, numBorderStyle);
+      setCellWithStyle(row, 5, remarks, borderStyle);
+
+      groupAmount = groupAmount.add(amount);
+      currentGroup = group;
     }
+
+    // 마지막 그룹 소계
+    if (!currentGroup.isEmpty()) {
+      Row subRow = sheet.createRow(rowIdx++);
+      setCellWithStyle(subRow, 0, "", sumStyle);
+      setCellWithStyle(subRow, 1, "소계", sumStyle);
+      setCellWithStyle(subRow, 2, "", sumStyle);
+      setCellWithStyle(subRow, 3, "", sumStyle);
+      makeMoneyCell(subRow, 4, groupAmount, sumNumStyle);
+      setCellWithStyle(subRow, 5, "", sumStyle);
+      grandTotal = grandTotal.add(groupAmount);
+    }
+
+    // 합계 행
+    Row totalRow = sheet.createRow(rowIdx);
+    setCellWithStyle(totalRow, 0, "합계", sumStyle);
+    setCellWithStyle(totalRow, 1, "", sumStyle);
+    setCellWithStyle(totalRow, 2, "", sumStyle);
+    setCellWithStyle(totalRow, 3, "", sumStyle);
+    makeMoneyCell(totalRow, 4, grandTotal, sumNumStyle);
+    setCellWithStyle(totalRow, 5, "", sumStyle);
 
     // 컬럼 너비
     sheet.setColumnWidth(0, 5000);
-    sheet.setColumnWidth(1, 3000);
+    sheet.setColumnWidth(1, 5000);
     sheet.setColumnWidth(2, 3500);
     sheet.setColumnWidth(3, 3500);
     sheet.setColumnWidth(4, 5000);
-    sheet.setColumnWidth(5, 5000);
+    sheet.setColumnWidth(5, 8000);
   }
 
   // ==================== Sheet 2: 상세-와이즈애드(메시지) ====================
 
-  private void addMessageDetailSheet(SXSSFWorkbook workbook, BillingStatsSearchRequest request) {
+  private void addMessageDetailSheet(
+      SXSSFWorkbook workbook,
+      BillingStatsSearchRequest request,
+      List<UserMsgStatsResponse> msgStats,
+      Map<String, Map<String, BigDecimal>> rateCache) {
     Sheet sheet = workbook.createSheet("상세-와이즈애드(메시지)");
 
     CellStyle titleStyle = titleStyle(workbook);
@@ -196,20 +381,6 @@ public class BillingExcelService {
     setHeaderCell(hr2, 8, "", headerStyle);
     sheet.addMergedRegion(new CellRangeAddress(2, 3, 8, 8));
 
-    // 단가 조회
-    BigDecimal smsRate = standardRateService.getStandardRateWithVat("msg_sms");
-    BigDecimal lmsRate = standardRateService.getStandardRateWithVat("msg_lms");
-    BigDecimal mmsRate = standardRateService.getStandardRateWithVat("msg_mms");
-
-    // 데이터
-    StatsSearchRequest statsReq =
-        StatsSearchRequest.builder()
-            .startDate(request.getStartDate())
-            .endDate(request.getEndDate())
-            .serviceType("M")
-            .build();
-    List<UserMsgStatsResponse> msgStats = userStatisticsService.findMsgStats(statsReq);
-
     int rowIdx = 4;
     long sumSmsTotal = 0, sumSmsSucc = 0, sumLmsTotal = 0, sumLmsSucc = 0;
     long sumMmsTotal = 0, sumMmsSucc = 0;
@@ -233,8 +404,11 @@ public class BillingExcelService {
       makeNumberCell(row, 6, stat.getMmsTotal(), ns);
       makeNumberCell(row, 7, stat.getMmsSucc(), ns);
 
-      // 사용금액 = 성공건수 × 단가
-      BigDecimal amount = calcMsgAmount(stat, smsRate, lmsRate, mmsRate);
+      // 사용금액 = 성공건수 × 유저별 단가
+      BigDecimal userSmsRate = getCachedRate(rateCache, stat.getUserId(), "msg_sms");
+      BigDecimal userLmsRate = getCachedRate(rateCache, stat.getUserId(), "msg_lms");
+      BigDecimal userMmsRate = getCachedRate(rateCache, stat.getUserId(), "msg_mms");
+      BigDecimal amount = calcMsgAmount(stat, userSmsRate, userLmsRate, userMmsRate);
       makeMoneyCell(row, 8, amount, ns);
 
       sumSmsTotal += stat.getSmsTotal();
@@ -274,7 +448,12 @@ public class BillingExcelService {
 
   // ==================== Sheet 3: 상세-와이즈애드(설문조사) ====================
 
-  private void addSurveyDetailSheet(SXSSFWorkbook workbook, BillingStatsSearchRequest request) {
+  private void addSurveyDetailSheet(
+      SXSSFWorkbook workbook,
+      BillingStatsSearchRequest request,
+      List<UserSurveyStatsResponse> surveyStats,
+      List<UserQrStatsResponse> qrStats,
+      Map<String, Map<String, BigDecimal>> rateCache) {
     Sheet sheet = workbook.createSheet("상세-와이즈애드(설문조사)");
 
     CellStyle titleStyle = titleStyle(workbook);
@@ -324,29 +503,6 @@ public class BillingExcelService {
     setHeaderCell(hr1, 6, "사용금액", headerStyle);
     setHeaderCell(hr2, 6, "", headerStyle);
     sheet.addMergedRegion(new CellRangeAddress(2, 3, 6, 6));
-
-    // 단가 조회
-    BigDecimal surveyRate = standardRateService.getStandardRateWithVat("survey");
-    BigDecimal qrRate = standardRateService.getStandardRateWithVat("qr_code");
-    BigDecimal qrExtraRate = standardRateService.getStandardRateWithVat("qr_code_extra");
-
-    // 설문 통계
-    StatsSearchRequest surveyReq =
-        StatsSearchRequest.builder()
-            .startDate(request.getStartDate())
-            .endDate(request.getEndDate())
-            .serviceType("S")
-            .build();
-    List<UserSurveyStatsResponse> surveyStats = userStatisticsService.findSurveyStats(surveyReq);
-
-    // QR 통계
-    StatsSearchRequest qrReq =
-        StatsSearchRequest.builder()
-            .startDate(request.getStartDate())
-            .endDate(request.getEndDate())
-            .serviceType("Q")
-            .build();
-    List<UserQrStatsResponse> qrStats = userStatisticsService.findQrStats(qrReq);
 
     // QR 통계를 userId별 Map으로
     Map<String, UserQrStatsResponse> qrMap = new HashMap<>();
@@ -401,15 +557,18 @@ public class BillingExcelService {
       makeNumberCell(row, 4, eventCount, ns);
       makeNumberCell(row, 5, visitCount, ns);
 
-      // 사용금액 = 설문 성공 × 설문단가 + QR 이벤트수 × QR기본단가 + QR 추가과금블록 × QR추가단가
+      // 사용금액 = 설문 성공 × 유저별 설문단가 + QR 이벤트수 × 유저별 QR기본단가 + QR 추가과금블록 × 유저별 QR추가단가
       // QR 추가과금: 기본 3,000건 포함, 이후 3,000건당 추가과금
+      BigDecimal userSurveyRate = getCachedRate(rateCache, uid, "survey");
+      BigDecimal userQrRate = getCachedRate(rateCache, uid, "qr_code");
+      BigDecimal userQrExtraRate = getCachedRate(rateCache, uid, "qr_code_extra");
       int extraBlocks =
           visitCount <= 0 ? 0 : ((visitCount + QR_VISITS_PER_BLOCK - 1) / QR_VISITS_PER_BLOCK - 1);
       BigDecimal amount =
-          surveyRate
+          userSurveyRate
               .multiply(BigDecimal.valueOf(surveySucc))
-              .add(qrRate.multiply(BigDecimal.valueOf(eventCount)))
-              .add(qrExtraRate.multiply(BigDecimal.valueOf(extraBlocks)));
+              .add(userQrRate.multiply(BigDecimal.valueOf(eventCount)))
+              .add(userQrExtraRate.multiply(BigDecimal.valueOf(extraBlocks)));
       makeMoneyCell(row, 6, amount, ns);
 
       sumSurveyTotal += surveyTotal;
@@ -593,6 +752,15 @@ public class BillingExcelService {
       log.warn("회사명 조회 실패: userId={}", userId, e);
       return null;
     }
+  }
+
+  /** 유저별 적용 요금 조회 (user_service_rate 우선, 없으면 standard_rate) */
+  private BigDecimal getEffectiveRate(String userId, String serviceId) {
+    Integer userSeq = resolveUserSeq(userId);
+    if (userSeq != null) {
+      return userServiceRateService.getEffectiveRate(userSeq, serviceId);
+    }
+    return standardRateService.getStandardRateWithVat(serviceId);
   }
 
   /** ID를 userSeq로 변환 (숫자면 그대로, 아니면 userId로 조회) */

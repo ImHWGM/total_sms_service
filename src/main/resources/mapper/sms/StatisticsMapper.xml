@@ -57,19 +57,15 @@
         ORDER BY EXT_COL3, MSG_TYPE
     </select>
 
-    <!-- 서비스 타입별 사용량 집계 -->
+    <!-- 서비스 타입별 사용량 집계 (문자 + 설문, 단일 스캔) -->
     <select id="selectUsageSummary" resultType="kr.wisead.domain.statistics.dto.UsageSummaryResponse">
         SELECT
-            CASE MSG_TYPE
-                WHEN 'SMS' THEN 'SMS'
-                WHEN 'LMS' THEN 'LMS'
-                WHEN 'MMS' THEN 'MMS'
-                WHEN 'ATA' THEN '알림톡'
-                WHEN 'FTA' THEN '친구톡'
-                WHEN 'FTI' THEN '친구톡(이미지)'
-                ELSE MSG_TYPE
-            END AS serviceTypeName,
-            '발송' AS category,
+            CASE WHEN ext_col0 IS NULL THEN '문자메시지' ELSE '설문조사' END AS serviceTypeName,
+            CASE
+                WHEN ext_col0 IS NULL THEN
+                    CASE MSG_TYPE WHEN 'S' THEN 'SMS' WHEN 'L' THEN 'LMS' ELSE 'MMS' END
+                ELSE '설문'
+            END AS category,
             COUNT(*) AS count,
             NULL AS unitPrice,
             NULL AS amount,
@@ -85,8 +81,7 @@
         <if test="endDate != null and endDate != ''">
             AND SAVE_TIME <![CDATA[<=]]> #{endDate}
         </if>
-        GROUP BY MSG_TYPE
-        ORDER BY MSG_TYPE
+        GROUP BY serviceTypeName, category
     </select>
 
     <!-- 월별 총 건수 조회 -->

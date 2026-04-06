@@ -13,6 +13,8 @@ import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.schedule.dto.ScheduledMessageResponse;
 import kr.wisead.domain.schedule.dto.ScheduledMessageSearchRequest;
 import kr.wisead.domain.schedule.entity.ScheduledMessage;
+import kr.wisead.mapper.primary.SmsSendMapper;
+import kr.wisead.mapper.primary.SurveyUserMapper;
 import kr.wisead.mapper.sms.ScheduledMessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +32,8 @@ public class ScheduledMessageService {
   private final BalanceService balanceService;
   private final WalletService walletService;
   private final UserIdResolver userIdResolver;
+  private final SurveyUserMapper surveyUserMapper;
+  private final SmsSendMapper smsSendMapper;
 
   @Value("${api.base.url:}")
   private String apiBaseUrl;
@@ -164,9 +168,31 @@ public class ScheduledMessageService {
       }
     }
 
-    // 5. 예약 메시지 삭제 (SMS DB - userId 사용)
+    // 5. 삭제 전 설문 메시지 정보 수집 (SMS DB)
+    List<ScheduledMessage> surveyMessages =
+        scheduledMessageMapper.selectSurveyMessagesForCancellation(userId, msgType, insertTime);
+
+    // 6. 예약 메시지 삭제 (SMS DB - userId 사용)
     int deleted = scheduledMessageMapper.deleteScheduledMessageGroup(userId, msgType, insertTime);
     log.info("예약 취소 - 메시지 삭제 완료: {}건", deleted);
+
+    // 7. 설문 메시지인 경우 survey_user soft delete + sms_send 삭제 (Primary DB)
+    for (ScheduledMessage msg : surveyMessages) {
+      try {
+        Integer eventSeq = msg.getExtCol0();
+        String extCol1 = msg.getExtCol1();
+        if (eventSeq != null && extCol1 != null) {
+          Integer surveyUserSeq = Integer.parseInt(extCol1);
+          surveyUserMapper.softDelete(surveyUserSeq, userId);
+          smsSendMapper.deleteByEventSeqAndUserSeq(eventSeq, surveyUserSeq);
+          log.info("예약 취소 - 설문 데이터 정리 완료 - eventSeq: {}, userSeq: {}", eventSeq, surveyUserSeq);
+        }
+      } catch (NumberFormatException e) {
+        log.warn("예약 취소 - 설문 데이터 정리 실패 - extCol1이 숫자가 아닙니다: {}", msg.getExtCol1());
+      } catch (Exception e) {
+        log.warn("예약 취소 - 설문 데이터 정리 실패 - error: {}", e.getMessage());
+      }
+    }
   }
 
   // ==================== Private Methods ====================

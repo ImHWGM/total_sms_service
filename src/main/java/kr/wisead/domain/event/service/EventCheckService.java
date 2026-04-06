@@ -189,6 +189,11 @@ public class EventCheckService {
     String attendTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
     participantMapper.updateAttendTime(participant.getSeq(), attendTime);
 
+    // 6. 미등록 상태인 경우 사전등록으로 변경
+    if (participant.getRegistType() == null || participant.getRegistType().isBlank()) {
+      participantMapper.updateRegistType(participant.getSeq(), "사전등록");
+    }
+
     log.info(
         "참가자 체크인 완료: eventSeq={}, participantSeq={}, name={}",
         participant.getEventSeq(),

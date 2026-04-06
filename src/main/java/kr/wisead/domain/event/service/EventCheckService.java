@@ -190,7 +190,7 @@ public class EventCheckService {
     participantMapper.updateAttendTime(participant.getSeq(), attendTime);
 
     // 6. 미등록 상태인 경우 사전등록으로 변경
-    if (participant.getRegistType() == null || participant.getRegistType().isBlank()) {
+    if (EventParticipant.DEFAULT_REGIST_TYPE.equals(participant.getRegistType())) {
       participantMapper.updateRegistType(participant.getSeq(), "사전등록");
     }
 

@@ -77,7 +77,7 @@
             M.AUTH as auth
         FROM SURVEY_USER U
         INNER JOIN SURVEY_MASTER M ON U.EVENT_SEQ = M.EVENT_SEQ
-        WHERE BINARY U.USER_KEY = #{userKey}
+        WHERE U.USER_KEY = #{userKey}
         AND U.DEL_YN = 'N'
         LIMIT 1
     </select>
@@ -88,7 +88,7 @@
             <include refid="selectColumns"/>
         FROM SURVEY_USER U
         WHERE U.EVENT_SEQ = #{eventSeq}
-        AND BINARY U.USER_KEY = #{userKey}
+        AND U.USER_KEY = #{userKey}
         AND U.DEL_YN = 'N'
     </select>
 
@@ -183,21 +183,21 @@
             SUBMISSION_DATE = NOW()
         </set>
         WHERE EVENT_SEQ = #{eventSeq}
-        AND BINARY USER_KEY = #{userKey}
+        AND USER_KEY = #{userKey}
     </update>
 
     <!-- 설문 접속 시간 기록 -->
     <update id="updateStartTime">
         UPDATE SURVEY_USER
         SET SURVEY_START_TIME = NOW()
-        WHERE BINARY USER_KEY = #{userKey}
+        WHERE USER_KEY = #{userKey}
     </update>
 
     <!-- 설문 인증 시간 기록 -->
     <update id="updateAuthTime">
         UPDATE SURVEY_USER
         SET SURVEY_AUTH_TIME = NOW()
-        WHERE BINARY USER_KEY = #{userKey}
+        WHERE USER_KEY = #{userKey}
     </update>
 
     <!-- 참여자 삭제 -->

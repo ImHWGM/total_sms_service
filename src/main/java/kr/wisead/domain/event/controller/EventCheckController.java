@@ -83,7 +83,7 @@ public class EventCheckController {
             + cookieValue
             + "; Max-Age=86400; HttpOnly; Secure; Path="
             + cookiePath
-            + "; SameSite=Lax");
+            + "; SameSite=None");
     return ApiResponse.success("인증 성공");
   }
 

@@ -276,16 +276,27 @@ public class EventService {
     return getEventDetail(eventSeq);
   }
 
-  /** 사전설문 기간 검증: 둘 다 NULL 또는 둘 다 입력. 종료 < 시작 차단. 종료 > 행사 시작은 WARN. */
+  /** 사전설문 기간 검증: 둘 다 빈 값 또는 둘 다 입력. 종료 < 시작 차단. 종료 > 행사 시작은 WARN. */
   private void validatePreSurveyDates(EventRequest request) {
-    LocalDateTime preStart = request.getPreSurveyStartDate();
-    LocalDateTime preEnd = request.getPreSurveyEndDate();
-    if (preStart == null && preEnd == null) {
+    String preStartStr = request.getPreSurveyStartDate();
+    String preEndStr = request.getPreSurveyEndDate();
+    boolean startBlank = preStartStr == null || preStartStr.isEmpty();
+    boolean endBlank = preEndStr == null || preEndStr.isEmpty();
+    if (startBlank && endBlank) {
       return;
     }
-    if (preStart == null || preEnd == null) {
+    if (startBlank || endBlank) {
       throw new BusinessException(
           ErrorCode.INVALID_INPUT_VALUE, "사전설문 시작/종료일은 둘 다 입력하거나 둘 다 비워야 합니다.");
+    }
+    LocalDateTime preStart;
+    LocalDateTime preEnd;
+    try {
+      preStart = parseFlexibleDateTime(preStartStr);
+      preEnd = parseFlexibleDateTime(preEndStr);
+    } catch (Exception e) {
+      throw new BusinessException(
+          ErrorCode.INVALID_INPUT_VALUE, "사전설문 시작/종료일 형식이 올바르지 않습니다.");
     }
     if (preEnd.isBefore(preStart)) {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사전설문 종료일은 시작일 이후여야 합니다.");
@@ -293,11 +304,7 @@ public class EventService {
     String eventStart = request.getStartDate();
     if (eventStart != null && !eventStart.isEmpty()) {
       try {
-        LocalDateTime evtStart =
-            LocalDateTime.parse(
-                eventStart.length() == 10
-                    ? eventStart + "T00:00:00"
-                    : eventStart.replace(' ', 'T'));
+        LocalDateTime evtStart = parseFlexibleDateTime(eventStart);
         if (preEnd.isAfter(evtStart)) {
           log.warn("사전설문 종료일({})이 행사 시작일({}) 이후입니다. 통과는 허용하나 운영 확인 필요.", preEnd, evtStart);
         }
@@ -305,6 +312,12 @@ public class EventService {
         log.debug("행사 시작일 파싱 실패 - 사전설문기간 vs 행사시작 비교 생략: {}", eventStart);
       }
     }
+  }
+
+  /** "yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:ss" 포맷을 모두 수용. */
+  private static LocalDateTime parseFlexibleDateTime(String value) {
+    if (value.length() == 10) return LocalDateTime.parse(value + "T00:00:00");
+    return LocalDateTime.parse(value.replace(' ', 'T'));
   }
 
   /**

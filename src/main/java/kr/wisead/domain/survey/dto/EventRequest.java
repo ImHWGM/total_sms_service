@@ -64,9 +64,9 @@ public class EventRequest {
 
   private String staffAuthCode; // 스태프 체크인 인증코드
 
-  private LocalDateTime preSurveyStartDate; // 사전설문 시작일
+  private String preSurveyStartDate; // 사전설문 시작일 (프로젝트 컨벤션: startDate/endDate와 동일한 String)
 
-  private LocalDateTime preSurveyEndDate; // 사전설문 종료일
+  private String preSurveyEndDate; // 사전설문 종료일
 
   // 문항 목록 (설문 생성 시)
   private List<QuestionRequest> questions;

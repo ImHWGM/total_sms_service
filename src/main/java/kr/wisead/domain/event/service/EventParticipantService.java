@@ -873,14 +873,29 @@ public class EventParticipantService {
         .build();
   }
 
-  /** 사전설문기간 활성 여부. 양쪽 날짜 중 하나라도 NULL이면 비활성(=QR_ONLY 폴백). */
+  /** 사전설문기간 활성 여부. 양쪽 날짜 중 하나라도 빈 값이거나 파싱 실패면 비활성(=QR_ONLY 폴백). */
   private static boolean isPreSurveyActive(SurveyMasterPreSurveyDto preSurvey) {
     if (preSurvey == null) return false;
-    LocalDateTime start = preSurvey.getPreSurveyStartDate();
-    LocalDateTime end = preSurvey.getPreSurveyEndDate();
-    if (start == null || end == null) return false;
-    LocalDateTime now = LocalDateTime.now();
-    return !start.isAfter(now) && !end.isBefore(now);
+    String startStr = preSurvey.getPreSurveyStartDate();
+    String endStr = preSurvey.getPreSurveyEndDate();
+    if (startStr == null || startStr.isEmpty() || endStr == null || endStr.isEmpty()) {
+      return false;
+    }
+    try {
+      LocalDateTime start = parseFlexibleDateTime(startStr);
+      LocalDateTime end = parseFlexibleDateTime(endStr);
+      LocalDateTime now = LocalDateTime.now();
+      return !start.isAfter(now) && !end.isBefore(now);
+    } catch (Exception e) {
+      log.warn("사전설문기간 파싱 실패 → QR_ONLY 폴백: start={}, end={}", startStr, endStr);
+      return false;
+    }
+  }
+
+  /** "yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:ss" 모두 수용. */
+  private static LocalDateTime parseFlexibleDateTime(String value) {
+    if (value.length() == 10) return LocalDateTime.parse(value + "T00:00:00");
+    return LocalDateTime.parse(value.replace(' ', 'T'));
   }
 
   /** RSVP 영문 응답값을 한국어로 변환 */

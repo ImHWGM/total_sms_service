@@ -43,8 +43,8 @@ public class SurveyMaster {
   private String badgePrintType; // 출입증 출력 여부
   private String nametagConfig; // 명찰 템플릿 설정 (JSON 문자열)
   private String staffAuthCode; // 스태프 체크인 인증코드
-  private LocalDateTime preSurveyStartDate; // 사전설문 시작일
-  private LocalDateTime preSurveyEndDate; // 사전설문 종료일
+  private String preSurveyStartDate; // 사전설문 시작일 (startDate/endDate와 동일한 String 컨벤션)
+  private String preSurveyEndDate; // 사전설문 종료일
 
   // 집계 정보 (조회용)
   private Integer totSurveyUser; // 설문 대상자 수
@@ -168,7 +168,7 @@ public class SurveyMaster {
   }
 
   /** 사전설문 기간 설정 */
-  public void setPreSurveyDates(LocalDateTime preSurveyStartDate, LocalDateTime preSurveyEndDate) {
+  public void setPreSurveyDates(String preSurveyStartDate, String preSurveyEndDate) {
     this.preSurveyStartDate = preSurveyStartDate;
     this.preSurveyEndDate = preSurveyEndDate;
   }

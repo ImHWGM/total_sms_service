@@ -2,17 +2,22 @@ package kr.wisead.domain.event.service;
 
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.ratelimit.RateLimitExceededException;
+import kr.wisead.common.ratelimit.SimpleRateLimiter;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.event.dto.*;
 import kr.wisead.domain.event.entity.*;
+import kr.wisead.domain.event.security.RsvpNonceStore;
+import kr.wisead.domain.event.util.RegistTypeMapper;
 import kr.wisead.domain.excel.service.ExcelService;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
@@ -43,6 +48,8 @@ public class EventParticipantService {
   private final SendHistoryMapper sendHistoryMapper;
   private final AdminService adminService;
   private final ExcelService excelService;
+  private final RsvpNonceStore rsvpNonceStore;
+  private final SimpleRateLimiter simpleRateLimiter;
 
   @Value("${wisead.url:http://localhost:8080}")
   private String wiseadUrl;
@@ -740,6 +747,140 @@ public class EventParticipantService {
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
     return getParticipantStatus(participant.getSeq());
+  }
+
+  // ==================== 행사 통합 링크 ====================
+
+  /** 통합 링크 페이지 상태 조회. eventSeq + checkCode capability 모델. */
+  @Transactional(readOnly = true)
+  public UnifiedLinkStateResponse getUnifiedLinkState(
+      Integer eventSeq, String checkCode, String clientIp) {
+    // 브루트포스 / 열거 공격 방어: /state 도 rate limit 적용 (IP + eventSeq 기준 1초 1회).
+    String stateRateKey = clientIp + ":" + eventSeq + ":state";
+    if (!simpleRateLimiter.tryAcquire(stateRateKey)) {
+      throw new RateLimitExceededException("요청이 너무 빈번합니다. 잠시 후 다시 시도해 주세요.");
+    }
+
+    // selectByEventSeqAndCheckCode가 participant의 eventSeq FK로 event 존재를 이미 증명한다.
+    // 별도 selectByEventSeq 호출은 selectWithCounts의 비싼 서브쿼리를 유발하므로 제거.
+    EventParticipant participant =
+        participantMapper
+            .selectByEventSeqAndCheckCode(eventSeq, checkCode)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+
+    SurveyMasterPreSurveyDto preSurvey =
+        surveyMasterMapper.selectPreSurveyDatesByEventSeq(eventSeq);
+    boolean preSurveyActive = isPreSurveyActive(preSurvey);
+
+    String registType = participant.getRegistType();
+    String mode;
+    if (!preSurveyActive) {
+      mode = "QR_ONLY";
+    } else if (registType == null || registType.isEmpty()) {
+      mode = "RSVP";
+    } else if (RegistTypeMapper.isAttendType(registType)) {
+      mode = "RSVP_ANSWERED_ATTEND";
+    } else if (RegistTypeMapper.ABSENT.equals(registType)) {
+      mode = "RSVP_ANSWERED_ABSENT";
+    } else {
+      mode = "RSVP";
+    }
+
+    String qrCodeUrl = null;
+    if ("QR_ONLY".equals(mode) || "RSVP_ANSWERED_ATTEND".equals(mode)) {
+      qrCodeUrl = wiseadUrl + "/event/" + eventSeq + "/check/" + checkCode;
+    }
+
+    String nonce = null;
+    if (!"QR_ONLY".equals(mode)) {
+      nonce = rsvpNonceStore.issue(eventSeq, checkCode);
+      if (nonce == null) {
+        // 저장소 포화. fail-fast로 cryptic nonce 에러를 방지.
+        throw new BusinessException(
+            ErrorCode.INTERNAL_SERVER_ERROR, "일시적인 서버 부하로 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    }
+
+    log.debug(
+        "unified link state: eventSeq={}, participantSeq={}, mode={}, ip={}",
+        eventSeq,
+        participant.getSeq(),
+        mode,
+        clientIp);
+
+    return UnifiedLinkStateResponse.builder()
+        .mode(mode)
+        .participant(
+            UnifiedLinkStateResponse.ParticipantSummary.builder()
+                .name(participant.getUserName())
+                .checkCode(participant.getCheckCode())
+                .build())
+        .qrCodeUrl(qrCodeUrl)
+        .registType(registType)
+        .preSurveyActive(preSurveyActive)
+        .nonce(nonce)
+        .build();
+  }
+
+  /** 통합 링크 RSVP 제출. capability 모델 + nonce + rate limit. */
+  @Transactional
+  public RsvpSubmitResponse submitRsvpByCheckCode(
+      Integer eventSeq, String checkCode, String response, String nonce, String clientIp) {
+
+    String rateKey = clientIp + ":" + eventSeq + ":rsvp";
+    if (!simpleRateLimiter.tryAcquire(rateKey)) {
+      throw new RateLimitExceededException("요청이 너무 빈번합니다. 잠시 후 다시 시도해 주세요.");
+    }
+
+    if (!rsvpNonceStore.validateAndConsume(eventSeq, checkCode, nonce)) {
+      throw new BusinessException(ErrorCode.INVALID_TOKEN, "인증 토큰이 유효하지 않습니다. 페이지를 새로고침해 주세요.");
+    }
+
+    EventParticipant participant =
+        participantMapper
+            .selectByEventSeqAndCheckCode(eventSeq, checkCode)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+
+    SurveyMasterPreSurveyDto preSurvey =
+        surveyMasterMapper.selectPreSurveyDatesByEventSeq(eventSeq);
+    if (!isPreSurveyActive(preSurvey)) {
+      throw new BusinessException(ErrorCode.ACCESS_DENIED, "사전설문기간이 아닙니다.");
+    }
+
+    String prevRegistType = participant.getRegistType();
+    String newRegistType;
+    try {
+      newRegistType = RegistTypeMapper.toKorean(response);
+    } catch (IllegalArgumentException e) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, e.getMessage());
+    }
+
+    participantMapper.updateRegistType(participant.getSeq(), newRegistType);
+
+    log.info(
+        "RSVP updated: eventSeq={}, participantSeq={}, from={}, to={}, ip={}",
+        eventSeq,
+        participant.getSeq(),
+        prevRegistType,
+        newRegistType,
+        clientIp);
+
+    return RsvpSubmitResponse.builder()
+        .registType(newRegistType)
+        .prevRegistType(prevRegistType)
+        .build();
+  }
+
+  /** 사전설문기간 활성 여부. 양쪽 날짜 중 하나라도 NULL이면 비활성(=QR_ONLY 폴백). */
+  private static boolean isPreSurveyActive(SurveyMasterPreSurveyDto preSurvey) {
+    if (preSurvey == null) return false;
+    LocalDateTime start = preSurvey.getPreSurveyStartDate();
+    LocalDateTime end = preSurvey.getPreSurveyEndDate();
+    if (start == null || end == null) return false;
+    LocalDateTime now = LocalDateTime.now();
+    return !start.isAfter(now) && !end.isBefore(now);
   }
 
   /** RSVP 영문 응답값을 한국어로 변환 */

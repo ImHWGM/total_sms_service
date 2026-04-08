@@ -21,6 +21,10 @@ public interface SurveyMasterMapper {
   /** 이벤트 상세 조회 */
   Optional<SurveyMaster> selectByEventSeq(@Param("eventSeq") Integer eventSeq);
 
+  /** 사전설문 기간 조회 (행사 통합 링크용) */
+  kr.wisead.domain.event.dto.SurveyMasterPreSurveyDto selectPreSurveyDatesByEventSeq(
+      @Param("eventSeq") Integer eventSeq);
+
   /** 이벤트 코드로 조회 */
   Optional<SurveyMaster> selectByEventCode(@Param("eventCode") String eventCode);
 

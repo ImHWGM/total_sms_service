@@ -1,6 +1,7 @@
 package kr.wisead.domain.survey.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.*;
 
@@ -62,6 +63,10 @@ public class EventRequest {
   private String nametagConfig; // 명찰 템플릿 설정 (JSON 문자열)
 
   private String staffAuthCode; // 스태프 체크인 인증코드
+
+  private LocalDateTime preSurveyStartDate; // 사전설문 시작일
+
+  private LocalDateTime preSurveyEndDate; // 사전설문 종료일
 
   // 문항 목록 (설문 생성 시)
   private List<QuestionRequest> questions;

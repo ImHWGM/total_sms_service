@@ -1,5 +1,6 @@
 package kr.wisead.domain.survey.service;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -208,9 +209,13 @@ public class EventService {
             .nametagConfig(request.getNametagConfig())
             .staffAuthCode(
                 "E".equals(request.getEventType()) ? SurveyMaster.generateStaffAuthCode() : null)
+            .preSurveyStartDate(request.getPreSurveyStartDate())
+            .preSurveyEndDate(request.getPreSurveyEndDate())
             .eventEndImg(null) // 임시 경로 대신 null로 저장, 이동 후 업데이트
             .regId(actualUserId)
             .build();
+
+    validatePreSurveyDates(request);
 
     surveyMasterMapper.insert(event);
 
@@ -269,6 +274,37 @@ public class EventService {
     }
 
     return getEventDetail(eventSeq);
+  }
+
+  /** 사전설문 기간 검증: 둘 다 NULL 또는 둘 다 입력. 종료 < 시작 차단. 종료 > 행사 시작은 WARN. */
+  private void validatePreSurveyDates(EventRequest request) {
+    LocalDateTime preStart = request.getPreSurveyStartDate();
+    LocalDateTime preEnd = request.getPreSurveyEndDate();
+    if (preStart == null && preEnd == null) {
+      return;
+    }
+    if (preStart == null || preEnd == null) {
+      throw new BusinessException(
+          ErrorCode.INVALID_INPUT_VALUE, "사전설문 시작/종료일은 둘 다 입력하거나 둘 다 비워야 합니다.");
+    }
+    if (preEnd.isBefore(preStart)) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사전설문 종료일은 시작일 이후여야 합니다.");
+    }
+    String eventStart = request.getStartDate();
+    if (eventStart != null && !eventStart.isEmpty()) {
+      try {
+        LocalDateTime evtStart =
+            LocalDateTime.parse(
+                eventStart.length() == 10
+                    ? eventStart + "T00:00:00"
+                    : eventStart.replace(' ', 'T'));
+        if (preEnd.isAfter(evtStart)) {
+          log.warn("사전설문 종료일({})이 행사 시작일({}) 이후입니다. 통과는 허용하나 운영 확인 필요.", preEnd, evtStart);
+        }
+      } catch (Exception e) {
+        log.debug("행사 시작일 파싱 실패 - 사전설문기간 vs 행사시작 비교 생략: {}", eventStart);
+      }
+    }
   }
 
   /**
@@ -425,6 +461,8 @@ public class EventService {
       log.info("종료 이미지 삭제 - eventSeq: {}", eventSeq);
     }
 
+    validatePreSurveyDates(request);
+
     event.update(
         request.getEventName(),
         request.getEventEmphasisYn(),
@@ -449,6 +487,7 @@ public class EventService {
         request.getBadgePrintType(),
         request.getNametagConfig(),
         actualUptId);
+    event.setPreSurveyDates(request.getPreSurveyStartDate(), request.getPreSurveyEndDate());
 
     surveyMasterMapper.update(event);
 

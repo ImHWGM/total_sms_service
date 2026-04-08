@@ -35,7 +35,9 @@
         M.ORGANIZER as organizer,
         M.BADGE_PRINT_TYPE as badgePrintType,
         M.NAMETAG_CONFIG as nametagConfig,
-        M.STAFF_AUTH_CODE as staffAuthCode
+        M.STAFF_AUTH_CODE as staffAuthCode,
+        M.PRE_SURVEY_START_DATE as preSurveyStartDate,
+        M.PRE_SURVEY_END_DATE as preSurveyEndDate
     </sql>
 
     <sql id="selectWithCounts">
@@ -147,14 +149,16 @@
             STATUS, PRIVACY_POLICY_YN, PRIVACY_POLICY_TTL, PRIVACY_POLICY_DESC,
             THIRD_PARTY_YN, THIRD_PARTY_TTL, THIRD_PARTY_DESC,
             AUTH, QR_CODE, QR_CODE_IMG_PATH, AUTH_CODE_URL,
-            END_MESSAGE, EVENT_END_IMG, VENUE, ORGANIZER, BADGE_PRINT_TYPE, NAMETAG_CONFIG, STAFF_AUTH_CODE, REG_DATE, REG_ID
+            END_MESSAGE, EVENT_END_IMG, VENUE, ORGANIZER, BADGE_PRINT_TYPE, NAMETAG_CONFIG, STAFF_AUTH_CODE,
+            PRE_SURVEY_START_DATE, PRE_SURVEY_END_DATE, REG_DATE, REG_ID
         ) VALUES (
             #{userSeq}, #{eventCode}, #{eventName}, #{eventEmphasisYn},
             #{eventDescImg}, #{eventDesc}, #{eventType}, #{startDate}, #{endDate},
             #{status}, #{privacyPolicyYn}, #{privacyPolicyTtl}, #{privacyPolicyDesc},
             #{thirdPartyYn}, #{thirdPartyTtl}, #{thirdPartyDesc},
             #{auth}, #{qrCode}, #{qrCodeImgPath}, #{authCodeUrl},
-            #{endMessage}, #{eventEndImg}, #{venue}, #{organizer}, #{badgePrintType}, #{nametagConfig}, #{staffAuthCode}, NOW(),
+            #{endMessage}, #{eventEndImg}, #{venue}, #{organizer}, #{badgePrintType}, #{nametagConfig}, #{staffAuthCode},
+            #{preSurveyStartDate}, #{preSurveyEndDate}, NOW(),
             #{regId}
         )
     </insert>
@@ -193,10 +197,22 @@
             ORGANIZER = #{organizer},
         BADGE_PRINT_TYPE = #{badgePrintType},
             NAMETAG_CONFIG = #{nametagConfig},
+            PRE_SURVEY_START_DATE = #{preSurveyStartDate},
+            PRE_SURVEY_END_DATE = #{preSurveyEndDate},
             UPT_ID = #{uptId},
             UPT_DATE = NOW()
         WHERE EVENT_SEQ = #{eventSeq}
     </update>
+
+    <!-- 사전설문 기간 조회 -->
+    <select id="selectPreSurveyDatesByEventSeq"
+            resultType="kr.wisead.domain.event.dto.SurveyMasterPreSurveyDto">
+        SELECT
+            PRE_SURVEY_START_DATE as preSurveyStartDate,
+            PRE_SURVEY_END_DATE as preSurveyEndDate
+        FROM SURVEY_MASTER
+        WHERE EVENT_SEQ = #{eventSeq}
+    </select>
 
     <!-- 상태 변경 -->
     <update id="updateStatus">

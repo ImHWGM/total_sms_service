@@ -41,6 +41,8 @@ public class EventResponse {
   private String badgePrintType; // 서비스 옵션
   private String nametagConfig; // 명찰 템플릿 설정 (JSON 문자열)
   private String staffAuthCode; // 스태프 체크인 인증코드
+  private String preSurveyStartDate; // 사전설문 시작일
+  private String preSurveyEndDate; // 사전설문 종료일
   private LocalDateTime regDate; // 등록일
   private String regId; // 등록 ID
 
@@ -99,6 +101,8 @@ public class EventResponse {
         .badgePrintType(entity.getBadgePrintType())
         .nametagConfig(entity.getNametagConfig())
         .staffAuthCode(entity.getStaffAuthCode())
+        .preSurveyStartDate(entity.getPreSurveyStartDate())
+        .preSurveyEndDate(entity.getPreSurveyEndDate())
         .regDate(entity.getRegDate())
         .regId(entity.getRegId())
         .totSurveyUser(entity.getTotSurveyUser())

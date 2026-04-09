@@ -64,6 +64,10 @@ public interface SurveyUserMapper {
   /** 참여자 삭제 */
   int delete(@Param("eventSeq") Integer eventSeq, @Param("userKey") String userKey);
 
+  /** 참여자 배치 삭제 (userKey 목록) */
+  int deleteByUserKeys(
+      @Param("eventSeq") Integer eventSeq, @Param("userKeys") List<String> userKeys);
+
   /** 범용인증 상태 확인 */
   Map<String, Object> checkGeneralAuthStatus(
       @Param("authCodeUrl") String authCodeUrl, @Param("generalAuthCode") String generalAuthCode);

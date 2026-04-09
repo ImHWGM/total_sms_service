@@ -207,6 +207,16 @@
         AND USER_KEY = #{userKey}
     </delete>
 
+    <!-- 참여자 배치 삭제 -->
+    <delete id="deleteByUserKeys">
+        DELETE FROM SURVEY_USER
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND USER_KEY IN
+        <foreach collection="userKeys" item="uk" open="(" separator="," close=")">
+            #{uk}
+        </foreach>
+    </delete>
+
     <!-- 범용인증 상태 확인 -->
     <select id="checkGeneralAuthStatus" resultType="map">
         SELECT

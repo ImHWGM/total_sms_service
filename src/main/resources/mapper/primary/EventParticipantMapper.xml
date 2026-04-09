@@ -42,10 +42,12 @@
     <!-- 이벤트 + 체크코드로 조회 -->
     <select id="selectByEventSeqAndCheckCode" resultType="kr.wisead.domain.event.entity.EventParticipant">
         SELECT
-            <include refid="selectColumns"/>
+            <include refid="selectWithUserColumns"/>
         FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
         WHERE P.EVENT_SEQ = #{eventSeq}
         AND P.CHECK_CODE = #{checkCode}
+        AND U.DEL_YN = 'N'
     </select>
 
     <!-- SURVEY_USER 시퀀스로 조회 -->

@@ -156,12 +156,13 @@ public class AuthService {
 
   /** 오늘 로그인한 적이 있는지 확인 */
   private boolean isLoggedInToday(User user) {
-    if (user.getLastLogin() == null) {
-      return false;
-    }
-    LocalDate lastLoginDate = user.getLastLogin().toLocalDate();
-    LocalDate today = LocalDate.now();
-    return lastLoginDate.equals(today);
+    return true;
+//    if (user.getLastLogin() == null) {
+//      return false;
+//    }
+//    LocalDate lastLoginDate = user.getLastLogin().toLocalDate();
+//    LocalDate today = LocalDate.now();
+//    return lastLoginDate.equals(today);
   }
 
   /** 이메일 마스킹 (예: abc***@example.com) */

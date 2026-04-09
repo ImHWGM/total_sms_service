@@ -72,6 +72,41 @@
         AND u.USER_KEY = #{userKey}
     </select>
 
+    <!-- 지정 userKey 중 답변이 존재하는 userKey 목록 -->
+    <select id="selectUserKeysWithAnswer" resultType="string">
+        SELECT DISTINCT u.USER_KEY
+        FROM SURVEY_USER u
+        INNER JOIN SURVEY_ANSWER a ON a.EVENT_SEQ = u.EVENT_SEQ AND a.USER_SEQ = u.SEQ
+        WHERE u.EVENT_SEQ = #{eventSeq}
+        AND u.USER_KEY IN
+        <foreach collection="userKeys" item="uk" open="(" separator="," close=")">
+            #{uk}
+        </foreach>
+    </select>
+
+    <!-- 인증 매핑 배치 삭제 -->
+    <delete id="deleteByUserKeys">
+        DELETE FROM AUTH_USER_MAPPING
+        WHERE EVENT_SEQ = #{eventSeq}
+        AND USER_KEY IN
+        <foreach collection="userKeys" item="uk" open="(" separator="," close=")">
+            #{uk}
+        </foreach>
+    </delete>
+
+    <!-- 이벤트의 인증키 userKey 목록 (답변 없는 것만) -->
+    <select id="selectAllUserKeysWithoutAnswer" resultType="string">
+        SELECT u.USER_KEY
+        FROM SURVEY_USER u
+        INNER JOIN AUTH_USER_MAPPING m ON m.EVENT_SEQ = u.EVENT_SEQ AND m.USER_KEY = u.USER_KEY
+        WHERE u.EVENT_SEQ = #{eventSeq}
+        AND m.GENERAL_AUTH_CODE IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM SURVEY_ANSWER ans
+            WHERE ans.EVENT_SEQ = u.EVENT_SEQ AND ans.USER_SEQ = u.SEQ
+        )
+    </select>
+
     <!-- 인증 매핑 배치 등록 -->
     <insert id="insertBatch" parameterType="list">
         INSERT INTO AUTH_USER_MAPPING (

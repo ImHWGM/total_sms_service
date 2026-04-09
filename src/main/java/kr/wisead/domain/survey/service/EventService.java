@@ -295,8 +295,7 @@ public class EventService {
       preStart = parseFlexibleDateTime(preStartStr);
       preEnd = parseFlexibleDateTime(preEndStr);
     } catch (Exception e) {
-      throw new BusinessException(
-          ErrorCode.INVALID_INPUT_VALUE, "사전설문 시작/종료일 형식이 올바르지 않습니다.");
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사전설문 시작/종료일 형식이 올바르지 않습니다.");
     }
     if (preEnd.isBefore(preStart)) {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사전설문 종료일은 시작일 이후여야 합니다.");
@@ -771,6 +770,87 @@ public class EventService {
     surveyUserMapper.delete(eventSeq, userKey);
 
     log.info("범용인증키 삭제 - eventSeq: {}, userKey: {}", eventSeq, userKey);
+  }
+
+  /** 범용인증키 선택 삭제 (응답 있는 키는 스킵) */
+  @Transactional
+  public Map<String, Object> deleteAuthKeys(
+      Integer eventSeq, List<String> userKeys, String userId) {
+    if (userKeys == null || userKeys.isEmpty()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "삭제할 인증키가 없습니다.");
+    }
+
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+    Integer userLevel = adminService.getUserLevel(userId);
+    adminService.validateModifyPermission(userId, userLevel, event.getRegId());
+
+    List<String> skipped = authUserMappingMapper.selectUserKeysWithAnswer(eventSeq, userKeys);
+    Set<String> skippedSet = new HashSet<>(skipped);
+    List<String> deletable =
+        userKeys.stream().filter(k -> !skippedSet.contains(k)).collect(Collectors.toList());
+
+    int deleted = 0;
+    if (!deletable.isEmpty()) {
+      authUserMappingMapper.deleteByUserKeys(eventSeq, deletable);
+      surveyUserMapper.deleteByUserKeys(eventSeq, deletable);
+      deleted = deletable.size();
+    }
+
+    log.info(
+        "범용인증키 선택 삭제 - eventSeq: {}, 요청: {}, 삭제: {}, 스킵(응답존재): {}",
+        eventSeq,
+        userKeys.size(),
+        deleted,
+        skipped.size());
+
+    Map<String, Object> result = new HashMap<>();
+    result.put("requested", userKeys.size());
+    result.put("deletedCount", deleted);
+    result.put("skippedCount", skipped.size());
+    result.put("skippedUserKeys", skipped);
+    return result;
+  }
+
+  /** 범용인증키 전체 삭제 (응답 있는 키는 스킵) */
+  @Transactional
+  public Map<String, Object> deleteAllAuthKeys(Integer eventSeq, String userId) {
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트를 찾을 수 없습니다."));
+
+    Integer userLevel = adminService.getUserLevel(userId);
+    adminService.validateModifyPermission(userId, userLevel, event.getRegId());
+
+    int total = authUserMappingMapper.countByEventSeq(eventSeq);
+    List<String> deletable = authUserMappingMapper.selectAllUserKeysWithoutAnswer(eventSeq);
+
+    int deleted = 0;
+    if (!deletable.isEmpty()) {
+      authUserMappingMapper.deleteByUserKeys(eventSeq, deletable);
+      surveyUserMapper.deleteByUserKeys(eventSeq, deletable);
+      deleted = deletable.size();
+    }
+
+    int skipped = total - deleted;
+    log.info(
+        "범용인증키 전체 삭제 - eventSeq: {}, 전체: {}, 삭제: {}, 스킵(응답존재): {}",
+        eventSeq,
+        total,
+        deleted,
+        skipped);
+
+    Map<String, Object> result = new HashMap<>();
+    result.put("requested", total);
+    result.put("deletedCount", deleted);
+    result.put("skippedCount", skipped);
+    return result;
   }
 
   /** 문항 저장 (JSON 방식 - 이미지 경로 변환) - 임시 경로를 eventSeq 기반 경로로 변환하여 저장 */

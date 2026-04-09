@@ -193,6 +193,27 @@ public class EventController {
     return ApiResponse.success(null);
   }
 
+  /** 범용인증키 선택 삭제 (body: {userKeys: [...]}) */
+  @DeleteMapping("/{eventSeq}/auth-keys")
+  public ApiResponse<Map<String, Object>> deleteAuthKeys(
+      @AuthenticationPrincipal UserDetails userDetails,
+      @PathVariable Integer eventSeq,
+      @RequestBody Map<String, List<String>> request) {
+    String userId = userDetails.getUsername();
+    List<String> userKeys = request.get("userKeys");
+    Map<String, Object> result = eventService.deleteAuthKeys(eventSeq, userKeys, userId);
+    return ApiResponse.success(result);
+  }
+
+  /** 범용인증키 전체 삭제 */
+  @DeleteMapping("/{eventSeq}/auth-keys/all")
+  public ApiResponse<Map<String, Object>> deleteAllAuthKeys(
+      @AuthenticationPrincipal UserDetails userDetails, @PathVariable Integer eventSeq) {
+    String userId = userDetails.getUsername();
+    Map<String, Object> result = eventService.deleteAllAuthKeys(eventSeq, userId);
+    return ApiResponse.success(result);
+  }
+
   /** 범용인증키 설명문구 조회 */
   @GetMapping("/{eventSeq}/auth-key-desc")
   public ApiResponse<Map<String, String>> getAuthKeyDesc(@PathVariable Integer eventSeq) {

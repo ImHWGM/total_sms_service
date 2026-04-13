@@ -68,11 +68,15 @@ public class NametagService {
 
     // 수동 명찰 출력 시 참석시간 반영 (기존 체크인이 없는 경우만)
     if (participant.getAttendTime() == null || participant.getAttendTime().isBlank()) {
-      String attendTime =
-          LocalDateTime.now().format(TIME_HH_MM) + " (수동)";
+      String attendTime = LocalDateTime.now().format(TIME_HH_MM) + " (수동)";
       participantMapper.updateAttendTime(participant.getSeq(), attendTime);
       log.info(
           "수동 명찰 출력으로 참석시간 반영: participantSeq={}, attendTime={}", participant.getSeq(), attendTime);
+    }
+
+    // 미등록 상태인 경우 사전등록으로 변경
+    if (EventParticipant.DEFAULT_REGIST_TYPE.equals(participant.getRegistType())) {
+      participantMapper.updateRegistType(participant.getSeq(), "사전등록");
     }
 
     log.info(

@@ -144,7 +144,7 @@ public class EventParticipantService {
             request.getPosition(),
             "일반",
             null,
-            "현장등록",
+            RegistTypeMapper.ONSITE_REGISTERED,
             null);
 
     insertWithUniqueCheckCode(participant);
@@ -570,8 +570,10 @@ public class EventParticipantService {
     Map<String, Object> params = new HashMap<>();
     params.put("eventSeq", request.getEventSeq());
     params.put("keyword", request.getKeyword());
-    params.put("participantType", request.getParticipantType());
+    params.put("participantTypes", request.getParticipantTypes());
+    params.put("excludeParticipantTypes", request.getExcludeParticipantTypes());
     params.put("registType", request.getRegistType());
+    params.put("attendStatus", request.getAttendStatus());
     params.put("offset", request.getOffset());
     params.put("limit", request.getSize());
 
@@ -901,8 +903,8 @@ public class EventParticipantService {
   /** RSVP 영문 응답값을 한국어로 변환 */
   private String convertRsvpResponse(String response) {
     return switch (response) {
-      case "attend", "preregister" -> "사전등록";
-      case "absent" -> "불참석";
+      case "attend", "preregister" -> RegistTypeMapper.PRE_REGISTERED;
+      case "absent" -> RegistTypeMapper.ABSENT;
       default -> response; // 이미 한국어인 경우 그대로 반환
     };
   }
@@ -937,13 +939,27 @@ public class EventParticipantService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사 정보를 찾을 수 없습니다."));
 
+    // 참석현황 통계 (attendTime 기준)
+    Map<String, Object> attendanceStats = participantMapper.selectAttendanceStats(eventSeq);
+    int attendanceTotal = getIntValue(attendanceStats, "totalCount");
+    int attendedCount = getIntValue(attendanceStats, "attendedCount");
+    int notAttendedCount = attendanceTotal - attendedCount;
+    double attendanceRate = calcRate(attendedCount, attendanceTotal);
+
+    EventStatisticsResponse.AttendanceSummary attendanceSummary =
+        EventStatisticsResponse.AttendanceSummary.builder()
+            .totalCount(attendanceTotal)
+            .attendedCount(attendedCount)
+            .notAttendedCount(notAttendedCount)
+            .attendanceRate(attendanceRate)
+            .build();
+
     // 참가자 통계 (체크인 현황)
     Map<String, Object> checkInStats = participantMapper.selectCheckInStats(eventSeq);
     int totalCount = getIntValue(checkInStats, "totalCount");
     int checkedInCount = getIntValue(checkInStats, "checkedInCount");
     int notCheckedInCount = totalCount - checkedInCount;
-    double checkedInRate =
-        totalCount > 0 ? Math.round((double) checkedInCount / totalCount * 1000) / 10.0 : 0;
+    double checkedInRate = calcRate(checkedInCount, totalCount);
 
     // 등록구분별 통계 (registType)
     Map<String, Object> registTypeStats = participantMapper.selectRegistTypeStats(eventSeq);
@@ -999,10 +1015,7 @@ public class EventParticipantService {
                 m -> {
                   int actionTotal = getIntValue(m, "totalCount");
                   int completedCount = getIntValue(m, "completedCount");
-                  double completionRate =
-                      actionTotal > 0
-                          ? Math.round((double) completedCount / actionTotal * 1000) / 10.0
-                          : 0;
+                  double completionRate = calcRate(completedCount, actionTotal);
 
                   return EventStatisticsResponse.ActionStatistics.builder()
                       .actionTypeSeq(((Number) m.get("actionTypeSeq")).longValue())
@@ -1020,8 +1033,7 @@ public class EventParticipantService {
     int nametagTotal = getIntValue(nametagStats, "totalCount");
     int printedCount = getIntValue(nametagStats, "printedCount");
     int notPrintedCount = getIntValue(nametagStats, "notPrintedCount");
-    double printRate =
-        nametagTotal > 0 ? Math.round((double) printedCount / nametagTotal * 1000) / 10.0 : 0;
+    double printRate = calcRate(printedCount, nametagTotal);
 
     EventStatisticsResponse.NametagSummary nametagSummary =
         EventStatisticsResponse.NametagSummary.builder()
@@ -1034,6 +1046,7 @@ public class EventParticipantService {
     return EventStatisticsResponse.builder()
         .eventSeq(eventSeq)
         .eventName(event.getEventName())
+        .attendanceSummary(attendanceSummary)
         .participantSummary(participantSummary)
         .rsvpSummary(rsvpSummary)
         .messageSummary(messageSummary)
@@ -1085,6 +1098,10 @@ public class EventParticipantService {
     } catch (NumberFormatException e) {
       return 0;
     }
+  }
+
+  private double calcRate(int numerator, int denominator) {
+    return denominator > 0 ? Math.round((double) numerator / denominator * 1000) / 10.0 : 0;
   }
 
   /** 문자 발송 통계 조회 (msg_result_YYYYMM + msg_queue) */

@@ -14,6 +14,9 @@ public class EventStatisticsResponse {
   private Integer eventSeq;
   private String eventName;
 
+  // 참석현황 (attendTime 기준)
+  private AttendanceSummary attendanceSummary;
+
   // 전체 참가자 통계
   private ParticipantSummary participantSummary;
 
@@ -34,6 +37,18 @@ public class EventStatisticsResponse {
   @NoArgsConstructor
   @AllArgsConstructor
   @Builder
+  public static class AttendanceSummary {
+    private int totalCount; // 전체 참가자 수
+    private int attendedCount; // 참석 인원 (attendTime 있음)
+    private int notAttendedCount; // 미참석 인원 (attendTime 없음)
+    private double attendanceRate; // 참석율 (%)
+  }
+
+  @Getter
+  @Setter
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @Builder
   public static class ParticipantSummary {
     private int totalCount; // 전체 참가자 수
     private int checkedInCount; // 체크인 완료 수
@@ -41,7 +56,7 @@ public class EventStatisticsResponse {
     private double checkedInRate; // 체크인율 (%)
     private int preRegisteredCount; // 사전등록 수
     private int onsiteRegisteredCount; // 현장등록 수
-    private int absentCount; // 불참석 수
+    private int absentCount; // 사전미참석 수
     private int unregisteredCount; // 미등록 수
 
     // 참가자 유형별 통계

@@ -90,14 +90,7 @@
         AND U.DEL_YN = 'N'
     </select>
 
-    <!-- 참가자 검색 -->
-    <select id="searchParticipants" parameterType="map" resultType="kr.wisead.domain.event.entity.EventParticipant">
-        SELECT
-            <include refid="selectWithUserColumns"/>
-        FROM EVENT_PARTICIPANT P
-        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
-        WHERE P.EVENT_SEQ = #{eventSeq}
-        AND U.DEL_YN = 'N'
+    <sql id="searchFilters">
         <if test="keyword != null and keyword != ''">
             AND (
                 U.USER_NAME LIKE CONCAT('%', #{keyword}, '%')
@@ -105,8 +98,17 @@
                 OR P.POSITION LIKE CONCAT('%', #{keyword}, '%')
             )
         </if>
-        <if test="participantType != null and participantType != ''">
-            AND P.PARTICIPANT_TYPE = #{participantType}
+        <if test="participantTypes != null and !participantTypes.isEmpty()">
+            AND P.PARTICIPANT_TYPE IN
+            <foreach collection="participantTypes" item="type" open="(" separator="," close=")">
+                #{type}
+            </foreach>
+        </if>
+        <if test="excludeParticipantTypes != null and !excludeParticipantTypes.isEmpty()">
+            AND P.PARTICIPANT_TYPE NOT IN
+            <foreach collection="excludeParticipantTypes" item="type" open="(" separator="," close=")">
+                #{type}
+            </foreach>
         </if>
         <if test="registType != null and registType != ''">
             <choose>
@@ -118,6 +120,27 @@
                 </otherwise>
             </choose>
         </if>
+        <if test="attendStatus != null and attendStatus != ''">
+            <choose>
+                <when test="attendStatus == 'attended'">
+                    AND P.ATTEND_TIME IS NOT NULL AND P.ATTEND_TIME != ''
+                </when>
+                <when test="attendStatus == 'notAttended'">
+                    AND (P.ATTEND_TIME IS NULL OR P.ATTEND_TIME = '')
+                </when>
+            </choose>
+        </if>
+    </sql>
+
+    <!-- 참가자 검색 -->
+    <select id="searchParticipants" parameterType="map" resultType="kr.wisead.domain.event.entity.EventParticipant">
+        SELECT
+            <include refid="selectWithUserColumns"/>
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+        <include refid="searchFilters"/>
         ORDER BY P.REG_DATE DESC
         <if test="limit != null">
             LIMIT #{limit} OFFSET #{offset}
@@ -131,26 +154,7 @@
         INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
         WHERE P.EVENT_SEQ = #{eventSeq}
         AND U.DEL_YN = 'N'
-        <if test="keyword != null and keyword != ''">
-            AND (
-                U.USER_NAME LIKE CONCAT('%', #{keyword}, '%')
-                OR P.DEPARTMENT LIKE CONCAT('%', #{keyword}, '%')
-                OR P.POSITION LIKE CONCAT('%', #{keyword}, '%')
-            )
-        </if>
-        <if test="participantType != null and participantType != ''">
-            AND P.PARTICIPANT_TYPE = #{participantType}
-        </if>
-        <if test="registType != null and registType != ''">
-            <choose>
-                <when test="registType == '미등록'">
-                    AND (P.REGIST_TYPE IS NULL OR P.REGIST_TYPE = '')
-                </when>
-                <otherwise>
-                    AND P.REGIST_TYPE = #{registType}
-                </otherwise>
-            </choose>
-        </if>
+        <include refid="searchFilters"/>
     </select>
 
     <!-- 참가자 등록 -->
@@ -302,12 +306,23 @@
         AND T.ACTION_CODE = 'CHECK_IN'
     </select>
 
+    <!-- 참석현황 통계 (attendTime 기준) -->
+    <select id="selectAttendanceStats" resultType="map">
+        SELECT
+            COUNT(*) as totalCount,
+            SUM(CASE WHEN P.ATTEND_TIME IS NOT NULL AND P.ATTEND_TIME != '' THEN 1 ELSE 0 END) as attendedCount
+        FROM EVENT_PARTICIPANT P
+        INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ
+        WHERE P.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
+    </select>
+
     <!-- 등록구분별 통계 (registType 기준) -->
     <select id="selectRegistTypeStats" resultType="map">
         SELECT
             SUM(CASE WHEN P.REGIST_TYPE = '사전등록' THEN 1 ELSE 0 END) as preRegisteredCount,
             SUM(CASE WHEN P.REGIST_TYPE = '현장등록' THEN 1 ELSE 0 END) as onsiteRegisteredCount,
-            SUM(CASE WHEN P.REGIST_TYPE = '불참석' THEN 1 ELSE 0 END) as absentCount,
+            SUM(CASE WHEN P.REGIST_TYPE = '사전미참석' THEN 1 ELSE 0 END) as absentCount,
             SUM(CASE WHEN P.REGIST_TYPE IS NULL OR P.REGIST_TYPE = '' OR P.REGIST_TYPE = '미등록' THEN 1 ELSE 0 END) as unregisteredCount
         FROM EVENT_PARTICIPANT P
         INNER JOIN SURVEY_USER U ON P.SURVEY_USER_SEQ = U.SEQ

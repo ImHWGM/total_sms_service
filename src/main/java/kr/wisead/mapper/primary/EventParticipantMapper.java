@@ -80,6 +80,9 @@ public interface EventParticipantMapper {
   /** 이벤트의 체크인 통계 (CHECK_IN 액션 기준) */
   Map<String, Object> selectCheckInStats(@Param("eventSeq") Integer eventSeq);
 
+  /** 이벤트의 참석현황 통계 (attendTime 기준) */
+  Map<String, Object> selectAttendanceStats(@Param("eventSeq") Integer eventSeq);
+
   /** 이벤트의 등록구분별 통계 (registType 기준) */
   Map<String, Object> selectRegistTypeStats(@Param("eventSeq") Integer eventSeq);
 

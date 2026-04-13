@@ -7,6 +7,7 @@ import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.event.dto.*;
 import kr.wisead.domain.event.entity.*;
+import kr.wisead.domain.event.util.RegistTypeMapper;
 import kr.wisead.mapper.primary.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -191,7 +192,7 @@ public class EventCheckService {
 
     // 6. 미등록 상태인 경우 사전등록으로 변경
     if (EventParticipant.DEFAULT_REGIST_TYPE.equals(participant.getRegistType())) {
-      participantMapper.updateRegistType(participant.getSeq(), "사전등록");
+      participantMapper.updateRegistType(participant.getSeq(), RegistTypeMapper.PRE_REGISTERED);
     }
 
     log.info(

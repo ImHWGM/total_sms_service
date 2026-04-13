@@ -5,7 +5,7 @@ public final class RegistTypeMapper {
 
   public static final String PRE_REGISTERED = "사전등록";
   public static final String ONSITE_REGISTERED = "현장등록";
-  public static final String ABSENT = "불참석";
+  public static final String ABSENT = "사전미참석";
 
   private RegistTypeMapper() {}
 

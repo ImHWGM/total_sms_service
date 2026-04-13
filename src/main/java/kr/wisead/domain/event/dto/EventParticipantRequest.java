@@ -39,5 +39,5 @@ public class EventParticipantRequest {
   private String memo;
 
   @Size(max = 20, message = "등록구분은 20자 이내로 입력해주세요.")
-  private String registType; // 등록구분 (사전등록/현장등록/불참석, null=미등록)
+  private String registType; // 등록구분 (사전등록/현장등록/사전미참석, null=미등록)
 }

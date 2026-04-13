@@ -28,7 +28,7 @@ public class EventParticipant {
   private String memo; // 메모
   private String nametagPrinted; // 명찰 출력 여부
   private String attendTime; // 행사참석시간 (HH:mm)
-  private String registType; // 등록구분 (null=미등록/불참석/사전등록/현장등록)
+  private String registType; // 등록구분 (null=미등록/사전미참석/사전등록/현장등록)
   private LocalDateTime regDate; // 등록일
   private LocalDateTime modDate; // 수정일
 

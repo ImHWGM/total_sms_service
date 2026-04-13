@@ -5,6 +5,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 import kr.wisead.common.dto.DownloadVerifyRequest;
 import kr.wisead.common.response.ApiResponse;
@@ -71,16 +72,20 @@ public class EventParticipantController {
   public ApiResponse<PageResponse<EventParticipantResponse>> getParticipants(
       @PathVariable Integer eventSeq,
       @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) String participantType,
+      @RequestParam(required = false) List<String> participantTypes,
+      @RequestParam(required = false) List<String> excludeParticipantTypes,
       @RequestParam(required = false) String registType,
+      @RequestParam(required = false) String attendStatus,
       @RequestParam(defaultValue = "1") Integer page,
       @RequestParam(defaultValue = "20") Integer size) {
     ParticipantSearchRequest request =
         ParticipantSearchRequest.builder()
             .eventSeq(eventSeq)
             .keyword(keyword)
-            .participantType(participantType)
+            .participantTypes(participantTypes)
+            .excludeParticipantTypes(excludeParticipantTypes)
             .registType(registType)
+            .attendStatus(attendStatus)
             .page(page)
             .size(size)
             .build();

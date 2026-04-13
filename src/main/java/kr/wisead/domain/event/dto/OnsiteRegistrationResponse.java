@@ -2,6 +2,7 @@ package kr.wisead.domain.event.dto;
 
 import java.time.LocalDateTime;
 import kr.wisead.domain.event.entity.EventParticipant;
+import kr.wisead.domain.event.util.RegistTypeMapper;
 import lombok.*;
 
 /** 현장 등록 응답 DTO */
@@ -39,7 +40,7 @@ public class OnsiteRegistrationResponse {
         .department(entity.getDepartment())
         .position(entity.getPosition())
         .participantType(entity.getParticipantType())
-        .registType("현장등록")
+        .registType(RegistTypeMapper.ONSITE_REGISTERED)
         .attendTime(attendTime)
         .eventName(entity.getEventName())
         .build();

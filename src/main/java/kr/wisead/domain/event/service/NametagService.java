@@ -1,5 +1,7 @@
 package kr.wisead.domain.event.service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import kr.wisead.common.exception.BusinessException;
@@ -18,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class NametagService {
+
+  private static final DateTimeFormatter TIME_HH_MM = DateTimeFormatter.ofPattern("HH:mm");
 
   private final EventParticipantMapper participantMapper;
   private final EventNametagLogMapper nametagLogMapper;
@@ -61,6 +65,15 @@ public class NametagService {
 
     // 참가자 명찰 출력 여부 업데이트
     participantMapper.updateNametagPrinted(participant.getSeq(), "Y");
+
+    // 수동 명찰 출력 시 참석시간 반영 (기존 체크인이 없는 경우만)
+    if (participant.getAttendTime() == null || participant.getAttendTime().isBlank()) {
+      String attendTime =
+          LocalDateTime.now().format(TIME_HH_MM) + " (수동)";
+      participantMapper.updateAttendTime(participant.getSeq(), attendTime);
+      log.info(
+          "수동 명찰 출력으로 참석시간 반영: participantSeq={}, attendTime={}", participant.getSeq(), attendTime);
+    }
 
     log.info(
         "명찰 출력 완료: participantSeq={}, templateType={}, printBy={}",

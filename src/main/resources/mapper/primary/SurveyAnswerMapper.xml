@@ -32,7 +32,7 @@
         FROM SURVEY_ANSWER
         WHERE EVENT_SEQ = #{eventSeq}
         AND QUESTION_SEQ = #{questionSeq}
-        AND QUESTION_TYPE = 'MCM'
+        AND QUESTION_TYPE_DETAIL = 'MCM'
         AND (
             ANSWER = #{itemValue}
             OR ANSWER LIKE CONCAT(#{itemValue}, ',%')

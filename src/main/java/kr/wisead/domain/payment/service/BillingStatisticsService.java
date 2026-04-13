@@ -7,8 +7,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.payment.dto.BillingStatsSearchRequest;
 import kr.wisead.domain.payment.dto.BillingSummaryResponse;
@@ -19,6 +21,11 @@ import kr.wisead.domain.payment.dto.TransactionResponse;
 import kr.wisead.domain.payment.dto.UserBillingStatsResponse;
 import kr.wisead.domain.payment.dto.WalletSummaryResponse;
 import kr.wisead.domain.payment.entity.Transaction;
+import kr.wisead.domain.statistics.dto.StatsSearchRequest;
+import kr.wisead.domain.statistics.dto.UserMsgStatsResponse;
+import kr.wisead.domain.statistics.dto.UserQrStatsResponse;
+import kr.wisead.domain.statistics.dto.UserSurveyStatsResponse;
+import kr.wisead.domain.statistics.service.UserStatisticsService;
 import kr.wisead.mapper.primary.TransactionMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +44,12 @@ public class BillingStatisticsService {
   private final TransactionMapper transactionMapper;
   private final WalletService walletService;
   private final UserIdResolver userIdResolver;
+  private final UserStatisticsService userStatisticsService;
+  private final StandardRateService standardRateService;
+  private final UserServiceRateService userServiceRateService;
+
+  /** QR코드 추가과금 단위 (방문횟수 기준) */
+  private static final int QR_VISITS_PER_BLOCK = 3000;
 
   /** 일별 과금 통계 조회 */
   @Transactional(readOnly = true)
@@ -63,18 +76,160 @@ public class BillingStatisticsService {
     return rawStats.stream().map(this::toMonthlyBillingStatsResponse).toList();
   }
 
-  /** 서비스 타입별 과금 통계 조회 */
+  private static final String[] ALL_SERVICE_IDS =
+      {"msg_sms", "msg_lms", "msg_mms", "survey", "qr_code", "qr_code_extra"};
+
+  /** 서비스 타입별 과금 통계 조회 (SMS DB 기반) - 실제 발송 성공 건수 기준 - 유저별 단가 적용하여 사용료 계산 */
   @Transactional(readOnly = true)
   public List<ServiceTypeBillingStatsResponse> getBillingStatsByServiceType(
       BillingStatsSearchRequest request) {
     String[] dates = resolveDefaultDates(request.getStartDate(), request.getEndDate());
-    Integer userSeq = userIdResolver.toUserSeq(request.getUserId());
-    List<Integer> userSeqs = userIdResolver.toUserSeqs(request.getUserIds());
 
-    List<Map<String, Object>> rawStats =
-        transactionMapper.selectStatsByServiceId(userSeq, userSeqs, dates[0], dates[1]);
+    // SMS DB에서 실제 발송 통계 조회
+    List<UserMsgStatsResponse> msgStats =
+        userStatisticsService.findMsgStats(buildStatsRequest(dates, request, "M"));
+    List<UserSurveyStatsResponse> surveyStats =
+        userStatisticsService.findSurveyStats(buildStatsRequest(dates, request, "S"));
+    List<UserQrStatsResponse> qrStats =
+        userStatisticsService.findQrStats(buildStatsRequest(dates, request, "Q"));
 
-    return rawStats.stream().map(this::toServiceTypeBillingStatsResponse).toList();
+    // 유저별 단가 캐시 구축 (N+1 방지)
+    Map<String, Map<String, BigDecimal>> rateCache =
+        buildRateCache(msgStats, surveyStats, qrStats);
+
+    // 유저별 성공건수 × 유저별 단가로 사용료 합산
+    Map<String, Integer> countMap = new LinkedHashMap<>();
+    Map<String, BigDecimal> amountMap = new LinkedHashMap<>();
+
+    for (UserMsgStatsResponse stat : msgStats) {
+      Map<String, BigDecimal> rates = rateCache.getOrDefault(stat.getUserId(), Map.of());
+      countMap.merge("SMS", stat.getSmsSucc(), Integer::sum);
+      countMap.merge("LMS", stat.getLmsSucc(), Integer::sum);
+      countMap.merge("MMS", stat.getMmsSucc(), Integer::sum);
+      amountMap.merge(
+          "SMS",
+          rates.getOrDefault("msg_sms", BigDecimal.ZERO)
+              .multiply(BigDecimal.valueOf(stat.getSmsSucc())),
+          BigDecimal::add);
+      amountMap.merge(
+          "LMS",
+          rates.getOrDefault("msg_lms", BigDecimal.ZERO)
+              .multiply(BigDecimal.valueOf(stat.getLmsSucc())),
+          BigDecimal::add);
+      amountMap.merge(
+          "MMS",
+          rates.getOrDefault("msg_mms", BigDecimal.ZERO)
+              .multiply(BigDecimal.valueOf(stat.getMmsSucc())),
+          BigDecimal::add);
+    }
+
+    for (UserSurveyStatsResponse stat : surveyStats) {
+      Map<String, BigDecimal> rates = rateCache.getOrDefault(stat.getUserId(), Map.of());
+      countMap.merge("설문", stat.getSurveySucc(), Integer::sum);
+      amountMap.merge(
+          "설문",
+          rates.getOrDefault("survey", BigDecimal.ZERO)
+              .multiply(BigDecimal.valueOf(stat.getSurveySucc())),
+          BigDecimal::add);
+    }
+
+    // QR 통계를 userId별로 합산 후 추가과금 계산
+    Map<String, int[]> qrByUser = new LinkedHashMap<>();
+    for (UserQrStatsResponse qr : qrStats) {
+      qrByUser.merge(
+          qr.getUserId(),
+          new int[] {qr.getEventCount(), qr.getVisitCount()},
+          (a, b) -> new int[] {a[0] + b[0], a[1] + b[1]});
+    }
+    for (Map.Entry<String, int[]> entry : qrByUser.entrySet()) {
+      Map<String, BigDecimal> rates = rateCache.getOrDefault(entry.getKey(), Map.of());
+      int eventCount = entry.getValue()[0];
+      int visitCount = entry.getValue()[1];
+      int extraBlocks =
+          visitCount <= 0
+              ? 0
+              : ((visitCount + QR_VISITS_PER_BLOCK - 1) / QR_VISITS_PER_BLOCK - 1);
+      countMap.merge("QR코드", eventCount, Integer::sum);
+      countMap.merge("QR코드 추가과금", Math.max(extraBlocks, 0), Integer::sum);
+      amountMap.merge(
+          "QR코드",
+          rates.getOrDefault("qr_code", BigDecimal.ZERO)
+              .multiply(BigDecimal.valueOf(eventCount)),
+          BigDecimal::add);
+      amountMap.merge(
+          "QR코드 추가과금",
+          rates.getOrDefault("qr_code_extra", BigDecimal.ZERO)
+              .multiply(BigDecimal.valueOf(Math.max(extraBlocks, 0))),
+          BigDecimal::add);
+    }
+
+    // 표준 단가 조회
+    Map<String, BigDecimal> stdRateMap = new LinkedHashMap<>();
+    stdRateMap.put("SMS", standardRateService.getStandardRateWithVat("msg_sms"));
+    stdRateMap.put("LMS", standardRateService.getStandardRateWithVat("msg_lms"));
+    stdRateMap.put("MMS", standardRateService.getStandardRateWithVat("msg_mms"));
+    stdRateMap.put("설문", standardRateService.getStandardRateWithVat("survey"));
+    stdRateMap.put("QR코드", standardRateService.getStandardRateWithVat("qr_code"));
+    stdRateMap.put("QR코드 추가과금", standardRateService.getStandardRateWithVat("qr_code_extra"));
+
+    // 응답 생성
+    String[][] categories = {
+      {"SMS", ""}, {"LMS", ""}, {"MMS", ""},
+      {"설문", ""},
+      {"QR코드", "기본조회 3,000건, 이후 3,000건당 추가과금"},
+      {"QR코드 추가과금", ""},
+    };
+    List<ServiceTypeBillingStatsResponse> result = new ArrayList<>();
+    for (String[] cat : categories) {
+      result.add(
+          ServiceTypeBillingStatsResponse.builder()
+              .serviceType(cat[0])
+              .serviceTypeName(cat[0])
+              .transactionCount(countMap.getOrDefault(cat[0], 0))
+              .unitPrice(stdRateMap.getOrDefault(cat[0], BigDecimal.ZERO))
+              .totalAmount(amountMap.getOrDefault(cat[0], BigDecimal.ZERO))
+              .remarks(cat[1])
+              .build());
+    }
+    return result;
+  }
+
+  /** StatsSearchRequest 빌더 헬퍼 */
+  private StatsSearchRequest buildStatsRequest(
+      String[] dates, BillingStatsSearchRequest request, String serviceType) {
+    return StatsSearchRequest.builder()
+        .startDate(dates[0])
+        .endDate(dates[1])
+        .serviceType(serviceType)
+        .userId(request.getUserId())
+        .userIds(request.getUserIds())
+        .build();
+  }
+
+  /** 유저별 서비스 단가 캐시 구축 (N+1 방지) */
+  private Map<String, Map<String, BigDecimal>> buildRateCache(
+      List<UserMsgStatsResponse> msgStats,
+      List<UserSurveyStatsResponse> surveyStats,
+      List<UserQrStatsResponse> qrStats) {
+    Set<String> allUserIds = new LinkedHashSet<>();
+    for (UserMsgStatsResponse s : msgStats) allUserIds.add(s.getUserId());
+    for (UserSurveyStatsResponse s : surveyStats) allUserIds.add(s.getUserId());
+    for (UserQrStatsResponse s : qrStats) allUserIds.add(s.getUserId());
+
+    Map<String, Map<String, BigDecimal>> cache = new LinkedHashMap<>();
+    for (String uid : allUserIds) {
+      Integer userSeq = userIdResolver.toUserSeq(uid);
+      Map<String, BigDecimal> rates = new LinkedHashMap<>();
+      for (String sid : ALL_SERVICE_IDS) {
+        rates.put(
+            sid,
+            userSeq != null
+                ? userServiceRateService.getEffectiveRate(userSeq, sid)
+                : standardRateService.getStandardRateWithVat(sid));
+      }
+      cache.put(uid, rates);
+    }
+    return cache;
   }
 
   /** 사용자별 과금 통계 조회 */
@@ -375,18 +530,6 @@ public class BillingStatisticsService {
         .statMonth((String) raw.get("statMonth"))
         .operation(operation)
         .operationName(DailyBillingStatsResponse.getOperationName(operation))
-        .transactionCount(getIntValue(raw, "transactionCount"))
-        .totalAmount(getBigDecimalValue(raw, "totalAmount"))
-        .build();
-  }
-
-  private ServiceTypeBillingStatsResponse toServiceTypeBillingStatsResponse(
-      Map<String, Object> raw) {
-    String serviceId = (String) raw.get("serviceId");
-
-    return ServiceTypeBillingStatsResponse.builder()
-        .serviceType(serviceId)
-        .serviceTypeName(ServiceTypeBillingStatsResponse.getServiceTypeName(serviceId))
         .transactionCount(getIntValue(raw, "transactionCount"))
         .totalAmount(getBigDecimalValue(raw, "totalAmount"))
         .build();

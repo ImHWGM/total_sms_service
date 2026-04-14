@@ -30,6 +30,10 @@ public interface SurveyUserMapper {
   Optional<SurveyUser> selectByEventSeqAndUserKey(
       @Param("eventSeq") Integer eventSeq, @Param("userKey") String userKey);
 
+  /** 이벤트 + 사용자키로 조회 (SELECT ... FOR UPDATE, 동시 제출 직렬화용) */
+  Optional<SurveyUser> selectByEventSeqAndUserKeyForUpdate(
+      @Param("eventSeq") Integer eventSeq, @Param("userKey") String userKey);
+
   /** 재발송 전화번호로 조회 */
   Optional<SurveyUser> selectByResendUserPhone(
       @Param("eventSeq") Integer eventSeq, @Param("resendUserPhone") String resendUserPhone);

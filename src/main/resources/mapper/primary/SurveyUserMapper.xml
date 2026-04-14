@@ -92,6 +92,17 @@
         AND U.DEL_YN = 'N'
     </select>
 
+    <!-- 이벤트 + 사용자키로 조회 (FOR UPDATE, 동시 제출 직렬화용) -->
+    <select id="selectByEventSeqAndUserKeyForUpdate" resultType="kr.wisead.domain.survey.entity.SurveyUser">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM SURVEY_USER U
+        WHERE U.EVENT_SEQ = #{eventSeq}
+        AND U.USER_KEY = #{userKey}
+        AND U.DEL_YN = 'N'
+        FOR UPDATE
+    </select>
+
     <!-- 재발송 전화번호로 조회 -->
     <select id="selectByResendUserPhone" resultType="kr.wisead.domain.survey.entity.SurveyUser">
         SELECT

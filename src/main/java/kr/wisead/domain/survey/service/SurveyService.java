@@ -163,9 +163,11 @@ public class SurveyService {
   /** 설문 제출 */
   @Transactional
   public void submitSurvey(Integer eventSeq, SurveySubmitRequest request) {
+    // 동일 사용자 동시 제출 직렬화: SURVEY_USER 행을 FOR UPDATE로 잠금
+    // (USER_KEY UNIQUE 인덱스 기반 행 락 → 다른 사용자에는 영향 없음)
     SurveyUser user =
         surveyUserMapper
-            .selectByEventSeqAndUserKey(eventSeq, request.getUserKey())
+            .selectByEventSeqAndUserKeyForUpdate(eventSeq, request.getUserKey())
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "유효하지 않은 접근입니다."));
 
@@ -250,10 +252,11 @@ public class SurveyService {
           // MCS: itemSeq로 직접 기타 항목 확인
           if (itemSeq != null) {
             final Integer selectedItemSeq = itemSeq;
-            SurveyItem selectedItem = questionItems.stream()
-                .filter(i -> i.getItemSeq().equals(selectedItemSeq))
-                .findFirst()
-                .orElse(null);
+            SurveyItem selectedItem =
+                questionItems.stream()
+                    .filter(i -> i.getItemSeq().equals(selectedItemSeq))
+                    .findFirst()
+                    .orElse(null);
             if (selectedItem != null && selectedItem.isOther()) {
               hasOtherSelected = true;
             }

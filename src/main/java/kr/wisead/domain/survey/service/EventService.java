@@ -3,6 +3,8 @@ package kr.wisead.domain.survey.service;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
@@ -252,6 +254,34 @@ public class EventService {
           log.info("종료 이미지 경로 업데이트 - eventSeq: {}, path: {}", eventSeq, newEndImgPath);
         }
       }
+    } else {
+      // "불러오기" 케이스: 다른 이벤트의 이미지 경로(/survey/{N}/...)가 들어온 경우
+      // 파일을 새 이벤트 폴더로 복사하고 경로를 변환한다.
+      if (request.getEventDescImg() != null && !request.getEventDescImg().isEmpty()) {
+        String newDescImgPath = copyAndConvertSourceImagePath(request.getEventDescImg(), eventSeq);
+        surveyMasterMapper.updateDescImg(eventSeq, newDescImgPath);
+        log.info("불러오기 설명 이미지 처리 완료 - eventSeq: {}, path: {}", eventSeq, newDescImgPath);
+      }
+      if (request.getEventEndImg() != null && !request.getEventEndImg().isEmpty()) {
+        String newEndImgPath = copyAndConvertSourceImagePath(request.getEventEndImg(), eventSeq);
+        surveyMasterMapper.updateEndImg(eventSeq, newEndImgPath);
+        log.info("불러오기 종료 이미지 처리 완료 - eventSeq: {}, path: {}", eventSeq, newEndImgPath);
+      }
+      // 문항/항목 이미지는 saveQuestionsWithImages에서 처리되도록 request 객체의 경로를 미리 변환한다.
+      if (request.getQuestions() != null) {
+        for (QuestionRequest qReq : request.getQuestions()) {
+          if (qReq.getQuestionImg() != null && !qReq.getQuestionImg().isEmpty()) {
+            qReq.setQuestionImg(copyAndConvertSourceImagePath(qReq.getQuestionImg(), eventSeq));
+          }
+          if (qReq.getItems() != null) {
+            for (ItemRequest iReq : qReq.getItems()) {
+              if (iReq.getItemImg() != null && !iReq.getItemImg().isEmpty()) {
+                iReq.setItemImg(copyAndConvertSourceImagePath(iReq.getItemImg(), eventSeq));
+              }
+            }
+          }
+        }
+      }
     }
 
     // 레거시 방식: MultipartFile로 직접 업로드
@@ -353,6 +383,48 @@ public class EventService {
     }
     // temp_xxx 부분을 eventSeq로 교체
     return tempPath.replaceAll("temp_[a-zA-Z0-9]+", eventSeq);
+  }
+
+  private static final Pattern SURVEY_IMAGE_PATH_PATTERN =
+      Pattern.compile("/survey/(\\d+)/([^/?#]+)");
+
+  /**
+   * "불러오기" 시 다른 이벤트의 이미지 경로를 새 이벤트로 복사하고 경로를 변환한다.
+   *
+   * <p>예: "https://api.example.com/files/survey/251/1.png" + newEventSeq=260 → 파일 복사 후
+   * "https://api.example.com/files/survey/260/1.png" 반환
+   *
+   * <p>임시(/temp_) 경로, 매칭 실패, 동일 이벤트(self) 경로, 또는 파일 복사 실패 시에는 원본 경로를 그대로 반환한다 (DB가 존재하지 않는 파일을 가리키지
+   * 않도록).
+   */
+  private String copyAndConvertSourceImagePath(String path, int newEventSeq) {
+    if (path == null || path.isEmpty() || path.contains("/temp_")) {
+      return path;
+    }
+    Matcher m = SURVEY_IMAGE_PATH_PATTERN.matcher(path);
+    if (!m.find()) {
+      return path;
+    }
+    int sourceEventSeq;
+    try {
+      sourceEventSeq = Integer.parseInt(m.group(1));
+    } catch (NumberFormatException e) {
+      return path;
+    }
+    if (sourceEventSeq == newEventSeq) {
+      return path;
+    }
+    String fileName = m.group(2);
+    boolean copied = fileStorageService.copySurveyImageFile(sourceEventSeq, fileName, newEventSeq);
+    if (!copied) {
+      return path;
+    }
+    return path.substring(0, m.start())
+        + "/survey/"
+        + newEventSeq
+        + "/"
+        + fileName
+        + path.substring(m.end());
   }
 
   /**

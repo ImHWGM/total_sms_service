@@ -265,6 +265,52 @@ public class FileStorageService {
     }
   }
 
+  /**
+   * 단일 설문 이미지 파일을 다른 이벤트 폴더로 복사 (불러오기 시 사용)
+   *
+   * @param sourceEventSeq 원본 이벤트 번호
+   * @param fileName 복사할 파일명
+   * @param targetEventSeq 대상 이벤트 번호
+   * @return 복사 성공 여부
+   */
+  public boolean copySurveyImageFile(int sourceEventSeq, String fileName, int targetEventSeq) {
+    if (fileName == null || fileName.isBlank()) {
+      return false;
+    }
+    // 경로 탈출 차단: fileName은 단일 파일명이어야 함
+    if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+      log.warn("유효하지 않은 파일명(경로 구분자 포함): {}", fileName);
+      return false;
+    }
+    Path baseDir = Paths.get(surveyImgFilePath).toAbsolutePath().normalize();
+    Path source =
+        Paths.get(surveyImgFilePath, String.valueOf(sourceEventSeq), fileName)
+            .toAbsolutePath()
+            .normalize();
+    Path target =
+        Paths.get(surveyImgFilePath, String.valueOf(targetEventSeq), fileName)
+            .toAbsolutePath()
+            .normalize();
+    if (!source.startsWith(baseDir) || !target.startsWith(baseDir)) {
+      log.warn("base 디렉토리를 벗어난 경로 차단 - source: {}, target: {}", source, target);
+      return false;
+    }
+
+    if (!Files.exists(source)) {
+      log.warn("원본 설문 이미지 파일이 존재하지 않음: {}", source);
+      return false;
+    }
+    try {
+      Files.createDirectories(target.getParent());
+      Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+      log.info("설문 이미지 파일 복사 완료: {} -> {}", source, target);
+      return true;
+    } catch (IOException e) {
+      log.error("설문 이미지 파일 복사 실패: {} -> {}", source, target, e);
+      return false;
+    }
+  }
+
   /** 디렉토리 삭제 (하위 파일 포함) */
   private void deleteDirectory(Path directory) throws IOException {
     if (Files.exists(directory)) {

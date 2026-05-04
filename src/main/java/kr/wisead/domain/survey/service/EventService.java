@@ -1543,6 +1543,18 @@ public class EventService {
       }
     }
 
+    // SO 기타답변 복호화 lookup (한 문항당 isOther 항목은 1개, spec R5)
+    // SurveyService.resolveOtherTextForStorage가 SO 유형 OTHER_TEXT를 AES256+Base64로 저장하므로
+    // 엑셀 export 시 평문 jumin 복원을 위해 OtherType을 미리 색인해 둔다.
+    Map<Integer, OtherType> otherTypeByQuestion =
+        allItems.stream()
+            .filter(SurveyItem::isOther)
+            .collect(
+                Collectors.toMap(
+                    SurveyItem::getQuestionSeq,
+                    i -> i.getOtherType() != null ? i.getOtherType() : OtherType.SA,
+                    (a, b) -> a));
+
     // 통계 정보
     int totalParticipants = surveyUserMapper.countByEventSeq(eventSeq);
     int completedCount = surveyUserMapper.countCompletedByEventSeq(eventSeq);
@@ -1565,7 +1577,13 @@ public class EventService {
 
       // 시트3: 개별전체(응답자)
       addSurveyParticipantsSheet(
-          workbook, event, questions, participants, userAnswersMap, userOtherTextMap);
+          workbook,
+          event,
+          questions,
+          participants,
+          userAnswersMap,
+          userOtherTextMap,
+          otherTypeByQuestion);
 
       // 시트4: 개별전체(비응답자)
       addSurveyAbsenteesSheet(workbook, absentees);
@@ -1788,7 +1806,8 @@ public class EventService {
       List<SurveyQuestion> questions,
       List<SurveyUser> participants,
       Map<Integer, Map<Integer, String>> userAnswersMap,
-      Map<Integer, Map<Integer, String>> userOtherTextMap) {
+      Map<Integer, Map<Integer, String>> userOtherTextMap,
+      Map<Integer, OtherType> otherTypeByQuestion) {
     Sheet sheet = workbook.createSheet("개별전체(응답자)");
     sheet.setDefaultColumnWidth(15);
 
@@ -1881,10 +1900,18 @@ public class EventService {
           } else if ("MC".equals(question.getQuestionType())) {
             // 객관식 답변은 평문 숫자이므로 복호화 불필요
             displayAnswer = answer.replace("##", ", ");
-            // 기타 텍스트가 있으면 추가 표시
+            // 기타 텍스트가 있으면 추가 표시 (SO 유형은 AES256+Base64로 저장되어 복호화 필요)
             String otherText = userOtherTexts.get(question.getQuestionSeq());
             if (otherText != null && !otherText.isEmpty()) {
-              displayAnswer += " (기타: " + otherText + ")";
+              OtherType otherType = otherTypeByQuestion.get(question.getQuestionSeq());
+              String displayOtherText = otherText;
+              if (otherType == OtherType.SO) {
+                String decrypted = decryptDataSafe(otherText);
+                if (decrypted != null) {
+                  displayOtherText = decrypted;
+                }
+              }
+              displayAnswer += " (기타: " + displayOtherText + ")";
             }
           } else if ("SAA".equals(question.getQuestionType())
               || "SO".equals(question.getQuestionTypeDetail())) {

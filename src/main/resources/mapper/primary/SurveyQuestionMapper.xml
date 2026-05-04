@@ -13,6 +13,7 @@
             QUESTION_IMG as questionImg,
             ORD as `order`,
             FOREIGN_ALLOW as foreignAllow,
+            REQUIRED_YN as requiredYn,
             REG_DATE as regDate,
             REG_ID as regId
         FROM SURVEY_QUESTION
@@ -31,6 +32,7 @@
             QUESTION_IMG as questionImg,
             ORD as `order`,
             FOREIGN_ALLOW as foreignAllow,
+            REQUIRED_YN as requiredYn,
             REG_DATE as regDate,
             REG_ID as regId
         FROM SURVEY_QUESTION
@@ -49,10 +51,10 @@
             useGeneratedKeys="true" keyProperty="questionSeq" keyColumn="QUESTION_SEQ">
         INSERT INTO SURVEY_QUESTION (
             EVENT_SEQ, QUESTION_TYPE, QUESTION_TYPE_DETAIL,
-            QUESTION, QUESTION_IMG, ORD, FOREIGN_ALLOW, REG_DATE, REG_ID
+            QUESTION, QUESTION_IMG, ORD, FOREIGN_ALLOW, REQUIRED_YN, REG_DATE, REG_ID
         ) VALUES (
             #{eventSeq}, #{questionType}, #{questionTypeDetail},
-            #{question}, #{questionImg}, #{order}, #{foreignAllow}, NOW(), #{regId}
+            #{question}, #{questionImg}, #{order}, #{foreignAllow}, #{requiredYn}, NOW(), #{regId}
         )
     </insert>
 

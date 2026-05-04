@@ -18,6 +18,7 @@ public class SurveyQuestion {
   private String questionImg; // 문항 이미지
   private Integer order; // 순서
   private String foreignAllow; // 외국인 허용 여부 (Y/N)
+  private String requiredYn; // 필수 응답 여부 (Y:필수, N:선택)
   private LocalDateTime regDate; // 등록일
   private String regId; // 등록 ID
 
@@ -29,6 +30,7 @@ public class SurveyQuestion {
       String question,
       Integer order,
       String foreignAllow,
+      String requiredYn,
       String regId) {
     return SurveyQuestion.builder()
         .eventSeq(eventSeq)
@@ -37,8 +39,14 @@ public class SurveyQuestion {
         .question(question)
         .order(order)
         .foreignAllow(foreignAllow)
+        .requiredYn("Y".equals(requiredYn) ? "Y" : "N")
         .regId(regId)
         .build();
+  }
+
+  /** 필수 응답 문항 여부 */
+  public boolean isRequired() {
+    return "Y".equals(this.requiredYn);
   }
 
   /** 문항 이미지 설정 */

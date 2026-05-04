@@ -2,11 +2,13 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="kr.wisead.mapper.primary.SurveyAnswerMapper">
 
-    <!-- 이벤트의 답변 수 -->
+    <!-- 이벤트의 답변 수 (소프트 삭제된 사용자의 답변은 제외) -->
     <select id="countByEventSeq" resultType="int">
         SELECT COUNT(*)
-        FROM SURVEY_ANSWER
-        WHERE EVENT_SEQ = #{eventSeq}
+        FROM SURVEY_ANSWER A
+        INNER JOIN SURVEY_USER U ON U.SEQ = A.USER_SEQ
+        WHERE A.EVENT_SEQ = #{eventSeq}
+        AND U.DEL_YN = 'N'
     </select>
 
     <!-- 문항별 응답자 수 -->

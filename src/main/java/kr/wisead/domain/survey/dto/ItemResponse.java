@@ -1,5 +1,6 @@
 package kr.wisead.domain.survey.dto;
 
+import kr.wisead.domain.survey.entity.OtherType;
 import kr.wisead.domain.survey.entity.SurveyItem;
 import lombok.*;
 
@@ -20,6 +21,7 @@ public class ItemResponse {
   private Integer jumpQuestion; // 분기 문항 시퀀스
   private String otherYn; // 기타 항목 여부 (Y/N)
   private String otherPlaceholder; // 기타 항목 입력 안내 문구
+  private OtherType otherType; // 기타 답변 유형 (SA/NE/SO/EM/AD/CU)
 
   // 통계용
   private Integer answerCount; // 해당 보기 선택 수
@@ -38,6 +40,7 @@ public class ItemResponse {
         .jumpQuestion(entity.getJumpQuestion())
         .otherYn(entity.getOtherYn())
         .otherPlaceholder(entity.getOtherPlaceholder())
+        .otherType(entity.getOtherType() != null ? entity.getOtherType() : OtherType.SA)
         .build();
   }
 

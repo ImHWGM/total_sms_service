@@ -2,6 +2,7 @@ package kr.wisead.domain.survey.service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
@@ -193,7 +194,7 @@ public class SurveyService {
       // 기타 항목 판별을 위해 이벤트 전체 항목을 사전 조회 (N+1 방지)
       Map<Integer, List<SurveyItem>> itemsByQuestion =
           surveyItemMapper.selectByEventSeq(eventSeq).stream()
-              .collect(java.util.stream.Collectors.groupingBy(SurveyItem::getQuestionSeq));
+              .collect(Collectors.groupingBy(SurveyItem::getQuestionSeq));
 
       for (SurveySubmitRequest.AnswerRequest answerReq : request.getAnswers()) {
         SurveyAnswer answer;
@@ -248,11 +249,12 @@ public class SurveyService {
           List<SurveyItem> questionItems =
               itemsByQuestion.getOrDefault(answerReq.getQuestionSeq(), List.of());
           boolean hasOtherSelected = false;
+          SurveyItem selectedItem = null;
 
           // MCS: itemSeq로 직접 기타 항목 확인
           if (itemSeq != null) {
             final Integer selectedItemSeq = itemSeq;
-            SurveyItem selectedItem =
+            selectedItem =
                 questionItems.stream()
                     .filter(i -> i.getItemSeq().equals(selectedItemSeq))
                     .findFirst()
@@ -268,8 +270,11 @@ public class SurveyService {
           }
 
           if (hasOtherSelected) {
-            validateOtherText(answerReq.getOtherText());
-            answer.setOtherText(answerReq.getOtherText());
+            OtherType otherType = resolveOtherType(selectedItem, questionItems);
+            String otherText = answerReq.getOtherText();
+            // SO 유형의 RSA 복호화 + AES256 재암호화 흐름은 PR #4에서 추가됨. 본 PR은 raw 검증 + 그대로 저장만 수행한다.
+            OtherTypeValidator.validateRawOtherText(otherType, otherText);
+            answer.setOtherText(otherText);
           }
         } else {
           // 주관식
@@ -301,17 +306,23 @@ public class SurveyService {
     log.info("설문 제출 완료 - eventSeq: {}, userKey: {}", eventSeq, request.getUserKey());
   }
 
-  /** SO 답변을 평문 주민번호로 정규화 (RSA/FOREIGN/평문 지원) */
-  /** 기타 텍스트 유효성 검증 */
-  private void validateOtherText(String otherText) {
-    if (otherText == null || otherText.isBlank()) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT, "기타 항목 선택 시 텍스트 입력은 필수입니다.");
+  /**
+   * 기타 항목의 OtherType 결정 — MCS는 selectedItem의 otherType, MCM은 문항의 첫 isOther 항목의 otherType. 한 문항당 기타 항목은 최대
+   * 1개 (spec R5)이므로 MCM도 단일 결정.
+   */
+  private OtherType resolveOtherType(SurveyItem selectedItem, List<SurveyItem> questionItems) {
+    if (selectedItem != null && selectedItem.isOther() && selectedItem.getOtherType() != null) {
+      return selectedItem.getOtherType();
     }
-    if (otherText.length() > 2000) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT, "기타 텍스트는 2000자를 초과할 수 없습니다.");
-    }
+    return questionItems.stream()
+        .filter(SurveyItem::isOther)
+        .findFirst()
+        .map(SurveyItem::getOtherType)
+        .filter(Objects::nonNull)
+        .orElse(OtherType.SA);
   }
 
+  /** SO 답변을 평문 주민번호로 정규화 (RSA/FOREIGN/평문 지원) */
   private String resolveSoAnswer(SurveySubmitRequest.AnswerRequest answerReq) {
     String answer = answerReq.getAnswer();
     if (CommonUtils.isNullOrEmpty(answer)) {

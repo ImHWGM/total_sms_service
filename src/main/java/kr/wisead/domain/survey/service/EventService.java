@@ -1175,6 +1175,9 @@ public class EventService {
     if (iReq.getOtherPlaceholder() != null) {
       item.setOtherPlaceholder(iReq.getOtherPlaceholder());
     }
+    if (iReq.getOtherType() != null) {
+      item.setOtherType(iReq.getOtherType());
+    }
     if (iReq.getJumpQuestion() != null) {
       item.setJumpQuestion(iReq.getJumpQuestion());
     }

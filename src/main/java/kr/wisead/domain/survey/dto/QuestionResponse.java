@@ -19,6 +19,7 @@ public class QuestionResponse {
   private String questionImg; // 문항 이미지
   private Integer order; // 순서
   private String foreignAllow; // 외국인 허용 여부
+  private String requiredYn; // 필수 응답 여부 (Y:필수, N:선택)
 
   // 객관식 문항의 보기 목록
   private List<ItemResponse> items;
@@ -37,6 +38,7 @@ public class QuestionResponse {
         .questionImg(entity.getQuestionImg())
         .order(entity.getOrder())
         .foreignAllow(entity.getForeignAllow())
+        .requiredYn(entity.getRequiredYn())
         .build();
   }
 

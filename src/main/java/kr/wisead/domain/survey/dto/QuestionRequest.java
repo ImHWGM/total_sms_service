@@ -26,6 +26,8 @@ public class QuestionRequest {
 
   private String foreignAllow; // 외국인 허용 여부 (Y/N)
 
+  private String requiredYn; // 필수 응답 여부 (Y:필수, N:선택, 미전달 시 N)
+
   // 객관식 문항의 보기 목록
   private List<ItemRequest> items;
 }

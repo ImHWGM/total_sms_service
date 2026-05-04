@@ -945,6 +945,7 @@ public class EventService {
               qReq.getQuestion(),
               questionOrder,
               qReq.getForeignAllow(),
+              qReq.getRequiredYn(),
               regId);
 
       // JSON 방식: 문항 이미지 경로 변환 후 저장
@@ -1061,6 +1062,7 @@ public class EventService {
               qReq.getQuestion(),
               questionOrder,
               qReq.getForeignAllow(),
+              qReq.getRequiredYn(),
               regId);
       surveyQuestionMapper.insert(question);
 
@@ -1134,6 +1136,7 @@ public class EventService {
               qReq.getQuestion(),
               qReq.getOrder() != null ? qReq.getOrder() : order,
               qReq.getForeignAllow(),
+              qReq.getRequiredYn(),
               regId);
       if (qReq.getQuestionImg() != null) {
         question.setQuestionImg(qReq.getQuestionImg());

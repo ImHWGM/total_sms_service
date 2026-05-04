@@ -196,7 +196,25 @@ public class SurveyService {
           surveyItemMapper.selectByEventSeq(eventSeq).stream()
               .collect(Collectors.groupingBy(SurveyItem::getQuestionSeq));
 
+      // 필수 응답 검증 — 이벤트의 필수 문항 중 미응답이 있으면 거부
+      List<SurveyQuestion> questions = surveyQuestionMapper.selectByEventSeq(eventSeq);
+      java.util.Set<Integer> answeredQuestionSeqs =
+          request.getAnswers().stream()
+              .filter(a -> !isEmptyAnswer(a))
+              .map(SurveySubmitRequest.AnswerRequest::getQuestionSeq)
+              .collect(Collectors.toSet());
+      for (SurveyQuestion q : questions) {
+        if (q.isRequired() && !answeredQuestionSeqs.contains(q.getQuestionSeq())) {
+          throw new BusinessException(ErrorCode.INVALID_INPUT, "필수 응답 문항에 답변하지 않았습니다.");
+        }
+      }
+
       for (SurveySubmitRequest.AnswerRequest answerReq : request.getAnswers()) {
+        // 빈 답변(미응답) skip — 선택 문항은 미응답 허용
+        if (isEmptyAnswer(answerReq)) {
+          continue;
+        }
+
         SurveyAnswer answer;
         String answerValue = answerReq.getAnswer();
 
@@ -214,15 +232,7 @@ public class SurveyService {
           }
         }
 
-        // itemSeq가 null이면 해당 문항의 첫 번째 항목에서 조회 (FE 미전달 fallback)
         Integer itemSeq = answerReq.getItemSeq();
-        if (itemSeq == null) {
-          itemSeq =
-              itemsByQuestion.getOrDefault(answerReq.getQuestionSeq(), List.of()).stream()
-                  .findFirst()
-                  .map(SurveyItem::getItemSeq)
-                  .orElse(null);
-        }
 
         if ("FE".equals(answerReq.getQuestionTypeDetail())) {
           // 파일 업로드
@@ -305,9 +315,17 @@ public class SurveyService {
     log.info("설문 제출 완료 - eventSeq: {}, userKey: {}", eventSeq, request.getUserKey());
   }
 
+  /** 빈 답변(미응답) 판정 — itemSeq/answer/otherText/filePath 가 모두 비어있으면 미응답 */
+  private boolean isEmptyAnswer(SurveySubmitRequest.AnswerRequest a) {
+    return a.getItemSeq() == null
+        && CommonUtils.isNullOrEmpty(a.getAnswer())
+        && CommonUtils.isNullOrEmpty(a.getOtherText())
+        && CommonUtils.isNullOrEmpty(a.getFilePath());
+  }
+
   /**
-   * 기타 항목의 OtherType 결정 — MCS는 selectedItem의 otherType, MCM은 문항의 첫 isOther 항목의 otherType. 한 문항당 기타 항목은 최대
-   * 1개 (spec R5)이므로 MCM도 단일 결정.
+   * 기타 항목의 OtherType 결정 — MCS는 selectedItem의 otherType, MCM은 문항의 첫 isOther 항목의 otherType. 한 문항당 기타
+   * 항목은 최대 1개 (spec R5)이므로 MCM도 단일 결정.
    */
   private OtherType resolveOtherType(SurveyItem selectedItem, List<SurveyItem> questionItems) {
     if (selectedItem != null && selectedItem.isOther() && selectedItem.getOtherType() != null) {
@@ -322,8 +340,8 @@ public class SurveyService {
   }
 
   /**
-   * 기타답변 OTHER_TEXT 저장값 결정 — SO 유형은 일반 SO 문항과 동일한 흐름(RSA 복호화 → AES256+Base64 재암호화)을 적용하고, 그 외 5종은 raw
-   * 그대로 저장한다 (plan §3 Phase D-3-b, AC-9, spec R7 "기존 SO 흐름 100% 동일").
+   * 기타답변 OTHER_TEXT 저장값 결정 — SO 유형은 일반 SO 문항과 동일한 흐름(RSA 복호화 → AES256+Base64 재암호화)을 적용하고, 그 외 5종은
+   * raw 그대로 저장한다 (plan §3 Phase D-3-b, AC-9, spec R7 "기존 SO 흐름 100% 동일").
    *
    * <ul>
    *   <li>SO + RSA 복호화 성공: 평문 jumin → validatePlain → AES256+Base64 저장
@@ -339,11 +357,9 @@ public class SurveyService {
       return otherText;
     }
     String plain =
-        resolveJuminFromSource(
-            otherText, answerReq.getKeypadId(), answerReq.getQuestionSeq());
+        resolveJuminFromSource(otherText, answerReq.getKeypadId(), answerReq.getQuestionSeq());
     if (plain == null) {
-      log.warn(
-          "SO 기타답변 RSA 복호화 실패 - 원본 raw 저장 (questionSeq: {})", answerReq.getQuestionSeq());
+      log.warn("SO 기타답변 RSA 복호화 실패 - 원본 raw 저장 (questionSeq: {})", answerReq.getQuestionSeq());
       return otherText;
     }
     // FOREIGN과 평문 jumin 모두 AES256+Base64 적용 (일반 SO 문항 L204-207 흐름 미러).
@@ -361,12 +377,13 @@ public class SurveyService {
   }
 
   /**
-   * 주민번호 source string을 평문 주민번호로 정규화 — 일반 SO 문항과 SO 유형 기타답변의 단일 source-of-truth (plan §3 Phase D-3-a).
+   * 주민번호 source string을 평문 주민번호로 정규화 — 일반 SO 문항과 SO 유형 기타답변의 단일 source-of-truth (plan §3 Phase
+   * D-3-a).
    *
    * <ul>
    *   <li>{@code "FOREIGN:..."} → 그대로 반환 (평문 저장 정책, 외국인 등록번호)
-   *   <li>{@code "RSA:front:backCipher"} → 3-part split → front 6자리 검증 → back을
-   *       decryptKeypadInput으로 RSA 복호화 → "front-back7자리" 평문 jumin 결합 반환
+   *   <li>{@code "RSA:front:backCipher"} → 3-part split → front 6자리 검증 → back을 decryptKeypadInput으로
+   *       RSA 복호화 → "front-back7자리" 평문 jumin 결합 반환
    *   <li>평문 jumin {@code \d{6}-\d{7}} → 그대로 반환
    *   <li>형식 오류 / RSA 복호화 실패 / keypadId 만료 등 → {@code null} 반환 (caller가 fallback 정책 적용)
    * </ul>
@@ -412,8 +429,7 @@ public class SurveyService {
       }
       return front + "-" + back;
     } catch (BusinessException e) {
-      log.warn(
-          "SO RSA 복호화 실패 (questionSeq: {}, reason: {})", questionSeqForLog, e.getMessage());
+      log.warn("SO RSA 복호화 실패 (questionSeq: {}, reason: {})", questionSeqForLog, e.getMessage());
       return null;
     }
   }

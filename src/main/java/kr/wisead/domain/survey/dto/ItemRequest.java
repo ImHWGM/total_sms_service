@@ -1,6 +1,7 @@
 package kr.wisead.domain.survey.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import kr.wisead.domain.survey.entity.OtherType;
 import lombok.*;
 
 /** 항목(보기) 생성/수정 요청 DTO */
@@ -25,4 +26,6 @@ public class ItemRequest {
   private String otherYn; // 기타 항목 여부 (Y/N)
 
   private String otherPlaceholder; // 기타 항목 입력 안내 문구
+
+  private OtherType otherType; // 기타 답변 유형 (SA/NE/SO/EM/AD/CU, default SA)
 }

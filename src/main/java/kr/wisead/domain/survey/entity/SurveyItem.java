@@ -20,6 +20,7 @@ public class SurveyItem {
   private Integer jumpQuestion; // 분기 문항 시퀀스
   private String otherYn; // 기타 항목 여부 (Y/N)
   private String otherPlaceholder; // 기타 항목 입력 안내 문구
+  private OtherType otherType; // 기타 답변 유형 (SA/NE/SO/EM/AD/CU, default SA)
   private LocalDateTime regDate; // 등록일
   private String regId; // 등록 ID
 
@@ -38,6 +39,7 @@ public class SurveyItem {
         .itemValue(itemValue)
         .order(order)
         .otherYn("N")
+        .otherType(OtherType.SA)
         .regId(regId)
         .build();
   }
@@ -60,6 +62,11 @@ public class SurveyItem {
   /** 기타 항목 입력 안내 문구 설정 */
   public void setOtherPlaceholder(String otherPlaceholder) {
     this.otherPlaceholder = otherPlaceholder;
+  }
+
+  /** 기타 답변 유형 설정 */
+  public void setOtherType(OtherType otherType) {
+    this.otherType = otherType;
   }
 
   /** 기타 항목인지 확인 */

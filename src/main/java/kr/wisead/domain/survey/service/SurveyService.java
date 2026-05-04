@@ -272,9 +272,8 @@ public class SurveyService {
           if (hasOtherSelected) {
             OtherType otherType = resolveOtherType(selectedItem, questionItems);
             String otherText = answerReq.getOtherText();
-            // SO 유형의 RSA 복호화 + AES256 재암호화 흐름은 PR #4에서 추가됨. 본 PR은 raw 검증 + 그대로 저장만 수행한다.
             OtherTypeValidator.validateRawOtherText(otherType, otherText);
-            answer.setOtherText(otherText);
+            answer.setOtherText(resolveOtherTextForStorage(otherType, otherText, answerReq));
           }
         } else {
           // 주관식
@@ -322,52 +321,99 @@ public class SurveyService {
         .orElse(OtherType.SA);
   }
 
-  /** SO 답변을 평문 주민번호로 정규화 (RSA/FOREIGN/평문 지원) */
+  /**
+   * 기타답변 OTHER_TEXT 저장값 결정 — SO 유형은 일반 SO 문항과 동일한 흐름(RSA 복호화 → AES256+Base64 재암호화)을 적용하고, 그 외 5종은 raw
+   * 그대로 저장한다 (plan §3 Phase D-3-b, AC-9, spec R7 "기존 SO 흐름 100% 동일").
+   *
+   * <ul>
+   *   <li>SO + RSA 복호화 성공: 평문 jumin → validatePlain → AES256+Base64 저장
+   *   <li>SO + FOREIGN: AES256+Base64 저장 (일반 SO 문항 흐름과 동일하게 외국인 등록번호도 암호화)
+   *   <li>SO + 평문 jumin 직접 입력: validatePlain → AES256+Base64 저장
+   *   <li>SO + RSA 복호화 실패 / keypadId 만료 / 형식 오류: 원본 raw 저장 + warn 로그 — fallback 정책 미러
+   *   <li>비-SO (SA/NE/EM/AD/CU): raw 그대로 저장
+   * </ul>
+   */
+  private String resolveOtherTextForStorage(
+      OtherType otherType, String otherText, SurveySubmitRequest.AnswerRequest answerReq) {
+    if (otherType != OtherType.SO) {
+      return otherText;
+    }
+    String plain =
+        resolveJuminFromSource(
+            otherText, answerReq.getKeypadId(), answerReq.getQuestionSeq());
+    if (plain == null) {
+      log.warn(
+          "SO 기타답변 RSA 복호화 실패 - 원본 raw 저장 (questionSeq: {})", answerReq.getQuestionSeq());
+      return otherText;
+    }
+    // FOREIGN과 평문 jumin 모두 AES256+Base64 적용 (일반 SO 문항 L204-207 흐름 미러).
+    // FOREIGN은 jumin 패턴이 아니므로 validatePlain 호출 시 거부되어 skip한다.
+    if (!plain.startsWith("FOREIGN:")) {
+      OtherTypeValidator.validatePlainOtherText(OtherType.SO, plain);
+    }
+    return encryptSensitiveValue(plain);
+  }
+
+  /** SO 답변을 평문 주민번호로 정규화 (RSA/FOREIGN/평문 지원). */
   private String resolveSoAnswer(SurveySubmitRequest.AnswerRequest answerReq) {
-    String answer = answerReq.getAnswer();
-    if (CommonUtils.isNullOrEmpty(answer)) {
+    return resolveJuminFromSource(
+        answerReq.getAnswer(), answerReq.getKeypadId(), answerReq.getQuestionSeq());
+  }
+
+  /**
+   * 주민번호 source string을 평문 주민번호로 정규화 — 일반 SO 문항과 SO 유형 기타답변의 단일 source-of-truth (plan §3 Phase D-3-a).
+   *
+   * <ul>
+   *   <li>{@code "FOREIGN:..."} → 그대로 반환 (평문 저장 정책, 외국인 등록번호)
+   *   <li>{@code "RSA:front:backCipher"} → 3-part split → front 6자리 검증 → back을
+   *       decryptKeypadInput으로 RSA 복호화 → "front-back7자리" 평문 jumin 결합 반환
+   *   <li>평문 jumin {@code \d{6}-\d{7}} → 그대로 반환
+   *   <li>형식 오류 / RSA 복호화 실패 / keypadId 만료 등 → {@code null} 반환 (caller가 fallback 정책 적용)
+   * </ul>
+   */
+  private String resolveJuminFromSource(
+      String rawValue, String keypadId, Integer questionSeqForLog) {
+    if (CommonUtils.isNullOrEmpty(rawValue)) {
       return null;
     }
 
-    if (answer.startsWith("FOREIGN:")) {
-      return answer;
+    if (rawValue.startsWith("FOREIGN:")) {
+      return rawValue;
     }
 
-    if (!answer.startsWith("RSA:")) {
-      String normalized = answer.trim();
+    if (!rawValue.startsWith("RSA:")) {
+      String normalized = rawValue.trim();
       return normalized.matches("\\d{6}-\\d{7}") ? normalized : null;
     }
 
-    if (CommonUtils.isNullOrEmpty(answerReq.getKeypadId())) {
-      log.warn("SO RSA 복호화 스킵 - keypadId 누락 (questionSeq: {})", answerReq.getQuestionSeq());
+    if (CommonUtils.isNullOrEmpty(keypadId)) {
+      log.warn("SO RSA 복호화 스킵 - keypadId 누락 (questionSeq: {})", questionSeqForLog);
       return null;
     }
 
-    String[] parts = answer.split(":", 3);
+    String[] parts = rawValue.split(":", 3);
     if (parts.length < 3) {
-      log.warn("SO RSA 복호화 스킵 - answer 형식 오류 (questionSeq: {})", answerReq.getQuestionSeq());
+      log.warn("SO RSA 복호화 스킵 - 형식 오류 (questionSeq: {})", questionSeqForLog);
       return null;
     }
 
-    String front = parts[1] != null ? parts[1].replaceAll("\\D+", "") : "";
+    String front = parts[1].replaceAll("\\D+", "");
     if (!front.matches("\\d{6}")) {
-      log.warn("SO RSA 복호화 스킵 - 앞자리 형식 오류 (questionSeq: {})", answerReq.getQuestionSeq());
+      log.warn("SO RSA 복호화 스킵 - 앞자리 형식 오류 (questionSeq: {})", questionSeqForLog);
       return null;
     }
 
     try {
-      String decryptedBack = frontAuthService.decryptKeypadInput(answerReq.getKeypadId(), parts[2]);
+      String decryptedBack = frontAuthService.decryptKeypadInput(keypadId, parts[2]);
       String back = decryptedBack != null ? decryptedBack.replaceAll("\\D+", "") : "";
       if (!back.matches("\\d{7}")) {
-        log.warn("SO RSA 복호화 스킵 - 뒷자리 형식 오류 (questionSeq: {})", answerReq.getQuestionSeq());
+        log.warn("SO RSA 복호화 스킵 - 뒷자리 형식 오류 (questionSeq: {})", questionSeqForLog);
         return null;
       }
       return front + "-" + back;
     } catch (BusinessException e) {
       log.warn(
-          "SO RSA 복호화 실패 (questionSeq: {}, reason: {})",
-          answerReq.getQuestionSeq(),
-          e.getMessage());
+          "SO RSA 복호화 실패 (questionSeq: {}, reason: {})", questionSeqForLog, e.getMessage());
       return null;
     }
   }

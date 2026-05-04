@@ -1171,9 +1171,18 @@ public class MessageSendService {
         String text = request.getText();
 
         // 대치문자 및 유저키 처리
+        // AC-3: applyReplaceChars → applySurveyReplaceChars → applyUserKey → ShortUrlUtils 순서 변경 금지
         text =
             applyReplaceChars(
                 text, receiver.getRepChar01(), receiver.getRepChar02(), receiver.getRepChar03());
+        text =
+            applySurveyReplaceChars(
+                text,
+                receiver.getSurveyRepChar01(),
+                receiver.getSurveyRepChar02(),
+                receiver.getSurveyRepChar03(),
+                receiver.getSurveyRepChar04(),
+                receiver.getSurveyRepChar05());
         text = applyUserKey(text, userKey);
 
         // URL 패턴을 찾아서 단축 URL로 변환
@@ -1506,6 +1515,30 @@ public class MessageSendService {
     if (repChar03 != null && !repChar03.isEmpty()) {
       text = text.replace("#대치문자3#", repChar03);
     }
+    return text;
+  }
+
+  /**
+   * 설문 대치문자 처리 (#설문대치1#~#설문대치5# 치환).
+   *
+   * <p>기존 {@link #applyReplaceChars}와 시맨틱 차이: 빈 값 / null인 경우 토큰을 빈 문자열로 치환하여 사라지게 한다 (AC-5b).
+   * applyReplaceChars는 빈 값일 때 토큰을 그대로 둔다.
+   */
+  private String applySurveyReplaceChars(
+      String text,
+      String surveyRepChar01,
+      String surveyRepChar02,
+      String surveyRepChar03,
+      String surveyRepChar04,
+      String surveyRepChar05) {
+    if (text == null) {
+      return null;
+    }
+    text = text.replace("#설문대치1#", surveyRepChar01 != null ? surveyRepChar01 : "");
+    text = text.replace("#설문대치2#", surveyRepChar02 != null ? surveyRepChar02 : "");
+    text = text.replace("#설문대치3#", surveyRepChar03 != null ? surveyRepChar03 : "");
+    text = text.replace("#설문대치4#", surveyRepChar04 != null ? surveyRepChar04 : "");
+    text = text.replace("#설문대치5#", surveyRepChar05 != null ? surveyRepChar05 : "");
     return text;
   }
 

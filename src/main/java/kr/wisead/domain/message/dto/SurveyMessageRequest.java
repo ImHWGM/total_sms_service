@@ -1,5 +1,6 @@
 package kr.wisead.domain.message.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
@@ -12,6 +13,7 @@ import lombok.NoArgsConstructor;
 /** 설문 문자 발송 요청 DTO 설문 문자는 LMS 전용 (제목 포함, 99원/건) */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class SurveyMessageRequest {
 
   @NotNull(message = "이벤트 시퀀스는 필수입니다.")
@@ -70,6 +72,7 @@ public class SurveyMessageRequest {
   /** 수신자 정보 */
   @Getter
   @NoArgsConstructor(access = AccessLevel.PROTECTED)
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class Receiver {
     private String phone;
     private Integer userSeq;
@@ -77,6 +80,11 @@ public class SurveyMessageRequest {
     private String repChar01; // 대치문자1
     private String repChar02; // 대치문자2
     private String repChar03; // 대치문자3
+    private String surveyRepChar01; // 설문대치1
+    private String surveyRepChar02; // 설문대치2
+    private String surveyRepChar03; // 설문대치3
+    private String surveyRepChar04; // 설문대치4
+    private String surveyRepChar05; // 설문대치5
 
     @Builder
     public Receiver(
@@ -85,13 +93,23 @@ public class SurveyMessageRequest {
         String userKey,
         String repChar01,
         String repChar02,
-        String repChar03) {
+        String repChar03,
+        String surveyRepChar01,
+        String surveyRepChar02,
+        String surveyRepChar03,
+        String surveyRepChar04,
+        String surveyRepChar05) {
       this.phone = phone;
       this.userSeq = userSeq;
       this.userKey = userKey;
       this.repChar01 = repChar01;
       this.repChar02 = repChar02;
       this.repChar03 = repChar03;
+      this.surveyRepChar01 = surveyRepChar01;
+      this.surveyRepChar02 = surveyRepChar02;
+      this.surveyRepChar03 = surveyRepChar03;
+      this.surveyRepChar04 = surveyRepChar04;
+      this.surveyRepChar05 = surveyRepChar05;
     }
 
     /** 전화번호 정규화 (하이픈 제거) */

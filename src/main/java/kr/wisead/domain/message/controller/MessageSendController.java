@@ -174,8 +174,8 @@ public class MessageSendController {
   /**
    * 설문 문자 발송 POST /api/message/send/survey
    *
-   * <p>설문 문자 발송 (단축 URL 자동 적용) - #유저키#, #userKey# 치환 - #대치문자1#, #대치문자2#, #대치문자3# 치환 - /auth/ 패턴 URL
-   * 자동 단축
+   * <p>설문 문자 발송 (단축 URL 자동 적용) - #유저키#, #userKey# 치환 - #대치문자1#, #대치문자2#, #대치문자3# 치환 -
+   * #설문대치1#~#설문대치5# 치환 (수신자별, 빈 값은 빈 문자열로 치환되어 토큰 사라짐) - /auth/ 패턴 URL 자동 단축
    */
   @PostMapping("/survey")
   public ApiResponse<SurveyMessageResponse> sendSurveyMessage(

@@ -58,6 +58,9 @@ public class PrimaryDataSourceConfig {
         configuration.setMapUnderscoreToCamelCase(true);
         factoryBean.setConfiguration(configuration);
 
+        // TypeHandler 글로벌 등록 (plan §3 Phase B-2.1)
+        factoryBean.setTypeHandlersPackage("kr.wisead.common.typehandler");
+
         return factoryBean.getObject();
     }
 

@@ -15,6 +15,7 @@
             JUMP_QUESTION as jumpQuestion,
             OTHER_YN as otherYn,
             OTHER_PLACEHOLDER as otherPlaceholder,
+            OTHER_TYPE as otherType,
             REG_DATE as regDate,
             REG_ID as regId
         FROM SURVEY_ITEM
@@ -35,6 +36,7 @@
             JUMP_QUESTION as jumpQuestion,
             OTHER_YN as otherYn,
             OTHER_PLACEHOLDER as otherPlaceholder,
+            OTHER_TYPE as otherType,
             REG_DATE as regDate,
             REG_ID as regId
         FROM SURVEY_ITEM
@@ -48,11 +50,11 @@
             useGeneratedKeys="true" keyProperty="itemSeq" keyColumn="ITEM_SEQ">
         INSERT INTO SURVEY_ITEM (
             EVENT_SEQ, QUESTION_SEQ, ITEM, ITEM_VALUE,
-            ITEM_IMG, `ORDER`, JUMP_QUESTION, OTHER_YN, OTHER_PLACEHOLDER,
+            ITEM_IMG, `ORDER`, JUMP_QUESTION, OTHER_YN, OTHER_PLACEHOLDER, OTHER_TYPE,
             REG_DATE, REG_ID
         ) VALUES (
             #{eventSeq}, #{questionSeq}, #{item}, #{itemValue},
-            #{itemImg}, #{order}, #{jumpQuestion}, #{otherYn}, #{otherPlaceholder},
+            #{itemImg}, #{order}, #{jumpQuestion}, #{otherYn}, #{otherPlaceholder}, #{otherType},
             NOW(), #{regId}
         )
     </insert>

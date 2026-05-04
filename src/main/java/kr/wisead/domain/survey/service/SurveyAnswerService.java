@@ -2,8 +2,10 @@ package kr.wisead.domain.survey.service;
 
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.survey.dto.AnswerResponse;
 import kr.wisead.domain.survey.dto.AnswerStatisticsResponse;
+import kr.wisead.domain.survey.entity.OtherType;
 import kr.wisead.domain.survey.entity.SurveyAnswer;
 import kr.wisead.domain.survey.entity.SurveyItem;
 import kr.wisead.domain.survey.entity.SurveyQuestion;
@@ -44,6 +46,7 @@ public class SurveyAnswerService {
     @Transactional(readOnly = true)
     public List<AnswerResponse> getAnswersByEvent(Integer eventSeq) {
         List<SurveyAnswer> answers = surveyAnswerMapper.selectByEventSeq(eventSeq);
+        decryptSoOtherText(eventSeq, answers);
         return answers.stream()
                 .map(AnswerResponse::from)
                 .collect(Collectors.toList());
@@ -55,6 +58,7 @@ public class SurveyAnswerService {
     @Transactional(readOnly = true)
     public List<AnswerResponse> getAnswersByUser(Integer eventSeq, Integer userSeq) {
         List<SurveyAnswer> answers = surveyAnswerMapper.selectByUserSeq(eventSeq, userSeq);
+        decryptSoOtherText(eventSeq, answers);
         return answers.stream()
                 .map(AnswerResponse::from)
                 .collect(Collectors.toList());
@@ -66,9 +70,53 @@ public class SurveyAnswerService {
     @Transactional(readOnly = true)
     public List<AnswerResponse> getAnswersByQuestion(Integer eventSeq, Integer questionSeq) {
         List<SurveyAnswer> answers = surveyAnswerMapper.selectByQuestionSeq(eventSeq, questionSeq);
+        decryptSoOtherText(eventSeq, answers);
         return answers.stream()
                 .map(AnswerResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * SO 유형 기타답변 OTHER_TEXT 복호화 후처리.
+     *
+     * <p>SurveyService.resolveOtherTextForStorage가 OtherType.SO 인 기타답변을 AES256+Base64로 저장하므로
+     * (일반 SO 문항 흐름 미러), API 응답 시 평문 jumin으로 복원해 노출한다. 한 문항당 isOther 항목은 1개 (spec R5)이므로
+     * questionSeq → OtherType lookup으로 단순화. 복호화 실패 시 raw 보존 (RSA fallback 케이스 대응).
+     */
+    private void decryptSoOtherText(Integer eventSeq, List<SurveyAnswer> answers) {
+        if (answers == null || answers.isEmpty()) {
+            return;
+        }
+        Map<Integer, OtherType> otherTypeByQuestion =
+                surveyItemMapper.selectByEventSeq(eventSeq).stream()
+                        .filter(SurveyItem::isOther)
+                        .collect(Collectors.toMap(
+                                SurveyItem::getQuestionSeq,
+                                i -> i.getOtherType() != null ? i.getOtherType() : OtherType.SA,
+                                (a, b) -> a));
+        for (SurveyAnswer a : answers) {
+            String raw = a.getOtherText();
+            if (raw == null || raw.isEmpty()) {
+                continue;
+            }
+            if (otherTypeByQuestion.get(a.getQuestionSeq()) != OtherType.SO) {
+                continue;
+            }
+            String decrypted = tryDecryptAES(raw);
+            if (decrypted != null) {
+                a.setOtherText(decrypted);
+            }
+        }
+    }
+
+    /** AES256+Base64 복호화 시도. 실패 시 null 반환 (RSA fallback raw 등은 호출자가 raw 유지). */
+    private String tryDecryptAES(String value) {
+        try {
+            return CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(value));
+        } catch (Exception e) {
+            log.debug("OTHER_TEXT AES 복호화 실패 - raw 유지: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**

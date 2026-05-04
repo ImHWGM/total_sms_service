@@ -39,7 +39,9 @@ public class SurveyQuestion {
         .question(question)
         .order(order)
         .foreignAllow(foreignAllow)
-        .requiredYn("Y".equals(requiredYn) ? "Y" : "N")
+        // 미전달(null/blank)은 'Y'로 처리 — 기존 운영 동작(전 문항 필수)을 보존하고,
+        // FE가 명시적으로 'N'을 보낸 경우에만 선택 응답으로 저장한다.
+        .requiredYn("N".equals(requiredYn) ? "N" : "Y")
         .regId(regId)
         .build();
   }

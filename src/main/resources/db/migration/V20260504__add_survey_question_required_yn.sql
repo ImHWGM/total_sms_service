@@ -1,17 +1,14 @@
--- 문항 필수 응답 여부 컬럼 추가
--- DEFAULT 'N' (선택 응답) — 신규 문항은 명시적으로 'Y'를 보내야 필수 처리
--- 기존 모든 문항은 'Y'로 백필 (현재 "전부 필수" 동작 유지)
+-- SURVEY_QUESTION.REQUIRED_YN 컬럼 추가
+-- DEFAULT 'Y': 기존 행 및 컬럼 미전달 신규 INSERT 모두 필수 응답으로 처리 (기존 동작 보존).
+-- FE가 명시적으로 'N'을 보낼 때만 선택 응답으로 저장된다.
 
 -- 1. SURVEY_QUESTION.REQUIRED_YN 컬럼 추가
 ALTER TABLE SURVEY_QUESTION
-    ADD COLUMN REQUIRED_YN CHAR(1) NOT NULL DEFAULT 'N'
+    ADD COLUMN REQUIRED_YN CHAR(1) NOT NULL DEFAULT 'Y'
     AFTER FOREIGN_ALLOW,
     ALGORITHM=INSTANT, LOCK=NONE;
 
--- 2. 기존 데이터 'Y'로 백필 (현재까지 등록된 문항은 모두 필수)
-UPDATE SURVEY_QUESTION SET REQUIRED_YN = 'Y' WHERE REQUIRED_YN = 'N';
-
--- 3. CHECK 제약 — 'Y'/'N' 외 거부
+-- 2. CHECK 제약 — 'Y'/'N' 외 거부
 ALTER TABLE SURVEY_QUESTION
     ADD CONSTRAINT CK_SURVEY_QUESTION_REQUIRED_YN
     CHECK (REQUIRED_YN IN ('Y', 'N'));

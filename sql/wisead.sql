@@ -456,7 +456,7 @@ CREATE TABLE IF NOT EXISTS `survey_question` (
     `REG_DATE` timestamp NOT NULL DEFAULT current_timestamp() COMMENT '질문 등록일',
     `REG_ID` varchar(20) DEFAULT NULL COMMENT '질문 등록 ID',
     `FOREIGN_ALLOW` char(1) DEFAULT 'N',
-    `REQUIRED_YN` char(1) NOT NULL DEFAULT 'N' COMMENT '필수 응답 여부 (Y:필수, N:선택)',
+    `REQUIRED_YN` char(1) NOT NULL DEFAULT 'Y' COMMENT '필수 응답 여부 (Y:필수, N:선택)',
   PRIMARY KEY (`QUESTION_SEQ`,`EVENT_SEQ`),
   KEY `fk_TB_SURVEY_QUESTION_TB_SURVEY_MASTER1_idx` (`EVENT_SEQ`),
   CONSTRAINT `fk_TB_SURVEY_QUESTION_TB_SURVEY_MASTER1` FOREIGN KEY (`EVENT_SEQ`) REFERENCES `survey_master` (`EVENT_SEQ`),

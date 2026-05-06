@@ -33,10 +33,12 @@ import kr.wisead.domain.message.entity.SmsSend;
 import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
+import kr.wisead.domain.survey.entity.SurveyUserRepChar;
 import kr.wisead.domain.user.entity.User;
 import kr.wisead.mapper.primary.SmsSendMapper;
 import kr.wisead.mapper.primary.SurveyMasterMapper;
 import kr.wisead.mapper.primary.SurveyUserMapper;
+import kr.wisead.mapper.primary.SurveyUserRepCharMapper;
 import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.mapper.sms.MsgQueueMapper;
 import kr.wisead.mapper.sms.MsgResultMapper;
@@ -55,6 +57,7 @@ public class MessageSendService {
   private final MsgQueueMapper msgQueueMapper;
   private final MsgResultMapper msgResultMapper;
   private final SurveyUserMapper surveyUserMapper;
+  private final SurveyUserRepCharMapper surveyUserRepCharMapper;
   private final SurveyMasterMapper surveyMasterMapper;
   private final SmsSendMapper smsSendMapper;
   private final WalletService walletService;
@@ -1168,6 +1171,10 @@ public class MessageSendService {
           }
         }
 
+        if (userSeq != null) {
+          persistSurveyRepChars(userSeq, receiver);
+        }
+
         String text = request.getText();
 
         // 대치문자 및 유저키 처리
@@ -1540,6 +1547,35 @@ public class MessageSendService {
     text = text.replace("#설문대치4#", surveyRepChar04 != null ? surveyRepChar04 : "");
     text = text.replace("#설문대치5#", surveyRepChar05 != null ? surveyRepChar05 : "");
     return text;
+  }
+
+  /**
+   * 설문 치환문자 영속화 (SURVEY_USER_REP_CHAR). INSERT IGNORE — first-write-wins. 실패 시 발송 계속 (graceful
+   * degradation).
+   */
+  private void persistSurveyRepChars(Integer userSeq, SurveyMessageRequest.Receiver receiver) {
+    String[] values = {
+      receiver.getSurveyRepChar01(),
+      receiver.getSurveyRepChar02(),
+      receiver.getSurveyRepChar03(),
+      receiver.getSurveyRepChar04(),
+      receiver.getSurveyRepChar05(),
+    };
+    List<SurveyUserRepChar> rows = new ArrayList<>();
+    for (int idx = 1; idx <= values.length; idx++) {
+      SurveyUserRepChar row = SurveyUserRepChar.create(userSeq, idx, values[idx - 1]);
+      if (row != null) {
+        rows.add(row);
+      }
+    }
+    if (rows.isEmpty()) {
+      return;
+    }
+    try {
+      surveyUserRepCharMapper.insertIgnoreBatch(rows);
+    } catch (Exception e) {
+      log.warn("설문 치환문자 영속화 실패 (발송 계속) - userSeq: {}, error: {}", userSeq, e.getMessage());
+    }
   }
 
   /** 유저키 치환 (#유저키#, #userKey# -> userKey) */

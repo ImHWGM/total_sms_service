@@ -37,6 +37,12 @@ public class SurveyService {
   @Value("${api.base.url:}")
   private String apiBaseUrl;
 
+  /** 이벤트 코드로 설문 정보 조회 (userKey 없이 호출 — 토큰은 모두 빈 문자열로 치환됨). */
+  @Transactional(readOnly = true)
+  public EventResponse getSurveyByEventCode(String eventCode) {
+    return getSurveyByEventCode(eventCode, null);
+  }
+
   /**
    * 이벤트 코드로 설문 정보 조회.
    *

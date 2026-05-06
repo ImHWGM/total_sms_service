@@ -18,10 +18,12 @@ public class SurveyController {
 
   private final SurveyService surveyService;
 
-  /** 이벤트 코드로 설문 조회 */
+  /** 이벤트 코드로 설문 조회. userKey(optional)가 있으면 #설문대치N# 토큰을 치환한다. */
   @GetMapping("/code/{eventCode}")
-  public ApiResponse<EventResponse> getSurveyByEventCode(@PathVariable String eventCode) {
-    EventResponse response = surveyService.getSurveyByEventCode(eventCode);
+  public ApiResponse<EventResponse> getSurveyByEventCode(
+      @PathVariable String eventCode,
+      @RequestParam(value = "userKey", required = false) String userKey) {
+    EventResponse response = surveyService.getSurveyByEventCode(eventCode, userKey);
     return ApiResponse.success(response);
   }
 

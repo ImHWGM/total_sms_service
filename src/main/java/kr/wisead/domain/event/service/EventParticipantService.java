@@ -1088,6 +1088,7 @@ public class EventParticipantService {
   }
 
   private int getIntValue(Map<String, Object> map, String key) {
+    if (map == null) return 0;
     Object value = map.get(key);
     if (value == null) return 0;
     if (value instanceof Number) {

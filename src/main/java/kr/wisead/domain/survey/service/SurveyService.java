@@ -37,9 +37,14 @@ public class SurveyService {
   @Value("${api.base.url:}")
   private String apiBaseUrl;
 
-  /** 이벤트 코드로 설문 정보 조회 */
+  /**
+   * 이벤트 코드로 설문 정보 조회.
+   *
+   * <p>userKey가 non-blank이고 해당 이벤트(eventSeq)에 속한 사용자일 때만 user를 토큰 치환에 사용한다. 이벤트 불일치 / 미존재 userKey의 경우
+   * 다른 이벤트의 사용자 정보 노출 방지를 위해 user를 무시한다 (모든 토큰이 빈 문자열로 치환됨).
+   */
   @Transactional(readOnly = true)
-  public EventResponse getSurveyByEventCode(String eventCode) {
+  public EventResponse getSurveyByEventCode(String eventCode, String userKey) {
     SurveyMaster event =
         surveyMasterMapper
             .selectByEventCode(eventCode)
@@ -48,7 +53,15 @@ public class SurveyService {
 
     validateEventActive(event);
 
-    return buildSurveyResponse(event, null);
+    SurveyUser user =
+        (userKey != null && !userKey.isBlank())
+            ? surveyUserMapper
+                .selectByUserKey(userKey)
+                .filter(u -> u.getEventSeq().equals(event.getEventSeq()))
+                .orElse(null)
+            : null;
+
+    return buildSurveyResponse(event, user);
   }
 
   /** QR코드 URL로 설문 정보 조회 (방문 수 증가는 FrontAuthService.createQrUser에서 QR_VISIT_LOG에 기록) */

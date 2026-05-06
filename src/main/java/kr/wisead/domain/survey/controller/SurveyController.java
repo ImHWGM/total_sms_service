@@ -18,10 +18,17 @@ public class SurveyController {
 
   private final SurveyService surveyService;
 
-  /** 이벤트 코드로 설문 조회 */
+  /**
+   * 이벤트 코드로 설문 조회.
+   *
+   * <p>userKey가 함께 전달되면 해당 사용자의 #설문대치N# 토큰을 영속된 값으로 치환한다. userKey 미전달 / 다른 이벤트의 userKey / 미존재 userKey
+   * 인 경우 토큰은 빈 문자열로 치환된다 (graceful fallback).
+   */
   @GetMapping("/code/{eventCode}")
-  public ApiResponse<EventResponse> getSurveyByEventCode(@PathVariable String eventCode) {
-    EventResponse response = surveyService.getSurveyByEventCode(eventCode);
+  public ApiResponse<EventResponse> getSurveyByEventCode(
+      @PathVariable String eventCode,
+      @RequestParam(value = "userKey", required = false) String userKey) {
+    EventResponse response = surveyService.getSurveyByEventCode(eventCode, userKey);
     return ApiResponse.success(response);
   }
 

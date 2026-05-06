@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.SurveyUserRepCharMapper">
+
+    <sql id="selectColumns">
+        R.USER_SEQ as userSeq,
+        R.REP_CHAR_IDX as repCharIdx,
+        R.REP_CHAR_VAL as repCharVal,
+        R.REG_DATE as regDate
+    </sql>
+
+    <insert id="insertIgnoreBatch">
+        INSERT IGNORE INTO SURVEY_USER_REP_CHAR (
+            USER_SEQ,
+            REP_CHAR_IDX,
+            REP_CHAR_VAL
+        ) VALUES
+        <foreach collection="rows" item="row" separator=",">
+            (
+                #{row.userSeq},
+                #{row.repCharIdx},
+                #{row.repCharVal}
+            )
+        </foreach>
+    </insert>
+
+    <select id="selectByUserSeq" resultType="kr.wisead.domain.survey.entity.SurveyUserRepChar">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM SURVEY_USER_REP_CHAR R
+        WHERE R.USER_SEQ = #{userSeq}
+        ORDER BY R.REP_CHAR_IDX ASC
+    </select>
+
+</mapper>

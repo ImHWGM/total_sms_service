@@ -27,8 +27,12 @@ public class SurveyService {
   private final SurveyQuestionMapper surveyQuestionMapper;
   private final SurveyItemMapper surveyItemMapper;
   private final SurveyUserMapper surveyUserMapper;
+  private final SurveyUserRepCharMapper surveyUserRepCharMapper;
   private final SurveyAnswerMapper surveyAnswerMapper;
   private final FrontAuthService frontAuthService;
+
+  /** 설문 치환문자 슬롯 개수 (#설문대치1~N#) — 추후 슬롯 확장 시 이 상수만 변경. */
+  private static final int MAX_SURVEY_REP_CHARS = 5;
 
   @Value("${api.base.url:}")
   private String apiBaseUrl;
@@ -44,7 +48,7 @@ public class SurveyService {
 
     validateEventActive(event);
 
-    return buildSurveyResponse(event);
+    return buildSurveyResponse(event, null);
   }
 
   /** QR코드 URL로 설문 정보 조회 (방문 수 증가는 FrontAuthService.createQrUser에서 QR_VISIT_LOG에 기록) */
@@ -58,7 +62,7 @@ public class SurveyService {
 
     validateEventActive(event);
 
-    return buildSurveyResponse(event);
+    return buildSurveyResponse(event, null);
   }
 
   /** 사용자 키로 설문 정보 조회 */
@@ -85,7 +89,7 @@ public class SurveyService {
     // 설문 접속 시간 기록
     surveyUserMapper.updateStartTime(userKey);
 
-    return buildSurveyResponse(event);
+    return buildSurveyResponse(event, user);
   }
 
   /** 범용인증 확인 */
@@ -335,7 +339,6 @@ public class SurveyService {
         .filter(SurveyItem::isOther)
         .findFirst()
         .map(SurveyItem::getOtherType)
-        .filter(Objects::nonNull)
         .orElse(OtherType.SA);
   }
 
@@ -476,19 +479,24 @@ public class SurveyService {
     }
   }
 
-  /** 설문 응답 빌드 */
-  private EventResponse buildSurveyResponse(SurveyMaster event) {
+  /** 설문 응답 빌드. user가 null(QR/eventCode 진입)이면 빈 Map으로 모든 토큰을 빈 문자열로 치환한다. */
+  private EventResponse buildSurveyResponse(SurveyMaster event, SurveyUser user) {
     EventResponse response = EventResponse.from(event);
 
-    // 문항 목록 조회
     List<SurveyQuestion> questions = surveyQuestionMapper.selectByEventSeq(event.getEventSeq());
     List<SurveyItem> allItems = surveyItemMapper.selectByEventSeq(event.getEventSeq());
+
+    Map<Integer, String> repChars =
+        (user != null && user.getSeq() != null) ? loadSurveyRepChars(user.getSeq()) : Map.of();
 
     List<QuestionResponse> questionResponses =
         questions.stream()
             .map(
                 q -> {
-                  QuestionResponse qr = QuestionResponse.from(q);
+                  QuestionResponse qr =
+                      QuestionResponse.from(q)
+                          .withReplacedQuestion(
+                              applySurveyRepCharsToQuestion(q.getQuestion(), repChars));
                   List<ItemResponse> items =
                       allItems.stream()
                           .filter(item -> item.getQuestionSeq().equals(q.getQuestionSeq()))
@@ -509,5 +517,27 @@ public class SurveyService {
     }
 
     return response;
+  }
+
+  /** 사용자 시퀀스로 치환문자 Map 로드 (idx → value). */
+  private Map<Integer, String> loadSurveyRepChars(Integer userSeq) {
+    return surveyUserRepCharMapper.selectByUserSeq(userSeq).stream()
+        .collect(
+            Collectors.toMap(SurveyUserRepChar::getRepCharIdx, SurveyUserRepChar::getRepCharVal));
+  }
+
+  /** 문항 텍스트의 #설문대치N# 토큰을 치환. 매칭 row 없는 토큰은 빈 문자열로 치환된다. */
+  private String applySurveyRepCharsToQuestion(String text, Map<Integer, String> repChars) {
+    if (text == null || text.isEmpty()) {
+      return text;
+    }
+    String result = text;
+    for (int idx = 1; idx <= MAX_SURVEY_REP_CHARS; idx++) {
+      String token = "#설문대치" + idx + "#";
+      if (result.contains(token)) {
+        result = result.replace(token, repChars.getOrDefault(idx, ""));
+      }
+    }
+    return result;
   }
 }

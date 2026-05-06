@@ -56,6 +56,11 @@ public class QuestionResponse {
     return this;
   }
 
+  public QuestionResponse withReplacedQuestion(String replacedQuestion) {
+    this.question = replacedQuestion;
+    return this;
+  }
+
   /** 응답 수 설정 */
   public QuestionResponse withAnswerCount(Integer answerCount) {
     this.answerCount = answerCount;

@@ -12,8 +12,8 @@ import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.PasswordValidator;
 import kr.wisead.domain.admin.service.AdminService;
-import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.email.service.EmailService;
+import kr.wisead.domain.email.service.PreSignupEmailAuthService;
 import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.user.dto.FindIdRequest;
 import kr.wisead.domain.user.dto.FindIdResponse;
@@ -42,7 +42,7 @@ public class UserService {
   private final PasswordHintMapper passwordHintMapper;
   private final PasswordResetTokenMapper passwordResetTokenMapper;
   private final PasswordEncoder passwordEncoder;
-  private final EmailAuthService emailAuthService;
+  private final PreSignupEmailAuthService emailAuthService;
   private final EmailService emailService;
   private final AdminService adminService;
   private final WalletService walletService;
@@ -528,6 +528,11 @@ public class UserService {
             .status(user.getStatus() != null ? user.getStatus() : existingUser.getStatus())
             .callback(user.getCallback() != null ? user.getCallback() : existingUser.getCallback())
             .uptId(operatorId)
+            .loginPhone(existingUser.getLoginPhone())
+            .defaultTwoFactorMethod(
+                existingUser.getDefaultTwoFactorMethod() != null
+                    ? existingUser.getDefaultTwoFactorMethod()
+                    : "EMAIL")
             .build();
 
     int result = userMapper.updateMemberInfo(updateUser);

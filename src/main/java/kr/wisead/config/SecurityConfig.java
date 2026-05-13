@@ -2,6 +2,7 @@ package kr.wisead.config;
 
 import java.util.Arrays;
 import java.util.List;
+import kr.wisead.common.filter.IpRateLimiterFilter;
 import kr.wisead.security.jwt.JwtAccessDeniedHandler;
 import kr.wisead.security.jwt.JwtAuthenticationEntryPoint;
 import kr.wisead.security.jwt.JwtAuthenticationFilter;
@@ -34,6 +35,7 @@ public class SecurityConfig {
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
   private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
   private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
+  private final IpRateLimiterFilter ipRateLimiterFilter;
 
   /** 인증 없이 접근 가능한 경로 */
   private static final String[] PUBLIC_ENDPOINTS = {
@@ -164,8 +166,10 @@ public class SecurityConfig {
                     .anyRequest()
                     .authenticated())
 
-        // JWT 필터 추가
-        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        // JWT 필터 추가 (UsernamePasswordAuthenticationFilter 이전)
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+        // IP rate limit 필터 (JWT 인증 이전에 위치 - plan v5 §4 Phase C-Filter)
+        .addFilterBefore(ipRateLimiterFilter, JwtAuthenticationFilter.class);
 
     return http.build();
   }

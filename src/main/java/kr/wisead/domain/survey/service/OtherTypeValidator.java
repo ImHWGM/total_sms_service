@@ -8,8 +8,8 @@ import kr.wisead.domain.survey.entity.OtherType;
 /**
  * 설문 객관식 "기타" 답변 유형별 검증 (plan §3 Phase D-1, AC-10).
  *
- * <p>2단 분리: {@link #validateRawOtherText} (RSA 복호화 전 raw 검증) + {@link #validatePlainOtherText} (RSA 복호화 후
- * 평문 검증). SO 유형만 두 단계가 필요하고, 그 외 5종은 raw == plain이라 raw 검증만 호출하면 충분하다.
+ * <p>2단 분리: {@link #validateRawOtherText} (RSA 복호화 전 raw 검증) + {@link #validatePlainOtherText} (RSA
+ * 복호화 후 평문 검증). SO 유형만 두 단계가 필요하고, 그 외 5종은 raw == plain이라 raw 검증만 호출하면 충분하다.
  *
  * <p>EM 정규식은 {@code EmailAuthService.java:164} verbatim. NE/AD/CU 길이 제한은 spec.md R8 기반 신규 정책.
  */
@@ -55,8 +55,8 @@ public final class OtherTypeValidator {
   }
 
   /**
-   * RSA 복호화 후 평문 OTHER_TEXT 검증. SO만 의미 있고 그 외는 raw == plain이라 no-op. PR #4의 SO 흐름에서 RSA 복호화 결과를 검증할 때
-   * 호출된다.
+   * RSA 복호화 후 평문 OTHER_TEXT 검증. SO만 의미 있고 그 외는 raw == plain이라 no-op. PR #4의 SO 흐름에서 RSA 복호화 결과를 검증할
+   * 때 호출된다.
    */
   public static void validatePlainOtherText(OtherType type, String plain) {
     if (type != OtherType.SO) {
@@ -69,13 +69,17 @@ public final class OtherTypeValidator {
 
   private static void requireMaxLen(String value, int max, String label) {
     if (value.length() > max) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT, label + "은(는) " + max + "자를 초과할 수 없습니다.");
+      throw new BusinessException(
+          ErrorCode.INVALID_INPUT, label + "은(는) " + max + "자를 초과할 수 없습니다.");
     }
   }
 
   private static void requireSoShape(String raw) {
     boolean ok =
-        raw.startsWith("RSA:") || raw.startsWith("FOREIGN:") || JUMIN_PATTERN.matcher(raw).matches();
+        raw.startsWith("RSA:")
+            || raw.startsWith("ENC:")
+            || raw.startsWith("FOREIGN:")
+            || JUMIN_PATTERN.matcher(raw).matches();
     if (!ok) {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "주민번호 입력 형식이 올바르지 않습니다.");
     }

@@ -10,6 +10,8 @@ import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.domain.survey.dto.JuminEncryptRequest;
+import kr.wisead.domain.survey.dto.JuminEncryptResponse;
 import kr.wisead.domain.survey.dto.KeypadResponse;
 import kr.wisead.domain.survey.dto.PhoneValidationRequest;
 import kr.wisead.domain.survey.dto.SurveyUserResponse;
@@ -212,12 +214,12 @@ public class FrontAuthService {
     KeyPairInfo keyPairInfo = keyPairStore.get(keypadId);
 
     if (keyPairInfo == null) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT, "유효하지 않은 키패드 세션입니다.");
+      throw new BusinessException(ErrorCode.KEYPAD_INVALID, "유효하지 않은 키패드 세션입니다.");
     }
 
     if (System.currentTimeMillis() > keyPairInfo.expiresAt) {
       keyPairStore.remove(keypadId);
-      throw new BusinessException(ErrorCode.INVALID_INPUT, "키패드 세션이 만료되었습니다.");
+      throw new BusinessException(ErrorCode.KEYPAD_EXPIRED, "키패드 세션이 만료되었습니다.");
     }
 
     try {
@@ -238,6 +240,34 @@ public class FrontAuthService {
     }
   }
 
+  /**
+   * 가상 키패드 입력값을 즉시 서버측 AES256+Base64 ciphertext로 변환.
+   *
+   * <p>F+H 흐름의 핵심: FE가 jumin 키패드 "확인" 시점에 호출 → RSA 복호화 → 평문 jumin 조합 → AES 재암호화 → ciphertext 반환. 이후
+   * keypad 세션은 소멸되고, FE는 ciphertext만 보관 후 설문 제출 시 그대로 전송한다. 따라서 설문 응답 시간이 길어져도 keypad TTL 만료의 영향을
+   * 받지 않는다.
+   *
+   * <p>ciphertext는 {@code "ENC:" + base64(AES(plainJumin))} 형식이며, SurveyService 제출 흐름에서 해당 prefix를
+   * 인식해 그대로 저장한다.
+   */
+  public JuminEncryptResponse encryptJumin(JuminEncryptRequest request) {
+    // @Valid on controller ensures keypadId/front/backCipher are non-blank and front matches \d{6}.
+    // RSA 복호화 (만료/무효 시 KEYPAD_EXPIRED / KEYPAD_INVALID ErrorCode 전파 → FE가 키패드 재발급 트리거)
+    String back =
+        decryptKeypadInput(request.getKeypadId(), request.getBackCipher()).replaceAll("\\D+", "");
+    if (!back.matches("\\d{7}")) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "주민번호 뒷자리 형식이 올바르지 않습니다.");
+    }
+
+    String plainJumin = request.getFront() + "-" + back;
+    String encrypted = CryptoUtils.encryptAES256(plainJumin);
+    if (CommonUtils.isNullOrEmpty(encrypted)) {
+      throw new BusinessException(ErrorCode.INTERNAL_ERROR, "주민번호 암호화에 실패했습니다.");
+    }
+    String ciphertext = "ENC:" + CryptoUtils.encodeBase64(encrypted);
+    return JuminEncryptResponse.builder().ciphertext(ciphertext).build();
+  }
+
   /** 전화번호 정규화 (하이픈 제거) */
   private String normalizePhone(String phone) {
     if (CommonUtils.isNullOrEmpty(phone)) {
@@ -255,12 +285,11 @@ public class FrontAuthService {
   /** 만료된 키 정리 (스케줄러) - 1분마다 실행 */
   @Scheduled(fixedRate = 60000)
   public void scheduledCleanupExpiredKeys() {
-    int sizeBefore = keyPairStore.size();
+    int before = keyPairStore.size();
     cleanupExpiredKeys();
-    int sizeAfter = keyPairStore.size();
-    int cleanedCount = sizeBefore - sizeAfter;
-    if (cleanedCount > 0) {
-      log.debug("만료된 키패드 세션 정리 - 정리된 키 수: {}, 남은 키 수: {}", cleanedCount, sizeAfter);
+    int cleaned = before - keyPairStore.size();
+    if (cleaned > 0) {
+      log.debug("만료된 키패드 세션 정리 - 정리된 키 수: {}, 남은 키 수: {}", cleaned, keyPairStore.size());
     }
   }
 

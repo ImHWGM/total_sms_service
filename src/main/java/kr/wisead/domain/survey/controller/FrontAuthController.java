@@ -69,6 +69,17 @@ public class FrontAuthController {
         .build();
   }
 
+  /**
+   * 가상 키패드 입력 주민번호 즉시 변환 - 키패드 RSA ciphertext를 받아 즉시 RSA 복호화 후 AES256+Base64 ciphertext로 변환하여 반환.
+   * FE는 응답 ciphertext만 보관 후 설문 제출 시 answer 필드에 첨부한다 (keypad TTL과 설문 제출 시점 분리).
+   */
+  @PostMapping("/jumin/encrypt")
+  public ApiResponse<JuminEncryptResponse> encryptJumin(
+      @Valid @RequestBody JuminEncryptRequest request) {
+    JuminEncryptResponse response = frontAuthService.encryptJumin(request);
+    return ApiResponse.success(response);
+  }
+
   // ==================== KCP 실명인증 ====================
 
   /** KCP 인증 시작 데이터 생성 - 모바일 앱에서 WebView로 KCP 인증 페이지 호출 전 필요한 데이터 생성 */

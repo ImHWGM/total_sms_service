@@ -622,7 +622,7 @@ public class SurveyUserService {
         .juminNum(maskJuminNum(decryptedJuminNum))
         .userPhone(maskPhone(decryptedPhone))
         .resendUserPhone(maskPhone(decryptedPhone))
-        .userEmail(maskEmail(user.getUserEmail()))
+        .userEmail(CommonUtils.maskingEmailShort(user.getUserEmail()))
         .address(maskAddress(decryptedAddress))
         .address2(maskAddress(decryptedAddress2))
         .depositDate(user.getDepositDate())
@@ -675,7 +675,8 @@ public class SurveyUserService {
     String userName = masked ? maskName(decryptedName) : decryptedName;
     String juminNum = masked ? maskJuminNum(decryptedJuminNum) : decryptedJuminNum;
     String userPhone = masked ? maskPhone(decryptedPhone) : decryptedPhone;
-    String userEmail = masked ? maskEmail(user.getUserEmail()) : user.getUserEmail();
+    String userEmail =
+        masked ? CommonUtils.maskingEmailShort(user.getUserEmail()) : user.getUserEmail();
     String address = masked ? maskAddress(decryptedAddress) : decryptedAddress;
     String address2 = masked ? maskAddress(decryptedAddress2) : decryptedAddress2;
 
@@ -731,21 +732,6 @@ public class SurveyUserService {
     }
     // 3자 이상: 첫 글자 + 마스킹 + 마지막 글자
     return name.charAt(0) + "*".repeat(name.length() - 2) + name.charAt(name.length() - 1);
-  }
-
-  /** 이메일 마스킹 (아이디 앞 3자 + *** + @도메인) */
-  private String maskEmail(String email) {
-    if (CommonUtils.isNullOrEmpty(email) || !email.contains("@")) {
-      return email;
-    }
-    int atIndex = email.indexOf("@");
-    String localPart = email.substring(0, atIndex);
-    String domain = email.substring(atIndex);
-
-    if (localPart.length() <= 3) {
-      return localPart.charAt(0) + "***" + domain;
-    }
-    return localPart.substring(0, 3) + "***" + domain;
   }
 
   /** 주소 마스킹 (앞 10자만 표시) */

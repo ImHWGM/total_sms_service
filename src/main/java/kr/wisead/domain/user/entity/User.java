@@ -41,6 +41,8 @@ public class User {
     private String bizPdfLoc;
     private String storeCode;
     private Integer blockedSeq;
+    private String loginPhone;
+    private String defaultTwoFactorMethod;
 
     @Builder
     public User(Integer seq, String userId, String userPass, String corpName, String corpAddr,
@@ -49,7 +51,8 @@ public class User {
                 LocalDateTime lastLogin, Integer loginFailureCnt, LocalDateTime regDate,
                 String regId, LocalDateTime uptDate, String uptId, String status,
                 String emailCode, LocalDateTime codeValidate,
-                String callback, String bizPdfLoc, String storeCode, Integer blockedSeq) {
+                String callback, String bizPdfLoc, String storeCode, Integer blockedSeq,
+                String loginPhone, String defaultTwoFactorMethod) {
         this.seq = seq;
         this.userId = userId;
         this.userPass = userPass;
@@ -77,6 +80,8 @@ public class User {
         this.bizPdfLoc = bizPdfLoc;
         this.storeCode = storeCode;
         this.blockedSeq = blockedSeq;
+        this.loginPhone = loginPhone;
+        this.defaultTwoFactorMethod = defaultTwoFactorMethod != null ? defaultTwoFactorMethod : "EMAIL";
     }
 
     /**

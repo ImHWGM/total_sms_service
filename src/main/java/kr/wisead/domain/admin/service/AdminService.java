@@ -108,6 +108,8 @@ public class AdminService {
             .regId(creatorId)
             .loginFailureCnt(0)
             .storeCode(storeCode)
+            .loginPhone(null) // SMS 2FA 미등록 상태로 관리자 계정 생성
+            .defaultTwoFactorMethod("EMAIL") // 기본 2FA: EMAIL
             .build();
 
     // 회원 등록 (INSERT 후 user.seq에 자동 생성된 키가 주입됨)

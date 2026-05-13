@@ -117,4 +117,10 @@ public interface UserMapper {
   @org.apache.ibatis.annotations.MapKey("STORE_CODE")
   java.util.Map<String, java.util.Map<String, String>> findUserIdsByStoreCodesRaw(
       @Param("storeCodes") List<String> storeCodes);
+
+  /** 로그인 휴대폰번호(login_phone) 갱신 — 마이페이지 SMS 2FA 등록/해제용 (plan v5 §4 Phase E). */
+  int updateLoginPhone(@Param("seq") Integer seq, @Param("loginPhone") String loginPhone);
+
+  /** 기본 2FA 채널(default_two_factor_method) 갱신 — EMAIL/SMS (plan v5 §4 Phase E). */
+  int updateDefaultTwoFactorMethod(@Param("seq") Integer seq, @Param("method") String method);
 }

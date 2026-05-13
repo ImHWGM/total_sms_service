@@ -98,6 +98,8 @@ public class MemberUpdateRequest {
                 .allowIp(this.allowIp)
                 .status(this.status)
                 .callback(this.callback)
+                .loginPhone(null)
+                .defaultTwoFactorMethod("EMAIL")
                 .build();
     }
 }

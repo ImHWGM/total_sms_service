@@ -13,24 +13,25 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
- * 로그인/2FA 도메인 이메일 인증 서비스 (key=userId).
+ * 회원가입(사전 인증) 도메인 이메일 인증 서비스.
  *
- * <p>이미 사용자 ID(seq)가 식별된 흐름(로그인 이메일 2FA 등)에서만 사용한다. 저장소 키는 {@code user.seq(Integer)}이며, 같은 이메일을
- * 사용하는 다른 사용자/회원가입과는 도메인이 격리된다. email 인자는 *발송용*으로만 받고 인증 키에는 사용하지 않는다.
+ * <p>회원가입 흐름과 같이 아직 로그인된 사용자 식별자(userId/seq)가 존재하지 않는 단계에서 사용한다. 저장소 키는 {@code email}(소문자 정규화)이며,
+ * 행동상 기존 {@link EmailAuthService}(key=email) 로직과 1:1 동등하다.
  *
- * <p>회원가입처럼 사용자 식별자가 없는 흐름은 {@link PreSignupEmailAuthService}(key=email)를 사용한다.
+ * <p>로그인 후/2FA 흐름은 {@link EmailAuthService}(key=userId)를 사용해야 한다. 두 서비스는 저장소가 완전히 격리되어 있어 동일 이메일이라도
+ * 도메인 간 인증 정보가 공유되지 않는다.
  *
- * <p>plan §4 Phase B-0-3 (#v3-1 CRITICAL 해소).
+ * <p>plan §4 Phase B-0-2.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class EmailAuthService {
+public class PreSignupEmailAuthService {
 
   private final EmailService emailService;
 
-  /** 인증 코드 저장소 (userId(seq) -> 인증정보). */
-  private final Map<Integer, VerificationInfo> verificationStore = new ConcurrentHashMap<>();
+  /** 인증 코드 저장소 (이메일 소문자 -> 인증정보). */
+  private final Map<String, VerificationInfo> verificationStore = new ConcurrentHashMap<>();
 
   /** 인증 코드 유효 시간 (5분). */
   private static final int EXPIRATION_MINUTES = 5;
@@ -41,21 +42,14 @@ public class EmailAuthService {
   /** 최대 시도 횟수. */
   private static final int MAX_ATTEMPTS = 5;
 
-  /**
-   * 인증 코드 발송.
-   *
-   * @param userId 사용자 seq (인증 저장소 key)
-   * @param email 발송 대상 이메일 (발송용; 저장소 key가 아님)
-   */
-  public boolean sendVerificationCode(Integer userId, String email) {
-    if (userId == null) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사용자 식별자가 필요합니다.");
-    }
+  /** 인증 코드 발송. */
+  public boolean sendVerificationCode(String email) {
     if (!isValidEmail(email)) {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "유효하지 않은 이메일 형식입니다.");
     }
 
-    VerificationInfo existingInfo = verificationStore.get(userId);
+    String key = email.toLowerCase();
+    VerificationInfo existingInfo = verificationStore.get(key);
     if (existingInfo != null && !existingInfo.canResend()) {
       long remainingSeconds = existingInfo.getRemainingResendSeconds();
       throw new BusinessException(
@@ -65,69 +59,57 @@ public class EmailAuthService {
     String code = emailService.createVerificationCode();
 
     VerificationInfo info = new VerificationInfo(code, LocalDateTime.now());
-    verificationStore.put(userId, info);
+    verificationStore.put(key, info);
 
     try {
       emailService.sendVerificationEmail(email, code);
-      log.info("인증 코드 발송 완료: userId={}, email={}", userId, CommonUtils.maskingEmailShort(email));
+      log.info("[PreSignup] 인증 코드 발송 완료: email={}", CommonUtils.maskingEmailShort(email));
       return true;
     } catch (Exception e) {
-      log.error(
-          "인증 코드 발송 실패: userId={}, email={}", userId, CommonUtils.maskingEmailShort(email), e);
-      verificationStore.remove(userId);
+      log.error("[PreSignup] 인증 코드 발송 실패: email={}", CommonUtils.maskingEmailShort(email), e);
+      verificationStore.remove(key);
       throw new BusinessException(ErrorCode.INTERNAL_ERROR, "인증 코드 발송에 실패했습니다.");
     }
   }
 
-  /**
-   * 인증 코드 검증.
-   *
-   * @param userId 사용자 seq (인증 저장소 key)
-   * @param code 입력 코드
-   */
-  public boolean verifyCode(Integer userId, String code) {
-    if (userId == null) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사용자 식별자가 필요합니다.");
-    }
-    VerificationInfo info = verificationStore.get(userId);
+  /** 인증 코드 검증. */
+  public boolean verifyCode(String email, String code) {
+    String normalizedEmail = email.toLowerCase();
+    VerificationInfo info = verificationStore.get(normalizedEmail);
 
     if (info == null) {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드를 먼저 발송해주세요.");
     }
 
     if (info.isExpired()) {
-      verificationStore.remove(userId);
+      verificationStore.remove(normalizedEmail);
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드가 만료되었습니다. 다시 발송해주세요.");
     }
 
     if (info.getAttempts() >= MAX_ATTEMPTS) {
-      verificationStore.remove(userId);
+      verificationStore.remove(normalizedEmail);
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 시도 횟수를 초과했습니다. 다시 발송해주세요.");
     }
 
     info.incrementAttempts();
     if (!info.getCode().equals(code)) {
-      log.warn("인증 코드 불일치: userId={}, attempts={}", userId, info.getAttempts());
+      log.warn(
+          "[PreSignup] 인증 코드 불일치: email={}, attempts={}",
+          CommonUtils.maskingEmailShort(email),
+          info.getAttempts());
       throw new BusinessException(
           ErrorCode.INVALID_INPUT_VALUE,
           String.format("인증 코드가 일치하지 않습니다. (남은 시도: %d회)", MAX_ATTEMPTS - info.getAttempts()));
     }
 
-    verificationStore.remove(userId);
-    log.info("이메일 인증 성공: userId={}", userId);
+    verificationStore.remove(normalizedEmail);
+    log.info("[PreSignup] 이메일 인증 성공: email={}", CommonUtils.maskingEmailShort(email));
     return true;
   }
 
-  /**
-   * 인증 상태 확인.
-   *
-   * @param userId 사용자 seq
-   */
-  public EmailVerificationStatus getVerificationStatus(Integer userId) {
-    if (userId == null) {
-      return new EmailVerificationStatus(false, 0, 0, 0);
-    }
-    VerificationInfo info = verificationStore.get(userId);
+  /** 인증 상태 확인. */
+  public EmailVerificationStatus getVerificationStatus(String email) {
+    VerificationInfo info = verificationStore.get(email.toLowerCase());
     if (info == null) {
       return new EmailVerificationStatus(false, 0, 0, 0);
     }
@@ -140,29 +122,10 @@ public class EmailAuthService {
         true, remainingSeconds, remainingResendSeconds, remainingAttempts);
   }
 
-  /**
-   * 인증 코드 재발송 (기존 코드 무효화).
-   *
-   * @param userId 사용자 seq (저장소 key)
-   * @param email 발송 대상 이메일 (발송용)
-   */
-  public boolean resendVerificationCode(Integer userId, String email) {
-    if (userId != null) {
-      verificationStore.remove(userId);
-    }
-    return sendVerificationCode(userId, email);
-  }
-
-  /**
-   * 사용자에 묶인 인증 정보 강제 무효화 (OtpStoreCoordinator 등 외부 협력자용).
-   *
-   * <p>도메인 격리를 위해 신규로 추가된 메서드. plan §4 Phase B-0-3.
-   */
-  public void invalidate(Integer userId) {
-    if (userId == null) {
-      return;
-    }
-    verificationStore.remove(userId);
+  /** 인증 코드 재발송 (기존 코드 무효화). */
+  public boolean resendVerificationCode(String email) {
+    verificationStore.remove(email.toLowerCase());
+    return sendVerificationCode(email);
   }
 
   /** 만료된 인증 정보 정리 (5분마다 실행). */
@@ -172,17 +135,12 @@ public class EmailAuthService {
     verificationStore.entrySet().removeIf(entry -> entry.getValue().isExpired());
     int after = verificationStore.size();
     if (before != after) {
-      log.debug("만료된 인증 코드 정리: {} -> {}", before, after);
+      log.debug("[PreSignup] 만료된 인증 코드 정리: {} -> {}", before, after);
     }
   }
 
   // ==================== Private Methods ====================
 
-  /**
-   * 이메일 형식 검증.
-   *
-   * <p>참고: 같은 정규식 패턴이 {@code OtherTypeValidator.EMAIL_PATTERN}에 verbatim 복제되어 있다 (단일 SoT는 거기에 있음).
-   */
   private boolean isValidEmail(String email) {
     if (email == null || email.isBlank()) {
       return false;
@@ -192,7 +150,7 @@ public class EmailAuthService {
 
   // ==================== Inner Classes ====================
 
-  /** 인증 정보 (userId 키 도메인 전용). */
+  /** 인증 정보 (이메일 키 도메인 전용). */
   private static class VerificationInfo {
     private final String code;
     private final LocalDateTime createdAt;

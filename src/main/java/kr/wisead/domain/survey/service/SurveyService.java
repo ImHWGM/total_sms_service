@@ -2,7 +2,6 @@ package kr.wisead.domain.survey.service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
@@ -46,8 +45,8 @@ public class SurveyService {
   /**
    * 이벤트 코드로 설문 정보 조회.
    *
-   * <p>userKey가 non-blank이고 해당 이벤트(eventSeq)에 속한 사용자일 때만 user를 토큰 치환에 사용한다. 이벤트 불일치 / 미존재 userKey의 경우
-   * 다른 이벤트의 사용자 정보 노출 방지를 위해 user를 무시한다 (모든 토큰이 빈 문자열로 치환됨).
+   * <p>userKey가 non-blank이고 해당 이벤트(eventSeq)에 속한 사용자일 때만 user를 토큰 치환에 사용한다. 이벤트 불일치 / 미존재 userKey의
+   * 경우 다른 이벤트의 사용자 정보 노출 방지를 위해 user를 무시한다 (모든 토큰이 빈 문자열로 치환됨).
    */
   @Transactional(readOnly = true)
   public EventResponse getSurveyByEventCode(String eventCode, String userKey) {
@@ -242,16 +241,24 @@ public class SurveyService {
         String answerValue = answerReq.getAnswer();
 
         if ("SO".equals(answerReq.getQuestionTypeDetail())) {
-          String resolvedJuminNum = resolveSoAnswer(answerReq);
-          if (!CommonUtils.isNullOrEmpty(resolvedJuminNum)) {
-            submitJuminNum = resolvedJuminNum;
-            answerValue = encryptSensitiveValue(resolvedJuminNum);
-          } else if (answerValue != null && answerValue.startsWith("RSA:")) {
-            log.warn(
-                "SO RSA 답변 원문 저장 - 복호화 실패 (eventSeq: {}, userKey: {}, questionSeq: {})",
-                eventSeq,
-                request.getUserKey(),
-                answerReq.getQuestionSeq());
+          String envelopePlain = decryptEnvelopeIfPresent(answerValue);
+          if (envelopePlain != null) {
+            // F+H 흐름: FE가 jumin 키패드 "확인" 시점에 /jumin/encrypt로 미리 변환받은 AES ciphertext.
+            // 키패드 TTL 만료 영향 없음. 평문 회수 후 일반 SO 흐름과 동일하게 user.submit()에서 재암호화.
+            submitJuminNum = envelopePlain;
+            answerValue = encryptSensitiveValue(envelopePlain);
+          } else {
+            String resolvedJuminNum = resolveSoAnswer(answerReq);
+            if (!CommonUtils.isNullOrEmpty(resolvedJuminNum)) {
+              submitJuminNum = resolvedJuminNum;
+              answerValue = encryptSensitiveValue(resolvedJuminNum);
+            } else if (answerValue != null && answerValue.startsWith("RSA:")) {
+              log.warn(
+                  "SO RSA 답변 원문 저장 - 복호화 실패 (eventSeq: {}, userKey: {}, questionSeq: {})",
+                  eventSeq,
+                  request.getUserKey(),
+                  answerReq.getQuestionSeq());
+            }
           }
         }
 
@@ -378,14 +385,25 @@ public class SurveyService {
     if (otherType != OtherType.SO) {
       return otherText;
     }
+    // F+H 흐름: ENC envelope면 즉시 복호화 후 일반 SO 흐름과 동일하게 재암호화.
+    String decrypted = decryptEnvelopeIfPresent(otherText);
+    if (decrypted != null) {
+      return encryptAfterSoValidation(decrypted);
+    }
     String plain =
         resolveJuminFromSource(otherText, answerReq.getKeypadId(), answerReq.getQuestionSeq());
     if (plain == null) {
       log.warn("SO 기타답변 RSA 복호화 실패 - 원본 raw 저장 (questionSeq: {})", answerReq.getQuestionSeq());
       return otherText;
     }
-    // FOREIGN과 평문 jumin 모두 AES256+Base64 적용 (일반 SO 문항 L204-207 흐름 미러).
-    // FOREIGN은 jumin 패턴이 아니므로 validatePlain 호출 시 거부되어 skip한다.
+    return encryptAfterSoValidation(plain);
+  }
+
+  /**
+   * SO 평문(jumin 또는 FOREIGN:...)을 검증 후 AES256+Base64로 암호화. FOREIGN은 jumin 패턴이 아니므로 validatePlain을
+   * skip한다 (일반 SO 문항 흐름과 동일).
+   */
+  private String encryptAfterSoValidation(String plain) {
     if (!plain.startsWith("FOREIGN:")) {
       OtherTypeValidator.validatePlainOtherText(OtherType.SO, plain);
     }
@@ -452,6 +470,31 @@ public class SurveyService {
       return front + "-" + back;
     } catch (BusinessException e) {
       log.warn("SO RSA 복호화 실패 (questionSeq: {}, reason: {})", questionSeqForLog, e.getMessage());
+      return null;
+    }
+  }
+
+  /**
+   * F+H 흐름 ENC envelope 복호화 — {@code "ENC:" + AES256+Base64} ciphertext를 평문 주민번호로 복원. prefix 없거나
+   * 복호화 실패 시 null 반환 (caller가 기존 흐름으로 폴백). {@code FOREIGN:} 평문 envelope도 동일하게 처리한다.
+   */
+  private String decryptEnvelopeIfPresent(String value) {
+    if (value == null || !value.startsWith("ENC:")) {
+      return null;
+    }
+    String base64 = value.substring("ENC:".length());
+    try {
+      String plain = CryptoUtils.decryptAES256(CryptoUtils.decodeBase64(base64));
+      if (CommonUtils.isNullOrEmpty(plain)) {
+        return null;
+      }
+      if (!plain.startsWith("FOREIGN:") && !plain.matches("\\d{6}-\\d{7}")) {
+        log.warn("ENC envelope 복호화 결과가 jumin/FOREIGN 형식 아님");
+        return null;
+      }
+      return plain;
+    } catch (Exception e) {
+      log.warn("ENC envelope 복호화 실패: {}", e.getMessage());
       return null;
     }
   }

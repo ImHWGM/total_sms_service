@@ -2,16 +2,19 @@ package kr.wisead.domain.user.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.MemberUtil;
 import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.payment.entity.UserServiceRate;
 import kr.wisead.domain.payment.service.StandardRateService;
 import kr.wisead.domain.payment.service.WalletService;
+import kr.wisead.domain.sms.service.SmsAuthService;
 import kr.wisead.domain.user.dto.LoginRequest;
 import kr.wisead.domain.user.dto.LoginResponse;
 import kr.wisead.domain.user.dto.SignUpRequest;
@@ -19,6 +22,7 @@ import kr.wisead.domain.user.entity.User;
 import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.mapper.primary.UserServiceRateMapper;
 import kr.wisead.security.jwt.JwtTokenProvider;
+import kr.wisead.security.sessionkey.SessionKeyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -42,8 +46,21 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
   private final JwtTokenProvider jwtTokenProvider;
   private final EmailAuthService emailAuthService;
+  private final SmsAuthService smsAuthService;
+  private final SessionKeyService sessionKeyService;
 
-  /** 로그인 - 이메일 인증 필요 여부: 오늘 로그인한 적이 없으면 이메일 인증 필요 - 이메일 인증 필요시 서버가 자동으로 이메일 발송 */
+  /**
+   * 로그인 - 채널(EMAIL/SMS) 분기 + 휴면 스킵 정책 적용.
+   *
+   * <p>plan v5 §4 Phase C-1-b / Phase D.
+   *
+   * <ul>
+   *   <li>{@code defaultTwoFactorMethod} 가 "SMS" 면 SmsAuthService 로 OTP 발송, 아니면 EMAIL (기본).
+   *   <li>{@code isLoggedInToday()} 가 true 면 OTP 스킵 — EMAIL/SMS 공통 적용 (#v3-2).
+   *   <li>OTP 발송 시 sessionKey 발급 (Phase D) — 응답 {@code sessionKey} 필드에 포함.
+   *   <li>OTP 코드 제출 시 request.sessionKey 로 validate → 검증 성공 시 invalidate (재사용 방지).
+   * </ul>
+   */
   @Transactional
   public LoginResponse login(LoginRequest request) {
     log.info("[로그인 시도] userId={}", request.getUserId());
@@ -78,52 +95,26 @@ public class AuthService {
       throw new BusinessException(ErrorCode.LOGIN_FAILED, "아이디 또는 비밀번호가 일치하지 않습니다.");
     }
 
-    // 5. 이메일 인증 처리
+    // 5. OTP 코드 검증 흐름 (1차 인증 완료 후 채널 OTP)
     String emailCode = request.getEmailCode();
+    String channel = resolveChannel(user);
 
-    if (!StringUtils.hasText(emailCode)) {
-      // 5-1. 이메일 코드가 없는 경우: 이메일 인증 필요 여부 판단
-      if (!isLoggedInToday(user)) {
-        // 오늘 로그인한 적이 없으면 이메일 인증 필요
-        String email = decryptField(user.getEmail());
-        log.info("[이메일 인증 필요] userId={}, email={}", user.getUserId(), maskEmail(email));
-
-        if (!StringUtils.hasText(email)) {
-          throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다. 관리자에게 문의하세요.");
-        }
-
-        // 이미 인증 코드가 발송되었는지 확인
-        var verificationStatus = emailAuthService.getVerificationStatus(email);
-        if (!verificationStatus.codeSent()) {
-          // 인증 코드가 발송되지 않은 경우에만 발송
-          log.info("[인증 코드 발송 시도] userId={}, email={}", user.getUserId(), maskEmail(email));
-          try {
-            emailAuthService.sendVerificationCode(email);
-            log.info("[인증 코드 발송 성공] userId={}, email={}", user.getUserId(), maskEmail(email));
-          } catch (BusinessException e) {
-            log.warn(
-                "[인증 코드 발송 실패] userId={}, email={}, 사유={}",
-                user.getUserId(),
-                maskEmail(email),
-                e.getMessage());
-            throw e;
-          }
-        } else {
-          log.info("[인증 코드 이미 발송됨 (재사용)] userId={}, email={}", user.getUserId(), maskEmail(email));
-        }
-
-        // 이메일 인증 필요 응답 반환
-        return LoginResponse.builder().emailRequired(true).maskedEmail(maskEmail(email)).build();
-      }
-      // 오늘 이미 로그인한 경우: 이메일 인증 불필요, 바로 로그인 성공
-      log.info("[이메일 인증 스킵] userId={}, 오늘 이미 로그인함", user.getUserId());
+    if (StringUtils.hasText(emailCode)) {
+      // 5-A. OTP 코드 제출: sessionKey 유효성 검증 후 OTP 검증 (Phase D)
+      sessionKeyService.validate(request.getSessionKey());
+      verifyOtpInternal(user.getSeq(), emailCode, channel);
+      sessionKeyService.invalidate(request.getSessionKey()); // 검증 성공 → sessionKey 폐기 (재사용 방지)
+      log.info("[OTP 인증 성공] userId={}, channel={}", user.getUserId(), channel);
     } else {
-      // 5-2. 이메일 코드가 있는 경우: 코드 검증
-      String email = decryptField(user.getEmail());
-      if (!emailAuthService.verifyCode(email, emailCode)) {
-        throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드가 일치하지 않습니다.");
+      // 5-B. OTP 코드 미제출: 휴면 스킵 또는 OTP 발송 분기
+      if (isLoggedInToday(user)) {
+        // 휴면 스킵 (EMAIL/SMS 공통, #v3-2): JWT 즉시 발급으로 진행
+        log.info("[OTP 스킵] userId={}, 오늘 이미 로그인함, channel={}", user.getUserId(), channel);
+      } else {
+        // OTP 발송 필요: 채널 분기 + sessionKey 발급 (Phase D)
+        String sessionKey = sessionKeyService.issue(user.getSeq());
+        return sendOtpForLogin(user, channel, sessionKey);
       }
-      log.info("[이메일 인증 성공] userId={}", user.getUserId());
     }
 
     // 6. 로그인 성공 처리
@@ -134,13 +125,12 @@ public class AuthService {
     String accessToken = jwtTokenProvider.createAccessToken(authentication, user.getPerson());
     String refreshToken = jwtTokenProvider.createRefreshToken(authentication, user.getPerson());
 
-    log.info("[로그인 성공] userId={}", user.getUserId());
+    log.info("[로그인 성공] userId={}, channel={}", user.getUserId(), channel);
 
     return LoginResponse.builder()
         .accessToken(accessToken)
         .refreshToken(refreshToken)
         .expiresIn(jwtTokenProvider.getAccessTokenValidityInSeconds())
-        .emailRequired(false)
         .user(
             LoginResponse.UserInfo.builder()
                 .seq(user.getSeq())
@@ -154,6 +144,168 @@ public class AuthService {
         .build();
   }
 
+  /**
+   * 로그인 OTP 채널 즉시 전환 (사용자가 "이메일로 받기" / "휴대폰으로 받기" 클릭).
+   *
+   * <p>plan v5 §4 Phase C-1-c / Phase D. 채널 변경 시 반대 채널의 OTP 는 무효화하고 (cross-channel cleanup), 새 채널의
+   * OTP 를 즉시 발송한다. sessionKey 로 userId 를 검증하고 switchCount 를 증가시킨다.
+   */
+  @Transactional
+  public LoginResponse switchChannel(String sessionKey, String targetChannel) {
+    Integer userId = sessionKeyService.validate(sessionKey);
+    sessionKeyService.recordChannelSwitch(sessionKey);
+
+    User user =
+        userMapper
+            .findBySeq(userId)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자를 찾을 수 없습니다."));
+
+    // 기존 OTP 모두 무효화 (cross-channel cleanup)
+    emailAuthService.invalidate(userId);
+    smsAuthService.invalidate(userId);
+
+    if ("SMS".equals(targetChannel)) {
+      String loginPhone = user.getLoginPhone();
+      if (!StringUtils.hasText(loginPhone)) {
+        throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 휴대폰 번호가 없습니다.");
+      }
+      smsAuthService.sendVerificationCode(userId, loginPhone);
+      log.info("[채널 전환 → SMS] userId={}, phone={}", userId, CommonUtils.maskingPhone(loginPhone));
+      return LoginResponse.builder()
+          .sessionKey(sessionKey)
+          .channel("SMS")
+          .maskedPhone(CommonUtils.maskingPhone(loginPhone))
+          .availableChannels(getAvailableChannels(user))
+          .build();
+    } else if ("EMAIL".equals(targetChannel)) {
+      String email = decryptField(user.getEmail());
+      if (!StringUtils.hasText(email)) {
+        throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다.");
+      }
+      emailAuthService.sendVerificationCode(userId, email);
+      log.info("[채널 전환 → EMAIL] userId={}, email={}", userId, CommonUtils.maskingEmailShort(email));
+      return LoginResponse.builder()
+          .sessionKey(sessionKey)
+          .channel("EMAIL")
+          .maskedEmail(CommonUtils.maskingEmailShort(email))
+          .availableChannels(getAvailableChannels(user))
+          .build();
+    } else {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "지원하지 않는 채널입니다.");
+    }
+  }
+
+  /**
+   * 현재 채널의 OTP 발송 (sendVerificationCode 중복 방지 포함) + sessionKey 응답 포함 (Phase D).
+   *
+   * <p>plan v5 §4 Phase C-1-b / Phase D 보조 메서드.
+   */
+  private LoginResponse sendOtpForLogin(User user, String channel, String sessionKey) {
+    if ("SMS".equals(channel)) {
+      String loginPhone = user.getLoginPhone();
+      if (!StringUtils.hasText(loginPhone)) {
+        throw new BusinessException(
+            ErrorCode.INVALID_INPUT_VALUE, "SMS 인증 채널이 설정되어 있으나 휴대폰 번호가 등록되지 않았습니다.");
+      }
+      var status = smsAuthService.getVerificationStatus(user.getSeq());
+      if (!status.codeSent()) {
+        log.info(
+            "[SMS OTP 발송 시도] userId={}, phone={}",
+            user.getUserId(),
+            CommonUtils.maskingPhone(loginPhone));
+        smsAuthService.sendVerificationCode(user.getSeq(), loginPhone);
+        log.info(
+            "[SMS OTP 발송 성공] userId={}, phone={}",
+            user.getUserId(),
+            CommonUtils.maskingPhone(loginPhone));
+      } else {
+        log.info(
+            "[SMS OTP 이미 발송됨 (재사용)] userId={}, phone={}",
+            user.getUserId(),
+            CommonUtils.maskingPhone(loginPhone));
+      }
+      return LoginResponse.builder()
+          .sessionKey(sessionKey)
+          .channel("SMS")
+          .maskedPhone(CommonUtils.maskingPhone(loginPhone))
+          .availableChannels(getAvailableChannels(user))
+          .build();
+    } else {
+      // EMAIL (기본)
+      String email = decryptField(user.getEmail());
+      if (!StringUtils.hasText(email)) {
+        throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다. 관리자에게 문의하세요.");
+      }
+      var status = emailAuthService.getVerificationStatus(user.getSeq());
+      if (!status.codeSent()) {
+        log.info(
+            "[EMAIL OTP 발송 시도] userId={}, email={}",
+            user.getUserId(),
+            CommonUtils.maskingEmailShort(email));
+        try {
+          emailAuthService.sendVerificationCode(user.getSeq(), email);
+          log.info(
+              "[EMAIL OTP 발송 성공] userId={}, email={}",
+              user.getUserId(),
+              CommonUtils.maskingEmailShort(email));
+        } catch (BusinessException e) {
+          log.warn(
+              "[EMAIL OTP 발송 실패] userId={}, email={}, 사유={}",
+              user.getUserId(),
+              CommonUtils.maskingEmailShort(email),
+              e.getMessage());
+          throw e;
+        }
+      } else {
+        log.info(
+            "[EMAIL OTP 이미 발송됨 (재사용)] userId={}, email={}",
+            user.getUserId(),
+            CommonUtils.maskingEmailShort(email));
+      }
+      return LoginResponse.builder()
+          .sessionKey(sessionKey)
+          .channel("EMAIL")
+          .maskedEmail(CommonUtils.maskingEmailShort(email))
+          .availableChannels(getAvailableChannels(user))
+          .build();
+    }
+  }
+
+  /**
+   * OTP 코드 검증 (채널 분기).
+   *
+   * <p>plan v5 §4 Phase C-1-d. login() 내부에서 사용하는 비공개 헬퍼.
+   */
+  private void verifyOtpInternal(Integer userId, String code, String channel) {
+    if ("SMS".equals(channel)) {
+      smsAuthService.verifyCode(userId, code);
+    } else {
+      if (!emailAuthService.verifyCode(userId, code)) {
+        throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드가 일치하지 않습니다.");
+      }
+    }
+  }
+
+  /** 사용자의 현재 OTP 채널 결정 (default_two_factor_method 기반, 미설정 시 EMAIL). */
+  private String resolveChannel(User user) {
+    String channel = user.getDefaultTwoFactorMethod();
+    if ("SMS".equals(channel)) {
+      return "SMS";
+    }
+    return "EMAIL";
+  }
+
+  /** 사용자가 선택 가능한 채널 목록 (EMAIL 은 항상, SMS 는 login_phone 등록 시). */
+  private List<String> getAvailableChannels(User user) {
+    List<String> channels = new ArrayList<>();
+    channels.add("EMAIL");
+    if (StringUtils.hasText(user.getLoginPhone())) {
+      channels.add("SMS");
+    }
+    return channels;
+  }
+
   /** 오늘 로그인한 적이 있는지 확인 */
   private boolean isLoggedInToday(User user) {
     if (user.getLastLogin() == null) {
@@ -162,18 +314,6 @@ public class AuthService {
     LocalDate lastLoginDate = user.getLastLogin().toLocalDate();
     LocalDate today = LocalDate.now();
     return lastLoginDate.equals(today);
-  }
-
-  /** 이메일 마스킹 (예: abc***@example.com) */
-  private String maskEmail(String email) {
-    if (email == null || !email.contains("@")) {
-      return "***";
-    }
-    int atIndex = email.indexOf("@");
-    if (atIndex <= 3) {
-      return email.charAt(0) + "***" + email.substring(atIndex);
-    }
-    return email.substring(0, 3) + "***" + email.substring(atIndex);
   }
 
   /** 로그인 이메일 인증 코드 재발송 - ID/PW 검증 후 이메일 인증 코드 재발송 */
@@ -208,11 +348,18 @@ public class AuthService {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다. 관리자에게 문의하세요.");
     }
 
-    // 6. 이메일 인증 코드 재발송 (기존 코드 무효화 후 새 코드 발송)
-    emailAuthService.resendVerificationCode(email);
-    log.info("이메일 인증 코드 재발송: userId={}, email={}", user.getUserId(), maskEmail(email));
+    // 6. 이메일 인증 코드 재발송 (기존 코드 무효화 후 새 코드 발송, Phase B-0-5: key=user.seq)
+    emailAuthService.resendVerificationCode(user.getSeq(), email);
+    log.info(
+        "이메일 인증 코드 재발송: userId={}, email={}",
+        user.getUserId(),
+        CommonUtils.maskingEmailShort(email));
 
-    return LoginResponse.builder().emailRequired(true).maskedEmail(maskEmail(email)).build();
+    return LoginResponse.builder()
+        .channel("EMAIL")
+        .maskedEmail(CommonUtils.maskingEmailShort(email))
+        .availableChannels(getAvailableChannels(user))
+        .build();
   }
 
   /** 회원가입 */
@@ -273,7 +420,7 @@ public class AuthService {
             .corpAddr(request.getCorpAddr())
             .bizNum(request.getBizNum())
             .bizTel(request.getBizTel())
-//            .person(request.getPerson())
+            //            .person(request.getPerson())
             .person(encryptedPerson)
             .phone(encryptedPhone)
             .email(request.getEmail())
@@ -282,6 +429,8 @@ public class AuthService {
             .status("미승인") // 가입 후 관리자 승인 필요
             .regId(request.getUserId())
             .storeCode(storeCode) // 스토어코드 추가
+            .loginPhone(null) // SMS 2FA 미등록 상태로 가입
+            .defaultTwoFactorMethod("EMAIL") // 기본 2FA: EMAIL
             .build();
 
     userMapper.insert(user);

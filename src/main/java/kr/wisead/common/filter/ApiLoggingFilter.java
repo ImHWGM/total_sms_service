@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import kr.wisead.common.util.ClientIpExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -205,32 +206,9 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
     return info.toString();
   }
 
-  private static final List<String> IP_HEADERS =
-      List.of(
-          "X-Forwarded-For",
-          "Proxy-Client-IP",
-          "WL-Proxy-Client-IP",
-          "HTTP_CLIENT_IP",
-          "HTTP_X_FORWARDED_FOR");
-
   /** 클라이언트 IP 추출 (프록시 고려) */
   private String getClientIp(HttpServletRequest request) {
-    String ip =
-        IP_HEADERS.stream()
-            .map(request::getHeader)
-            .filter(this::isValidIp)
-            .findFirst()
-            .orElse(request.getRemoteAddr());
-
-    // 여러 IP가 있는 경우 첫 번째 IP 반환
-    if (ip != null && ip.contains(",")) {
-      ip = ip.split(",")[0].trim();
-    }
-    return ip;
-  }
-
-  private boolean isValidIp(String ip) {
-    return ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip);
+    return ClientIpExtractor.extract(request);
   }
 
   /** 쿼리 파라미터 추출 */

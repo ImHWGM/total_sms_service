@@ -291,7 +291,6 @@ class UserAuthIntegrationTest {
             .refreshToken(
                 "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0ZXN0dXNlcjAxIiwiZXhwIjoxNzM3MzY2ODAwfQ.test")
             .expiresIn(3600L)
-            .emailRequired(false)
             .user(
                 LoginResponse.UserInfo.builder()
                     .seq(1)
@@ -432,7 +431,6 @@ class UserAuthIntegrationTest {
             .accessToken("eyJhbGciOiJIUzUxMiJ9.test")
             .refreshToken("eyJhbGciOiJIUzUxMiJ9.refresh")
             .expiresIn(3600L)
-            .emailRequired(false)
             .user(
                 LoginResponse.UserInfo.builder()
                     .seq(1)
@@ -1184,12 +1182,12 @@ class UserAuthIntegrationTest {
   /**
    * TC1.7.6: 아이디 찾기 - 기본 엔드포인트 사용자 없음
    *
-   * <p>존재하지 않는 사용자 -> BusinessException 발생
+   * <p>존재하지 않는 사용자 -> BusinessException(MEMBER_NOT_FOUND) → HTTP 404
    */
   @Test
   @Order(176)
   @DisplayName("TC1.7.6: 아이디 찾기 - 기본 엔드포인트 사용자 없음")
-  void TC1_7_6_findId_BasicEndpoint_UserNotFound_Returns400() throws Exception {
+  void TC1_7_6_findId_BasicEndpoint_UserNotFound_Returns404() throws Exception {
     // Given: 존재하지 않는 사용자
     Map<String, String> request =
         Map.of(
@@ -1202,13 +1200,13 @@ class UserAuthIntegrationTest {
             new kr.wisead.common.exception.BusinessException(
                 kr.wisead.common.response.ErrorCode.MEMBER_NOT_FOUND, "일치하는 회원 정보가 없습니다."));
 
-    // When & Then
+    // When & Then: MEMBER_NOT_FOUND(M001) 은 HTTP 404 로 매핑됨
     mockMvc
         .perform(
             post("/api/users/find-id")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isBadRequest())
+        .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.message").value("일치하는 회원 정보가 없습니다."));
 
@@ -1689,26 +1687,225 @@ class UserAuthIntegrationTest {
     verify(userService, times(2)).unlockAccount(eq(activeUserId));
   }
 
-  /** TC1.9.6: 빈 userId로 해제 시도 - 404 Not Found */
+  /** TC1.9.6: 빈 userId로 해제 시도 - 405 Method Not Allowed */
   @Test
   @Order(195)
   @DisplayName("TC1.9.6: 계정 잠금 해제 - 빈 userId")
-  void TC1_9_6_unlockAccount_EmptyUserId_Returns404() throws Exception {
+  void TC1_9_6_unlockAccount_EmptyUserId_Returns405() throws Exception {
     // 관리자 JWT 토큰 생성
     UsernamePasswordAuthenticationToken adminAuth =
         new UsernamePasswordAuthenticationToken(
             "admin", null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")));
     String adminToken = jwtTokenProvider.createAccessToken(adminAuth);
 
-    // When & Then: 빈 userId는 경로 매칭 실패로 404
+    // When & Then: 빈 userId 경로 `/api/users//unlock` 는 Spring MVC 가 정규화 후
+    // `/api/users/unlock` 으로 매칭하나 PUT 핸들러가 없어 405 Method Not Allowed 응답.
     mockMvc
         .perform(
             put("/api/users//unlock")
                 .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isMethodNotAllowed());
 
     // Verify: unlockAccount가 호출되지 않아야 함
     verify(userService, never()).unlockAccount(any());
+  }
+
+  // ============================================================
+  // Task 1.9 SMS 2FA 채널 분기 테스트 (TC1.9.x) — plan v5 §4 Phase C-4
+  // ============================================================
+
+  /** TC1.9.7: EMAIL 채널 사용자 로그인 → EMAIL OTP 응답 반환 */
+  @Test
+  @Order(197)
+  @DisplayName("TC1.9.7: EMAIL 채널 사용자 로그인 - EMAIL OTP 응답")
+  void TC1_9_7_login_emailUser_routesToEmail() throws Exception {
+    LoginRequest request =
+        LoginRequest.builder().userId(TEST_USER_ID).userPass(TEST_PASSWORD).build();
+
+    // Mock: EMAIL 채널 OTP 발송 응답 (accessToken 없음 = OTP 대기)
+    LoginResponse otpResponse =
+        LoginResponse.builder()
+            .channel("EMAIL")
+            .maskedEmail("tes***@example.com")
+            .availableChannels(java.util.List.of("EMAIL"))
+            .build();
+
+    when(authService.login(any(LoginRequest.class))).thenReturn(otpResponse);
+
+    mockMvc
+        .perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.message").value("이메일 인증이 필요합니다."))
+        .andExpect(jsonPath("$.data.channel").value("EMAIL"))
+        .andExpect(jsonPath("$.data.maskedEmail").value("tes***@example.com"));
+
+    verify(authService, times(1)).login(any(LoginRequest.class));
+  }
+
+  /** TC1.9.8: SMS 채널 사용자 로그인 → SMS OTP 응답 반환 */
+  @Test
+  @Order(198)
+  @DisplayName("TC1.9.8: SMS 채널 사용자 로그인 - SMS OTP 응답")
+  void TC1_9_8_login_smsUser_routesToSms() throws Exception {
+    LoginRequest request =
+        LoginRequest.builder().userId(TEST_USER_ID).userPass(TEST_PASSWORD).build();
+
+    // Mock: SMS 채널 OTP 발송 응답 (accessToken 없음 = OTP 대기)
+    LoginResponse otpResponse =
+        LoginResponse.builder()
+            .channel("SMS")
+            .maskedPhone("010-****-5678")
+            .availableChannels(java.util.List.of("EMAIL", "SMS"))
+            .build();
+
+    when(authService.login(any(LoginRequest.class))).thenReturn(otpResponse);
+
+    mockMvc
+        .perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.message").value("SMS 인증이 필요합니다."))
+        .andExpect(jsonPath("$.data.channel").value("SMS"))
+        .andExpect(jsonPath("$.data.maskedPhone").value("010-****-5678"));
+
+    verify(authService, times(1)).login(any(LoginRequest.class));
+  }
+
+  /** TC1.9.9: SMS 채널이지만 loginPhone 미등록 → BusinessException */
+  @Test
+  @Order(199)
+  @DisplayName("TC1.9.9: SMS 채널 + loginPhone 없음 - BusinessException")
+  void TC1_9_9_login_smsUser_withoutLoginPhone_throws() throws Exception {
+    LoginRequest request =
+        LoginRequest.builder().userId(TEST_USER_ID).userPass(TEST_PASSWORD).build();
+
+    when(authService.login(any(LoginRequest.class)))
+        .thenThrow(
+            new kr.wisead.common.exception.BusinessException(
+                kr.wisead.common.response.ErrorCode.INVALID_INPUT_VALUE,
+                "SMS 인증 채널이 설정되어 있으나 휴대폰 번호가 등록되지 않았습니다."));
+
+    mockMvc
+        .perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.message").value("SMS 인증 채널이 설정되어 있으나 휴대폰 번호가 등록되지 않았습니다."));
+
+    verify(authService, times(1)).login(any(LoginRequest.class));
+  }
+
+  /** TC1.9.10: switch-channel EMAIL→SMS → SMS OTP 발송 응답 반환 (Phase D: sessionKey 기반) */
+  @Test
+  @Order(200)
+  @DisplayName("TC1.9.10: switch-channel EMAIL→SMS - SMS OTP 발송 응답 (sessionKey)")
+  void TC1_9_10_switchChannel_emailToSms_returnsSmsOtp() throws Exception {
+    String testSessionKey = "test-session-key-for-tc1910";
+    kr.wisead.domain.user.dto.SwitchChannelRequest switchRequest =
+        new kr.wisead.domain.user.dto.SwitchChannelRequest();
+    switchRequest.setSessionKey(testSessionKey);
+    switchRequest.setTargetChannel("SMS");
+
+    LoginResponse smsResponse =
+        LoginResponse.builder()
+            .sessionKey(testSessionKey)
+            .channel("SMS")
+            .maskedPhone("010-****-5678")
+            .availableChannels(java.util.List.of("EMAIL", "SMS"))
+            .build();
+
+    when(authService.switchChannel(eq(testSessionKey), eq("SMS"))).thenReturn(smsResponse);
+
+    mockMvc
+        .perform(
+            post("/api/auth/switch-channel")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(switchRequest)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.message").value("SMS 인증 코드를 발송했습니다."))
+        .andExpect(jsonPath("$.data.channel").value("SMS"))
+        .andExpect(jsonPath("$.data.maskedPhone").value("010-****-5678"))
+        .andExpect(jsonPath("$.data.sessionKey").value(testSessionKey));
+
+    verify(authService, times(1)).switchChannel(eq(testSessionKey), eq("SMS"));
+  }
+
+  /** TC1.9.11: switch-channel SMS→EMAIL → EMAIL OTP 발송 응답 반환 (Phase D: sessionKey 기반) */
+  @Test
+  @Order(201)
+  @DisplayName("TC1.9.11: switch-channel SMS→EMAIL - EMAIL OTP 발송 응답 (sessionKey)")
+  void TC1_9_11_switchChannel_smsToEmail_returnsEmailOtp() throws Exception {
+    String testSessionKey = "test-session-key-for-tc1911";
+    kr.wisead.domain.user.dto.SwitchChannelRequest switchRequest =
+        new kr.wisead.domain.user.dto.SwitchChannelRequest();
+    switchRequest.setSessionKey(testSessionKey);
+    switchRequest.setTargetChannel("EMAIL");
+
+    LoginResponse emailResponse =
+        LoginResponse.builder()
+            .sessionKey(testSessionKey)
+            .channel("EMAIL")
+            .maskedEmail("tes***@example.com")
+            .availableChannels(java.util.List.of("EMAIL", "SMS"))
+            .build();
+
+    when(authService.switchChannel(eq(testSessionKey), eq("EMAIL"))).thenReturn(emailResponse);
+
+    mockMvc
+        .perform(
+            post("/api/auth/switch-channel")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(switchRequest)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.message").value("이메일 인증 코드를 발송했습니다."))
+        .andExpect(jsonPath("$.data.channel").value("EMAIL"))
+        .andExpect(jsonPath("$.data.maskedEmail").value("tes***@example.com"))
+        .andExpect(jsonPath("$.data.sessionKey").value(testSessionKey));
+
+    verify(authService, times(1)).switchChannel(eq(testSessionKey), eq("EMAIL"));
+  }
+
+  /**
+   * TC1.9.12: switch-channel 후 응답에 sessionKey 포함 여부 + 유효하지 않은 sessionKey 거부 (Phase D).
+   *
+   * <p>AuthService 는 MockitoBean 이므로 실제 SessionKeyService 를 호출하지 않는다. switchChannel 의
+   * sessionKey 파라미터 전달 경로가 올바른지 검증한다.
+   */
+  @Test
+  @Order(202)
+  @DisplayName("TC1.9.12: switch-channel - 유효하지 않은 sessionKey → BusinessException (Phase D)")
+  void TC1_9_12_switchChannel_invalidSessionKey_throws() throws Exception {
+    kr.wisead.domain.user.dto.SwitchChannelRequest switchRequest =
+        new kr.wisead.domain.user.dto.SwitchChannelRequest();
+    switchRequest.setSessionKey("invalid-session-key");
+    switchRequest.setTargetChannel("SMS");
+
+    when(authService.switchChannel(eq("invalid-session-key"), eq("SMS")))
+        .thenThrow(
+            new kr.wisead.common.exception.BusinessException(
+                kr.wisead.common.response.ErrorCode.UNAUTHORIZED, "유효하지 않은 sessionKey 입니다."));
+
+    mockMvc
+        .perform(
+            post("/api/auth/switch-channel")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(switchRequest)))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.message").value("유효하지 않은 sessionKey 입니다."));
+
+    verify(authService, times(1)).switchChannel(eq("invalid-session-key"), eq("SMS"));
   }
 }

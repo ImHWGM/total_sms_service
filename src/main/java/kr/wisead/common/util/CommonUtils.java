@@ -190,6 +190,18 @@ public class CommonUtils {
     return str;
   }
 
+  /** 이메일 마스킹 (앞 3자 유지 + *** + @도메인). 로그/2FA 응답용 short 포맷. */
+  public static String maskingEmailShort(String email) {
+    if (email == null || !email.contains("@")) {
+      return "***";
+    }
+    int atIndex = email.indexOf("@");
+    if (atIndex <= 3) {
+      return email.charAt(0) + "***" + email.substring(atIndex);
+    }
+    return email.substring(0, 3) + "***" + email.substring(atIndex);
+  }
+
   /** 랜덤 문자열 생성 (대문자 + 숫자) */
   public static String randomString(int length) {
     StringBuilder sb = new StringBuilder();

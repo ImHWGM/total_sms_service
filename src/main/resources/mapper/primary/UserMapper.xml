@@ -31,6 +31,8 @@
         <result property="bizPdfLoc" column="BIZ_PDF_LOC"/>
         <result property="storeCode" column="STORE_CODE"/>
         <result property="blockedSeq" column="BLOCKED_SEQ"/>
+        <result property="loginPhone" column="LOGIN_PHONE"/>
+        <result property="defaultTwoFactorMethod" column="DEFAULT_TWO_FACTOR_METHOD"/>
     </resultMap>
 
     <!-- 기본 컬럼 -->
@@ -39,7 +41,8 @@
         PERSON, PHONE, EMAIL, USER_LEVEL, USE_YN, ALLOW_IP_YN, ALLOW_IP,
         LAST_LOGIN, LOGIN_FAILURE_CNT, REG_DATE, REG_ID, UPT_DATE, UPT_ID,
         STATUS, EMAIL_CODE, CODE_VALIDATE, CALLBACK,
-        BIZ_PDF_LOC, STORE_CODE, BLOCKED_SEQ
+        BIZ_PDF_LOC, STORE_CODE, BLOCKED_SEQ,
+        LOGIN_PHONE, DEFAULT_TWO_FACTOR_METHOD
     </sql>
 
     <!-- 회원 조회 (by SEQ) -->
@@ -92,11 +95,13 @@
         INSERT INTO user (
             USER_ID, USER_PASS, CORP_NAME, CORP_ADDR, BIZ_NUM, BIZ_TEL,
             PERSON, PHONE, EMAIL, USER_LEVEL, USE_YN, STATUS,
-            REG_DATE, REG_ID, STORE_CODE
+            REG_DATE, REG_ID, STORE_CODE,
+            LOGIN_PHONE, DEFAULT_TWO_FACTOR_METHOD
         ) VALUES (
             #{userId}, #{userPass}, #{corpName}, #{corpAddr}, #{bizNum}, #{bizTel},
             #{person}, #{phone}, #{email}, #{userLevel}, #{useYn}, #{status},
-            NOW(), #{regId}, #{storeCode}
+            NOW(), #{regId}, #{storeCode},
+            #{loginPhone}, #{defaultTwoFactorMethod}
         )
     </insert>
 
@@ -263,6 +268,8 @@
             ALLOW_IP = #{allowIp},
             STATUS = #{status},
             CALLBACK = #{callback},
+            LOGIN_PHONE = #{loginPhone},
+            DEFAULT_TWO_FACTOR_METHOD = #{defaultTwoFactorMethod},
             UPT_DATE = NOW(),
             UPT_ID = #{uptId}
         WHERE SEQ = #{seq}
@@ -321,5 +328,21 @@
         </foreach>
         AND USE_YN = 'Y'
     </select>
+
+    <!-- 로그인 휴대폰번호 갱신 (마이페이지 SMS 2FA 등록/해제 — plan v5 §4 Phase E) -->
+    <update id="updateLoginPhone">
+        UPDATE user
+        SET LOGIN_PHONE = #{loginPhone},
+            UPT_DATE = NOW()
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- 기본 2FA 채널 갱신 (EMAIL/SMS — plan v5 §4 Phase E) -->
+    <update id="updateDefaultTwoFactorMethod">
+        UPDATE user
+        SET DEFAULT_TWO_FACTOR_METHOD = #{method},
+            UPT_DATE = NOW()
+        WHERE SEQ = #{seq}
+    </update>
 
 </mapper>

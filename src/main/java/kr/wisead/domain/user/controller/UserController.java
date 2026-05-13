@@ -39,8 +39,8 @@ public class UserController {
   /** 내 정보 조회 */
   @GetMapping("/me")
   public ApiResponse<UserResponse> getMyInfo(@AuthenticationPrincipal UserDetails userDetails) {
-    Integer seq = Integer.parseInt(userDetails.getUsername());
-    UserResponse response = userService.getUserBySeq(seq);
+    // JWT subject 는 userId(문자열) 형식이므로 userId 기반으로 조회한다.
+    UserResponse response = userService.getUserByUserId(userDetails.getUsername());
     return ApiResponse.success(response);
   }
 

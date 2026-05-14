@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.email.dto.EmailVerificationRequest;
 import kr.wisead.domain.user.dto.FindIdRequest;
 import kr.wisead.domain.user.dto.FindIdResponse;
@@ -35,13 +36,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
   private final UserService userService;
+  private final UserIdResolver userIdResolver;
 
   /** 내 정보 조회 */
   @GetMapping("/me")
   public ApiResponse<UserResponse> getMyInfo(@AuthenticationPrincipal UserDetails userDetails) {
-    // JWT subject 는 userId(문자열) 형식이므로 userId 기반으로 조회한다.
-    UserResponse response = userService.getUserByUserId(userDetails.getUsername());
-    return ApiResponse.success(response);
+    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
+    return ApiResponse.success(userService.getUserBySeq(userSeq));
   }
 
   /** 회원 정보 조회 (by SEQ) - 관리자 전용 */
@@ -65,11 +66,9 @@ public class UserController {
   @PutMapping("/me/password")
   public ApiResponse<Void> changePassword(
       @AuthenticationPrincipal UserDetails userDetails, @RequestBody Map<String, String> request) {
-    Integer seq = Integer.parseInt(userDetails.getUsername());
-    String userId = userService.getUserIdBySeq(seq);
-    String currentPassword = request.get("currentPassword");
-    String newPassword = request.get("newPassword");
-    userService.changePassword(userId, currentPassword, newPassword);
+    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
+    String userId = userService.getUserIdBySeq(userSeq);
+    userService.changePassword(userId, request.get("currentPassword"), request.get("newPassword"));
     return ApiResponse.success("비밀번호가 변경되었습니다.");
   }
 
@@ -128,9 +127,8 @@ public class UserController {
   /** 비밀번호 만료일 연장 (본인용) PUT /api/users/me/password/extend */
   @PutMapping("/me/password/extend")
   public ApiResponse<Void> extendPasswordExpiry(@AuthenticationPrincipal UserDetails userDetails) {
-    Integer seq = Integer.parseInt(userDetails.getUsername());
-    String userId = userService.getUserIdBySeq(seq);
-    userService.extendPasswordExpiry(userId);
+    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
+    userService.extendPasswordExpiry(userService.getUserIdBySeq(userSeq));
     return ApiResponse.success("비밀번호 만료일이 180일 연장되었습니다.");
   }
 
@@ -138,10 +136,9 @@ public class UserController {
   @PutMapping("/me/password/expired")
   public ApiResponse<Void> changeExpiredPassword(
       @AuthenticationPrincipal UserDetails userDetails, @RequestBody Map<String, String> request) {
-    Integer seq = Integer.parseInt(userDetails.getUsername());
-    String userId = userService.getUserIdBySeq(seq);
-    String newPassword = request.get("newPassword");
-    userService.changeExpiredPassword(userId, newPassword);
+    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
+    String userId = userService.getUserIdBySeq(userSeq);
+    userService.changeExpiredPassword(userId, request.get("newPassword"));
     return ApiResponse.success("비밀번호가 변경되었습니다.");
   }
 

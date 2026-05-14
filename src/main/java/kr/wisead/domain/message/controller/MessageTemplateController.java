@@ -7,10 +7,10 @@ import kr.wisead.domain.file.service.FileStorageService;
 import kr.wisead.domain.message.dto.MessageTemplateRequest;
 import kr.wisead.domain.message.dto.MessageTemplateResponse;
 import kr.wisead.domain.message.service.MessageTemplateService;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,29 +27,26 @@ public class MessageTemplateController {
   /** 템플릿 생성 */
   @PostMapping
   public ApiResponse<MessageTemplateResponse> create(
-      @AuthenticationPrincipal UserDetails userDetails,
-      @Valid @RequestBody MessageTemplateRequest request) {
-    Integer userSeq = getUserSeq(userDetails);
-    MessageTemplateResponse response = messageTemplateService.create(userSeq, request);
+      @CurrentUser JwtPrincipal user, @Valid @RequestBody MessageTemplateRequest request) {
+    MessageTemplateResponse response = messageTemplateService.create(user.seq(), request);
     return ApiResponse.success(response);
   }
 
   /** MMS 템플릿 생성 (이미지 포함) */
   @PostMapping("/with-image")
   public ApiResponse<MessageTemplateResponse> createWithImage(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam("msgType") String msgType,
       @RequestParam(value = "subject", required = false) String subject,
       @RequestParam("text") String text,
       @RequestParam(value = "sendingForm", required = false, defaultValue = "d") String sendingForm,
       @RequestParam(value = "image", required = false) MultipartFile image) {
 
-    Integer userSeq = getUserSeq(userDetails);
     String imagePath = null;
 
     // MMS이고 이미지가 있을 때만 처리
     if ("MMS".equals(msgType) && image != null && !image.isEmpty()) {
-      imagePath = fileStorageService.storeTemplateImage(image, userSeq);
+      imagePath = fileStorageService.storeTemplateImage(image, user.seq());
     }
 
     MessageTemplateRequest request =
@@ -61,7 +58,7 @@ public class MessageTemplateController {
             .imagePath(imagePath)
             .build();
 
-    MessageTemplateResponse response = messageTemplateService.create(userSeq, request);
+    MessageTemplateResponse response = messageTemplateService.create(user.seq(), request);
     return ApiResponse.success(response);
   }
 
@@ -72,94 +69,80 @@ public class MessageTemplateController {
    */
   @GetMapping
   public ApiResponse<List<MessageTemplateResponse>> getList(
-      @AuthenticationPrincipal UserDetails userDetails,
-      @RequestParam(required = false) String type) {
-    Integer userSeq = getUserSeq(userDetails);
+      @CurrentUser JwtPrincipal user, @RequestParam(required = false) String type) {
     List<MessageTemplateResponse> list;
     if (type != null && !type.isEmpty()) {
-      list = messageTemplateService.getListBySendingForm(userSeq, type);
+      list = messageTemplateService.getListBySendingForm(user.seq(), type);
     } else {
-      list = messageTemplateService.getList(userSeq);
+      list = messageTemplateService.getList(user.seq());
     }
     return ApiResponse.success(list);
   }
 
   /** 설문용 템플릿 목록 조회 */
   @GetMapping("/survey")
-  public ApiResponse<List<MessageTemplateResponse>> getSurveyList(
-      @AuthenticationPrincipal UserDetails userDetails) {
-    Integer userSeq = getUserSeq(userDetails);
-    List<MessageTemplateResponse> list = messageTemplateService.getListBySendingForm(userSeq, "s");
+  public ApiResponse<List<MessageTemplateResponse>> getSurveyList(@CurrentUser JwtPrincipal user) {
+    List<MessageTemplateResponse> list =
+        messageTemplateService.getListBySendingForm(user.seq(), "s");
     return ApiResponse.success(list);
   }
 
   /** 직접발송용 템플릿 목록 조회 */
   @GetMapping("/direct")
-  public ApiResponse<List<MessageTemplateResponse>> getDirectList(
-      @AuthenticationPrincipal UserDetails userDetails) {
-    Integer userSeq = getUserSeq(userDetails);
-    List<MessageTemplateResponse> list = messageTemplateService.getListBySendingForm(userSeq, "d");
+  public ApiResponse<List<MessageTemplateResponse>> getDirectList(@CurrentUser JwtPrincipal user) {
+    List<MessageTemplateResponse> list =
+        messageTemplateService.getListBySendingForm(user.seq(), "d");
     return ApiResponse.success(list);
   }
 
   /** 템플릿 상세 조회 (소유자 검증 포함) */
   @GetMapping("/{templateSeq}")
   public ApiResponse<MessageTemplateResponse> getOne(
-      @AuthenticationPrincipal UserDetails userDetails, @PathVariable Long templateSeq) {
-    Integer userSeq = getUserSeq(userDetails);
-    MessageTemplateResponse response = messageTemplateService.getOne(templateSeq, userSeq);
+      @CurrentUser JwtPrincipal user, @PathVariable Long templateSeq) {
+    MessageTemplateResponse response = messageTemplateService.getOne(templateSeq, user.seq());
     return ApiResponse.success(response);
   }
 
   /** 템플릿 수정 */
   @PutMapping("/{templateSeq}")
   public ApiResponse<MessageTemplateResponse> update(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @PathVariable Long templateSeq,
       @Valid @RequestBody MessageTemplateRequest request) {
-    Integer userSeq = getUserSeq(userDetails);
-    MessageTemplateResponse response = messageTemplateService.update(templateSeq, userSeq, request);
+    MessageTemplateResponse response =
+        messageTemplateService.update(templateSeq, user.seq(), request);
     return ApiResponse.success(response);
   }
 
   /** 템플릿 삭제 */
   @DeleteMapping("/{templateSeq}")
   public ApiResponse<Void> delete(
-      @AuthenticationPrincipal UserDetails userDetails, @PathVariable Long templateSeq) {
-    Integer userSeq = getUserSeq(userDetails);
-    messageTemplateService.delete(templateSeq, userSeq);
+      @CurrentUser JwtPrincipal user, @PathVariable Long templateSeq) {
+    messageTemplateService.delete(templateSeq, user.seq());
     return ApiResponse.success(null);
   }
 
   /** 템플릿 순서 변경 */
   @PutMapping("/reorder")
   public ApiResponse<Void> reorder(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestBody List<Long> templateSeqList) {
-    Integer userSeq = getUserSeq(userDetails);
-    messageTemplateService.reorder(userSeq, templateSeqList);
+      @CurrentUser JwtPrincipal user, @RequestBody List<Long> templateSeqList) {
+    messageTemplateService.reorder(user.seq(), templateSeqList);
     return ApiResponse.success(null);
   }
 
   /** 설문용 템플릿 순서 변경 */
   @PutMapping("/survey/reorder")
   public ApiResponse<Void> reorderSurvey(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestBody List<Long> templateSeqList) {
-    Integer userSeq = getUserSeq(userDetails);
-    messageTemplateService.reorderBySendingForm(userSeq, templateSeqList, "s");
+      @CurrentUser JwtPrincipal user, @RequestBody List<Long> templateSeqList) {
+    messageTemplateService.reorderBySendingForm(user.seq(), templateSeqList, "s");
     return ApiResponse.success(null);
   }
 
   /** 직접발송용 템플릿 순서 변경 */
   @PutMapping("/direct/reorder")
   public ApiResponse<Void> reorderDirect(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestBody List<Long> templateSeqList) {
-    Integer userSeq = getUserSeq(userDetails);
-    messageTemplateService.reorderBySendingForm(userSeq, templateSeqList, "d");
+      @CurrentUser JwtPrincipal user, @RequestBody List<Long> templateSeqList) {
+    messageTemplateService.reorderBySendingForm(user.seq(), templateSeqList, "d");
     return ApiResponse.success(null);
-  }
-
-  /** UserDetails에서 userSeq 추출 */
-  private Integer getUserSeq(UserDetails userDetails) {
-    return Integer.parseInt(userDetails.getUsername());
   }
 }

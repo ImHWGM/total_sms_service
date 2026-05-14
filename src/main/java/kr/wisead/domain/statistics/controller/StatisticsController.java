@@ -2,15 +2,14 @@ package kr.wisead.domain.statistics.controller;
 
 import java.util.List;
 import kr.wisead.common.response.ApiResponse;
-import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.statistics.dto.*;
 import kr.wisead.domain.statistics.service.PeriodStatisticsService;
 import kr.wisead.domain.statistics.service.StatisticsService;
 import kr.wisead.domain.statistics.service.UserStatisticsService;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 /** 통계 Controller */
@@ -23,30 +22,18 @@ public class StatisticsController {
   private final StatisticsService statisticsService;
   private final PeriodStatisticsService periodStatisticsService;
   private final UserStatisticsService userStatisticsService;
-  private final UserIdResolver userIdResolver;
-
-  /** UserDetails에서 userId 추출 (null-safe) */
-  private String extractUserId(UserDetails userDetails) {
-    if (userDetails == null) {
-      return null;
-    }
-    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
-    return userIdResolver.toUserId(userSeq);
-  }
 
   /** 일별 통계 조회 GET /api/statistics/daily?startDate=2025-01-01&endDate=2025-01-31&serviceType=SMS */
   @GetMapping("/daily")
   public ApiResponse<List<DailyStatsResponse>> getDailyStats(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
       @RequestParam(required = false) String serviceType) {
 
-    String userId = extractUserId(userDetails);
-
     StatsSearchRequest request =
         StatsSearchRequest.builder()
-            .userId(userId)
+            .userId(user.userId())
             .startDate(startDate)
             .endDate(endDate)
             .serviceType(serviceType)
@@ -73,14 +60,16 @@ public class StatisticsController {
   /** 사용량 요약 조회 (청구용) GET /api/statistics/usage-summary?startDate=2025-01-01&endDate=2025-01-31 */
   @GetMapping("/usage-summary")
   public ApiResponse<List<UsageSummaryResponse>> getUsageSummary(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate) {
 
-    String userId = extractUserId(userDetails);
-
     StatsSearchRequest request =
-        StatsSearchRequest.builder().userId(userId).startDate(startDate).endDate(endDate).build();
+        StatsSearchRequest.builder()
+            .userId(user.userId())
+            .startDate(startDate)
+            .endDate(endDate)
+            .build();
 
     List<UsageSummaryResponse> summary = statisticsService.getUsageSummary(request);
     return ApiResponse.success(summary);
@@ -89,16 +78,14 @@ public class StatisticsController {
   /** 월별 통계 조회 GET /api/statistics/monthly?startDate=2025-01-01&endDate=2025-12-31 */
   @GetMapping("/monthly")
   public ApiResponse<List<MonthlyStatsResponse>> getMonthlyStats(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
       @RequestParam(required = false) String serviceType) {
 
-    String userId = extractUserId(userDetails);
-
     StatsSearchRequest request =
         StatsSearchRequest.builder()
-            .userId(userId)
+            .userId(user.userId())
             .startDate(startDate)
             .endDate(endDate)
             .serviceType(serviceType)
@@ -136,17 +123,15 @@ public class StatisticsController {
    */
   @GetMapping("/period/daily")
   public ApiResponse<List<DailyStatsResponse>> getPeriodDailyStats(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
       @RequestParam(required = false) String msgType,
       @RequestParam(required = false) String serviceType) {
 
-    String userId = extractUserId(userDetails);
-
     StatsSearchRequest request =
         StatsSearchRequest.builder()
-            .userId(userId)
+            .userId(user.userId())
             .startDate(startDate)
             .endDate(endDate)
             .msgType(msgType)
@@ -188,15 +173,13 @@ public class StatisticsController {
   @GetMapping("/period/day/{date}")
   public ApiResponse<DailyStatsResponse> getDayStats(
       @PathVariable String date,
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(required = false) String msgType,
       @RequestParam(required = false) String serviceType) {
 
-    String userId = extractUserId(userDetails);
-
     StatsSearchRequest request =
         StatsSearchRequest.builder()
-            .userId(userId)
+            .userId(user.userId())
             .msgType(msgType)
             .serviceType(serviceType)
             .build();
@@ -208,17 +191,15 @@ public class StatisticsController {
   /** 기간 합계 통계 조회 GET /api/statistics/period/total?startDate=2025-01-01&endDate=2025-01-31 */
   @GetMapping("/period/total")
   public ApiResponse<DailyStatsResponse> getPeriodTotalStats(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam String startDate,
       @RequestParam String endDate,
       @RequestParam(required = false) String msgType,
       @RequestParam(required = false) String serviceType) {
 
-    String userId = extractUserId(userDetails);
-
     StatsSearchRequest request =
         StatsSearchRequest.builder()
-            .userId(userId)
+            .userId(user.userId())
             .startDate(startDate)
             .endDate(endDate)
             .msgType(msgType)

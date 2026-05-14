@@ -2,7 +2,6 @@ package kr.wisead.domain.payment.controller;
 
 import java.util.List;
 import kr.wisead.common.response.ApiResponse;
-import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.payment.dto.BillingStatsSearchRequest;
 import kr.wisead.domain.payment.dto.BillingSummaryResponse;
@@ -12,10 +11,10 @@ import kr.wisead.domain.payment.dto.ServiceTypeBillingStatsResponse;
 import kr.wisead.domain.payment.dto.TransactionResponse;
 import kr.wisead.domain.payment.dto.UserBillingStatsResponse;
 import kr.wisead.domain.payment.service.BillingStatisticsService;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 /** 과금 통계 Controller */
@@ -27,7 +26,6 @@ public class BillingStatisticsController {
 
   private final BillingStatisticsService billingStatisticsService;
   private final AdminService adminService;
-  private final UserIdResolver userIdResolver;
 
   /**
    * 일별 과금 통계 조회 GET
@@ -84,10 +82,9 @@ public class BillingStatisticsController {
       @RequestParam(required = false) String userId,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
-      @AuthenticationPrincipal UserDetails userDetails) {
+      @CurrentUser JwtPrincipal user) {
 
-    BillingStatsSearchRequest request =
-        buildRequestWithPermission(userId, startDate, endDate, userDetails);
+    BillingStatsSearchRequest request = buildRequestWithPermission(userId, startDate, endDate, user);
 
     List<ServiceTypeBillingStatsResponse> response =
         billingStatisticsService.getBillingStatsByServiceType(request);
@@ -114,10 +111,9 @@ public class BillingStatisticsController {
       @RequestParam(required = false) String userId,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
-      @AuthenticationPrincipal UserDetails userDetails) {
+      @CurrentUser JwtPrincipal user) {
 
-    BillingStatsSearchRequest request =
-        buildRequestWithPermission(userId, startDate, endDate, userDetails);
+    BillingStatsSearchRequest request = buildRequestWithPermission(userId, startDate, endDate, user);
 
     BillingSummaryResponse response = billingStatisticsService.getBillingSummary(request);
     return ApiResponse.success(response);
@@ -126,10 +122,9 @@ public class BillingStatisticsController {
   /** 현재 월 과금 요약 조회 (대시보드용) GET /api/billing/statistics/current-month */
   @GetMapping("/current-month")
   public ApiResponse<BillingSummaryResponse> getCurrentMonthSummary(
-      @RequestParam(required = false) String userId,
-      @AuthenticationPrincipal UserDetails userDetails) {
+      @RequestParam(required = false) String userId, @CurrentUser JwtPrincipal user) {
 
-    String targetUserId = resolveUserId(userId, userDetails);
+    String targetUserId = userId != null ? userId : user.userId();
     BillingSummaryResponse response = billingStatisticsService.getCurrentMonthSummary(targetUserId);
     return ApiResponse.success(response);
   }
@@ -137,10 +132,9 @@ public class BillingStatisticsController {
   /** 이전 월 과금 요약 조회 GET /api/billing/statistics/previous-month */
   @GetMapping("/previous-month")
   public ApiResponse<BillingSummaryResponse> getPreviousMonthSummary(
-      @RequestParam(required = false) String userId,
-      @AuthenticationPrincipal UserDetails userDetails) {
+      @RequestParam(required = false) String userId, @CurrentUser JwtPrincipal user) {
 
-    String targetUserId = resolveUserId(userId, userDetails);
+    String targetUserId = userId != null ? userId : user.userId();
     BillingSummaryResponse response =
         billingStatisticsService.getPreviousMonthSummary(targetUserId);
     return ApiResponse.success(response);
@@ -161,13 +155,12 @@ public class BillingStatisticsController {
   /** 내 과금 요약 조회 (로그인 사용자) GET /api/billing/statistics/my */
   @GetMapping("/my")
   public ApiResponse<UserBillingStatsResponse> getMySummary(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate) {
 
-    String userId = extractUserId(userDetails);
     UserBillingStatsResponse response =
-        billingStatisticsService.getUserBillingSummary(userId, startDate, endDate);
+        billingStatisticsService.getUserBillingSummary(user.userId(), startDate, endDate);
     return ApiResponse.success(response);
   }
 
@@ -203,23 +196,6 @@ public class BillingStatisticsController {
 
   // ==================== Private Methods ====================
 
-  /** userId가 지정되면 해당 값, 없으면 JWT에서 실제 userId 추출 */
-  private String resolveUserId(String userId, UserDetails userDetails) {
-    if (userId != null) {
-      return userId;
-    }
-    return extractUserId(userDetails);
-  }
-
-  /** UserDetails에서 실제 userId 추출 (JWT subject는 userSeq) */
-  private String extractUserId(UserDetails userDetails) {
-    if (userDetails == null) {
-      return null;
-    }
-    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
-    return userIdResolver.toUserId(userSeq);
-  }
-
   /**
    * 권한 기반 BillingStatsSearchRequest 생성
    *
@@ -227,7 +203,7 @@ public class BillingStatisticsController {
    * 50-89: 관리하는 계정들 (userIds 설정) - 50 미만: 본인만 (userId 설정)
    */
   private BillingStatsSearchRequest buildRequestWithPermission(
-      String userId, String startDate, String endDate, UserDetails userDetails) {
+      String userId, String startDate, String endDate, JwtPrincipal user) {
 
     // userId가 명시적으로 지정된 경우 해당 유저만 조회
     if (userId != null && !userId.isBlank()) {
@@ -238,16 +214,7 @@ public class BillingStatisticsController {
           .build();
     }
 
-    // 로그인 정보 없으면 빈 결과
-    if (userDetails == null) {
-      return BillingStatsSearchRequest.builder()
-          .userId("__NONE__") // 존재하지 않는 ID로 빈 결과 반환
-          .startDate(startDate)
-          .endDate(endDate)
-          .build();
-    }
-
-    String currentUserId = extractUserId(userDetails);
+    String currentUserId = user.userId();
     Integer userLevel = adminService.getUserLevel(currentUserId);
 
     // determineQueryUserIds 결과: "ALL", "userId1,userId2", 또는 단일 userId

@@ -17,13 +17,13 @@ import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.survey.dto.*;
 import kr.wisead.domain.survey.service.EventService;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -43,7 +43,7 @@ public class EventController {
   /** 이벤트 목록 조회 */
   @GetMapping
   public ApiResponse<PageResponse<EventResponse>> getList(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(required = false) String eventType,
       @RequestParam(required = false) List<String> eventTypes,
       @RequestParam(required = false) String surveyStatus,
@@ -55,14 +55,13 @@ public class EventController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "20") int size) {
 
-    String userId = userDetails.getUsername();
+    String userId = user.userId();
     Integer userLevel = adminService.getUserLevel(userId);
-    String actualRegId = userIdResolver.resolveUserId(userId);
     EventSearchRequest request =
         EventSearchRequest.builder()
-            .regId(actualRegId)
+            .regId(userId)
             .userLevel(userLevel)
-            .queryUserIds(adminService.resolveQueryUserIds(actualRegId, userLevel))
+            .queryUserIds(adminService.resolveQueryUserIds(userId, userLevel))
             .eventType(eventType)
             .eventTypes(eventTypes)
             .surveyStatus(surveyStatus)
@@ -89,50 +88,46 @@ public class EventController {
   /** 이벤트 생성 - JSON으로 이벤트 데이터 전송, 이미지는 /api/file/survey/* API로 별도 업로드 */
   @PostMapping
   public ApiResponse<EventResponse> create(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestBody @Valid EventRequest request) {
-    String userId = userDetails.getUsername();
-    EventResponse response = eventService.createEvent(userId, request, null, null, null, null);
+      @CurrentUser JwtPrincipal user, @RequestBody @Valid EventRequest request) {
+    EventResponse response =
+        eventService.createEvent(user.userId(), request, null, null, null, null);
     return ApiResponse.success(response);
   }
 
   /** 이벤트 수정 - JSON으로 이벤트 데이터 전송, 이미지는 /api/file/survey/* API로 별도 업로드 */
   @PutMapping("/{eventSeq}")
   public ApiResponse<EventResponse> update(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @PathVariable Integer eventSeq,
       @RequestBody @Valid EventRequest request) {
-    String uptId = userDetails.getUsername();
     EventResponse response =
-        eventService.updateEvent(eventSeq, request, uptId, null, null, null, null);
+        eventService.updateEvent(eventSeq, request, user.userId(), null, null, null, null);
     return ApiResponse.success(response);
   }
 
   /** 이벤트 상태 변경 */
   @PatchMapping("/{eventSeq}/status")
   public ApiResponse<Void> updateStatus(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @PathVariable Integer eventSeq,
       @RequestParam String status) {
-    String userId = userDetails.getUsername();
-    eventService.updateEventStatus(eventSeq, status, userId);
+    eventService.updateEventStatus(eventSeq, status, user.userId());
     return ApiResponse.success(null);
   }
 
   /** 현장등록 QR 코드 생성 */
   @PostMapping("/{eventSeq}/onsite-qrcode")
   public ApiResponse<Map<String, String>> generateOnsiteQrCode(
-      @AuthenticationPrincipal UserDetails userDetails, @PathVariable Integer eventSeq) {
-    String userId = userDetails.getUsername();
-    String qrCodeImgPath = eventService.generateOnsiteRegistrationQrCode(eventSeq, userId);
+      @CurrentUser JwtPrincipal user, @PathVariable Integer eventSeq) {
+    String qrCodeImgPath = eventService.generateOnsiteRegistrationQrCode(eventSeq, user.userId());
     return ApiResponse.success(Map.of("qrCodeImgPath", qrCodeImgPath), "QR 코드가 생성되었습니다.");
   }
 
   /** 행사 복사 */
   @PostMapping("/{eventSeq}/copy")
   public ApiResponse<EventResponse> copyEvent(
-      @AuthenticationPrincipal UserDetails userDetails, @PathVariable Integer eventSeq) {
-    String userId = userDetails.getUsername();
-    EventResponse response = eventService.copyEvent(eventSeq, userId);
+      @CurrentUser JwtPrincipal user, @PathVariable Integer eventSeq) {
+    EventResponse response = eventService.copyEvent(eventSeq, user.userId());
     return ApiResponse.success(response, "행사가 복사되었습니다.");
   }
 
@@ -146,15 +141,14 @@ public class EventController {
   /** 이벤트명 검색 (자동완성) */
   @GetMapping("/search/names")
   public ApiResponse<List<String>> searchEventNames(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestParam String keyword) {
-    String userId = userDetails.getUsername();
+      @CurrentUser JwtPrincipal user, @RequestParam String keyword) {
+    String userId = user.userId();
     Integer userLevel = adminService.getUserLevel(userId);
-    String actualRegId = userIdResolver.resolveUserId(userId);
     EventSearchRequest request =
         EventSearchRequest.builder()
-            .regId(actualRegId)
+            .regId(userId)
             .userLevel(userLevel)
-            .queryUserIds(adminService.resolveQueryUserIds(actualRegId, userLevel))
+            .queryUserIds(adminService.resolveQueryUserIds(userId, userLevel))
             .searchKeyword(keyword)
             .build();
     List<String> names = eventService.searchEventNames(request);
@@ -174,43 +168,39 @@ public class EventController {
   /** 범용인증키 추가 */
   @PostMapping("/{eventSeq}/auth-keys")
   public ApiResponse<Void> addAuthKey(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @PathVariable Integer eventSeq,
       @Valid @RequestBody AuthKeyRequest request) {
-    String regId = userDetails.getUsername();
-    eventService.addAuthKey(eventSeq, request.getAuthCode(), regId);
+    eventService.addAuthKey(eventSeq, request.getAuthCode(), user.userId());
     return ApiResponse.success(null);
   }
 
   /** 범용인증키 삭제 */
   @DeleteMapping("/{eventSeq}/auth-keys/{userKey}")
   public ApiResponse<Void> deleteAuthKey(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @PathVariable Integer eventSeq,
       @PathVariable String userKey) {
-    String userId = userDetails.getUsername();
-    eventService.deleteAuthKey(eventSeq, userKey, userId);
+    eventService.deleteAuthKey(eventSeq, userKey, user.userId());
     return ApiResponse.success(null);
   }
 
   /** 범용인증키 선택 삭제 (body: {userKeys: [...]}) */
   @DeleteMapping("/{eventSeq}/auth-keys")
   public ApiResponse<Map<String, Object>> deleteAuthKeys(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @PathVariable Integer eventSeq,
       @RequestBody Map<String, List<String>> request) {
-    String userId = userDetails.getUsername();
     List<String> userKeys = request.get("userKeys");
-    Map<String, Object> result = eventService.deleteAuthKeys(eventSeq, userKeys, userId);
+    Map<String, Object> result = eventService.deleteAuthKeys(eventSeq, userKeys, user.userId());
     return ApiResponse.success(result);
   }
 
   /** 범용인증키 전체 삭제 */
   @DeleteMapping("/{eventSeq}/auth-keys/all")
   public ApiResponse<Map<String, Object>> deleteAllAuthKeys(
-      @AuthenticationPrincipal UserDetails userDetails, @PathVariable Integer eventSeq) {
-    String userId = userDetails.getUsername();
-    Map<String, Object> result = eventService.deleteAllAuthKeys(eventSeq, userId);
+      @CurrentUser JwtPrincipal user, @PathVariable Integer eventSeq) {
+    Map<String, Object> result = eventService.deleteAllAuthKeys(eventSeq, user.userId());
     return ApiResponse.success(result);
   }
 
@@ -224,46 +214,43 @@ public class EventController {
   /** 범용인증키 설명문구 수정 */
   @PutMapping("/{eventSeq}/auth-key-desc")
   public ApiResponse<Void> updateAuthKeyDesc(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @PathVariable Integer eventSeq,
       @RequestBody Map<String, String> request) {
-    String userId = userDetails.getUsername();
     String authKeyDesc = request.get("authKeyDesc");
-    eventService.updateAuthKeyDesc(eventSeq, authKeyDesc, userId);
+    eventService.updateAuthKeyDesc(eventSeq, authKeyDesc, user.userId());
     return ApiResponse.success(null);
   }
 
   /** 유저키 생성 */
   @PostMapping("/{eventSeq}/user-keys")
   public ApiResponse<Map<String, Object>> generateUserKeys(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @PathVariable Integer eventSeq,
       @RequestParam int count) {
-    String regId = userDetails.getUsername();
-    List<String> userKeys = eventService.generateUserKeys(eventSeq, count, regId);
+    List<String> userKeys = eventService.generateUserKeys(eventSeq, count, user.userId());
     return ApiResponse.success(Map.of("count", userKeys.size(), "userKeys", userKeys));
   }
 
   /** 범용인증코드 엑셀 업로드 POST /api/event/auth-keys/excel */
   @PostMapping(value = "/auth-keys/excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ApiResponse<Map<String, Object>> uploadAuthKeyExcel(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestParam("file") MultipartFile file) {
-    String regId = userDetails.getUsername();
-    log.info("범용인증코드 엑셀 업로드 요청 - 파일명: {}, 사용자: {}", file.getOriginalFilename(), regId);
-    Map<String, Object> result = eventService.uploadAuthKeyExcel(file, regId);
+      @CurrentUser JwtPrincipal user, @RequestParam("file") MultipartFile file) {
+    log.info("범용인증코드 엑셀 업로드 요청 - 파일명: {}, 사용자: {}", file.getOriginalFilename(), user.userId());
+    Map<String, Object> result = eventService.uploadAuthKeyExcel(file, user.userId());
     return ApiResponse.success(result);
   }
 
   /** 이벤트 결과 엑셀 다운로드 POST /api/event/{eventSeq}/excel */
   @PostMapping("/{eventSeq}/excel")
   public ResponseEntity<byte[]> downloadEventResultExcel(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @PathVariable Integer eventSeq,
       @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       HttpServletRequest httpRequest) {
 
     // 비밀번호 검증
-    String userId = downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
+    String userId = downloadVerifyService.verify(user, verifyRequest.getPassword());
     String userName = userIdResolver.resolveUserName(userId);
 
     log.info("이벤트 결과 엑셀 다운로드 요청 - eventSeq: {}, 사용자: {}", eventSeq, userId);

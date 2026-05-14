@@ -7,15 +7,14 @@ import java.util.List;
 import java.util.Map;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
-import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.survey.dto.SurveyUserRequest;
 import kr.wisead.domain.survey.dto.SurveyUserResponse;
 import kr.wisead.domain.survey.service.SurveyUserService;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 /** 설문 참여자 관리 Controller (관리자용) */
@@ -27,7 +26,6 @@ public class SurveyUserController {
 
   private final SurveyUserService surveyUserService;
   private final AdminService adminService;
-  private final UserIdResolver userIdResolver;
 
   /**
    * 참여자 목록 조회 (검색 + 페이징) GET
@@ -61,12 +59,11 @@ public class SurveyUserController {
       @RequestParam(defaultValue = "10") int size,
       @RequestParam(defaultValue = "true") boolean masked,
       @RequestParam(required = false) String reason,
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       HttpServletRequest httpRequest) {
 
-    String rawUserId = userDetails != null ? userDetails.getUsername() : "ANONYMOUS";
-    String userId = userIdResolver.resolveUserId(rawUserId);
-    Integer userLevel = adminService.getUserLevel(rawUserId);
+    String userId = user.userId();
+    Integer userLevel = adminService.getUserLevel(userId);
     List<String> queryUserIds = adminService.resolveQueryUserIds(userId, userLevel);
 
     log.info(
@@ -145,10 +142,8 @@ public class SurveyUserController {
   /** 참여자 등록 */
   @PostMapping
   public ApiResponse<SurveyUserResponse> createUser(
-      @Valid @RequestBody SurveyUserRequest request,
-      @AuthenticationPrincipal UserDetails userDetails) {
-    String regId = userDetails != null ? userDetails.getUsername() : "SYSTEM";
-    SurveyUserResponse response = surveyUserService.createUser(request, regId);
+      @Valid @RequestBody SurveyUserRequest request, @CurrentUser JwtPrincipal user) {
+    SurveyUserResponse response = surveyUserService.createUser(request, user.userId());
     return ApiResponse.success(response);
   }
 
@@ -157,9 +152,8 @@ public class SurveyUserController {
   public ApiResponse<Integer> createUsersBatch(
       @RequestParam Integer eventSeq,
       @Valid @RequestBody List<SurveyUserRequest> requests,
-      @AuthenticationPrincipal UserDetails userDetails) {
-    String regId = userDetails != null ? userDetails.getUsername() : "SYSTEM";
-    int result = surveyUserService.createUsersBatch(eventSeq, requests, regId);
+      @CurrentUser JwtPrincipal user) {
+    int result = surveyUserService.createUsersBatch(eventSeq, requests, user.userId());
     return ApiResponse.success(result);
   }
 
@@ -168,9 +162,8 @@ public class SurveyUserController {
   public ApiResponse<SurveyUserResponse> updateUser(
       @PathVariable Integer userSeq,
       @Valid @RequestBody SurveyUserRequest request,
-      @AuthenticationPrincipal UserDetails userDetails) {
-    String uptId = userDetails != null ? userDetails.getUsername() : "SYSTEM";
-    SurveyUserResponse response = surveyUserService.updateUser(userSeq, request, uptId);
+      @CurrentUser JwtPrincipal user) {
+    SurveyUserResponse response = surveyUserService.updateUser(userSeq, request, user.userId());
     return ApiResponse.success(response);
   }
 
@@ -179,9 +172,8 @@ public class SurveyUserController {
   public ApiResponse<Void> updateResendPhone(
       @PathVariable Integer userSeq,
       @RequestParam String phone,
-      @AuthenticationPrincipal UserDetails userDetails) {
-    String uptId = userDetails != null ? userDetails.getUsername() : "SYSTEM";
-    surveyUserService.updateResendPhone(userSeq, phone, uptId);
+      @CurrentUser JwtPrincipal user) {
+    surveyUserService.updateResendPhone(userSeq, phone, user.userId());
     return ApiResponse.success(null);
   }
 
@@ -191,27 +183,24 @@ public class SurveyUserController {
       @PathVariable Integer userSeq,
       @RequestParam(required = false) LocalDate depositDate,
       @RequestParam(required = false) LocalDate shipmentDate,
-      @AuthenticationPrincipal UserDetails userDetails) {
-    String uptId = userDetails != null ? userDetails.getUsername() : "SYSTEM";
-    surveyUserService.updatePaymentInfo(userSeq, depositDate, shipmentDate, uptId);
+      @CurrentUser JwtPrincipal user) {
+    surveyUserService.updatePaymentInfo(userSeq, depositDate, shipmentDate, user.userId());
     return ApiResponse.success(null);
   }
 
   /** 참여자 삭제 */
   @DeleteMapping("/{userSeq}")
   public ApiResponse<Void> deleteUser(
-      @PathVariable Integer userSeq, @AuthenticationPrincipal UserDetails userDetails) {
-    String uptId = userDetails != null ? userDetails.getUsername() : "SYSTEM";
-    surveyUserService.deleteUser(userSeq, uptId);
+      @PathVariable Integer userSeq, @CurrentUser JwtPrincipal user) {
+    surveyUserService.deleteUser(userSeq, user.userId());
     return ApiResponse.success(null);
   }
 
   /** 이벤트의 모든 참여자 삭제 */
   @DeleteMapping("/event/{eventSeq}")
   public ApiResponse<Void> deleteUsersByEventSeq(
-      @PathVariable Integer eventSeq, @AuthenticationPrincipal UserDetails userDetails) {
-    String uptId = userDetails != null ? userDetails.getUsername() : "SYSTEM";
-    surveyUserService.deleteUsersByEventSeq(eventSeq, uptId);
+      @PathVariable Integer eventSeq, @CurrentUser JwtPrincipal user) {
+    surveyUserService.deleteUsersByEventSeq(eventSeq, user.userId());
     return ApiResponse.success(null);
   }
 

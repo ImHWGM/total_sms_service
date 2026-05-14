@@ -5,6 +5,7 @@ import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.user.entity.User;
 import kr.wisead.mapper.primary.UserMapper;
+import kr.wisead.security.jwt.JwtPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -26,17 +27,28 @@ public class DownloadVerifyService {
   private final PasswordEncoder passwordEncoder;
 
   /**
-   * UserDetails 기반 비밀번호 검증 (@AuthenticationPrincipal 사용 컨트롤러용)
+   * UserDetails 기반 비밀번호 검증 (레거시 @AuthenticationPrincipal 컨트롤러용)
    *
-   * @param userDetails Spring Security UserDetails
-   * @param rawPassword 사용자가 입력한 평문 비밀번호
-   * @return 검증된 userId (컨트롤러에서 재조회 불필요)
-   * @throws BusinessException 비밀번호 불일치 시
+   * @deprecated {@link #verify(JwtPrincipal, String)} 사용 권장
    */
+  @Deprecated
   public String verify(UserDetails userDetails, String rawPassword) {
     String userId = resolveUserIdFromDetails(userDetails);
     verifyPassword(userId, rawPassword);
     return userId;
+  }
+
+  /**
+   * JwtPrincipal 기반 비밀번호 검증 (@CurrentUser 사용 컨트롤러용)
+   *
+   * @param user 인증된 사용자
+   * @param rawPassword 사용자가 입력한 평문 비밀번호
+   * @return 검증된 userId
+   * @throws BusinessException 비밀번호 불일치 시
+   */
+  public String verify(JwtPrincipal user, String rawPassword) {
+    verifyPassword(user.userId(), rawPassword);
+    return user.userId();
   }
 
   /**

@@ -24,8 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -246,13 +244,13 @@ public class EventController {
   /** 이벤트 결과 엑셀 다운로드 POST /api/event/{eventSeq}/excel */
   @PostMapping("/{eventSeq}/excel")
   public ResponseEntity<byte[]> downloadEventResultExcel(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @PathVariable Integer eventSeq,
       @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       HttpServletRequest httpRequest) {
 
     // 비밀번호 검증
-    String userId = downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
+    String userId = downloadVerifyService.verify(user, verifyRequest.getPassword());
     String userName = userIdResolver.resolveUserName(userId);
 
     log.info("이벤트 결과 엑셀 다운로드 요청 - eventSeq: {}, 사용자: {}", eventSeq, userId);

@@ -13,7 +13,6 @@ import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.service.DownloadVerifyService;
 import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
-import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.excel.dto.SurveyExcelDownloadRequest;
@@ -26,6 +25,8 @@ import kr.wisead.domain.statistics.service.StatisticsService;
 import kr.wisead.domain.user.entity.User;
 import kr.wisead.mapper.primary.SurveyUserMapper;
 import kr.wisead.mapper.primary.UserMapper;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -34,8 +35,6 @@ import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -51,7 +50,6 @@ public class ExcelController {
   private final StatisticsService statisticsService;
   private final SurveyUserMapper surveyUserMapper;
   private final UserMapper userMapper;
-  private final UserIdResolver userIdResolver;
   private final ActionLogService actionLogService;
   private final AdminService adminService;
   private final DownloadVerifyService downloadVerifyService;
@@ -60,26 +58,17 @@ public class ExcelController {
   private static final DateTimeFormatter DATETIME_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-  /** UserDetails에서 userId 추출 (null-safe) */
-  private String extractUserId(UserDetails userDetails) {
-    if (userDetails == null) {
-      return null;
-    }
-    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
-    return userIdResolver.toUserId(userSeq);
-  }
-
   /** 통계 Excel 다운로드 POST /api/excel/statistics/download */
   @PostMapping("/statistics/download")
   public ResponseEntity<byte[]> downloadStatisticsExcel(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
       @RequestParam(required = false) String serviceType,
       @RequestBody @Valid DownloadVerifyRequest verifyRequest) {
 
     // 비밀번호 검증
-    String userId = downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
+    String userId = downloadVerifyService.verify(user, verifyRequest.getPassword());
 
     // 기본 날짜 설정
     LocalDate now = LocalDate.now();
@@ -151,7 +140,7 @@ public class ExcelController {
   /** 과금 통계 Excel 다운로드 (다중 시트) POST /api/excel/billing/download */
   @PostMapping("/billing/download")
   public ResponseEntity<byte[]> downloadBillingExcel(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(required = false) String startDate,
       @RequestParam(required = false) String endDate,
       @RequestParam(required = false) String userId,
@@ -159,18 +148,17 @@ public class ExcelController {
       HttpServletRequest httpRequest) {
 
     // 비밀번호 검증
-    downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
+    String currentUserId = downloadVerifyService.verify(user, verifyRequest.getPassword());
 
-    String currentUserId = extractUserId(userDetails);
-    User user = userMapper.findByUserId(currentUserId).orElseThrow();
-    Integer userLevel = user.getUserLevel();
+    User currentUser = userMapper.findByUserId(currentUserId).orElseThrow();
+    Integer userLevel = currentUser.getUserLevel();
 
     log.info("[엑셀 다운로드 시작] 과금 통계 - 사용자: {}, 기간: {} ~ {}", currentUserId, startDate, endDate);
 
     // 활동 로그 기록
     actionLogService.logDownloadAction(
         currentUserId,
-        CryptoUtils.decryptName(user.getPerson()),
+        CryptoUtils.decryptName(currentUser.getPerson()),
         "과금통계 엑셀다운로드",
         "R",
         verifyRequest.getReason(),
@@ -297,7 +285,7 @@ public class ExcelController {
   /** 설문조사 참여현황 Excel 다운로드 POST /api/excel/survey/download */
   @PostMapping("/survey/download")
   public ResponseEntity<byte[]> downloadSurveyExcel(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(required = false) Integer eventSeq,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String searchType,
@@ -308,15 +296,15 @@ public class ExcelController {
       HttpServletRequest request) {
 
     // 비밀번호 검증
-    String userId = downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
-    User user = userMapper.findByUserId(userId).orElseThrow();
+    String userId = downloadVerifyService.verify(user, verifyRequest.getPassword());
+    User loggedUser = userMapper.findByUserId(userId).orElseThrow();
 
     log.info("[엑셀 다운로드 시작] 설문조사 참여현황 - 사용자: {}", userId);
 
     // 활동 로그 기록
     actionLogService.logDownloadAction(
         userId,
-        CryptoUtils.decryptName(user.getPerson()),
+        CryptoUtils.decryptName(loggedUser.getPerson()),
         "설문조사 참여현황 엑셀다운로드",
         "R",
         verifyRequest.getReason(),
@@ -331,7 +319,7 @@ public class ExcelController {
     params.put("submissionStatus", submissionStatus);
     params.put("startDate", startDate);
     params.put("endDate", endDate);
-    params.put("userLevel", user.getUserLevel());
+    params.put("userLevel", loggedUser.getUserLevel());
     params.put("regId", userId);
 
     List<Map<String, Object>> dataList = surveyUserMapper.selectForExcelDownload(params);
@@ -388,7 +376,7 @@ public class ExcelController {
   /** 개인정보취합 참여현황 Excel 다운로드 POST /api/excel/privacy/download */
   @PostMapping("/privacy/download")
   public ResponseEntity<byte[]> downloadPrivacyExcel(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(required = false) Integer eventSeq,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String searchType,
@@ -399,15 +387,15 @@ public class ExcelController {
       HttpServletRequest request) {
 
     // 비밀번호 검증
-    String userId = downloadVerifyService.verify(userDetails, verifyRequest.getPassword());
-    User user = userMapper.findByUserId(userId).orElseThrow();
+    String userId = downloadVerifyService.verify(user, verifyRequest.getPassword());
+    User loggedUser = userMapper.findByUserId(userId).orElseThrow();
 
     log.info("[엑셀 다운로드 시작] 개인정보취합 참여현황 - 사용자: {}", userId);
 
     // 활동 로그 기록
     actionLogService.logDownloadAction(
         userId,
-        CryptoUtils.decryptName(user.getPerson()),
+        CryptoUtils.decryptName(loggedUser.getPerson()),
         "개인정보취합 참여현황 엑셀다운로드",
         "R",
         verifyRequest.getReason(),
@@ -422,14 +410,14 @@ public class ExcelController {
     params.put("submissionStatus", submissionStatus);
     params.put("startDate", startDate);
     params.put("endDate", endDate);
-    params.put("userLevel", user.getUserLevel());
+    params.put("userLevel", loggedUser.getUserLevel());
     params.put("regId", userId);
 
     List<Map<String, Object>> dataList = surveyUserMapper.selectForExcelDownload(params);
 
     // 모바일이앤엠애드 회사 여부 확인 (입금일자, 입금금액, 출고일자 컬럼 추가용)
     boolean includePaymentInfo =
-        user.getCorpName() != null && user.getCorpName().contains("모바일이앤엠애드");
+        loggedUser.getCorpName() != null && loggedUser.getCorpName().contains("모바일이앤엠애드");
 
     try (SXSSFWorkbook workbook = excelService.createWorkbook()) {
       Sheet sheet = excelService.createSheet(workbook, "개인정보취합 참여현황");
@@ -505,13 +493,13 @@ public class ExcelController {
    */
   @PostMapping("/participant/download")
   public ResponseEntity<byte[]> downloadParticipantExcel(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestBody SurveyExcelDownloadRequest downloadRequest,
       HttpServletRequest request) {
 
     // 비밀번호 검증
-    String userId = downloadVerifyService.verify(userDetails, downloadRequest.getPassword());
-    User user = userMapper.findByUserId(userId).orElseThrow();
+    String userId = downloadVerifyService.verify(user, downloadRequest.getPassword());
+    User loggedUser = userMapper.findByUserId(userId).orElseThrow();
 
     SurveyExcelDownloadRequest.DownloadType downloadType = downloadRequest.getDownloadType();
     String eventType = downloadRequest.getEventType();
@@ -526,7 +514,7 @@ public class ExcelController {
         String.format("%s 참여현황 엑셀다운로드 (%s)", menuName, getDownloadTypeText(downloadType));
     actionLogService.logDownloadAction(
         userId,
-        CryptoUtils.decryptName(user.getPerson()),
+        CryptoUtils.decryptName(loggedUser.getPerson()),
         logMenuName,
         "R",
         downloadRequest.getReason(),
@@ -534,7 +522,7 @@ public class ExcelController {
 
     // 데이터 조회
     List<Map<String, Object>> dataList =
-        getDataListByDownloadType(downloadType, downloadRequest, user, userId);
+        getDataListByDownloadType(downloadType, downloadRequest, loggedUser, userId);
 
     if (dataList.isEmpty()) {
       throw new RuntimeException("다운로드할 데이터가 없습니다.");
@@ -594,7 +582,8 @@ public class ExcelController {
       } else {
         // 개인정보취합 헤더
         boolean includePaymentInfo =
-            user.getCorpName() != null && user.getCorpName().contains("모바일이앤엠애드");
+            loggedUser.getCorpName() != null
+                && loggedUser.getCorpName().contains("모바일이앤엠애드");
 
         List<String> headers =
             new ArrayList<>(Arrays.asList("번호", "고객사명", "이벤트명", "당첨자명", "전화번호", "주민번호", "주소"));

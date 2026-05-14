@@ -9,8 +9,8 @@ import kr.wisead.mapper.primary.SurveyMasterMapper;
 import kr.wisead.mapper.primary.SurveyQuestionMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -206,9 +206,8 @@ public class FileUploadController {
   /** 템플릿 이미지 업로드 */
   @PostMapping("/template")
   public ApiResponse<FileUploadResponse> uploadTemplateImage(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestParam("file") MultipartFile file) {
-    int userSeq = Integer.parseInt(userDetails.getUsername());
-    String relativePath = fileStorageService.storeTemplateImage(file, userSeq);
+      @CurrentUser JwtPrincipal user, @RequestParam("file") MultipartFile file) {
+    String relativePath = fileStorageService.storeTemplateImage(file, user.seq());
     FileUploadResponse response =
         FileUploadResponse.builder()
             .success(true)

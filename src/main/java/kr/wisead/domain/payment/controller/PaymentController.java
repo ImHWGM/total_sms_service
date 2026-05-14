@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
-import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.payment.dto.BalanceResponse;
 import kr.wisead.domain.payment.dto.ChargeRequest;
@@ -30,13 +29,13 @@ import kr.wisead.domain.payment.service.BalanceService;
 import kr.wisead.domain.payment.service.BillingService;
 import kr.wisead.domain.payment.service.PaymentService;
 import kr.wisead.domain.payment.service.UserServiceRateService;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 /** 결제/잔액 Controller */
@@ -50,7 +49,6 @@ public class PaymentController {
   private final BalanceService balanceService;
   private final BillingService billingService;
   private final UserServiceRateService userServiceRateService;
-  private final UserIdResolver userIdResolver;
   private final AdminService adminService;
 
   @Value("${wisead.url}")
@@ -58,82 +56,68 @@ public class PaymentController {
 
   /** 현재 잔액 조회 GET /api/payment/balance */
   @GetMapping("/balance")
-  public ApiResponse<BalanceResponse> getCurrentBalance(
-      @AuthenticationPrincipal UserDetails userDetails) {
-    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
-    BalanceResponse response = balanceService.getCurrentBalance(userSeq);
-    return ApiResponse.success(response);
+  public ApiResponse<BalanceResponse> getCurrentBalance(@CurrentUser JwtPrincipal user) {
+    return ApiResponse.success(balanceService.getCurrentBalance(user.seq()));
   }
 
   /** 잔액 내역 조회 GET /api/payment/balance/history?page=1&size=10 */
   @GetMapping("/balance/history")
   public ApiResponse<PageResponse<BalanceResponse>> getBalanceHistory(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
-    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
-    PageResponse<BalanceResponse> response = balanceService.getBalanceHistory(userSeq, page, size);
-    return ApiResponse.success(response);
+    return ApiResponse.success(balanceService.getBalanceHistory(user.seq(), page, size));
   }
 
   /** 충전 (관리자용) POST /api/payment/charge */
   @PostMapping("/charge")
   public ApiResponse<BalanceResponse> charge(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestBody ChargeRequest request) {
-    String operatorId = userDetails.getUsername();
-    BalanceResponse response = balanceService.charge(request, operatorId);
-    return ApiResponse.success(response);
+      @CurrentUser JwtPrincipal user, @RequestBody ChargeRequest request) {
+    return ApiResponse.success(balanceService.charge(request, user.userId()));
   }
 
   /** 차감 (관리자용) POST /api/payment/deduct */
   @PostMapping("/deduct")
   public ApiResponse<BalanceResponse> deduct(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam String userId,
       @RequestParam BigDecimal amount,
       @RequestParam(required = false) String comment) {
-    String operatorId = userDetails.getUsername();
-    BalanceResponse response =
-        balanceService.deduct(userId, amount, comment != null ? comment : "관리자 차감", operatorId);
-    return ApiResponse.success(response);
+    return ApiResponse.success(
+        balanceService.deduct(
+            userId, amount, comment != null ? comment : "관리자 차감", user.userId()));
   }
 
   /** 잔액 충분 여부 확인 GET /api/payment/balance/check?amount=10000 */
   @GetMapping("/balance/check")
   public ApiResponse<Boolean> checkBalance(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestParam BigDecimal amount) {
-    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
-    boolean hasEnough = balanceService.hasEnoughBalance(userSeq, amount);
-    return ApiResponse.success(hasEnough);
+      @CurrentUser JwtPrincipal user, @RequestParam BigDecimal amount) {
+    return ApiResponse.success(balanceService.hasEnoughBalance(user.seq(), amount));
   }
 
   /** QR 코드 신청 비용 잔액 충분 여부 확인 GET /api/payment/balance/check-qr */
   @GetMapping("/balance/check-qr")
-  public ApiResponse<Boolean> checkQrBalance(@AuthenticationPrincipal UserDetails userDetails) {
-    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
-    boolean canCharge = billingService.canChargeQr(userSeq);
-    return ApiResponse.success(canCharge);
+  public ApiResponse<Boolean> checkQrBalance(@CurrentUser JwtPrincipal user) {
+    return ApiResponse.success(billingService.canChargeQr(user.seq()));
   }
 
   /** 문자 요금 설정 (관리자용) PUT /api/payment/sms-price */
   @PutMapping("/sms-price")
   @PreAuthorize("hasRole('ADMIN')")
   public ApiResponse<BalanceResponse> updateSmsPrice(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestBody SmsPriceRequest request) {
-    String operatorId = userDetails.getUsername();
-    BalanceResponse response = balanceService.updateSmsPrice(request, operatorId);
-    return ApiResponse.success(response);
+      @CurrentUser JwtPrincipal user, @RequestBody SmsPriceRequest request) {
+    return ApiResponse.success(balanceService.updateSmsPrice(request, user.userId()));
   }
 
   /** 특정 사용자 잔액 내역 조회 (본인/운영관리자/최고관리자) GET /api/payment/balance/history/{userId} */
   @GetMapping("/balance/history/{userId}")
   public ApiResponse<PageResponse<BalanceResponse>> getBalanceHistoryByUserId(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @PathVariable String userId,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
-    String currentUserId = userIdResolver.resolveUserId(userDetails.getUsername());
-    Integer userLevel = adminService.getUserLevel(userDetails.getUsername());
+    String currentUserId = user.userId();
+    Integer userLevel = adminService.getUserLevel(currentUserId);
 
     if (!currentUserId.equals(userId)) {
       String queryScope = adminService.determineQueryUserIds(currentUserId, userLevel);
@@ -144,8 +128,7 @@ public class PaymentController {
       }
     }
 
-    PageResponse<BalanceResponse> response = balanceService.getBalanceHistory(userId, page, size);
-    return ApiResponse.success(response);
+    return ApiResponse.success(balanceService.getBalanceHistory(userId, page, size));
   }
 
   /** 결제 결과 콜백 (PG 연동) POST /api/payment/callback */
@@ -168,12 +151,10 @@ public class PaymentController {
   /** 결제 내역 조회 GET /api/payment/history?page=1&size=10 (미사용 - KG_PAYMENT 테이블 없음) */
   @GetMapping("/history")
   public ApiResponse<PageResponse<Payment>> getPaymentHistory(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
-    String userSeqStr = userDetails.getUsername();
-    PageResponse<Payment> response = paymentService.getPaymentHistory(userSeqStr, page, size);
-    return ApiResponse.success(response);
+    return ApiResponse.success(paymentService.getPaymentHistory(user.userId(), page, size));
   }
 
   /** 거래 ID로 결제 정보 조회 GET /api/payment/{tradeId} */
@@ -259,28 +240,23 @@ public class PaymentController {
 
   /** 지갑 요약 조회 (CASH/POINT/BONUS 분리) GET /api/payment/wallet/summary */
   @GetMapping("/wallet/summary")
-  public ApiResponse<WalletSummaryResponse> getWalletSummary(
-      @AuthenticationPrincipal UserDetails userDetails) {
-    String userId = userDetails.getUsername();
-    return ApiResponse.success(balanceService.getWalletSummary(userId));
+  public ApiResponse<WalletSummaryResponse> getWalletSummary(@CurrentUser JwtPrincipal user) {
+    return ApiResponse.success(balanceService.getWalletSummary(user.seq()));
   }
 
   /** 활성 Lot 목록 조회 (만료일 포함) GET /api/payment/wallet/lots */
   @GetMapping("/wallet/lots")
-  public ApiResponse<List<WalletLotResponse>> getActiveLots(
-      @AuthenticationPrincipal UserDetails userDetails) {
-    String userId = userDetails.getUsername();
-    return ApiResponse.success(balanceService.getActiveLots(userId));
+  public ApiResponse<List<WalletLotResponse>> getActiveLots(@CurrentUser JwtPrincipal user) {
+    return ApiResponse.success(balanceService.getActiveLots(user.seq()));
   }
 
   /** 거래 이력 조회 (신규) GET /api/payment/transactions */
   @GetMapping("/transactions")
   public ApiResponse<PageResponse<TransactionResponse>> getTransactions(
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
-    String userId = userDetails.getUsername();
-    return ApiResponse.success(balanceService.getTransactionHistory(userId, page, size));
+    return ApiResponse.success(balanceService.getTransactionHistory(user.seq(), page, size));
   }
 
   /** 환불 미리보기 GET /api/payment/refund/preview?txGroupId={id} */

@@ -2,6 +2,7 @@ package kr.wisead.domain.user.controller;
 
 import jakarta.validation.Valid;
 import kr.wisead.common.response.ApiResponse;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.user.dto.DefaultChannelRequest;
 import kr.wisead.domain.user.dto.SmsRegisterRequest;
 import kr.wisead.domain.user.dto.SmsVerifyRequest;
@@ -31,13 +32,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class TwoFactorController {
 
   private final TwoFactorService twoFactorService;
+  private final UserIdResolver userIdResolver;
 
   /** SMS 등록을 위한 OTP 발송 (C2). */
   @PostMapping("/sms/send-code")
   public ApiResponse<Void> sendSmsRegisterCode(
       @AuthenticationPrincipal UserDetails userDetails,
       @Valid @RequestBody SmsRegisterRequest request) {
-    twoFactorService.sendSmsRegisterCode(userDetails.getUsername(), request.getPhoneNumber());
+    String userId = userIdResolver.resolveUserId(userDetails.getUsername());
+    twoFactorService.sendSmsRegisterCode(userId, request.getPhoneNumber());
     return ApiResponse.success("SMS 인증 코드를 발송했습니다.");
   }
 
@@ -46,14 +49,16 @@ public class TwoFactorController {
   public ApiResponse<Void> verifySmsRegisterCode(
       @AuthenticationPrincipal UserDetails userDetails,
       @Valid @RequestBody SmsVerifyRequest request) {
-    twoFactorService.verifySmsRegisterCode(userDetails.getUsername(), request.getCode());
+    String userId = userIdResolver.resolveUserId(userDetails.getUsername());
+    twoFactorService.verifySmsRegisterCode(userId, request.getCode());
     return ApiResponse.success("SMS 인증 채널이 활성화되었습니다.");
   }
 
   /** SMS 채널 비활성화 (login_phone 삭제 + default_two_factor_method=EMAIL). */
   @DeleteMapping("/sms")
   public ApiResponse<Void> deactivateSms(@AuthenticationPrincipal UserDetails userDetails) {
-    twoFactorService.deactivateSms(userDetails.getUsername());
+    String userId = userIdResolver.resolveUserId(userDetails.getUsername());
+    twoFactorService.deactivateSms(userId);
     return ApiResponse.success("SMS 인증 채널이 비활성화되었습니다.");
   }
 
@@ -62,7 +67,8 @@ public class TwoFactorController {
   public ApiResponse<Void> setDefaultChannel(
       @AuthenticationPrincipal UserDetails userDetails,
       @Valid @RequestBody DefaultChannelRequest request) {
-    twoFactorService.setDefaultChannel(userDetails.getUsername(), request.getChannel());
+    String userId = userIdResolver.resolveUserId(userDetails.getUsername());
+    twoFactorService.setDefaultChannel(userId, request.getChannel());
     return ApiResponse.success("기본 인증 채널이 변경되었습니다.");
   }
 
@@ -70,7 +76,8 @@ public class TwoFactorController {
   @GetMapping
   public ApiResponse<TwoFactorSettingsResponse> getSettings(
       @AuthenticationPrincipal UserDetails userDetails) {
-    TwoFactorSettingsResponse settings = twoFactorService.getSettings(userDetails.getUsername());
+    String userId = userIdResolver.resolveUserId(userDetails.getUsername());
+    TwoFactorSettingsResponse settings = twoFactorService.getSettings(userId);
     return ApiResponse.success(settings);
   }
 }

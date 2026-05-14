@@ -13,6 +13,8 @@ import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.service.DownloadVerifyService;
 import kr.wisead.domain.event.dto.*;
 import kr.wisead.domain.event.service.*;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -42,10 +44,10 @@ public class EventParticipantController {
   public ApiResponse<EventParticipantResponse> createParticipant(
       @PathVariable Integer eventSeq,
       @Valid @RequestBody EventParticipantRequest request,
-      @AuthenticationPrincipal UserDetails userDetails) {
+      @CurrentUser JwtPrincipal user) {
     request.setEventSeq(eventSeq);
     EventParticipantResponse response =
-        participantService.createParticipant(request, userDetails.getUsername());
+        participantService.createParticipant(request, user.userId());
     return ApiResponse.success(response, "참가자가 등록되었습니다.");
   }
 
@@ -54,15 +56,15 @@ public class EventParticipantController {
   public ApiResponse<Map<String, Object>> uploadParticipantExcel(
       @PathVariable Integer eventSeq,
       @RequestParam("file") MultipartFile file,
-      @AuthenticationPrincipal UserDetails userDetails) {
+      @CurrentUser JwtPrincipal user) {
     Map<String, Object> result =
-        participantService.uploadParticipantExcel(eventSeq, file, userDetails.getUsername());
+        participantService.uploadParticipantExcel(eventSeq, file, user.userId());
     return ApiResponse.success(result, "일괄 등록 완료");
   }
 
   /** 문자 발송용 참가자 전체 목록 조회 (페이징 없음) */
   @GetMapping("/for-message")
-  public ApiResponse<java.util.List<ParticipantForMessageResponse>> getParticipantsForMessage(
+  public ApiResponse<List<ParticipantForMessageResponse>> getParticipantsForMessage(
       @PathVariable Integer eventSeq) {
     return ApiResponse.success(participantService.getParticipantsForMessage(eventSeq));
   }
@@ -112,9 +114,9 @@ public class EventParticipantController {
       @PathVariable Integer eventSeq,
       @PathVariable Long seq,
       @Valid @RequestBody EventParticipantRequest request,
-      @AuthenticationPrincipal UserDetails userDetails) {
+      @CurrentUser JwtPrincipal user) {
     return ApiResponse.success(
-        participantService.updateParticipant(seq, request, userDetails.getUsername()),
+        participantService.updateParticipant(seq, request, user.userId()),
         "참가자 정보가 수정되었습니다.");
   }
 
@@ -123,8 +125,8 @@ public class EventParticipantController {
   public ApiResponse<Void> deleteParticipant(
       @PathVariable Integer eventSeq,
       @PathVariable Long seq,
-      @AuthenticationPrincipal UserDetails userDetails) {
-    participantService.deleteParticipant(seq, userDetails.getUsername());
+      @CurrentUser JwtPrincipal user) {
+    participantService.deleteParticipant(seq, user.userId());
     return ApiResponse.success("참가자가 삭제되었습니다.");
   }
 
@@ -133,9 +135,8 @@ public class EventParticipantController {
   public ApiResponse<EventCheckResponse> processAction(
       @PathVariable Integer eventSeq,
       @Valid @RequestBody EventCheckRequest request,
-      @AuthenticationPrincipal UserDetails userDetails) {
-    EventCheckResponse response =
-        checkService.processAction(eventSeq, request, userDetails.getUsername());
+      @CurrentUser JwtPrincipal user) {
+    EventCheckResponse response = checkService.processAction(eventSeq, request, user.userId());
     return ApiResponse.success(response, response.getMessage());
   }
 
@@ -152,9 +153,9 @@ public class EventParticipantController {
       @PathVariable Integer eventSeq,
       @PathVariable Long seq,
       @RequestBody NametagPrintRequest request,
-      @AuthenticationPrincipal UserDetails userDetails) {
+      @CurrentUser JwtPrincipal user) {
     request.setParticipantSeq(seq);
-    nametagService.recordPrint(request, userDetails.getUsername());
+    nametagService.recordPrint(request, user.userId());
     return ApiResponse.success("명찰 출력이 기록되었습니다.");
   }
 

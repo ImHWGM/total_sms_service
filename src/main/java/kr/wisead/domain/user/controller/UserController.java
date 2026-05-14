@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
-import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.email.dto.EmailVerificationRequest;
 import kr.wisead.domain.user.dto.FindIdRequest;
 import kr.wisead.domain.user.dto.FindIdResponse;
@@ -15,10 +14,10 @@ import kr.wisead.domain.user.dto.MemberUpdateRequest;
 import kr.wisead.domain.user.dto.PasswordResetConfirmRequest;
 import kr.wisead.domain.user.dto.UserResponse;
 import kr.wisead.domain.user.service.UserService;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,13 +35,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
   private final UserService userService;
-  private final UserIdResolver userIdResolver;
 
   /** 내 정보 조회 */
   @GetMapping("/me")
-  public ApiResponse<UserResponse> getMyInfo(@AuthenticationPrincipal UserDetails userDetails) {
-    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
-    return ApiResponse.success(userService.getUserBySeq(userSeq));
+  public ApiResponse<UserResponse> getMyInfo(@CurrentUser JwtPrincipal user) {
+    return ApiResponse.success(userService.getUserBySeq(user.seq()));
   }
 
   /** 회원 정보 조회 (by SEQ) - 관리자 전용 */
@@ -65,10 +62,9 @@ public class UserController {
   /** 비밀번호 변경 */
   @PutMapping("/me/password")
   public ApiResponse<Void> changePassword(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestBody Map<String, String> request) {
-    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
-    String userId = userService.getUserIdBySeq(userSeq);
-    userService.changePassword(userId, request.get("currentPassword"), request.get("newPassword"));
+      @CurrentUser JwtPrincipal user, @RequestBody Map<String, String> request) {
+    userService.changePassword(
+        user.userId(), request.get("currentPassword"), request.get("newPassword"));
     return ApiResponse.success("비밀번호가 변경되었습니다.");
   }
 
@@ -126,19 +122,16 @@ public class UserController {
 
   /** 비밀번호 만료일 연장 (본인용) PUT /api/users/me/password/extend */
   @PutMapping("/me/password/extend")
-  public ApiResponse<Void> extendPasswordExpiry(@AuthenticationPrincipal UserDetails userDetails) {
-    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
-    userService.extendPasswordExpiry(userService.getUserIdBySeq(userSeq));
+  public ApiResponse<Void> extendPasswordExpiry(@CurrentUser JwtPrincipal user) {
+    userService.extendPasswordExpiry(user.userId());
     return ApiResponse.success("비밀번호 만료일이 180일 연장되었습니다.");
   }
 
   /** 만료된 비밀번호 변경 (본인용) PUT /api/users/me/password/expired */
   @PutMapping("/me/password/expired")
   public ApiResponse<Void> changeExpiredPassword(
-      @AuthenticationPrincipal UserDetails userDetails, @RequestBody Map<String, String> request) {
-    Integer userSeq = userIdResolver.fromJwtUsername(userDetails.getUsername());
-    String userId = userService.getUserIdBySeq(userSeq);
-    userService.changeExpiredPassword(userId, request.get("newPassword"));
+      @CurrentUser JwtPrincipal user, @RequestBody Map<String, String> request) {
+    userService.changeExpiredPassword(user.userId(), request.get("newPassword"));
     return ApiResponse.success("비밀번호가 변경되었습니다.");
   }
 
@@ -187,10 +180,10 @@ public class UserController {
   @PreAuthorize("hasRole('ADMIN')")
   public ApiResponse<Void> updateMemberInfo(
       @PathVariable Integer seq,
-      @AuthenticationPrincipal UserDetails userDetails,
+      @CurrentUser JwtPrincipal user,
       @Valid @RequestBody MemberUpdateRequest request) {
     request.setSeq(seq);
-    userService.updateMemberInfo(request.toEntity(), userDetails.getUsername());
+    userService.updateMemberInfo(request.toEntity(), user.userId());
     return ApiResponse.success("회원 정보가 수정되었습니다.");
   }
 }

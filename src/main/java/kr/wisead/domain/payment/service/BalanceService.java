@@ -100,7 +100,8 @@ public class BalanceService {
       case "BONUS" -> {
         // BONUS 적립 (wallet_lot 테이블)
         var lotResponse =
-            walletService.grantBonus(userSeq, amount, request.getExpireDate(), comment);
+            walletService.grantBonus(
+                userSeq, amount, request.getExpireDate(), comment, operatorId);
         seq = lotResponse.getLotSeq();
         regDate = lotResponse.getRegDate();
         // 전체 잔액 조회
@@ -115,7 +116,8 @@ public class BalanceService {
       case "POINT" -> {
         // POINT 적립 (wallet_lot 테이블)
         var lotResponse =
-            walletService.grantPoint(userSeq, amount, request.getExpireDate(), comment);
+            walletService.grantPoint(
+                userSeq, amount, request.getExpireDate(), comment, operatorId);
         seq = lotResponse.getLotSeq();
         regDate = lotResponse.getRegDate();
         // 전체 잔액 조회
@@ -129,7 +131,8 @@ public class BalanceService {
       }
       default -> {
         // CASH 충전 (wallet 테이블) - 기존 로직
-        TransactionResponse txResponse = walletService.charge(userSeq, amount, comment);
+        TransactionResponse txResponse =
+            walletService.charge(userSeq, amount, comment, operatorId);
         seq = (long) txResponse.getSeq();
         regDate = txResponse.getRegDate();
         balanceAfter = txResponse.getBalanceAfter();
@@ -167,7 +170,7 @@ public class BalanceService {
     }
 
     // 우선순위 차감 (BONUS → POINT → CASH) - 금액 직접 차감
-    String txGroupId = walletService.deductByAmount(userSeq, amount, comment);
+    String txGroupId = walletService.deductByAmount(userSeq, amount, comment, operatorId);
 
     WalletSummaryResponse summary = walletService.getWalletSummary(userSeq);
 
@@ -200,7 +203,7 @@ public class BalanceService {
     }
 
     // 우선순위 차감 (BONUS → POINT → CASH) - 지정된 txGroupId 사용
-    walletService.deductByAmount(userSeq, amount, comment, txGroupId);
+    walletService.deductByAmount(userSeq, amount, comment, txGroupId, operatorId);
 
     WalletSummaryResponse summary = walletService.getWalletSummary(userSeq);
 
@@ -234,7 +237,8 @@ public class BalanceService {
    * @return txGroupId 거래 그룹 ID
    */
   @Transactional
-  public String deductMessageCharge(Integer userSeq, int count, String msgType, String comment) {
+  public String deductMessageCharge(
+      Integer userSeq, int count, String msgType, String comment, String regId) {
     String serviceId = getServiceIdByMsgType(msgType);
     BigDecimal quantity = BigDecimal.valueOf(count);
 
@@ -248,7 +252,8 @@ public class BalanceService {
     }
 
     // 우선순위 차감
-    String txGroupId = walletService.deductWithPriority(userSeq, serviceId, quantity, comment);
+    String txGroupId =
+        walletService.deductWithPriority(userSeq, serviceId, quantity, comment, regId);
 
     log.info(
         "메시지 비용 차감: userSeq={}, count={}, type={}, charge={}, txGroupId={}",
@@ -264,7 +269,7 @@ public class BalanceService {
   /** 메시지 발송 비용 차감 (txGroupId 지정 버전) - 외부에서 생성한 txGroupId를 사용 (MsgQueue에 저장 후 차감 시 동일 ID 사용) */
   @Transactional
   public void deductMessageChargeWithTxGroupId(
-      Integer userSeq, int count, String msgType, String comment, String txGroupId) {
+      Integer userSeq, int count, String msgType, String comment, String txGroupId, String regId) {
     String serviceId = getServiceIdByMsgType(msgType);
     BigDecimal quantity = BigDecimal.valueOf(count);
 
@@ -278,7 +283,7 @@ public class BalanceService {
     }
 
     // 우선순위 차감 (지정된 txGroupId 사용)
-    walletService.deductWithPriority(userSeq, serviceId, quantity, comment, txGroupId);
+    walletService.deductWithPriority(userSeq, serviceId, quantity, comment, txGroupId, regId);
 
     log.info(
         "메시지 비용 차감: userSeq={}, count={}, type={}, charge={}, txGroupId={}",
@@ -353,8 +358,8 @@ public class BalanceService {
 
   /** 환불 처리 */
   @Transactional
-  public RefundResult refund(String txGroupId) {
-    return walletService.refundByGroup(txGroupId);
+  public RefundResult refund(String txGroupId, String operatorId) {
+    return walletService.refundByGroup(txGroupId, operatorId);
   }
 
   // ========== userId 기반 오버로드 메서드 (API 호환용) ==========

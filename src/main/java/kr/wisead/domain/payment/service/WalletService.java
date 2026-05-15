@@ -38,7 +38,7 @@ public class WalletService {
     // CASH 조회
     BigDecimal cash =
         walletMapper
-            .selectByUserSeq(userSeq, "CASH")
+            .selectByUserSeq(userSeq, Transaction.CURRENCY_CASH)
             .map(Wallet::getBalance)
             .orElse(BigDecimal.ZERO);
 
@@ -50,9 +50,9 @@ public class WalletService {
     BigDecimal bonus = BigDecimal.ZERO;
 
     for (WalletLotMapper.CurrencyBalance cb : lotBalances) {
-      if ("POINT".equals(cb.currencyType())) {
+      if (Transaction.CURRENCY_POINT.equals(cb.currencyType())) {
         point = cb.balance();
-      } else if ("BONUS".equals(cb.currencyType())) {
+      } else if (Transaction.CURRENCY_BONUS.equals(cb.currencyType())) {
         bonus = cb.balance();
       }
     }
@@ -79,16 +79,17 @@ public class WalletService {
 
   /** CASH 충전 */
   @Transactional
-  public TransactionResponse charge(Integer userSeq, BigDecimal amount, String comment) {
+  public TransactionResponse charge(
+      Integer userSeq, BigDecimal amount, String comment, String regId) {
     // 지갑 존재 확인
-    Optional<Wallet> walletOpt = walletMapper.selectForUpdate(userSeq, "CASH");
+    Optional<Wallet> walletOpt = walletMapper.selectForUpdate(userSeq, Transaction.CURRENCY_CASH);
 
     // 없으면 생성 (INSERT IGNORE로 동시성 문제 방지)
     if (walletOpt.isEmpty()) {
       Wallet newWallet = Wallet.createCashWallet(userSeq);
       walletMapper.insertIgnore(newWallet); // 중복 시 무시
       // 다시 조회 (다른 스레드가 먼저 생성했을 수 있음)
-      walletOpt = walletMapper.selectForUpdate(userSeq, "CASH");
+      walletOpt = walletMapper.selectForUpdate(userSeq, Transaction.CURRENCY_CASH);
     }
 
     Wallet wallet =
@@ -96,11 +97,11 @@ public class WalletService {
             () -> new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "지갑 생성 실패"));
 
     // 잔액 증가
-    walletMapper.addBalance(userSeq, "CASH", amount);
+    walletMapper.addBalance(userSeq, Transaction.CURRENCY_CASH, amount);
     BigDecimal balanceAfter = wallet.getBalance().add(amount);
 
     // 거래 내역 기록
-    Transaction tx = Transaction.createCharge(userSeq, amount, balanceAfter, comment);
+    Transaction tx = Transaction.createCharge(userSeq, amount, balanceAfter, comment, regId);
     transactionMapper.insert(tx);
 
     log.info("충전 완료 - userSeq: {}, amount: {}, balanceAfter: {}", userSeq, amount, balanceAfter);
@@ -109,9 +110,9 @@ public class WalletService {
 
   /** 금액 직접 차감 (서비스ID 없이) - 우선순위: BONUS → POINT → CASH */
   @Transactional
-  public String deductByAmount(Integer userSeq, BigDecimal amount, String comment) {
+  public String deductByAmount(Integer userSeq, BigDecimal amount, String comment, String regId) {
     String txGroupId = UUID.randomUUID().toString().replace("-", "");
-    return deductByAmount(userSeq, amount, comment, txGroupId);
+    return deductByAmount(userSeq, amount, comment, txGroupId, regId);
   }
 
   /**
@@ -120,7 +121,7 @@ public class WalletService {
    */
   @Transactional
   public String deductByAmount(
-      Integer userSeq, BigDecimal amount, String comment, String txGroupId) {
+      Integer userSeq, BigDecimal amount, String comment, String txGroupId, String regId) {
     // 잔액 충분 여부 확인
     if (!hasEnoughBalance(userSeq, amount)) {
       throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "잔액이 부족합니다.");
@@ -130,14 +131,18 @@ public class WalletService {
     BigDecimal remaining = amount;
 
     // 1. BONUS Lot 차감 (만료일 빠른 순)
-    remaining = deductFromLotsSimple(userSeq, "BONUS", remaining, txGroupId, today, comment);
+    remaining =
+        deductFromLotsSimple(
+            userSeq, Transaction.CURRENCY_BONUS, remaining, txGroupId, today, comment, regId);
 
     // 2. POINT Lot 차감 (만료일 빠른 순)
-    remaining = deductFromLotsSimple(userSeq, "POINT", remaining, txGroupId, today, comment);
+    remaining =
+        deductFromLotsSimple(
+            userSeq, Transaction.CURRENCY_POINT, remaining, txGroupId, today, comment, regId);
 
     // 3. CASH 차감
     if (remaining.compareTo(BigDecimal.ZERO) > 0) {
-      deductFromCashSimple(userSeq, remaining, txGroupId, comment);
+      deductFromCashSimple(userSeq, remaining, txGroupId, comment, regId);
     }
 
     log.info("금액 직접 차감 완료 - userSeq: {}, amount: {}, txGroupId: {}", userSeq, amount, txGroupId);
@@ -147,9 +152,9 @@ public class WalletService {
   /** 우선순위 차감 (BONUS → POINT → CASH) - 서비스ID 기반 단가 조회 후 수량 × 단가로 차감 */
   @Transactional
   public String deductWithPriority(
-      Integer userSeq, String serviceId, BigDecimal quantity, String comment) {
+      Integer userSeq, String serviceId, BigDecimal quantity, String comment, String regId) {
     String txGroupId = UUID.randomUUID().toString().replace("-", "");
-    return deductWithPriority(userSeq, serviceId, quantity, comment, txGroupId);
+    return deductWithPriority(userSeq, serviceId, quantity, comment, txGroupId, regId);
   }
 
   /**
@@ -158,7 +163,12 @@ public class WalletService {
    */
   @Transactional
   public String deductWithPriority(
-      Integer userSeq, String serviceId, BigDecimal quantity, String comment, String txGroupId) {
+      Integer userSeq,
+      String serviceId,
+      BigDecimal quantity,
+      String comment,
+      String txGroupId,
+      String regId) {
     BigDecimal unitPrice = getAppliedRate(userSeq, serviceId);
     BigDecimal totalAmount = unitPrice.multiply(quantity);
 
@@ -173,16 +183,35 @@ public class WalletService {
     // 1. BONUS Lot 차감 (만료일 빠른 순)
     remaining =
         deductFromLots(
-            userSeq, "BONUS", remaining, txGroupId, serviceId, unitPrice, quantity, today, comment);
+            userSeq,
+            Transaction.CURRENCY_BONUS,
+            remaining,
+            txGroupId,
+            serviceId,
+            unitPrice,
+            quantity,
+            today,
+            comment,
+            regId);
 
     // 2. POINT Lot 차감 (만료일 빠른 순)
     remaining =
         deductFromLots(
-            userSeq, "POINT", remaining, txGroupId, serviceId, unitPrice, quantity, today, comment);
+            userSeq,
+            Transaction.CURRENCY_POINT,
+            remaining,
+            txGroupId,
+            serviceId,
+            unitPrice,
+            quantity,
+            today,
+            comment,
+            regId);
 
     // 3. CASH 차감
     if (remaining.compareTo(BigDecimal.ZERO) > 0) {
-      deductFromCash(userSeq, remaining, txGroupId, serviceId, unitPrice, quantity, comment);
+      deductFromCash(
+          userSeq, remaining, txGroupId, serviceId, unitPrice, quantity, comment, regId);
     }
 
     log.info(
@@ -204,7 +233,8 @@ public class WalletService {
       BigDecimal unitPrice,
       BigDecimal totalQuantity,
       LocalDate today,
-      String comment) {
+      String comment,
+      String regId) {
     if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
       return remaining;
     }
@@ -236,7 +266,8 @@ public class WalletService {
               lot.getLotSeq(),
               lot.getExpireDate(),
               lot.getRemaining(),
-              comment);
+              comment,
+              regId);
       transactionMapper.insert(tx);
 
       remaining = remaining.subtract(deductFromThis);
@@ -260,10 +291,11 @@ public class WalletService {
       String serviceId,
       BigDecimal unitPrice,
       BigDecimal totalQuantity,
-      String comment) {
+      String comment,
+      String regId) {
     Wallet wallet =
         walletMapper
-            .selectForUpdate(userSeq, "CASH")
+            .selectForUpdate(userSeq, Transaction.CURRENCY_CASH)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "지갑을 찾을 수 없습니다."));
 
@@ -273,7 +305,7 @@ public class WalletService {
 
     BigDecimal deductQuantity = amount.divide(unitPrice, 3, java.math.RoundingMode.HALF_UP);
 
-    walletMapper.subtractBalance(userSeq, "CASH", amount);
+    walletMapper.subtractBalance(userSeq, Transaction.CURRENCY_CASH, amount);
     BigDecimal balanceAfter = wallet.getBalance().subtract(amount);
 
     Transaction tx =
@@ -285,7 +317,8 @@ public class WalletService {
             unitPrice,
             deductQuantity,
             balanceAfter,
-            comment);
+            comment,
+            regId);
     transactionMapper.insert(tx);
 
     log.debug("CASH 차감 - userSeq: {}, amount: {}, balanceAfter: {}", userSeq, amount, balanceAfter);
@@ -298,7 +331,8 @@ public class WalletService {
       BigDecimal remaining,
       String txGroupId,
       LocalDate today,
-      String comment) {
+      String comment,
+      String regId) {
     if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
       return remaining;
     }
@@ -327,6 +361,7 @@ public class WalletService {
               .lotSeq(lot.getLotSeq())
               .lotExpireDate(lot.getExpireDate())
               .comment(comment)
+              .regId(regId)
               .build();
       transactionMapper.insert(tx);
 
@@ -345,10 +380,10 @@ public class WalletService {
 
   /** CASH에서 금액 직접 차감 (Simple - 서비스ID/단가 없이) */
   private void deductFromCashSimple(
-      Integer userSeq, BigDecimal amount, String txGroupId, String comment) {
+      Integer userSeq, BigDecimal amount, String txGroupId, String comment, String regId) {
     Wallet wallet =
         walletMapper
-            .selectForUpdate(userSeq, "CASH")
+            .selectForUpdate(userSeq, Transaction.CURRENCY_CASH)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "지갑을 찾을 수 없습니다."));
 
@@ -356,7 +391,7 @@ public class WalletService {
       throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "CASH 잔액이 부족합니다.");
     }
 
-    walletMapper.subtractBalance(userSeq, "CASH", amount);
+    walletMapper.subtractBalance(userSeq, Transaction.CURRENCY_CASH, amount);
     BigDecimal balanceAfter = wallet.getBalance().subtract(amount);
 
     Transaction tx =
@@ -368,6 +403,7 @@ public class WalletService {
             .amount(amount)
             .balanceAfter(balanceAfter)
             .comment(comment)
+            .regId(regId)
             .build();
     transactionMapper.insert(tx);
 
@@ -425,7 +461,7 @@ public class WalletService {
 
   /** 환불 처리 (CASH → POINT → BONUS 역순) - N+1 최적화: Lot 환불 시 3회 쿼리 → 1회 쿼리 + 메모리 계산 */
   @Transactional
-  public RefundResult refundByGroup(String txGroupId) {
+  public RefundResult refundByGroup(String txGroupId, String regId) {
     List<Transaction> originalTxs = transactionMapper.selectByGroupId(txGroupId);
     if (originalTxs.isEmpty()) {
       throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "거래 내역을 찾을 수 없습니다.");
@@ -434,15 +470,13 @@ public class WalletService {
     // CASH → POINT → BONUS 역순 정렬 (차감 순서의 역순으로 환불)
     originalTxs.sort(
         Comparator.comparingInt(
-            tx -> {
-              String type = tx.getCurrencyType();
-              return switch (type) {
-                case "CASH" -> 0; // CASH 먼저 환불
-                case "POINT" -> 1; // POINT 다음
-                case "BONUS" -> 2; // BONUS 마지막
-                default -> 3;
-              };
-            }));
+            tx ->
+                switch (tx.getCurrencyType()) {
+                  case Transaction.CURRENCY_CASH -> 0;
+                  case Transaction.CURRENCY_POINT -> 1;
+                  case Transaction.CURRENCY_BONUS -> 2;
+                  default -> 3;
+                }));
 
     LocalDate today = LocalDate.now();
     String refundTxGroupId = UUID.randomUUID().toString().replace("-", "");
@@ -468,25 +502,27 @@ public class WalletService {
 
       if (Transaction.CURRENCY_CASH.equals(tx.getCurrencyType())) {
         // CASH는 무조건 환불
-        walletMapper.addBalance(tx.getUserSeq(), "CASH", tx.getAmount());
-        Wallet wallet = walletMapper.selectByUserSeq(tx.getUserSeq(), "CASH").orElseThrow();
+        walletMapper.addBalance(tx.getUserSeq(), Transaction.CURRENCY_CASH, tx.getAmount());
+        Wallet wallet =
+            walletMapper.selectByUserSeq(tx.getUserSeq(), Transaction.CURRENCY_CASH).orElseThrow();
 
         Transaction refundTx =
             Transaction.createRefund(
                 refundTxGroupId,
                 tx.getUserSeq(),
-                "CASH",
+                Transaction.CURRENCY_CASH,
                 tx.getAmount(),
                 wallet.getBalance(),
                 tx.getSeq(),
-                "환불");
+                "환불",
+                regId);
         transactionMapper.insert(refundTx);
 
         refundedAmount = refundedAmount.add(tx.getAmount());
         refundedCount++;
         details.add(
             RefundResult.RefundDetail.builder()
-                .currencyType("CASH")
+                .currencyType(Transaction.CURRENCY_CASH)
                 .amount(tx.getAmount())
                 .refunded(true)
                 .build());
@@ -503,7 +539,8 @@ public class WalletService {
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 tx.getSeq(),
-                "만료로 환불 불가");
+                "만료로 환불 불가",
+                regId);
         transactionMapper.insert(refundTx);
 
         details.add(
@@ -533,7 +570,8 @@ public class WalletService {
                 tx.getAmount(),
                 newBalance,
                 tx.getSeq(),
-                "환불");
+                "환불",
+                regId);
         transactionMapper.insert(refundTx);
 
         refundedAmount = refundedAmount.add(tx.getAmount());
@@ -569,7 +607,7 @@ public class WalletService {
   /** 포인트 적립 */
   @Transactional
   public WalletLotResponse grantPoint(
-      Integer userSeq, BigDecimal amount, LocalDate expireDate, String source) {
+      Integer userSeq, BigDecimal amount, LocalDate expireDate, String source, String regId) {
     WalletLot lot = WalletLot.createPointLot(userSeq, amount, expireDate, source);
     walletLotMapper.insert(lot);
 
@@ -585,7 +623,8 @@ public class WalletService {
             lot.getLotSeq(),
             expireDate,
             balanceAfter,
-            source);
+            source,
+            regId);
     transactionMapper.insert(tx);
 
     log.info("포인트 적립 - userSeq: {}, amount: {}, expireDate: {}", userSeq, amount, expireDate);
@@ -595,7 +634,7 @@ public class WalletService {
   /** 보너스 적립 */
   @Transactional
   public WalletLotResponse grantBonus(
-      Integer userSeq, BigDecimal amount, LocalDate expireDate, String source) {
+      Integer userSeq, BigDecimal amount, LocalDate expireDate, String source, String regId) {
     WalletLot lot = WalletLot.createBonusLot(userSeq, amount, expireDate, source);
     walletLotMapper.insert(lot);
 
@@ -611,7 +650,8 @@ public class WalletService {
             lot.getLotSeq(),
             expireDate,
             balanceAfter,
-            source);
+            source,
+            regId);
     transactionMapper.insert(tx);
 
     log.info("보너스 적립 - userSeq: {}, amount: {}, expireDate: {}", userSeq, amount, expireDate);
@@ -621,7 +661,7 @@ public class WalletService {
   /** 지갑 초기화 (신규 회원용) */
   @Transactional
   public void initializeWallet(Integer userSeq) {
-    if (!walletMapper.existsByUserSeq(userSeq, "CASH")) {
+    if (!walletMapper.existsByUserSeq(userSeq, Transaction.CURRENCY_CASH)) {
       Wallet wallet = Wallet.createCashWallet(userSeq);
       walletMapper.insert(wallet);
       log.info("지갑 초기화 - userSeq: {}", userSeq);
@@ -646,17 +686,17 @@ public class WalletService {
    * @return 환불 거래 ID
    */
   @Transactional
-  public String refundToCash(Integer userSeq, BigDecimal amount, String comment) {
+  public String refundToCash(Integer userSeq, BigDecimal amount, String comment, String regId) {
     if (amount.compareTo(BigDecimal.ZERO) <= 0) {
       return null;
     }
 
     // 지갑 존재 확인
-    Optional<Wallet> walletOpt = walletMapper.selectForUpdate(userSeq, "CASH");
+    Optional<Wallet> walletOpt = walletMapper.selectForUpdate(userSeq, Transaction.CURRENCY_CASH);
     if (walletOpt.isEmpty()) {
       Wallet newWallet = Wallet.createCashWallet(userSeq);
       walletMapper.insertIgnore(newWallet);
-      walletOpt = walletMapper.selectForUpdate(userSeq, "CASH");
+      walletOpt = walletMapper.selectForUpdate(userSeq, Transaction.CURRENCY_CASH);
     }
 
     Wallet wallet =
@@ -664,7 +704,7 @@ public class WalletService {
             () -> new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "지갑 조회 실패"));
 
     // 잔액 증가
-    walletMapper.addBalance(userSeq, "CASH", amount);
+    walletMapper.addBalance(userSeq, Transaction.CURRENCY_CASH, amount);
     BigDecimal balanceAfter = wallet.getBalance().add(amount);
 
     // 거래 내역 기록
@@ -678,6 +718,7 @@ public class WalletService {
             .amount(amount)
             .balanceAfter(balanceAfter)
             .comment(comment)
+            .regId(regId)
             .build();
     transactionMapper.insert(tx);
 
@@ -699,7 +740,8 @@ public class WalletService {
    * @return 환불 결과
    */
   @Transactional
-  public RefundResult refundPartialByGroup(String txGroupId, BigDecimal refundAmount) {
+  public RefundResult refundPartialByGroup(
+      String txGroupId, BigDecimal refundAmount, String regId) {
     List<Transaction> originalTxs = transactionMapper.selectByGroupId(txGroupId);
     if (originalTxs.isEmpty()) {
       throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "거래 내역을 찾을 수 없습니다.");
@@ -719,15 +761,13 @@ public class WalletService {
     List<Transaction> sortedTxs = new ArrayList<>(deductTxs);
     sortedTxs.sort(
         Comparator.comparingInt(
-            tx -> {
-              String type = tx.getCurrencyType();
-              return switch (type) {
-                case "CASH" -> 0;
-                case "POINT" -> 1;
-                case "BONUS" -> 2;
-                default -> 3;
-              };
-            }));
+            tx ->
+                switch (tx.getCurrencyType()) {
+                  case Transaction.CURRENCY_CASH -> 0;
+                  case Transaction.CURRENCY_POINT -> 1;
+                  case Transaction.CURRENCY_BONUS -> 2;
+                  default -> 3;
+                }));
 
     LocalDate today = LocalDate.now();
     String refundTxGroupId = UUID.randomUUID().toString().replace("-", "");
@@ -756,18 +796,20 @@ public class WalletService {
 
       if (Transaction.CURRENCY_CASH.equals(tx.getCurrencyType())) {
         // CASH 환불
-        walletMapper.addBalance(tx.getUserSeq(), "CASH", refundFromThis);
-        Wallet wallet = walletMapper.selectByUserSeq(tx.getUserSeq(), "CASH").orElseThrow();
+        walletMapper.addBalance(tx.getUserSeq(), Transaction.CURRENCY_CASH, refundFromThis);
+        Wallet wallet =
+            walletMapper.selectByUserSeq(tx.getUserSeq(), Transaction.CURRENCY_CASH).orElseThrow();
 
         Transaction refundTx =
             Transaction.createRefund(
                 refundTxGroupId,
                 tx.getUserSeq(),
-                "CASH",
+                Transaction.CURRENCY_CASH,
                 refundFromThis,
                 wallet.getBalance(),
                 tx.getSeq(),
-                "발송 실패 부분 환불");
+                "발송 실패 부분 환불",
+                regId);
         transactionMapper.insert(refundTx);
 
         totalRefunded = totalRefunded.add(refundFromThis);
@@ -776,7 +818,7 @@ public class WalletService {
 
         details.add(
             RefundResult.RefundDetail.builder()
-                .currencyType("CASH")
+                .currencyType(Transaction.CURRENCY_CASH)
                 .amount(refundFromThis)
                 .refunded(true)
                 .build());
@@ -813,7 +855,8 @@ public class WalletService {
                 refundFromThis,
                 newBalance,
                 tx.getSeq(),
-                "발송 실패 부분 환불");
+                "발송 실패 부분 환불",
+                regId);
         transactionMapper.insert(refundTx);
 
         totalRefunded = totalRefunded.add(refundFromThis);
@@ -851,16 +894,16 @@ public class WalletService {
 
   // ========== userId 기반 오버로드 메서드 (API 호환용) ==========
 
-  /** CASH 충전 (userId 기반) */
+  /** CASH 충전 (userId 기반). regId 도 userId 사용. */
   @Transactional
   public TransactionResponse charge(String userId, BigDecimal amount, String comment) {
-    return charge(userIdResolver.toUserSeq(userId), amount, comment);
+    return charge(userIdResolver.toUserSeq(userId), amount, comment, userId);
   }
 
-  /** 포인트 적립 (userId 기반) */
+  /** 포인트 적립 (userId 기반). regId 도 userId 사용. */
   @Transactional
   public WalletLotResponse grantPoint(
       String userId, BigDecimal amount, LocalDate expireDate, String source) {
-    return grantPoint(userIdResolver.toUserSeq(userId), amount, expireDate, source);
+    return grantPoint(userIdResolver.toUserSeq(userId), amount, expireDate, source, userId);
   }
 }

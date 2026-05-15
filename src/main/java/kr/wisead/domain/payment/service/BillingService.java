@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.UserIdResolver;
+import kr.wisead.domain.payment.entity.Transaction;
 import kr.wisead.mapper.primary.QrVisitLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,11 +21,8 @@ public class BillingService {
   private final QrVisitLogMapper qrVisitLogMapper;
   private final UserIdResolver userIdResolver;
 
-  // QR 코드 무료 제공 방문 수
   private static final long QR_FREE_VISITS = 3000L;
-  // QR 코드 과금 단위 (3000건마다 추가 과금)
   private static final long QR_OVERAGE_UNIT = 3000L;
-  // 서비스 ID
   private static final String SERVICE_QR = "qr_code";
   private static final String SERVICE_SURVEY = "survey";
 
@@ -51,7 +49,8 @@ public class BillingService {
             userSeq,
             SERVICE_QR,
             BigDecimal.ONE, // 수량 1
-            comment != null ? comment : "QR 코드 신청");
+            comment != null ? comment : "QR 코드 신청",
+            Transaction.REG_ID_SYSTEM);
 
     log.info("QR 신청 비용 차감 완료: userSeq={}, fee={}, txGroupId={}", userSeq, qrFee, txGroupId);
   }
@@ -103,7 +102,8 @@ public class BillingService {
             userSeq,
             SERVICE_QR,
             BigDecimal.ONE,
-            comment != null ? comment : "QR 코드 추가 과금 (" + currentVisits + "건)");
+            comment != null ? comment : "QR 코드 추가 과금 (" + currentVisits + "건)",
+            Transaction.REG_ID_SYSTEM);
 
     log.info(
         "QR 추가 과금 완료: userSeq={}, visits={}, fee={}, txGroupId={}",
@@ -139,7 +139,11 @@ public class BillingService {
     // 우선순위 차감
     String txGroupId =
         walletService.deductWithPriority(
-            userSeq, SERVICE_SURVEY, quantity, comment != null ? comment : "설문 참여 비용");
+            userSeq,
+            SERVICE_SURVEY,
+            quantity,
+            comment != null ? comment : "설문 참여 비용",
+            Transaction.REG_ID_SYSTEM);
 
     log.info(
         "설문 참여 비용 차감 완료: userSeq={}, count={}, charge={}, txGroupId={}",

@@ -17,8 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * 일반 문자(Multi Message) 발송 Controller. SMS/LMS/MMS 각각 다른 단가 적용.
  *
- * <p>MultiMessageService 는 regId 를 user.seq 문자열로 받는 레거시 contract. {@code
- * String.valueOf(user.seq())} 를 전달한다.
+ * <p>audit 표준은 user_id(alpha). {@code user.userId()} 를 regId 로 전달한다.
  */
 @Slf4j
 @RestController
@@ -33,8 +32,7 @@ public class MultiMessageController {
   @PostMapping("/send")
   public ApiResponse<MultiMessageResponse> sendMessages(
       @CurrentUser JwtPrincipal user, @RequestBody MultiMessageRequest request) {
-    MultiMessageResponse response =
-        multiMessageService.sendDirectMessage(request, String.valueOf(user.seq()));
+    MultiMessageResponse response = multiMessageService.sendDirectMessage(request, user.userId());
     return ApiResponse.success(response);
   }
 
@@ -90,8 +88,7 @@ public class MultiMessageController {
             .forceValidation(forceValidation)
             .build();
 
-    MultiMessageResponse response =
-        multiMessageService.sendDirectMessage(request, String.valueOf(user.seq()));
+    MultiMessageResponse response = multiMessageService.sendDirectMessage(request, user.userId());
     return ApiResponse.success(response);
   }
 

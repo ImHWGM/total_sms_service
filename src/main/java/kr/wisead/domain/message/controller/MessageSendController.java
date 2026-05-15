@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.*;
 /**
  * 메시지 발송 Controller.
  *
- * <p>MessageSendService는 regId 를 user.seq 의 문자열로 받는 레거시 contract 사용. EXT_COL3 audit 컬럼에도 seq
- * 문자열이 저장되어 있으므로 본 컨트롤러는 {@code String.valueOf(user.seq())} 를 regId 로 전달한다.
+ * <p>audit 표준은 user_id(alpha)이며 EXT_COL3 컬럼에도 user_id가 저장된다. 본 컨트롤러는 {@code user.userId()} 를 regId
+ * 로 전달한다.
  */
 @Slf4j
 @RestController
@@ -194,8 +194,8 @@ public class MessageSendController {
     return ApiResponse.success(response);
   }
 
-  /** MessageSendService 의 레거시 regId(=seq 문자열) contract 어댑터. */
+  /** MessageSendService 의 regId(=user_id) contract 어댑터. */
   private static String regIdOf(JwtPrincipal user) {
-    return String.valueOf(user.seq());
+    return user.userId();
   }
 }

@@ -89,7 +89,6 @@ public class MessageSendService {
     // 2. 메시지 발송 등록
     String userKey = MsgQueue.generateUserKey();
     List<Integer> mseqList = new ArrayList<>();
-    String realUserId = userIdResolver.resolveUserId(regId);
 
     for (String receiver : request.getReceivers()) {
       String normalizedReceiver = normalizePhoneNumber(receiver);
@@ -105,7 +104,7 @@ public class MessageSendService {
                     request.getText(),
                     userKey,
                     txGroupId,
-                    realUserId);
+                    regId);
         case "L" ->
             msgQueue =
                 MsgQueue.createLms(
@@ -115,7 +114,7 @@ public class MessageSendService {
                     request.getText(),
                     userKey,
                     txGroupId,
-                    realUserId);
+                    regId);
         case "M" ->
             msgQueue =
                 MsgQueue.createMms(
@@ -129,7 +128,7 @@ public class MessageSendService {
                     request.getFileloc3(),
                     userKey,
                     txGroupId,
-                    realUserId);
+                    regId);
         default -> throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 메시지 타입입니다.");
       }
 
@@ -156,18 +155,15 @@ public class MessageSendService {
   /**
    * 메시지 발송을 위한 잔액 차감
    *
-   * @param userId 사용자 ID
+   * @param userId 사용자 ID (user_id, alpha)
    * @param serviceId 서비스 ID (msg_sms, msg_lms, msg_mms)
    * @param quantity 발송 건수
    * @param msgType 메시지 타입 (로깅용)
    * @return txGroupId (환불 시 사용)
    */
   private String deductForMessage(String userId, String serviceId, int quantity, String msgType) {
-    // userId는 실제로 userSeq임 (JWT subject로 seq 사용)
-    Integer userSeq;
-    try {
-      userSeq = Integer.parseInt(userId);
-    } catch (NumberFormatException e) {
+    Integer userSeq = userIdResolver.toUserSeq(userId);
+    if (userSeq == null) {
       log.error("잘못된 사용자 식별자 - userId: {}", userId);
       throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
     }
@@ -244,10 +240,9 @@ public class MessageSendService {
       String txGroupId,
       String regId,
       LocalDateTime requestTime) {
-    String realUserId = userIdResolver.resolveUserId(regId);
     MsgQueue msgQueue =
         MsgQueue.createForSurvey(
-            msgType, dstaddr, callback, subject, text, eventSeq, userSeq, txGroupId, realUserId);
+            msgType, dstaddr, callback, subject, text, eventSeq, userSeq, txGroupId, regId);
 
     if (requestTime != null) {
       msgQueue = msgQueue.withRequestTime(requestTime);
@@ -437,11 +432,8 @@ public class MessageSendService {
 
   /** 부분 환불 (취소 건수 × 단가로 CASH 환불) - 원래 화폐 추적이 어려우므로 CASH로 환불 */
   private void refundPartial(String userId, String msgType, int count, String txGroupId) {
-    // userId는 실제로 userSeq임 (JWT subject로 seq 사용)
-    Integer userSeq;
-    try {
-      userSeq = Integer.parseInt(userId);
-    } catch (NumberFormatException e) {
+    Integer userSeq = userIdResolver.toUserSeq(userId);
+    if (userSeq == null) {
       log.error("환불 처리 실패 - 잘못된 사용자 식별자: userId={}", userId);
       return;
     }
@@ -655,7 +647,6 @@ public class MessageSendService {
     String txGroupId = deductForMessage(regId, "survey", 1, "L");
 
     // MSG_QUEUE에 등록
-    String realUserId = userIdResolver.resolveUserId(regId);
     MsgQueue msgQueue =
         MsgQueue.createForSurvey(
             "L", // LMS로 발송
@@ -666,7 +657,7 @@ public class MessageSendService {
             eventSeq,
             userSeq,
             txGroupId,
-            realUserId);
+            regId);
 
     // 예약 발송 처리
     if ("1".equals(reqType) || "reserve".equalsIgnoreCase(reqType)) {
@@ -768,7 +759,6 @@ public class MessageSendService {
     int successCount = 0;
     int failCount = 0;
     List<String> failedList = new ArrayList<>();
-    String realUserId = userIdResolver.resolveUserId(regId);
 
     for (ResendRequest.DuplicateReceiver receiver : receivers) {
       try {
@@ -797,7 +787,7 @@ public class MessageSendService {
                 request.getEventSeq(),
                 receiver.getUserSeq(),
                 txGroupId,
-                realUserId);
+                regId);
 
         msgQueueMapper.insertLms(msgQueue);
         recordSmsSend(
@@ -871,7 +861,6 @@ public class MessageSendService {
     int successCount = 0;
     int failCount = 0;
     List<String> failedList = new ArrayList<>();
-    String realUserId = userIdResolver.resolveUserId(regId);
 
     for (ResendRequest.DuplicateReceiver receiver : receivers) {
       try {
@@ -921,7 +910,7 @@ public class MessageSendService {
                 request.getEventSeq(),
                 newUserSeq,
                 txGroupId,
-                realUserId);
+                regId);
 
         try {
           msgQueueMapper.insertLms(msgQueue);
@@ -1088,14 +1077,7 @@ public class MessageSendService {
     int blockedCount = 0;
     List<String> maskedBlockedNumbers = List.of();
     if (request.isAdYn()) {
-      Integer userSeqForAd;
-      try {
-        userSeqForAd = Integer.parseInt(regId);
-      } catch (NumberFormatException e) {
-        log.warn("잘못된 사용자 식별자 - regId: {}", regId);
-        return SurveyMessageResponse.fail("사용자 정보를 찾을 수 없습니다.");
-      }
-      String storeCode = userMapper.findBySeq(userSeqForAd).map(User::getStoreCode).orElse(null);
+      String storeCode = userMapper.findByUserId(regId).map(User::getStoreCode).orElse(null);
       if (storeCode == null || storeCode.isBlank()) {
         storeCode = "DEFAULT";
       }
@@ -1123,7 +1105,6 @@ public class MessageSendService {
     int failCount = 0;
     List<String> failedPhones = new ArrayList<>();
     List<Integer> mseqList = new ArrayList<>();
-    String realUserId = userIdResolver.resolveUserId(regId);
 
     for (SurveyMessageRequest.Receiver receiver : receivers) {
       try {
@@ -1206,7 +1187,7 @@ public class MessageSendService {
                 request.getEventSeq(),
                 userSeq,
                 txGroupId,
-                realUserId);
+                regId);
 
         // 예약 발송 시간 설정
         if (!request.isImmediate() && request.getRequestTime() != null) {
@@ -1318,7 +1299,6 @@ public class MessageSendService {
     int failCount = 0;
     List<String> failedPhones = new ArrayList<>();
     List<Integer> mseqList = new ArrayList<>();
-    String realUserId = userIdResolver.resolveUserId(regId);
 
     for (EventMessageRequest.Receiver receiver : receivers) {
       try {
@@ -1411,7 +1391,7 @@ public class MessageSendService {
                 participantSeq,
                 surveyUserSeq,
                 txGroupId,
-                realUserId);
+                regId);
 
         // 예약 발송 시간 설정
         if (!request.isImmediate() && request.getRequestTime() != null) {

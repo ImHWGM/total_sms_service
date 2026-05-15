@@ -70,16 +70,13 @@ public class AdMessageService {
       return AdMessageResponse.fail(-1, "발송 대상이 없습니다.");
     }
 
-    // 2. 사용자 시퀀스 파싱 (userId는 실제로 userSeq임 - JWT subject로 seq 사용)
-    Integer userSeq;
-    try {
-      userSeq = Integer.parseInt(userId);
-    } catch (NumberFormatException e) {
+    // 2. user_id 로 user 조회 + seq 도출
+    Integer userSeq = userIdResolver.toUserSeq(userId);
+    if (userSeq == null) {
       log.warn("잘못된 사용자 식별자 - userId: {}", userId);
       return AdMessageResponse.fail(-1, "사용자 정보를 찾을 수 없습니다.");
     }
-    String storeCode = userMapper.findBySeq(userSeq).map(User::getStoreCode).orElse(null);
-    String realUserId = userIdResolver.resolveUserId(userId);
+    String storeCode = userMapper.findByUserId(userId).map(User::getStoreCode).orElse(null);
     if (storeCode == null || storeCode.isBlank()) {
       log.warn("상점코드 없음 - userId: {}", userId);
       storeCode = "DEFAULT";
@@ -166,7 +163,7 @@ public class AdMessageService {
                 request.getFileloc3(),
                 batchId,
                 txGroupId,
-                realUserId);
+                userId);
 
         // 예약 발송 시간 설정
         if (!request.isImmediate() && request.getReqDate() != null) {

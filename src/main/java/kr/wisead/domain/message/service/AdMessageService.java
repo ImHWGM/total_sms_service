@@ -189,7 +189,7 @@ public class AdMessageService {
       }
 
       balanceService.deductMessageChargeWithTxGroupId(
-          userSeq, successCount, request.getMsgTypeLabel(), comment, txGroupId);
+          userSeq, successCount, request.getMsgTypeLabel(), comment, txGroupId, userId);
     }
 
     log.info(

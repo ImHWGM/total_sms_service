@@ -46,9 +46,12 @@ public class Transaction {
   public static final String CURRENCY_POINT = "POINT";
   public static final String CURRENCY_BONUS = "BONUS";
 
+  /** 배치/스케줄러 자동 트리거의 audit actor sentinel */
+  public static final String REG_ID_SYSTEM = "SYSTEM";
+
   /** 충전 거래 생성 */
   public static Transaction createCharge(
-      Integer userSeq, BigDecimal amount, BigDecimal balanceAfter, String comment) {
+      Integer userSeq, BigDecimal amount, BigDecimal balanceAfter, String comment, String regId) {
     return Transaction.builder()
         .userSeq(userSeq)
         .currencyType(CURRENCY_CASH)
@@ -56,6 +59,7 @@ public class Transaction {
         .amount(amount)
         .balanceAfter(balanceAfter)
         .comment(comment)
+        .regId(regId)
         .build();
   }
 
@@ -67,7 +71,8 @@ public class Transaction {
       Long lotSeq,
       LocalDate lotExpireDate,
       BigDecimal balanceAfter,
-      String comment) {
+      String comment,
+      String regId) {
     return Transaction.builder()
         .userSeq(userSeq)
         .currencyType(currencyType)
@@ -77,6 +82,7 @@ public class Transaction {
         .lotExpireDate(lotExpireDate)
         .balanceAfter(balanceAfter)
         .comment(comment)
+        .regId(regId)
         .build();
   }
 
@@ -89,7 +95,8 @@ public class Transaction {
       BigDecimal unitPrice,
       BigDecimal quantity,
       BigDecimal balanceAfter,
-      String comment) {
+      String comment,
+      String regId) {
     return Transaction.builder()
         .txGroupId(txGroupId)
         .userSeq(userSeq)
@@ -101,6 +108,7 @@ public class Transaction {
         .serviceId(serviceId)
         .balanceAfter(balanceAfter)
         .comment(comment)
+        .regId(regId)
         .build();
   }
 
@@ -116,7 +124,8 @@ public class Transaction {
       Long lotSeq,
       LocalDate lotExpireDate,
       BigDecimal balanceAfter,
-      String comment) {
+      String comment,
+      String regId) {
     return Transaction.builder()
         .txGroupId(txGroupId)
         .userSeq(userSeq)
@@ -130,6 +139,7 @@ public class Transaction {
         .serviceId(serviceId)
         .balanceAfter(balanceAfter)
         .comment(comment)
+        .regId(regId)
         .build();
   }
 
@@ -141,7 +151,8 @@ public class Transaction {
       BigDecimal amount,
       BigDecimal balanceAfter,
       Long refTxSeq,
-      String comment) {
+      String comment,
+      String regId) {
     return Transaction.builder()
         .txGroupId(txGroupId)
         .userSeq(userSeq)
@@ -151,6 +162,7 @@ public class Transaction {
         .balanceAfter(balanceAfter)
         .refTxSeq(refTxSeq)
         .comment(comment)
+        .regId(regId)
         .build();
   }
 

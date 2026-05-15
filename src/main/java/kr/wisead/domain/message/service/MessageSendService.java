@@ -188,7 +188,11 @@ public class MessageSendService {
     // 잔액 차감
     String txGroupId =
         walletService.deductWithPriority(
-            userSeq, serviceId, qty, String.format("%s 발송 %d건", getMsgTypeName(msgType), quantity));
+            userSeq,
+            serviceId,
+            qty,
+            String.format("%s 발송 %d건", getMsgTypeName(msgType), quantity),
+            userId);
 
     log.info(
         "메시지 발송 비용 차감 - userId: {}, userSeq: {}, serviceId: {}, quantity: {}, totalAmount: {},"
@@ -380,7 +384,7 @@ public class MessageSendService {
     if (deleted > 0 && txGroupId != null) {
       if (deleted == totalCount) {
         // 전체 취소: txGroupId 기반 전체 환불
-        refundByTxGroupId(txGroupId);
+        refundByTxGroupId(txGroupId, regId);
       } else {
         // 부분 취소: 취소 건수만큼 부분 환불
         refundPartial(regId, msgType, deleted, txGroupId);
@@ -417,9 +421,9 @@ public class MessageSendService {
   }
 
   /** txGroupId 기반 전체 환불 (원래 결제 화폐로 환불) */
-  private void refundByTxGroupId(String txGroupId) {
+  private void refundByTxGroupId(String txGroupId, String regId) {
     try {
-      var result = walletService.refundByGroup(txGroupId);
+      var result = walletService.refundByGroup(txGroupId, regId);
       log.info(
           "txGroupId 기반 환불 완료 - txGroupId: {}, refundedAmount: {}, expiredAmount: {}",
           txGroupId,
@@ -446,7 +450,7 @@ public class MessageSendService {
       String comment =
           String.format(
               "%s 발송 취소 환불 %d건 (txGroupId: %s)", getMsgTypeName(msgType), count, txGroupId);
-      walletService.refundToCash(userSeq, refundAmount, comment);
+      walletService.refundToCash(userSeq, refundAmount, comment, userId);
 
       log.info(
           "부분 환불 완료 - userId: {}, userSeq: {}, msgType: {}, count: {}, refundAmount: {}, txGroupId:"

@@ -163,7 +163,7 @@ public class ScheduledMessageService {
       // 4. 환불 처리 (Primary DB - userSeq 사용)
       if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
         String comment = "예약문자 취소 환불: " + getTypeLabel(msgType) + " " + messageCount + "건";
-        walletService.refundToCash(userSeq, refundAmount, comment);
+        walletService.refundToCash(userSeq, refundAmount, comment, userId);
         log.info("예약 취소 - 환불 완료: {} 원", refundAmount);
       }
     }

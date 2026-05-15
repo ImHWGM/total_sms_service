@@ -268,8 +268,9 @@ public class PaymentController {
   /** 환불 처리 POST /api/payment/refund/{txGroupId} */
   @PostMapping("/refund/{txGroupId}")
   @PreAuthorize("hasRole('ADMIN')")
-  public ApiResponse<RefundResult> processRefund(@PathVariable String txGroupId) {
-    return ApiResponse.success(balanceService.refund(txGroupId));
+  public ApiResponse<RefundResult> processRefund(
+      @CurrentUser JwtPrincipal user, @PathVariable String txGroupId) {
+    return ApiResponse.success(balanceService.refund(txGroupId, user.userId()));
   }
 
   // ==================== 사용자별 서비스 요금 API ====================

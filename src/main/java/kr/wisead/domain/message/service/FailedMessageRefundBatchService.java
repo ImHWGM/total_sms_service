@@ -141,7 +141,8 @@ public class FailedMessageRefundBatchService {
     }
 
     // 3. 1건당 단가만큼 부분 환불
-    RefundResult refundResult = walletService.refundPartialByGroup(txGroupId, unitPrice);
+    RefundResult refundResult =
+        walletService.refundPartialByGroup(txGroupId, unitPrice, Transaction.REG_ID_SYSTEM);
 
     // 4. 환불 처리 완료 후 REFUND_YN = 'Y' 업데이트
     msgResultMapper.updateRefundStatus(tableName, msg.getMseq(), "Y");

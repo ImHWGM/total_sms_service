@@ -164,7 +164,7 @@ public class MultiMessageService {
       String comment = "문자발송 : " + msgType + "  " + successCount + "건";
 
       balanceService.deductMessageChargeWithTxGroupId(
-          userSeq, successCount, msgType, comment, txGroupId);
+          userSeq, successCount, msgType, comment, txGroupId, regId);
 
       log.info(
           "Multi 메시지 발송 완료 - 성공: {}, 중복: {}, 수신거부: {}, 차감: {}, txGroupId: {}",

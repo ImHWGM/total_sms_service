@@ -152,14 +152,10 @@ public class EventService {
       throw new BusinessException(ErrorCode.UNAUTHORIZED, "서비스 옵션 변경 권한이 없습니다.");
     }
 
-    // JWT username은 userSeq이므로 직접 파싱
-    Integer userSeq = userIdResolver.fromJwtUsername(userId);
+    Integer userSeq = userIdResolver.toUserSeq(userId);
     if (userSeq == null) {
       throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자를 찾을 수 없습니다.");
     }
-
-    // regId용 실제 user_id 조회
-    String actualUserId = userIdResolver.resolveUserId(userId);
 
     // 이벤트 코드 생성
     String eventCode = generateEventCode();
@@ -169,7 +165,7 @@ public class EventService {
     String qrCodeImgPath = null;
     if ("Y".equals(request.getQrCode())) {
       // QR 코드 신청 비용 차감 (잔액 부족 시 예외 발생) - userSeq 사용
-      billingService.deductInitialQrFee(userSeq, "설문 생성 - QR 코드 신청", actualUserId);
+      billingService.deductInitialQrFee(userSeq, "설문 생성 - QR 코드 신청", userId);
       authCodeUrl = CommonUtils.randomCode(20);
       qrCodeImgPath = generateQrCodeImage(authCodeUrl);
     }
@@ -214,7 +210,7 @@ public class EventService {
             .preSurveyStartDate(request.getPreSurveyStartDate())
             .preSurveyEndDate(request.getPreSurveyEndDate())
             .eventEndImg(null) // 임시 경로 대신 null로 저장, 이동 후 업데이트
-            .regId(actualUserId)
+            .regId(userId)
             .build();
 
     validatePreSurveyDates(request);
@@ -300,7 +296,7 @@ public class EventService {
     // 문항 등록 및 이미지 저장
     if (request.getQuestions() != null && !request.getQuestions().isEmpty()) {
       saveQuestionsWithImages(
-          eventSeq, request.getQuestions(), actualUserId, questionImages, itemImages, eventSeqStr);
+          eventSeq, request.getQuestions(), userId, questionImages, itemImages, eventSeqStr);
     }
 
     return getEventDetail(eventSeq);
@@ -459,16 +455,12 @@ public class EventService {
       }
     }
 
-    // uptId용 실제 user_id 조회
-    String actualUptId = userIdResolver.resolveUserId(uptId);
-
     // QR 간편인증 사용으로 변경되었고, 기존에 authCodeUrl이 없으면 새로 생성 (비용 차감 후)
     if ("Y".equals(request.getQrCode())
         && (event.getAuthCodeUrl() == null || event.getAuthCodeUrl().isEmpty())) {
-      // JWT username은 userSeq이므로 직접 파싱
-      Integer uptUserSeq = userIdResolver.fromJwtUsername(uptId);
+      Integer uptUserSeq = userIdResolver.toUserSeq(uptId);
       // QR 코드 신청 비용 차감 (잔액 부족 시 예외 발생) - userSeq 사용
-      billingService.deductInitialQrFee(uptUserSeq, "설문 수정 - QR 코드 신청", actualUptId);
+      billingService.deductInitialQrFee(uptUserSeq, "설문 수정 - QR 코드 신청", uptId);
       String authCodeUrl = CommonUtils.randomCode(20);
       String qrCodeImgPath = generateQrCodeImage(authCodeUrl);
       event.setQrCodeInfo(qrCodeImgPath, authCodeUrl);
@@ -570,7 +562,7 @@ public class EventService {
         request.getOrganizer(),
         request.getBadgePrintType(),
         request.getNametagConfig(),
-        actualUptId);
+        uptId);
     event.setPreSurveyDates(request.getPreSurveyStartDate(), request.getPreSurveyEndDate());
 
     surveyMasterMapper.update(event);
@@ -592,7 +584,7 @@ public class EventService {
         surveyQuestionMapper.deleteByEventSeq(eventSeq);
         // JSON 방식 사용 (이미지 경로 변환 처리)
         saveQuestionsWithImages(
-            eventSeq, request.getQuestions(), actualUptId, questionImages, itemImages, eventSeqStr);
+            eventSeq, request.getQuestions(), uptId, questionImages, itemImages, eventSeqStr);
       }
     }
 
@@ -613,10 +605,9 @@ public class EventService {
     }
 
     Integer userLevel = adminService.getUserLevel(userId);
-    String actualUserId = userIdResolver.resolveUserId(userId);
     adminService.validateModifyPermission(userId, userLevel, sourceEvent.getRegId());
 
-    Integer userSeq = userIdResolver.fromJwtUsername(userId);
+    Integer userSeq = userIdResolver.toUserSeq(userId);
     if (userSeq == null) {
       throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "사용자를 찾을 수 없습니다.");
     }
@@ -653,7 +644,7 @@ public class EventService {
                 "E".equals(sourceEvent.getEventType())
                     ? SurveyMaster.generateStaffAuthCode()
                     : null)
-            .regId(actualUserId)
+            .regId(userId)
             .build();
 
     surveyMasterMapper.insert(copiedEvent);
@@ -663,7 +654,7 @@ public class EventService {
     }
 
     copyEventActionTypes(sourceEventSeq, copiedEvent.getEventSeq());
-    copyEventParticipants(sourceEventSeq, copiedEvent.getEventSeq(), actualUserId);
+    copyEventParticipants(sourceEventSeq, copiedEvent.getEventSeq(), userId);
 
     log.info(
         "행사 복사 완료 - sourceEventSeq: {}, copiedEventSeq: {}",

@@ -166,10 +166,10 @@ public class AuthService {
     smsAuthService.invalidate(userId);
 
     if ("SMS".equals(targetChannel)) {
-      String loginPhone = user.getLoginPhone();
-      if (!StringUtils.hasText(loginPhone)) {
+      if (!StringUtils.hasText(user.getLoginPhone())) {
         throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 휴대폰 번호가 없습니다.");
       }
+      String loginPhone = decryptField(user.getLoginPhone());
       smsAuthService.sendVerificationCode(userId, loginPhone);
       log.info("[채널 전환 → SMS] userId={}, phone={}", userId, CommonUtils.maskingPhone(loginPhone));
       return LoginResponse.builder()
@@ -203,11 +203,11 @@ public class AuthService {
    */
   private LoginResponse sendOtpForLogin(User user, String channel, String sessionKey) {
     if ("SMS".equals(channel)) {
-      String loginPhone = user.getLoginPhone();
-      if (!StringUtils.hasText(loginPhone)) {
+      if (!StringUtils.hasText(user.getLoginPhone())) {
         throw new BusinessException(
             ErrorCode.INVALID_INPUT_VALUE, "SMS 인증 채널이 설정되어 있으나 휴대폰 번호가 등록되지 않았습니다.");
       }
+      String loginPhone = decryptField(user.getLoginPhone());
       var status = smsAuthService.getVerificationStatus(user.getSeq());
       if (!status.codeSent()) {
         log.info(
@@ -289,11 +289,7 @@ public class AuthService {
 
   /** 사용자의 현재 OTP 채널 결정 (default_two_factor_method 기반, 미설정 시 EMAIL). */
   private String resolveChannel(User user) {
-    String channel = user.getDefaultTwoFactorMethod();
-    if ("SMS".equals(channel)) {
-      return "SMS";
-    }
-    return "EMAIL";
+    return "SMS".equals(user.getDefaultTwoFactorMethod()) ? "SMS" : "EMAIL";
   }
 
   /** 사용자가 선택 가능한 채널 목록 (EMAIL 은 항상, SMS 는 login_phone 등록 시). */
@@ -389,7 +385,7 @@ public class AuthService {
       log.error("연락처 암호화 실패: {}", e.getMessage());
       throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "연락처 암호화에 실패했습니다.");
     }
-    // 4-1. 담당자 암호화 처리 -> 비밀번호 찾기에서 담당자 암호화 처리가 들어가기에 회원가입시에도 있어야 함.
+    // 4-2. 담당자 암호화 처리 -> 비밀번호 찾기에서 담당자 암호화 처리가 들어가기에 회원가입시에도 있어야 함.
     String encryptedPerson = null;
     try {
       String person = request.getPerson();

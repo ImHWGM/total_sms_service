@@ -47,7 +47,7 @@ public class SessionKeyService {
     String nonce = UUID.randomUUID().toString();
     String input = userId + "|" + timestamp + "|" + nonce;
     String key = computeHmac(input);
-    sessions.put(key, new SessionState(userId, timestamp, 0));
+    sessions.put(key, new SessionState(userId, timestamp, 0, null));
     return key;
   }
 
@@ -80,7 +80,6 @@ public class SessionKeyService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "유효하지 않은 sessionKey 입니다.");
           }
           if (state.switchCount() >= MAX_SWITCH_COUNT) {
-            // 상한 초과 → entry 제거 후 예외 (compute 반환 null = remove)
             throw new BusinessException(
                 ErrorCode.INVALID_INPUT_VALUE, "채널 변경 횟수를 초과했습니다. 다시 로그인해주세요.");
           }
@@ -92,6 +91,27 @@ public class SessionKeyService {
   public boolean isChannelRecentlySwitched(String sessionKey) {
     SessionState state = sessions.get(sessionKey);
     return state != null && state.channelSwitched();
+  }
+
+  /**
+   * 채널 전환 시 활성 채널 기록. login() OTP 검증 시 user.defaultTwoFactorMethod 대신 이 값으로 채널 결정. null 이면 default
+   * 사용.
+   */
+  public void setActiveChannel(String sessionKey, String channel) {
+    sessions.compute(
+        sessionKey,
+        (k, state) -> {
+          if (state == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "유효하지 않은 sessionKey 입니다.");
+          }
+          return state.withActiveChannel(channel);
+        });
+  }
+
+  /** sessionKey 의 활성 채널 조회. 전환 이력 없으면 null (user.defaultTwoFactorMethod 사용). */
+  public String getActiveChannel(String sessionKey) {
+    SessionState state = sessions.get(sessionKey);
+    return state == null ? null : state.activeChannel();
   }
 
   /** OTP 검증 성공 후 sessionKey 폐기 (재사용 방지). */
@@ -123,8 +143,11 @@ public class SessionKeyService {
    * @param userId 1차 인증 사용자 식별자
    * @param issuedAt 발급 시각 (epoch ms)
    * @param switchCount 채널 변경 누적 횟수 (≤ {@link #MAX_SWITCH_COUNT})
+   * @param activeChannel 채널 전환으로 활성화된 채널("EMAIL"/"SMS"). 전환 이력 없으면 null
+   *     (user.defaultTwoFactorMethod 사용)
    */
-  private record SessionState(Integer userId, long issuedAt, int switchCount) {
+  private record SessionState(
+      Integer userId, long issuedAt, int switchCount, String activeChannel) {
 
     /** 채널 변경 1회 이상 수행 여부 (강제 OTP 트리거용). switchCount 에서 파생. */
     boolean channelSwitched() {
@@ -132,7 +155,11 @@ public class SessionKeyService {
     }
 
     SessionState withSwitchIncrement() {
-      return new SessionState(userId, issuedAt, switchCount + 1);
+      return new SessionState(userId, issuedAt, switchCount + 1, activeChannel);
+    }
+
+    SessionState withActiveChannel(String channel) {
+      return new SessionState(userId, issuedAt, switchCount, channel);
     }
   }
 }

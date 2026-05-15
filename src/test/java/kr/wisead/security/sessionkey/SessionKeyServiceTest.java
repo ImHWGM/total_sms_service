@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import kr.wisead.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -103,23 +102,7 @@ class SessionKeyServiceTest {
   @DisplayName("validate_expiredKey_throws")
   void validate_expiredKey_throws() {
     String key = sut.issue(USER_ID);
-
-    // issuedAt 을 8분 전으로 역산 (7분 만료 초과)
-    @SuppressWarnings("unchecked")
-    ConcurrentHashMap<String, Object> sessions =
-        (ConcurrentHashMap<String, Object>) ReflectionTestUtils.getField(sut, "sessions");
-    Object state = sessions.get(key);
-    // record 를 직접 교체: ReflectionTestUtils 로 내부 record 는 교체 불가 → 새 issue 후 map 직접 조작
-    // SessionState 는 private record 이므로 reflection 으로 접근
-    long expiredAt = System.currentTimeMillis() - (8 * 60 * 1000L);
-    try {
-      Class<?> stateClass = state.getClass();
-      Object expiredState =
-          stateClass.getDeclaredConstructors()[0].newInstance(USER_ID, expiredAt, 0);
-      sessions.put(key, expiredState);
-    } catch (Exception e) {
-      throw new RuntimeException("SessionState 조작 실패: " + e.getMessage(), e);
-    }
+    expireSession(key, 8);
 
     assertThatThrownBy(() -> sut.validate(key))
         .isInstanceOf(BusinessException.class)
@@ -213,25 +196,11 @@ class SessionKeyServiceTest {
   @DisplayName("cleanup_removesExpiredSessions")
   void cleanup_removesExpiredSessions() {
     String key = sut.issue(USER_ID);
-
-    // issuedAt 을 8분 전으로 역산
-    @SuppressWarnings("unchecked")
-    ConcurrentHashMap<String, Object> sessions =
-        (ConcurrentHashMap<String, Object>) ReflectionTestUtils.getField(sut, "sessions");
-    Object state = sessions.get(key);
-    long expiredAt = System.currentTimeMillis() - (8 * 60 * 1000L);
-    try {
-      Class<?> stateClass = state.getClass();
-      Object expiredState =
-          stateClass.getDeclaredConstructors()[0].newInstance(USER_ID, expiredAt, 0);
-      sessions.put(key, expiredState);
-    } catch (Exception e) {
-      throw new RuntimeException("SessionState 조작 실패: " + e.getMessage(), e);
-    }
+    expireSession(key, 8);
 
     sut.cleanup();
 
-    assertThat(sessions).doesNotContainKey(key);
+    assertThat(sessionMap()).doesNotContainKey(key);
   }
 
   @Test
@@ -257,5 +226,30 @@ class SessionKeyServiceTest {
     ReflectionTestUtils.setField(sut, "secret", null);
 
     assertThatThrownBy(() -> sut.issue(USER_ID)).isInstanceOf(RuntimeException.class);
+  }
+
+  // --- helpers ---
+
+  /** sessions 내부 맵을 반환한다 (reflection). */
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> sessionMap() {
+    return (Map<String, Object>) ReflectionTestUtils.getField(sut, "sessions");
+  }
+
+  /**
+   * 특정 sessionKey 의 issuedAt 을 {@code minutesAgo} 분 전으로 역산하여 만료 상태로 만든다. SessionState 는 private
+   * record 이므로 reflection 으로 교체한다.
+   */
+  private void expireSession(String key, int minutesAgo) {
+    Map<String, Object> sessions = sessionMap();
+    Object state = sessions.get(key);
+    long expiredAt = System.currentTimeMillis() - ((long) minutesAgo * 60 * 1000L);
+    try {
+      Object expiredState =
+          state.getClass().getDeclaredConstructors()[0].newInstance(USER_ID, expiredAt, 0, null);
+      sessions.put(key, expiredState);
+    } catch (Exception e) {
+      throw new RuntimeException("SessionState 조작 실패: " + e.getMessage(), e);
+    }
   }
 }

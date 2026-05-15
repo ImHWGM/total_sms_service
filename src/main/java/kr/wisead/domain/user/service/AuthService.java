@@ -100,11 +100,16 @@ public class AuthService {
     String channel = resolveChannel(user);
 
     if (StringUtils.hasText(emailCode)) {
-      // 5-A. OTP 코드 제출: sessionKey 유효성 검증 후 OTP 검증 (Phase D)
-      sessionKeyService.validate(request.getSessionKey());
-      verifyOtpInternal(user.getSeq(), emailCode, channel);
-      sessionKeyService.invalidate(request.getSessionKey()); // 검증 성공 → sessionKey 폐기 (재사용 방지)
-      log.info("[OTP 인증 성공] userId={}, channel={}", user.getUserId(), channel);
+      // 5-A. OTP 코드 제출: sessionKey 검증 → 활성 채널 우선 사용 → OTP 검증 → sessionKey 폐기
+      String sessionKey = request.getSessionKey();
+      sessionKeyService.validate(sessionKey);
+      // 채널 전환 이력이 있으면 user.defaultTwoFactorMethod 대신 활성 채널로 검증 (cross-channel 방지)
+      String activeChannel = sessionKeyService.getActiveChannel(sessionKey);
+      String verifyChannel = activeChannel != null ? activeChannel : channel;
+      verifyOtpInternal(user.getSeq(), emailCode, verifyChannel);
+      sessionKeyService.invalidate(sessionKey);
+      log.info("[OTP 인증 성공] userId={}, channel={}", user.getUserId(), verifyChannel);
+      channel = verifyChannel;
     } else {
       // 5-B. OTP 코드 미제출: 휴면 스킵 또는 OTP 발송 분기
       if (isLoggedInToday(user)) {
@@ -171,6 +176,7 @@ public class AuthService {
       }
       String loginPhone = decryptField(user.getLoginPhone());
       smsAuthService.sendVerificationCode(userId, loginPhone);
+      sessionKeyService.setActiveChannel(sessionKey, "SMS");
       log.info("[채널 전환 → SMS] userId={}, phone={}", userId, CommonUtils.maskingPhone(loginPhone));
       return LoginResponse.builder()
           .sessionKey(sessionKey)
@@ -184,6 +190,7 @@ public class AuthService {
         throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다.");
       }
       emailAuthService.sendVerificationCode(userId, email);
+      sessionKeyService.setActiveChannel(sessionKey, "EMAIL");
       log.info("[채널 전환 → EMAIL] userId={}, email={}", userId, CommonUtils.maskingEmailShort(email));
       return LoginResponse.builder()
           .sessionKey(sessionKey)
@@ -191,9 +198,8 @@ public class AuthService {
           .maskedEmail(CommonUtils.maskingEmailShort(email))
           .availableChannels(getAvailableChannels(user))
           .build();
-    } else {
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "지원하지 않는 채널입니다.");
     }
+    throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "지원하지 않는 채널입니다.");
   }
 
   /**

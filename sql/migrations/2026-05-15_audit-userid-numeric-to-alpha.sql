@@ -1,16 +1,21 @@
 -- audit 컬럼 numeric(user.seq 문자열) → alpha(user.user_id) 일괄 마이그레이션
 --
+-- 운영자 수동 실행용 SQL — Flyway 자동 마이그레이션 아님.
+-- 동반 가이드: 2026-05-15_audit-userid-numeric-to-alpha.md (배포 순서/롤백/검증)
+--
 -- 배경: PR #40 (audit user_id 통일) 이전 일부 코드가 JWT subject seq 문자열을
 -- audit 컬럼에 저장하면서 기존 alpha 데이터와 혼재. 상용 DB 조사 결과 표준은
 -- user_id(alpha) 임을 확인. PR #40 으로 신규 row 는 alpha 보장. 본 마이그레이션은
 -- 기존 numeric row 를 user_id 로 정규화.
+--
+-- 실행 순서: PR #40 머지/배포 → 본 SQL 수동 실행 → 사후 분포 검증
 --
 -- 안전 장치:
 --   1) WHERE 절 REGEXP '^[0-9]+$' — 이미 alpha 인 row 는 안 건드림 (idempotent)
 --   2) JOIN user u ON u.SEQ = CAST(...) — 매칭 안 되는 orphan row 자동 스킵
 --   3) NULL row 는 변경 안 함 (transaction.reg_id NULL 5572 row 는 별도 검토)
 --
--- 사전 검증 (참고용 — Flyway 실행 전 수동 확인):
+-- 사전 검증 (참고용):
 --   SELECT 'sms_send' tbl, COUNT(*) numeric_cnt
 --     FROM sms_send WHERE REG_ID REGEXP '^[0-9]+$';
 --   (동일 패턴으로 다른 테이블 확인)

@@ -19,8 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * 광고 문자 발송 Controller.
  *
- * <p>AdMessageService 는 userId 를 user.seq 문자열로 받는 레거시 contract. {@code String.valueOf(user.seq())}
- * 를 전달한다.
+ * <p>audit 표준은 user_id(alpha). {@code user.userId()} 를 AdMessageService 에 전달한다.
  */
 @Slf4j
 @RestController
@@ -38,13 +37,13 @@ public class AdMessageController {
       @Valid @RequestPart("request") AdMessageRequest request,
       @RequestPart(value = "mmsFiles", required = false) List<MultipartFile> mmsFiles) {
 
-    String userSeqStr = String.valueOf(user.seq());
-    log.info("광고문자 발송 요청 - userSeq: {}, type: {}", userSeqStr, request.getMessageTypeIs());
+    String userId = user.userId();
+    log.info("광고문자 발송 요청 - userId: {}, type: {}", userId, request.getMessageTypeIs());
 
     // MMS 파일 업로드 처리
     AdMessageRequest processedRequest = processMmsFiles(request, mmsFiles);
 
-    AdMessageResponse response = adMessageService.sendDirectMessage(processedRequest, userSeqStr);
+    AdMessageResponse response = adMessageService.sendDirectMessage(processedRequest, userId);
     return ApiResponse.success(response);
   }
 
@@ -53,10 +52,10 @@ public class AdMessageController {
   public ApiResponse<AdMessageResponse> sendAdMessageJson(
       @CurrentUser JwtPrincipal user, @Valid @RequestBody AdMessageRequest request) {
 
-    String userSeqStr = String.valueOf(user.seq());
-    log.info("광고문자 발송 요청 (JSON) - userSeq: {}, type: {}", userSeqStr, request.getMessageTypeIs());
+    String userId = user.userId();
+    log.info("광고문자 발송 요청 (JSON) - userId: {}, type: {}", userId, request.getMessageTypeIs());
 
-    AdMessageResponse response = adMessageService.sendDirectMessage(request, userSeqStr);
+    AdMessageResponse response = adMessageService.sendDirectMessage(request, userId);
     return ApiResponse.success(response);
   }
 

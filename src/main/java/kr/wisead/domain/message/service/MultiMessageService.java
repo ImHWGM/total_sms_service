@@ -52,15 +52,12 @@ public class MultiMessageService {
       return MultiMessageResponse.error("야간 전송제한 시간입니다. (20:00 ~ 09:00)\n해당 시간에는 예약발송만 가능합니다.");
     }
 
-    // 0-1. regId는 이미 userSeq임 (JWT subject로 seq 사용)
-    Integer userSeq;
-    try {
-      userSeq = Integer.parseInt(regId);
-    } catch (NumberFormatException e) {
+    // 0-1. regId 는 user_id(alpha)
+    Integer userSeq = userIdResolver.toUserSeq(regId);
+    if (userSeq == null) {
       log.warn("잘못된 사용자 식별자 - regId: {}", regId);
       return MultiMessageResponse.error("사용자 정보를 찾을 수 없습니다.");
     }
-    String realUserId = userIdResolver.resolveUserId(regId);
 
     // 1. 잔액 조회
     var balanceResponse = balanceService.getCurrentBalance(userSeq);
@@ -140,7 +137,7 @@ public class MultiMessageService {
         String phone = normalizePhoneNumber(receiver.getPhone());
         String text = applyReplaceChars(request.getText(), receiver);
 
-        MsgQueue msgQueue = createMsgQueue(request, phone, text, batchId, txGroupId, realUserId);
+        MsgQueue msgQueue = createMsgQueue(request, phone, text, batchId, txGroupId, regId);
 
         // 예약 발송 설정
         if (!request.isImmediate() && request.getReqDate() != null) {
@@ -191,14 +188,9 @@ public class MultiMessageService {
     return now.isAfter(NIGHT_START) || now.isBefore(NIGHT_END);
   }
 
-  /** 사용자의 storeCode 조회 (regId는 userSeq임) */
+  /** 사용자의 storeCode 조회 (regId 는 user_id) */
   private String getStoreCode(String regId) {
-    try {
-      Integer userSeq = Integer.parseInt(regId);
-      return userMapper.findBySeq(userSeq).map(User::getStoreCode).orElse(null);
-    } catch (NumberFormatException e) {
-      return null;
-    }
+    return userMapper.findByUserId(regId).map(User::getStoreCode).orElse(null);
   }
 
   /** 메시지 타입별 단가 조회 (BalanceResponse 사용) */

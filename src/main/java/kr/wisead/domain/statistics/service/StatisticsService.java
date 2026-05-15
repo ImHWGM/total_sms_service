@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.statistics.dto.*;
 import kr.wisead.mapper.sms.StatisticsMapper;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 public class StatisticsService {
 
   private final StatisticsMapper statisticsMapper;
+  private final UserIdResolver userIdResolver;
 
   private static final String TABLE_PREFIX = "msg_result_";
   private static final DateTimeFormatter YEAR_MONTH_FORMATTER =
@@ -76,12 +78,8 @@ public class StatisticsService {
             String userIdStr = (String) stat.get("userId");
             if (userIdStr == null) continue;
 
-            Integer userId;
-            try {
-              userId = Integer.parseInt(userIdStr);
-            } catch (NumberFormatException e) {
-              continue;
-            }
+            Integer userSeq = userIdResolver.toUserSeq(userIdStr);
+            if (userSeq == null) continue;
 
             String serviceType = (String) stat.get("serviceType");
             int totalCnt = getIntValue(stat, "totalCnt");
@@ -90,7 +88,7 @@ public class StatisticsService {
 
             UserStatsResponse userStats =
                 userStatsMap.computeIfAbsent(
-                    userId, k -> UserStatsResponse.builder().userSeq(k).build());
+                    userSeq, k -> UserStatsResponse.builder().userSeq(k).build());
 
             updateUserStatsByServiceType(userStats, serviceType, totalCnt, succCnt, failCnt);
           }

@@ -31,9 +31,10 @@ public class BillingService {
    *
    * @param userSeq 사용자 시퀀스
    * @param comment 차감 사유
+   * @param regId audit actor (인증 컨텍스트의 user_id)
    */
   @Transactional
-  public void deductInitialQrFee(Integer userSeq, String comment) {
+  public void deductInitialQrFee(Integer userSeq, String comment, String regId) {
     // QR 단가 조회
     BigDecimal qrFee = walletService.getAppliedRate(userSeq, SERVICE_QR);
 
@@ -50,7 +51,7 @@ public class BillingService {
             SERVICE_QR,
             BigDecimal.ONE, // 수량 1
             comment != null ? comment : "QR 코드 신청",
-            Transaction.REG_ID_SYSTEM);
+            regId);
 
     log.info("QR 신청 비용 차감 완료: userSeq={}, fee={}, txGroupId={}", userSeq, qrFee, txGroupId);
   }
@@ -189,10 +190,10 @@ public class BillingService {
 
   // ========== userId 기반 오버로드 메서드 (API 호환용) ==========
 
-  /** QR 코드 신청 비용 차감 (userId 기반) */
+  /** QR 코드 신청 비용 차감 (userId 기반). regId 도 userId 사용. */
   @Transactional
   public void deductInitialQrFee(String userId, String comment) {
-    deductInitialQrFee(userIdResolver.toUserSeq(userId), comment);
+    deductInitialQrFee(userIdResolver.toUserSeq(userId), comment, userId);
   }
 
   /** QR 코드 과금 가능 여부 확인 (userId 기반) */

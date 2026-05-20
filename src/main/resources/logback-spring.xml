@@ -4,6 +4,8 @@
     <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
     <!-- application.properties의 logging.file.path 값 사용, 없으면 logs 기본값 -->
     <springProperty scope="context" name="LOG_PATH" source="logging.file.path" defaultValue="logs"/>
+    <!-- 롤링 아카이브 루트 (override: logging.archive.path) -->
+    <springProperty scope="context" name="ARCHIVE_PATH" source="logging.archive.path" defaultValue="C:/logs/WiseAd"/>
 
     <!-- 콘솔 출력 (개발용) -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -21,9 +23,7 @@
             <charset>UTF-8</charset>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/wisead-%d{yyyyMMdd}.log</fileNamePattern>
-            <maxHistory>30</maxHistory>
-            <totalSizeCap>3GB</totalSizeCap>
+            <fileNamePattern>${ARCHIVE_PATH}/wisead/wisead-%d{yyyyMMdd}.log</fileNamePattern>
         </rollingPolicy>
     </appender>
 
@@ -35,7 +35,7 @@
             <charset>UTF-8</charset>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/api-access-%d{yyyyMMdd}.log</fileNamePattern>
+            <fileNamePattern>${ARCHIVE_PATH}/api-access/api-access-%d{yyyyMMdd}.log</fileNamePattern>
             <maxHistory>90</maxHistory>
             <totalSizeCap>10GB</totalSizeCap>
         </rollingPolicy>
@@ -52,7 +52,7 @@
             <charset>UTF-8</charset>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/error-%d{yyyyMMdd}.log</fileNamePattern>
+            <fileNamePattern>${ARCHIVE_PATH}/error/error-%d{yyyyMMdd}.log</fileNamePattern>
             <maxHistory>90</maxHistory>
             <totalSizeCap>1GB</totalSizeCap>
         </rollingPolicy>

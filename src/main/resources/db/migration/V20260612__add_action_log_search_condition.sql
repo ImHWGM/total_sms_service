@@ -1,0 +1,4 @@
+-- 개인정보 접근 로그: 검색조건(무엇을) 저장 컬럼 추가
+-- 운영 DB 수동 실행 필요
+ALTER TABLE ACTION_LOG
+    ADD COLUMN SEARCH_CONDITION VARCHAR(1000) NULL AFTER ACTION_REASON;

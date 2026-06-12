@@ -20,6 +20,7 @@ public class ActionLog {
     private String menuName; // 메뉴명
     private String actionType; // 액션 타입 (R: 조회, C: 생성, U: 수정, D: 삭제)
     private String actionReason; // 액션 사유
+    private String searchCondition; // 검색 조건 (쿼리스트링 원문)
     private String menuUrl; // 메뉴 URL
     private String code; // 상태 코드 (200, 401, 500 등)
     private String referer; // 리퍼러

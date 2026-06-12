@@ -7,6 +7,7 @@
         <result property="menuName" column="MENU_NAME"/>
         <result property="actionType" column="ACTION_TYPE"/>
         <result property="actionReason" column="ACTION_REASON"/>
+        <result property="searchCondition" column="SEARCH_CONDITION"/>
         <result property="menuUrl" column="MENU_URL"/>
         <result property="code" column="CODE"/>
         <result property="referer" column="REFERER"/>
@@ -25,6 +26,7 @@
         L.MENU_NAME,
         L.ACTION_TYPE,
         L.ACTION_REASON,
+        L.SEARCH_CONDITION,
         L.MENU_URL,
         L.CODE,
         L.REFERER,
@@ -137,6 +139,33 @@
         ) VALUES (
             #{menuName},
             #{actionType},
+            #{menuUrl},
+            #{code},
+            #{referer},
+            #{userId},
+            #{userName},
+            #{ip},
+            NOW()
+        )
+    </insert>
+
+    <!-- 접근 로그 등록 (검색조건 포함) -->
+    <insert id="insertAccessLog" parameterType="kr.wisead.domain.admin.entity.ActionLog" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO ACTION_LOG (
+            MENU_NAME,
+            ACTION_TYPE,
+            SEARCH_CONDITION,
+            MENU_URL,
+            CODE,
+            REFERER,
+            USER_ID,
+            USER_NAME,
+            IP,
+            REG_DATE
+        ) VALUES (
+            #{menuName},
+            #{actionType},
+            #{searchCondition},
             #{menuUrl},
             #{code},
             #{referer},

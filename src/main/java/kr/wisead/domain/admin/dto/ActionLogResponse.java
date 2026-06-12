@@ -22,6 +22,7 @@ public class ActionLogResponse {
     private String actionType;
     private String actionTypeName;   // 액션 타입 명칭
     private String actionReason;
+    private String searchCondition;
     private String menuUrl;
     private String code;
     private String referer;
@@ -48,6 +49,7 @@ public class ActionLogResponse {
                 .actionType(entity.getActionType())
                 .actionTypeName(actionTypeName)
                 .actionReason(entity.getActionReason())
+                .searchCondition(entity.getSearchCondition())
                 .menuUrl(entity.getMenuUrl())
                 .code(entity.getCode())
                 .referer(entity.getReferer())

@@ -178,6 +178,39 @@ public class ActionLogService {
         log.info("에러 로그 기록: userId={}, menuName={}, error={}", userId, menuName, errorMessage);
     }
 
+    /**
+     * 개인정보 접근 로그 기록 (fire-and-forget).
+     *
+     * <p>AccessLogInterceptor가 호출. 기록 실패가 요청 흐름을 막지 않도록 예외를 삼킨다.
+     */
+    public void logAccess(
+            String userId,
+            String userName,
+            String menuName,
+            String actionType,
+            String searchCondition,
+            String code,
+            HttpServletRequest httpRequest) {
+        try {
+            ActionLog actionLog =
+                    ActionLog.builder()
+                            .menuName(menuName)
+                            .actionType(actionType)
+                            .searchCondition(searchCondition)
+                            .menuUrl(httpRequest.getRequestURI())
+                            .code(code)
+                            .referer(httpRequest.getHeader("Referer"))
+                            .userId(userId)
+                            .userName(userName)
+                            .ip(getClientIp(httpRequest))
+                            .build();
+            actionLogMapper.insertAccessLog(actionLog);
+            log.info("[접근로그] userId={}, menuName={}, uri={}", userId, menuName, httpRequest.getRequestURI());
+        } catch (Exception e) {
+            log.warn("[접근로그] 기록 실패: userId={}, menuName={}, 사유={}", userId, menuName, e.getMessage());
+        }
+    }
+
     // ==================== Private Methods ====================
 
     /**

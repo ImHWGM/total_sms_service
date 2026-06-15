@@ -15,6 +15,7 @@ import kr.wisead.domain.message.dto.MultiMessageRequest;
 import kr.wisead.domain.message.dto.MultiMessageResponse;
 import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.payment.service.BalanceService;
+import kr.wisead.domain.profanity.service.ProfanityFilterService;
 import kr.wisead.domain.user.entity.User;
 import kr.wisead.mapper.primary.BlockedSenderMapper;
 import kr.wisead.mapper.primary.UserMapper;
@@ -36,6 +37,7 @@ public class MultiMessageService {
   private final UserMapper userMapper;
   private final FileStorageService fileStorageService;
   private final UserIdResolver userIdResolver;
+  private final ProfanityFilterService profanityFilterService;
 
   // 야간 전송제한 시간 (20:00 ~ 09:00)
   private static final LocalTime NIGHT_START = LocalTime.of(20, 0);
@@ -58,6 +60,15 @@ public class MultiMessageService {
       log.warn("잘못된 사용자 식별자 - regId: {}", regId);
       return MultiMessageResponse.error("사용자 정보를 찾을 수 없습니다.");
     }
+
+    // 0-2. 금칙어 검사 (SEND: 일반 문자 발송)
+    profanityFilterService.validateForSend(
+        request.getText(),
+        userSeq,
+        null,
+        null,
+        null,
+        request.getReceivers() != null ? request.getReceivers().size() : null);
 
     // 1. 잔액 조회
     var balanceResponse = balanceService.getCurrentBalance(userSeq);

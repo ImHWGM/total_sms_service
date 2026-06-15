@@ -41,13 +41,24 @@ public class EmailAuthService {
   /** 최대 시도 횟수. */
   private static final int MAX_ATTEMPTS = 5;
 
+  // ── OTP 용도 상수 (AC28: purpose 분리로 cross-purpose replay 방지) ──────────
+  /** 로그인 2단계 인증용 OTP */
+  public static final String PURPOSE_LOGIN_2FA = "LOGIN_2FA";
+
+  /** 계정 잠금 해제용 OTP */
+  public static final String PURPOSE_UNLOCK = "UNLOCK";
+
+  /** 휴면 계정 복구용 OTP */
+  public static final String PURPOSE_DORMANT_RECOVERY = "DORMANT_RECOVERY";
+
   /**
-   * 인증 코드 발송.
+   * 인증 코드 발송 (purpose 지정).
    *
    * @param userId 사용자 seq (인증 저장소 key)
    * @param email 발송 대상 이메일 (발송용; 저장소 key가 아님)
+   * @param purpose OTP 용도 (PURPOSE_LOGIN_2FA / PURPOSE_UNLOCK / PURPOSE_DORMANT_RECOVERY)
    */
-  public boolean sendVerificationCode(Integer userId, String email) {
+  public boolean sendVerificationCode(Integer userId, String email, String purpose) {
     if (userId == null) {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사용자 식별자가 필요합니다.");
     }
@@ -63,13 +74,18 @@ public class EmailAuthService {
     }
 
     String code = emailService.createVerificationCode();
+    String resolvedPurpose = (purpose != null) ? purpose : PURPOSE_LOGIN_2FA;
 
-    VerificationInfo info = new VerificationInfo(code, LocalDateTime.now());
+    VerificationInfo info = new VerificationInfo(code, LocalDateTime.now(), resolvedPurpose);
     verificationStore.put(userId, info);
 
     try {
       emailService.sendVerificationEmail(email, code);
-      log.info("인증 코드 발송 완료: userId={}, email={}", userId, CommonUtils.maskingEmailShort(email));
+      log.info(
+          "인증 코드 발송 완료: userId={}, email={}, purpose={}",
+          userId,
+          CommonUtils.maskingEmailShort(email),
+          resolvedPurpose);
       return true;
     } catch (Exception e) {
       log.error(
@@ -80,12 +96,23 @@ public class EmailAuthService {
   }
 
   /**
-   * 인증 코드 검증.
+   * 인증 코드 발송 (기존 2-arg 시그니처 — 기본 purpose = LOGIN_2FA).
+   *
+   * @deprecated purpose 를 명시하는 3-arg 오버로드 사용 권장.
+   */
+  @Deprecated(since = "PR1", forRemoval = false)
+  public boolean sendVerificationCode(Integer userId, String email) {
+    return sendVerificationCode(userId, email, PURPOSE_LOGIN_2FA);
+  }
+
+  /**
+   * 인증 코드 검증 (purpose 검증 포함).
    *
    * @param userId 사용자 seq (인증 저장소 key)
    * @param code 입력 코드
+   * @param expectedPurpose 기대 용도 (null 이면 검증 skip — 기존 호환)
    */
-  public boolean verifyCode(Integer userId, String code) {
+  public boolean verifyCode(Integer userId, String code, String expectedPurpose) {
     if (userId == null) {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사용자 식별자가 필요합니다.");
     }
@@ -93,6 +120,16 @@ public class EmailAuthService {
 
     if (info == null) {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드를 먼저 발송해주세요.");
+    }
+
+    // AC28: purpose 불일치 시 즉시 거부 (cross-purpose replay 방지)
+    if (expectedPurpose != null && !expectedPurpose.equals(info.getPurpose())) {
+      log.warn(
+          "OTP purpose 불일치: userId={}, expected={}, actual={}",
+          userId,
+          expectedPurpose,
+          info.getPurpose());
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "OTP 용도가 일치하지 않습니다.");
     }
 
     if (info.isExpired()) {
@@ -116,6 +153,16 @@ public class EmailAuthService {
     verificationStore.remove(userId);
     log.info("이메일 인증 성공: userId={}", userId);
     return true;
+  }
+
+  /**
+   * 인증 코드 검증 (기존 2-arg 시그니처 — purpose 검증 skip).
+   *
+   * @deprecated purpose 를 명시하는 3-arg 오버로드 사용 권장.
+   */
+  @Deprecated(since = "PR1", forRemoval = false)
+  public boolean verifyCode(Integer userId, String code) {
+    return verifyCode(userId, code, null);
   }
 
   /**
@@ -198,14 +245,22 @@ public class EmailAuthService {
     private final LocalDateTime createdAt;
     private int attempts;
 
-    VerificationInfo(String code, LocalDateTime createdAt) {
+    /** OTP 용도 (AC28: cross-purpose replay 방지). */
+    private final String purpose;
+
+    VerificationInfo(String code, LocalDateTime createdAt, String purpose) {
       this.code = code;
       this.createdAt = createdAt;
       this.attempts = 0;
+      this.purpose = purpose;
     }
 
     String getCode() {
       return code;
+    }
+
+    String getPurpose() {
+      return purpose;
     }
 
     int getAttempts() {

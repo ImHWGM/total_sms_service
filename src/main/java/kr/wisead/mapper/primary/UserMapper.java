@@ -40,11 +40,26 @@ public interface UserMapper {
   /** 로그인 성공 시 최근 로그인 시간 업데이트 */
   int updateLastLogin(@Param("userId") String userId);
 
-  /** 로그인 실패 횟수 증가 */
-  int increaseLoginFailureCnt(@Param("userId") String userId);
+  /**
+   * 로그인 실패 횟수 원자적 증가 + 5회차 정확히 한 번 잠금 설정 (PR1 AC27).
+   *
+   * <p>seq 기반으로 변경됨 (userId 기반에서 전환). UserMapper.xml increaseLoginFailureCnt 참고.
+   */
+  int increaseLoginFailureCnt(@Param("seq") int seq);
 
-  /** 로그인 실패 횟수 초기화 */
+  /**
+   * 로그인 성공/잠금 해제 시 실패 횟수 초기화 + LOCKED_UNTIL NULL (원자적).
+   *
+   * <p>OTP unlock, 관리자 강제 해제, 로그인 성공 시 모두 이 메서드를 사용한다.
+   */
+  int resetLoginAndUnlock(@Param("seq") int seq);
+
+  /** 로그인 실패 횟수 초기화 (레거시 — userId 기반; 기존 코드 호환용) */
   int resetLoginFailureCnt(@Param("userId") String userId);
+
+  /** 잠금 시각 직접 설정 (관리자 운영 용도) */
+  int setLockedUntil(
+      @Param("seq") int seq, @Param("lockedUntil") java.time.LocalDateTime lockedUntil);
 
   /** 비밀번호 변경 */
   int updatePassword(@Param("userId") String userId, @Param("userPass") String userPass);
@@ -123,4 +138,32 @@ public interface UserMapper {
 
   /** 기본 2FA 채널(default_two_factor_method) 갱신 — EMAIL/SMS (plan v5 §4 Phase E). */
   int updateDefaultTwoFactorMethod(@Param("seq") Integer seq, @Param("method") String method);
+
+  /** PR1: 탈퇴 처리 — LIFECYCLE_STATUS, WITHDRAWN_AT, ANONYMIZED_AT, EMAIL, PERSON 일괄 갱신 */
+  int withdrawUser(kr.wisead.domain.user.entity.User user);
+
+  // ==================== PR3: 휴면/탈퇴 배치 ====================
+
+  /** 휴면 사전 알림 대상 조회. last_login < UTC_TIMESTAMP() - 5개월, ACTIVE, dormant_notified_at IS NULL. */
+  List<User> selectDormancyNotifyCandidates(@Param("limit") int limit);
+
+  /** 휴면 전환 대상 조회. last_login < UTC_TIMESTAMP() - 6개월, ACTIVE. */
+  List<User> selectDormancyTransitionCandidates(@Param("limit") int limit);
+
+  /** 배치 탈퇴 전환 대상 조회. dormant_at < UTC_TIMESTAMP() - 6개월, DORMANT. */
+  List<User> selectWithdrawalCandidates(@Param("limit") int limit);
+
+  /** 휴면 사전 알림 발송 시각 갱신 (idempotent guard). */
+  int markDormantNotified(@Param("seq") int seq);
+
+  /** 휴면 전환: LIFECYCLE_STATUS = 'DORMANT', DORMANT_AT = UTC_TIMESTAMP(). */
+  int transitionToDormant(@Param("seq") int seq);
+
+  /**
+   * 배치 탈퇴 전환 + 익명화: LIFECYCLE_STATUS = 'WITHDRAWN', WITHDRAWN_AT, EMAIL, PERSON, ANONYMIZED_AT 갱신.
+   */
+  int transitionToWithdrawnAndAnonymize(@Param("seq") int seq);
+
+  /** 휴면 복구: LIFECYCLE_STATUS = 'ACTIVE', DORMANT_AT = NULL, DORMANT_NOTIFIED_AT = NULL. */
+  int recoverDormant(@Param("seq") int seq);
 }

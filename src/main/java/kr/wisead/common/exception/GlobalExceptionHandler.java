@@ -1,7 +1,6 @@
 package kr.wisead.common.exception;
 
 import java.util.List;
-import java.util.stream.Collectors;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
@@ -28,12 +27,18 @@ public class GlobalExceptionHandler {
 
   /** 비즈니스 예외 처리 */
   @ExceptionHandler(BusinessException.class)
-  public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
+  public ResponseEntity<ApiResponse<Object>> handleBusinessException(BusinessException e) {
     log.warn("Business Exception: {} - {}", e.getErrorCode().getCode(), e.getEffectiveMessage());
 
     ErrorCode errorCode = e.getErrorCode();
-    return ResponseEntity.status(errorCode.getHttpStatus())
-        .body(ApiResponse.error(errorCode, e.getEffectiveMessage()));
+    ApiResponse<Object> response =
+        ApiResponse.<Object>builder()
+            .success(false)
+            .code(errorCode.getCode())
+            .message(e.getEffectiveMessage())
+            .data(e.getData())
+            .build();
+    return ResponseEntity.status(errorCode.getHttpStatus()).body(response);
   }
 
   /** Validation 예외 처리 (@Valid, @Validated) */
@@ -43,7 +48,7 @@ public class GlobalExceptionHandler {
     List<String> errors =
         e.getBindingResult().getFieldErrors().stream()
             .map(error -> String.format("[%s] %s", error.getField(), error.getDefaultMessage()))
-            .collect(Collectors.toList());
+            .toList();
 
     log.warn("Validation Exception: {}", errors);
 
@@ -63,7 +68,7 @@ public class GlobalExceptionHandler {
     List<String> errors =
         e.getBindingResult().getFieldErrors().stream()
             .map(FieldError::getDefaultMessage)
-            .collect(Collectors.toList());
+            .toList();
 
     log.warn("Bind Exception: {}", errors);
 

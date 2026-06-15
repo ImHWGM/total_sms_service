@@ -31,6 +31,7 @@ import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.message.entity.MsgResult;
 import kr.wisead.domain.message.entity.SmsSend;
 import kr.wisead.domain.payment.service.WalletService;
+import kr.wisead.domain.profanity.service.ProfanityFilterService;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
 import kr.wisead.domain.survey.entity.SurveyUserRepChar;
@@ -65,6 +66,7 @@ public class MessageSendService {
   private final EventParticipantService eventParticipantService;
   private final BlockedNumberService blockedNumberService;
   private final UserMapper userMapper;
+  private final ProfanityFilterService profanityFilterService;
 
   @Value("${wisead.url:https://wisead.kr}")
   private String wiseadUrl;
@@ -82,6 +84,19 @@ public class MessageSendService {
   public SmsSendResponse sendMessage(SmsSendRequest request, String regId) {
     int messageCount = request.getReceivers().size();
     String serviceId = getServiceIdFromMsgType(request.getMsgType());
+
+    // 0. caller 해석 (인증 사용자 → seq).
+    //    Note: sendMessage() 는 외부에서 message_id 를 받지 않고 즉시 생성하므로
+    //    IDOR (다른 사용자 message 호출) 위험은 cancelScheduledMessage 등 resource-id 받는
+    //    엔드포인트에서 별도 확인됨 (extCol3 owner check, AC29).
+    Integer callerSeq = userIdResolver.toUserSeq(regId);
+    if (callerSeq == null) {
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
+    }
+
+    // 0-1. 금칙어 검사 (SEND: 일반 문자 발송)
+    profanityFilterService.validateForSend(
+        request.getText(), callerSeq, null, null, null, messageCount);
 
     // 1. 잔액 확인 및 차감
     String txGroupId = deductForMessage(regId, serviceId, messageCount, request.getMsgType());

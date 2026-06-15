@@ -1,20 +1,27 @@
 package kr.wisead.domain.user.service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.MemberUtil;
+import kr.wisead.domain.audit.service.AuditEventService;
+import kr.wisead.domain.audit.service.AuditEventService.UnlockType;
 import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.payment.entity.UserServiceRate;
 import kr.wisead.domain.payment.service.StandardRateService;
 import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.sms.service.SmsAuthService;
+import kr.wisead.domain.user.dto.LoginFailureResponse;
 import kr.wisead.domain.user.dto.LoginRequest;
 import kr.wisead.domain.user.dto.LoginResponse;
 import kr.wisead.domain.user.dto.SignUpRequest;
@@ -48,6 +55,7 @@ public class AuthService {
   private final EmailAuthService emailAuthService;
   private final SmsAuthService smsAuthService;
   private final SessionKeyService sessionKeyService;
+  private final AuditEventService auditEventService;
 
   /**
    * 로그인 - 채널(EMAIL/SMS) 분기 + 휴면 스킵 정책 적용.
@@ -72,27 +80,40 @@ public class AuthService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.LOGIN_FAILED, "아이디 또는 비밀번호가 일치하지 않습니다."));
 
-    // 2. 계정 잠금 확인
+    // 2. 계정 잠금 확인 (lockedUntil 기반 — PR1 AC27)
     if (user.isLocked()) {
-      throw new BusinessException(
-          ErrorCode.ACCOUNT_LOCKED, "로그인 실패 횟수 초과로 계정이 잠겼습니다. 관리자에게 문의하세요.");
+      throw buildAccountLockedException(user.getLockedUntil());
     }
 
-    // 3. 계정 상태 확인 (Java 21 Switch Expression)
+    // 3. 계정 상태 확인 (lifecycleStatus 우선, 한글 status legacy fallback)
+    //    DORMANT는 별도 분기: ACCOUNT_LOCKED(423 의미) + 복관 안내 힌트 (PR3)
+    if (user.isDormant()) {
+      throw new BusinessException(
+          ErrorCode.ACCOUNT_LOCKED,
+          "휴면 계정입니다. 이메일 인증을 통해 복관하세요.",
+          Map.of("status", "DORMANT", "recoveryRequired", true));
+    }
     if (!user.isActive()) {
-      String message =
-          switch (user.getStatus()) {
-            case "미승인" -> "승인 대기 중인 계정입니다.";
-            case "탈퇴" -> "탈퇴된 계정입니다.";
-            default -> "비활성화된 계정입니다.";
-          };
-      throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, message);
+      throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, resolveInactiveMessage(user));
     }
 
     // 4. 비밀번호 확인
     if (!passwordEncoder.matches(request.getUserPass(), user.getUserPass())) {
-      userMapper.increaseLoginFailureCnt(request.getUserId());
-      throw new BusinessException(ErrorCode.LOGIN_FAILED, "아이디 또는 비밀번호가 일치하지 않습니다.");
+      // 원자적 실패 카운트 증가 (seq 기반, AC27)
+      userMapper.increaseLoginFailureCnt(user.getSeq());
+      // 재조회: 5회차에 LOCKED_UNTIL 이 설정됐는지 확인
+      User reloaded =
+          userMapper
+              .findBySeq(user.getSeq())
+              .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+      if (reloaded.isLocked()) {
+        throw buildAccountLockedException(reloaded.getLockedUntil());
+      }
+      int failureCnt = reloaded.getLoginFailureCnt() != null ? reloaded.getLoginFailureCnt() : 1;
+      throw new BusinessException(
+          ErrorCode.LOGIN_FAILED,
+          "아이디 또는 비밀번호가 일치하지 않습니다.",
+          LoginFailureResponse.forFailure(failureCnt));
     }
 
     // 5. OTP 코드 검증 흐름 (1차 인증 완료 후 채널 OTP)
@@ -122,7 +143,8 @@ public class AuthService {
       }
     }
 
-    // 6. 로그인 성공 처리
+    // 6. 로그인 성공 처리 — 실패 횟수 초기화 + 잠금 해제 (원자적) + 마지막 로그인 갱신
+    userMapper.resetLoginAndUnlock(user.getSeq());
     userMapper.updateLastLogin(request.getUserId());
 
     // 7. JWT 토큰 생성 (사용자 이름 포함)
@@ -214,27 +236,17 @@ public class AuthService {
             ErrorCode.INVALID_INPUT_VALUE, "SMS 인증 채널이 설정되어 있으나 휴대폰 번호가 등록되지 않았습니다.");
       }
       String loginPhone = decryptField(user.getLoginPhone());
-      var status = smsAuthService.getVerificationStatus(user.getSeq());
-      if (!status.codeSent()) {
-        log.info(
-            "[SMS OTP 발송 시도] userId={}, phone={}",
-            user.getUserId(),
-            CommonUtils.maskingPhone(loginPhone));
+      String masked = CommonUtils.maskingPhone(loginPhone);
+      if (!smsAuthService.getVerificationStatus(user.getSeq()).codeSent()) {
+        log.info("[SMS OTP 발송] userId={}, phone={}", user.getUserId(), masked);
         smsAuthService.sendVerificationCode(user.getSeq(), loginPhone);
-        log.info(
-            "[SMS OTP 발송 성공] userId={}, phone={}",
-            user.getUserId(),
-            CommonUtils.maskingPhone(loginPhone));
       } else {
-        log.info(
-            "[SMS OTP 이미 발송됨 (재사용)] userId={}, phone={}",
-            user.getUserId(),
-            CommonUtils.maskingPhone(loginPhone));
+        log.info("[SMS OTP 재사용] userId={}, phone={}", user.getUserId(), masked);
       }
       return LoginResponse.builder()
           .sessionKey(sessionKey)
           .channel("SMS")
-          .maskedPhone(CommonUtils.maskingPhone(loginPhone))
+          .maskedPhone(masked)
           .availableChannels(getAvailableChannels(user))
           .build();
     } else {
@@ -243,36 +255,17 @@ public class AuthService {
       if (!StringUtils.hasText(email)) {
         throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다. 관리자에게 문의하세요.");
       }
-      var status = emailAuthService.getVerificationStatus(user.getSeq());
-      if (!status.codeSent()) {
-        log.info(
-            "[EMAIL OTP 발송 시도] userId={}, email={}",
-            user.getUserId(),
-            CommonUtils.maskingEmailShort(email));
-        try {
-          emailAuthService.sendVerificationCode(user.getSeq(), email);
-          log.info(
-              "[EMAIL OTP 발송 성공] userId={}, email={}",
-              user.getUserId(),
-              CommonUtils.maskingEmailShort(email));
-        } catch (BusinessException e) {
-          log.warn(
-              "[EMAIL OTP 발송 실패] userId={}, email={}, 사유={}",
-              user.getUserId(),
-              CommonUtils.maskingEmailShort(email),
-              e.getMessage());
-          throw e;
-        }
+      String masked = CommonUtils.maskingEmailShort(email);
+      if (!emailAuthService.getVerificationStatus(user.getSeq()).codeSent()) {
+        log.info("[EMAIL OTP 발송] userId={}, email={}", user.getUserId(), masked);
+        emailAuthService.sendVerificationCode(user.getSeq(), email);
       } else {
-        log.info(
-            "[EMAIL OTP 이미 발송됨 (재사용)] userId={}, email={}",
-            user.getUserId(),
-            CommonUtils.maskingEmailShort(email));
+        log.info("[EMAIL OTP 재사용] userId={}, email={}", user.getUserId(), masked);
       }
       return LoginResponse.builder()
           .sessionKey(sessionKey)
           .channel("EMAIL")
-          .maskedEmail(CommonUtils.maskingEmailShort(email))
+          .maskedEmail(masked)
           .availableChannels(getAvailableChannels(user))
           .build();
     }
@@ -300,12 +293,10 @@ public class AuthService {
 
   /** 사용자가 선택 가능한 채널 목록 (EMAIL 은 항상, SMS 는 login_phone 등록 시). */
   private List<String> getAvailableChannels(User user) {
-    List<String> channels = new ArrayList<>();
-    channels.add("EMAIL");
     if (StringUtils.hasText(user.getLoginPhone())) {
-      channels.add("SMS");
+      return List.of("EMAIL", "SMS");
     }
-    return channels;
+    return List.of("EMAIL");
   }
 
   /** 오늘 로그인한 적이 있는지 확인 */
@@ -328,10 +319,9 @@ public class AuthService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.LOGIN_FAILED, "아이디 또는 비밀번호가 일치하지 않습니다."));
 
-    // 2. 계정 잠금 확인
+    // 2. 계정 잠금 확인 (login() 과 동일한 LoginFailureResponse payload — FE 일관성)
     if (user.isLocked()) {
-      throw new BusinessException(
-          ErrorCode.ACCOUNT_LOCKED, "로그인 실패 횟수 초과로 계정이 잠겼습니다. 관리자에게 문의하세요.");
+      throw buildAccountLockedException(user.getLockedUntil());
     }
 
     // 3. 계정 상태 확인
@@ -464,6 +454,10 @@ public class AuthService {
         lmsRate,
         mmsRate,
         qrRate);
+
+    // 8. 감사 로그 기록 (AC1-revised: SIGNUP → audit_event)
+    // ip/userAgent 는 SignUpRequest 에 없어 null 전달 (컨트롤러 레이어에서 HttpServletRequest 로 보강 가능)
+    auditEventService.recordSignup(user, null, null, "WEB");
   }
 
   /** 토큰 갱신 */
@@ -539,5 +533,178 @@ public class AuthService {
       log.debug("필드 복호화 실패, 원본 반환: {}", e.getMessage());
       return encryptedValue;
     }
+  }
+
+  /**
+   * 비활성 계정 오류 메시지 결정.
+   *
+   * <p>lifecycleStatus 가 non-null 이면 enum 기반 메시지 우선. null 이면 legacy 한글 STATUS 값으로 fallback
+   * (PR4 cleanup 전까지 보존).
+   */
+  private String resolveInactiveMessage(User user) {
+    if (user.getLifecycleStatus() != null) {
+      return switch (user.getLifecycleStatus()) {
+        case PENDING_APPROVAL -> "승인 대기 중인 계정입니다.";
+        case WITHDRAWN -> "탈퇴된 계정입니다.";
+        default -> "비활성화된 계정입니다.";
+      };
+    }
+    // legacy fallback (PR4 cleanup 전까지)
+    return switch (user.getStatus()) {
+      case "미승인" -> "승인 대기 중인 계정입니다.";
+      case "탈퇴" -> "탈퇴된 계정입니다.";
+      default -> "비활성화된 계정입니다.";
+    };
+  }
+
+  /** 계정 잠금 예외 생성 (lockedUntil 기반 LoginFailureResponse payload 포함). */
+  private BusinessException buildAccountLockedException(LocalDateTime lockedUntil) {
+    long remainingSecs = Duration.between(LocalDateTime.now(), lockedUntil).toSeconds();
+    Instant lockedUntilInstant = lockedUntil.atZone(ZoneOffset.UTC).toInstant();
+    return new BusinessException(
+        ErrorCode.ACCOUNT_LOCKED,
+        "로그인 실패 횟수 초과로 계정이 잠겼습니다.",
+        LoginFailureResponse.forLocked(lockedUntilInstant, (int) Math.max(0, remainingSecs)));
+  }
+
+  // ==================== 잠금 해제 (PR1) ====================
+
+  /**
+   * 이메일로 OTP 발송 요청 (잠금 해제용).
+   *
+   * <p>계정이 잠긴 사용자가 이메일 인증을 통해 즉시 잠금을 해제할 수 있도록 OTP를 발송한다.
+   *
+   * @param email 사용자 이메일
+   */
+  @Transactional(readOnly = true)
+  public void requestUnlockOtp(String email) {
+    // 계정 열거(account enumeration) 방지: 미존재/비잠금 계정은 조용히 무시하고
+    // 컨트롤러는 항상 동일한 일반 성공 응답을 반환한다. 실제 결과는 서버 로그로만 남긴다.
+    userMapper
+        .findByEmail(email)
+        .filter(User::isLocked)
+        .ifPresentOrElse(
+            user -> {
+              String decryptedEmail = decryptField(user.getEmail());
+              emailAuthService.sendVerificationCode(
+                  user.getSeq(), decryptedEmail, EmailAuthService.PURPOSE_UNLOCK);
+              log.info(
+                  "[잠금해제 OTP 발송] userSeq={}, email={}",
+                  user.getSeq(),
+                  CommonUtils.maskingEmailShort(decryptedEmail));
+            },
+            () -> log.info("[잠금해제 OTP 요청 무시] 미존재 또는 비잠금 계정 - 응답 일반화"));
+  }
+
+  /**
+   * 이메일 OTP 검증 후 즉시 잠금 해제.
+   *
+   * @param userSeq 사용자 seq
+   * @param otp 사용자가 입력한 OTP
+   */
+  @Transactional
+  public void unlockByEmailOtp(int userSeq, String otp) {
+    User user =
+        userMapper
+            .findBySeq(userSeq)
+            .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+    emailAuthService.verifyCode(userSeq, otp, EmailAuthService.PURPOSE_UNLOCK);
+
+    userMapper.resetLoginAndUnlock(userSeq);
+    auditEventService.recordUnlock(user, UnlockType.OTP, userSeq);
+    log.info("[잠금해제 완료 (OTP)] userSeq={}", userSeq);
+  }
+
+  /**
+   * 이메일 + OTP 로 잠금 해제 (컨트롤러 진입점 — 이메일로 userSeq 를 내부 조회).
+   *
+   * @param email 사용자 이메일 (암호화된 값 or 평문)
+   * @param otp 입력된 OTP
+   */
+  @Transactional
+  public void unlockByEmail(String email, String otp) {
+    User user =
+        userMapper
+            .findByEmail(email)
+            .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "등록된 이메일이 없습니다."));
+
+    unlockByEmailOtp(user.getSeq(), otp);
+  }
+
+  /**
+   * 관리자 강제 잠금 해제.
+   *
+   * <p>기존 unlockAccount(userId) 보강: seq 기반 atomic reset + AuditEvent 기록.
+   *
+   * @param userSeq 대상 사용자 seq
+   * @param adminSeq 요청한 관리자 seq
+   */
+  @Transactional
+  public void unlockAccount(int userSeq, int adminSeq) {
+    User user =
+        userMapper
+            .findBySeq(userSeq)
+            .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+    userMapper.resetLoginAndUnlock(userSeq);
+    auditEventService.recordUnlock(user, UnlockType.ADMIN, adminSeq);
+    log.info("[잠금해제 완료 (관리자)] userSeq={}, adminSeq={}", userSeq, adminSeq);
+  }
+
+  // ==================== 휴면 복관 (PR3) ====================
+
+  /**
+   * 휴면 계정 복관 OTP 발송 요청.
+   *
+   * <p>이메일로 사용자를 조회하고, 휴면 상태인 경우에만 OTP를 발송한다.
+   *
+   * @param email 사용자 이메일
+   */
+  @Transactional(readOnly = true)
+  public void requestDormantRecovery(String email) {
+    // 계정 열거(account enumeration) 방지: 미존재/비휴면 계정은 조용히 무시하고
+    // 컨트롤러는 항상 동일한 일반 성공 응답을 반환한다. 실제 결과는 서버 로그로만 남긴다.
+    userMapper
+        .findByEmail(email)
+        .filter(User::isDormant)
+        .ifPresentOrElse(
+            user -> {
+              String decryptedEmail = decryptField(user.getEmail());
+              emailAuthService.sendVerificationCode(
+                  user.getSeq(), decryptedEmail, EmailAuthService.PURPOSE_DORMANT_RECOVERY);
+              log.info(
+                  "[휴면 복관 OTP 발송] userSeq={}, email={}",
+                  user.getSeq(),
+                  CommonUtils.maskingEmailShort(decryptedEmail));
+            },
+            () -> log.info("[휴면 복관 OTP 요청 무시] 미존재 또는 비휴면 계정 - 응답 일반화"));
+  }
+
+  /**
+   * 이메일 OTP 검증 후 휴면 복관 처리.
+   *
+   * <p>OTP purpose=DORMANT_RECOVERY 검증 → LIFECYCLE_STATUS=ACTIVE, DORMANT_AT=NULL,
+   * DORMANT_NOTIFIED_AT=NULL → AuditEvent RECOVERY 기록.
+   *
+   * @param email 사용자 이메일 (컨트롤러에서 userSeq 대신 이메일로 진입)
+   * @param otp 사용자가 입력한 OTP
+   */
+  @Transactional
+  public void recoverDormant(String email, String otp) {
+    User user =
+        userMapper
+            .findByEmail(email)
+            .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "등록된 이메일이 없습니다."));
+
+    if (!user.isDormant()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "휴면 상태인 계정이 아닙니다.");
+    }
+
+    emailAuthService.verifyCode(user.getSeq(), otp, EmailAuthService.PURPOSE_DORMANT_RECOVERY);
+
+    userMapper.recoverDormant(user.getSeq());
+    auditEventService.recordRecovery(user, null, null);
+    log.info("[휴면 복관 완료] userSeq={}", user.getSeq());
   }
 }

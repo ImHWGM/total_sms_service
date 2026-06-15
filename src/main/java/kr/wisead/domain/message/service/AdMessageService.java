@@ -15,6 +15,7 @@ import kr.wisead.domain.message.dto.AdMessageResponse;
 import kr.wisead.domain.message.entity.MsgQueue;
 import kr.wisead.domain.payment.dto.BalanceResponse;
 import kr.wisead.domain.payment.service.BalanceService;
+import kr.wisead.domain.profanity.service.ProfanityFilterService;
 import kr.wisead.domain.user.entity.User;
 import kr.wisead.mapper.primary.UserMapper;
 import kr.wisead.mapper.sms.MsgQueueMapper;
@@ -35,6 +36,7 @@ public class AdMessageService {
   private final BlockedNumberService blockedNumberService;
   private final FileStorageService fileStorageService;
   private final UserIdResolver userIdResolver;
+  private final ProfanityFilterService profanityFilterService;
 
   /** 야간 전송제한 시간 (20:00 ~ 09:00) */
   private static final LocalTime NIGHT_START = LocalTime.of(20, 0);
@@ -76,6 +78,16 @@ public class AdMessageService {
       log.warn("잘못된 사용자 식별자 - userId: {}", userId);
       return AdMessageResponse.fail(-1, "사용자 정보를 찾을 수 없습니다.");
     }
+
+    // 2-1. 금칙어 검사 (SEND: 광고 문자 발송)
+    profanityFilterService.validateForSend(
+        request.getContTxt(),
+        userSeq,
+        null,
+        null,
+        null,
+        request.getRecipients() != null ? request.getRecipients().size() : null);
+
     String storeCode = userMapper.findByUserId(userId).map(User::getStoreCode).orElse(null);
     if (storeCode == null || storeCode.isBlank()) {
       log.warn("상점코드 없음 - userId: {}", userId);

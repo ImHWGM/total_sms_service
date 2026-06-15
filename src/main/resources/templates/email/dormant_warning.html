@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>계정 휴면 전환 예정 안내</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5;">
+<div style="max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+
+    <!-- 헤더 -->
+    <div style="background-color: #007bff; padding: 30px 40px;">
+        <h1 style="margin: 0; font-size: 22px; color: #ffffff; font-family: 'Noto Sans KR', Arial, sans-serif;">
+            WiseAd 계정 휴면 전환 예정 안내
+        </h1>
+    </div>
+
+    <!-- 본문 -->
+    <div style="padding: 40px; font-family: 'Noto Sans KR', Arial, sans-serif;">
+
+        <p style="font-size: 16px; color: #333; margin-top: 0;">
+            안녕하세요, <strong th:text="${userName}">홍길동</strong>님.
+        </p>
+
+        <p style="font-size: 15px; color: #555; line-height: 1.7;">
+            마지막 로그인 후 <strong>5개월</strong>이 경과하여 곧 휴면 계정으로 전환될 예정입니다.<br>
+            소중한 계정을 유지하려면 아래 안내를 확인해주세요.
+        </p>
+
+        <!-- 정보 테이블 -->
+        <table style="width: 100%; border-collapse: collapse; margin: 24px 0; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden;">
+            <tr style="background-color: #f8f9fa;">
+                <td style="padding: 14px 20px; font-size: 14px; font-weight: bold; color: #555; width: 160px; border-bottom: 1px solid #e0e0e0;">
+                    마지막 로그인
+                </td>
+                <td style="padding: 14px 20px; font-size: 14px; color: #333; border-bottom: 1px solid #e0e0e0;" th:text="${lastLoginDate}">
+                    2025-11-21
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 14px 20px; font-size: 14px; font-weight: bold; color: #555;">
+                    휴면 전환 예정일
+                </td>
+                <td style="padding: 14px 20px; font-size: 14px; color: #e53935; font-weight: bold;" th:text="${dormantDate}">
+                    2025-12-21
+                </td>
+            </tr>
+        </table>
+
+        <!-- CTA 버튼 -->
+        <div style="text-align: center; margin: 32px 0;">
+            <a th:href="${recoverUrl}" href="#"
+               style="display: inline-block; background-color: #007bff; color: #ffffff; padding: 14px 40px;
+                      text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: bold;
+                      font-family: 'Noto Sans KR', Arial, sans-serif;">
+                계정 유지 / 복관하기
+            </a>
+        </div>
+
+        <!-- 경고 박스 -->
+        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; padding: 16px 20px; margin-top: 24px;">
+            <p style="margin: 0; font-size: 14px; color: #856404; line-height: 1.6;">
+                <strong>주의사항</strong><br>
+                휴면 전환 후 <strong>6개월</strong>이 추가 경과하면 개인정보 보호법(PIPA Art.21)에 따라<br>
+                계정이 자동 탈퇴 처리되며 개인정보가 삭제됩니다.
+            </p>
+        </div>
+
+    </div>
+
+    <!-- 푸터 -->
+    <div style="background-color: #f8f9fa; padding: 20px 40px; border-top: 1px solid #e0e0e0;">
+        <p style="margin: 0; font-size: 12px; color: #999; line-height: 1.6;">
+            본 메일은 발신 전용입니다. 문의사항은 고객센터를 이용해주세요.<br>
+            &copy; WiseAd. All rights reserved.
+        </p>
+    </div>
+
+</div>
+</body>
+</html>

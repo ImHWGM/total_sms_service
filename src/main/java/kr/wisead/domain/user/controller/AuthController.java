@@ -108,7 +108,7 @@ public class AuthController {
   @PostMapping("/unlock/request")
   public ApiResponse<Void> requestUnlockOtp(@RequestBody Map<String, String> body) {
     authService.requestUnlockOtp(requireEmail(body));
-    return ApiResponse.success("잠금 해제 인증 코드가 이메일로 발송되었습니다.");
+    return ApiResponse.success("잠금 상태의 가입된 계정이라면 인증 코드가 이메일로 발송됩니다.");
   }
 
   /**
@@ -132,7 +132,7 @@ public class AuthController {
   @PostMapping("/dormant/request")
   public ApiResponse<Void> requestDormantRecovery(@RequestBody Map<String, String> body) {
     authService.requestDormantRecovery(requireEmail(body));
-    return ApiResponse.success("휴면 복관 인증 코드가 이메일로 발송되었습니다.");
+    return ApiResponse.success("휴면 상태의 가입된 계정이라면 인증 코드가 이메일로 발송됩니다.");
   }
 
   /**

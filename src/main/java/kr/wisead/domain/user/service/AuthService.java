@@ -578,22 +578,22 @@ public class AuthService {
    */
   @Transactional(readOnly = true)
   public void requestUnlockOtp(String email) {
-    User user =
-        userMapper
-            .findByEmail(email)
-            .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "등록된 이메일이 없습니다."));
-
-    if (!user.isLocked()) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "잠금 상태인 계정이 아닙니다.");
-    }
-
-    String decryptedEmail = decryptField(user.getEmail());
-    emailAuthService.sendVerificationCode(
-        user.getSeq(), decryptedEmail, EmailAuthService.PURPOSE_UNLOCK);
-    log.info(
-        "[잠금해제 OTP 발송] userSeq={}, email={}",
-        user.getSeq(),
-        CommonUtils.maskingEmailShort(decryptedEmail));
+    // 계정 열거(account enumeration) 방지: 미존재/비잠금 계정은 조용히 무시하고
+    // 컨트롤러는 항상 동일한 일반 성공 응답을 반환한다. 실제 결과는 서버 로그로만 남긴다.
+    userMapper
+        .findByEmail(email)
+        .filter(User::isLocked)
+        .ifPresentOrElse(
+            user -> {
+              String decryptedEmail = decryptField(user.getEmail());
+              emailAuthService.sendVerificationCode(
+                  user.getSeq(), decryptedEmail, EmailAuthService.PURPOSE_UNLOCK);
+              log.info(
+                  "[잠금해제 OTP 발송] userSeq={}, email={}",
+                  user.getSeq(),
+                  CommonUtils.maskingEmailShort(decryptedEmail));
+            },
+            () -> log.info("[잠금해제 OTP 요청 무시] 미존재 또는 비잠금 계정 - 응답 일반화"));
   }
 
   /**
@@ -663,22 +663,22 @@ public class AuthService {
    */
   @Transactional(readOnly = true)
   public void requestDormantRecovery(String email) {
-    User user =
-        userMapper
-            .findByEmail(email)
-            .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND, "등록된 이메일이 없습니다."));
-
-    if (!user.isDormant()) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "휴면 상태인 계정이 아닙니다.");
-    }
-
-    String decryptedEmail = decryptField(user.getEmail());
-    emailAuthService.sendVerificationCode(
-        user.getSeq(), decryptedEmail, EmailAuthService.PURPOSE_DORMANT_RECOVERY);
-    log.info(
-        "[휴면 복관 OTP 발송] userSeq={}, email={}",
-        user.getSeq(),
-        CommonUtils.maskingEmailShort(decryptedEmail));
+    // 계정 열거(account enumeration) 방지: 미존재/비휴면 계정은 조용히 무시하고
+    // 컨트롤러는 항상 동일한 일반 성공 응답을 반환한다. 실제 결과는 서버 로그로만 남긴다.
+    userMapper
+        .findByEmail(email)
+        .filter(User::isDormant)
+        .ifPresentOrElse(
+            user -> {
+              String decryptedEmail = decryptField(user.getEmail());
+              emailAuthService.sendVerificationCode(
+                  user.getSeq(), decryptedEmail, EmailAuthService.PURPOSE_DORMANT_RECOVERY);
+              log.info(
+                  "[휴면 복관 OTP 발송] userSeq={}, email={}",
+                  user.getSeq(),
+                  CommonUtils.maskingEmailShort(decryptedEmail));
+            },
+            () -> log.info("[휴면 복관 OTP 요청 무시] 미존재 또는 비휴면 계정 - 응답 일반화"));
   }
 
   /**

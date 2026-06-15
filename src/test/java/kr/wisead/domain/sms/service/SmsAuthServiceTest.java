@@ -12,8 +12,8 @@ import static org.mockito.Mockito.verify;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
-import kr.wisead.domain.email.dto.EmailVerificationStatus;
 import kr.wisead.domain.sms.sender.SmsOtpSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -61,7 +61,7 @@ class SmsAuthServiceTest {
     sut.sendVerificationCode(USER_ID, PHONE);
 
     verify(smsOtpSender, times(1)).sendOtp(eq(PHONE), anyString());
-    EmailVerificationStatus status = sut.getVerificationStatus(USER_ID);
+    VerificationStatus status = sut.getVerificationStatus(USER_ID);
     assertThat(status.codeSent()).isTrue();
     assertThat(status.remainingAttempts()).isEqualTo(5);
   }
@@ -89,7 +89,7 @@ class SmsAuthServiceTest {
     sut.verifyCode(USER_ID, code);
 
     // 검증 성공 후 store 에서 제거됨
-    EmailVerificationStatus status = sut.getVerificationStatus(USER_ID);
+    VerificationStatus status = sut.getVerificationStatus(USER_ID);
     assertThat(status.codeSent()).isFalse();
   }
 
@@ -112,7 +112,7 @@ class SmsAuthServiceTest {
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("발송");
 
-    EmailVerificationStatus status = sut.getVerificationStatus(USER_ID);
+    VerificationStatus status = sut.getVerificationStatus(USER_ID);
     assertThat(status.codeSent()).isFalse();
   }
 
@@ -176,7 +176,7 @@ class SmsAuthServiceTest {
   void getVerificationStatus_returnsCurrentState() {
     sut.sendVerificationCode(USER_ID, PHONE);
 
-    EmailVerificationStatus status = sut.getVerificationStatus(USER_ID);
+    VerificationStatus status = sut.getVerificationStatus(USER_ID);
 
     assertThat(status.codeSent()).isTrue();
     assertThat(status.remainingAttempts()).isEqualTo(5);
@@ -187,7 +187,7 @@ class SmsAuthServiceTest {
   @Test
   @DisplayName("getVerificationStatus_nullUserId_returnsFalse: null 안전")
   void getVerificationStatus_nullUserId_returnsFalse() {
-    EmailVerificationStatus status = sut.getVerificationStatus(null);
+    VerificationStatus status = sut.getVerificationStatus(null);
 
     assertThat(status.codeSent()).isFalse();
     assertThat(status.remainingSeconds()).isZero();

@@ -8,8 +8,8 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
-import kr.wisead.domain.email.dto.EmailVerificationStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,10 +51,10 @@ class PreSignupEmailAuthServiceTest {
     sut.sendVerificationCode(EMAIL);
 
     // then: 소문자 정규화 키로 조회하면 codeSent=true
-    EmailVerificationStatus status = sut.getVerificationStatus(EMAIL_LOWER);
+    VerificationStatus status = sut.getVerificationStatus(EMAIL_LOWER);
     assertThat(status.codeSent()).isTrue();
     // 원본 대소문자 키로도 동일하게 조회 가능
-    EmailVerificationStatus statusUpper = sut.getVerificationStatus(EMAIL);
+    VerificationStatus statusUpper = sut.getVerificationStatus(EMAIL);
     assertThat(statusUpper.codeSent()).isTrue();
 
     verify(emailService).sendVerificationEmail(eq(EMAIL), eq(CODE));
@@ -69,7 +69,7 @@ class PreSignupEmailAuthServiceTest {
 
     assertThat(result).isTrue();
     // 검증 성공 후 상태 조회 → codeSent=false (저장소 제거)
-    EmailVerificationStatus status = sut.getVerificationStatus(EMAIL_LOWER);
+    VerificationStatus status = sut.getVerificationStatus(EMAIL_LOWER);
     assertThat(status.codeSent()).isFalse();
   }
 
@@ -98,7 +98,7 @@ class PreSignupEmailAuthServiceTest {
   void getVerificationStatus_returnsCurrentState() {
     sut.sendVerificationCode(EMAIL);
 
-    EmailVerificationStatus status = sut.getVerificationStatus(EMAIL);
+    VerificationStatus status = sut.getVerificationStatus(EMAIL);
 
     assertThat(status.codeSent()).isTrue();
     assertThat(status.remainingSeconds()).isPositive();
@@ -108,7 +108,7 @@ class PreSignupEmailAuthServiceTest {
   @Test
   @DisplayName("getVerificationStatus: 발송 전 조회 시 codeSent=false")
   void getVerificationStatus_beforeSend_returnsFalse() {
-    EmailVerificationStatus status = sut.getVerificationStatus(EMAIL);
+    VerificationStatus status = sut.getVerificationStatus(EMAIL);
     assertThat(status.codeSent()).isFalse();
   }
 }

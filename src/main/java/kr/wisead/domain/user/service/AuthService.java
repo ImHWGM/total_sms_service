@@ -20,6 +20,7 @@ import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.payment.entity.UserServiceRate;
 import kr.wisead.domain.payment.service.StandardRateService;
 import kr.wisead.domain.payment.service.WalletService;
+import kr.wisead.domain.sms.service.PreSignupSmsAuthService;
 import kr.wisead.domain.sms.service.SmsAuthService;
 import kr.wisead.domain.user.dto.LoginFailureResponse;
 import kr.wisead.domain.user.dto.LoginRequest;
@@ -54,6 +55,7 @@ public class AuthService {
   private final JwtTokenProvider jwtTokenProvider;
   private final EmailAuthService emailAuthService;
   private final SmsAuthService smsAuthService;
+  private final PreSignupSmsAuthService preSignupSmsAuthService;
   private final SessionKeyService sessionKeyService;
   private final AuditEventService auditEventService;
 
@@ -371,6 +373,10 @@ public class AuthService {
     if (userMapper.existsByEmail(request.getEmail())) {
       throw new BusinessException(ErrorCode.DUPLICATE_EMAIL, "이미 등록된 이메일입니다.");
     }
+
+    // 3-1. 담당자 연락처 SMS 본인인증 강제 검사 (인증된 번호로만 가입 허용, 1회용 소비)
+    preSignupSmsAuthService.consumeVerification(
+        request.getPhone(), PreSignupSmsAuthService.PURPOSE_SIGNUP);
 
     // 4-1. 연락처 암호화 처리
     String encryptedPhone = null;

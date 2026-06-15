@@ -3,10 +3,10 @@ package kr.wisead.domain.email.service;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
-import kr.wisead.domain.email.dto.EmailVerificationStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -108,17 +108,17 @@ public class PreSignupEmailAuthService {
   }
 
   /** 인증 상태 확인. */
-  public EmailVerificationStatus getVerificationStatus(String email) {
+  public VerificationStatus getVerificationStatus(String email) {
     VerificationInfo info = verificationStore.get(email.toLowerCase());
     if (info == null) {
-      return new EmailVerificationStatus(false, 0, 0, 0);
+      return new VerificationStatus(false, 0, 0, 0);
     }
 
     long remainingSeconds = info.getRemainingSeconds();
     long remainingResendSeconds = info.getRemainingResendSeconds();
     int remainingAttempts = MAX_ATTEMPTS - info.getAttempts();
 
-    return new EmailVerificationStatus(
+    return new VerificationStatus(
         true, remainingSeconds, remainingResendSeconds, remainingAttempts);
   }
 

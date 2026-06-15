@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
-import kr.wisead.domain.email.dto.EmailVerificationStatus;
+import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.domain.email.service.EmailService;
 import kr.wisead.domain.email.service.PreSignupEmailAuthService;
 import kr.wisead.security.jwt.JwtAuthenticationFilter;
@@ -89,7 +89,7 @@ class EmailVerificationControllerTest {
       "signupFlow: GET /verification/status → PreSignupEmailAuthService.getVerificationStatus 호출")
   void signupFlow_getStatus_routesToPreSignup() throws Exception {
     when(emailAuthService.getVerificationStatus(EMAIL))
-        .thenReturn(new EmailVerificationStatus(true, 240, 0, 5));
+        .thenReturn(new VerificationStatus(true, 240, 0, 5));
 
     mockMvc
         .perform(get("/api/email/verification/status").param("email", EMAIL))

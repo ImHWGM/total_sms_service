@@ -3,10 +3,10 @@ package kr.wisead.domain.email.service;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
-import kr.wisead.domain.email.dto.EmailVerificationStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -170,20 +170,20 @@ public class EmailAuthService {
    *
    * @param userId 사용자 seq
    */
-  public EmailVerificationStatus getVerificationStatus(Integer userId) {
+  public VerificationStatus getVerificationStatus(Integer userId) {
     if (userId == null) {
-      return new EmailVerificationStatus(false, 0, 0, 0);
+      return new VerificationStatus(false, 0, 0, 0);
     }
     VerificationInfo info = verificationStore.get(userId);
     if (info == null) {
-      return new EmailVerificationStatus(false, 0, 0, 0);
+      return new VerificationStatus(false, 0, 0, 0);
     }
 
     long remainingSeconds = info.getRemainingSeconds();
     long remainingResendSeconds = info.getRemainingResendSeconds();
     int remainingAttempts = MAX_ATTEMPTS - info.getAttempts();
 
-    return new EmailVerificationStatus(
+    return new VerificationStatus(
         true, remainingSeconds, remainingResendSeconds, remainingAttempts);
   }
 

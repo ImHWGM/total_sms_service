@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
-import kr.wisead.domain.email.dto.EmailVerificationStatus;
+import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.domain.email.service.PreSignupEmailAuthService;
 import kr.wisead.domain.user.dto.LoginRequest;
 import kr.wisead.domain.user.dto.LoginResponse;
@@ -100,7 +100,7 @@ class LoginWithEmailVerificationTest {
   @DisplayName("3. 이메일 인증 상태 조회")
   void getVerificationStatus_CodeSent() throws Exception {
     // Given: 인증코드가 발송된 상태
-    EmailVerificationStatus status = new EmailVerificationStatus(true, 240, 0, 5);
+    VerificationStatus status = new VerificationStatus(true, 240, 0, 5);
 
     when(emailAuthService.getVerificationStatus(TEST_EMAIL)).thenReturn(status);
 

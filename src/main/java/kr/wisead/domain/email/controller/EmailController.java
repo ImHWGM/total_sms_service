@@ -1,10 +1,10 @@
 package kr.wisead.domain.email.controller;
 
 import jakarta.validation.Valid;
+import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.domain.email.dto.EmailRequest;
 import kr.wisead.domain.email.dto.EmailVerificationRequest;
-import kr.wisead.domain.email.dto.EmailVerificationStatus;
 import kr.wisead.domain.email.service.EmailService;
 import kr.wisead.domain.email.service.PreSignupEmailAuthService;
 import lombok.RequiredArgsConstructor;
@@ -48,8 +48,8 @@ public class EmailController {
 
   /** 인증 상태 조회 GET /api/email/verification/status?email=test@example.com */
   @GetMapping("/verification/status")
-  public ApiResponse<EmailVerificationStatus> getVerificationStatus(@RequestParam String email) {
-    EmailVerificationStatus status = emailAuthService.getVerificationStatus(email);
+  public ApiResponse<VerificationStatus> getVerificationStatus(@RequestParam String email) {
+    VerificationStatus status = emailAuthService.getVerificationStatus(email);
     return ApiResponse.success(status);
   }
 

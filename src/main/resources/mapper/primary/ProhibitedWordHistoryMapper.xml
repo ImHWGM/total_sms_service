@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.ProhibitedWordHistoryMapper">
+
+    <resultMap id="ProhibitedWordHistoryResultMap" type="kr.wisead.domain.profanity.entity.ProhibitedWordHistory">
+        <id     property="seq"       column="SEQ"/>
+        <result property="wordId"    column="WORD_ID"/>
+        <result property="action"    column="ACTION"/>
+        <result property="prevValue" column="PREV_VALUE"/>
+        <result property="newValue"  column="NEW_VALUE"/>
+        <result property="actorId"   column="ACTOR_ID"/>
+        <result property="reason"    column="REASON"/>
+        <result property="createdAt" column="CREATED_AT"/>
+    </resultMap>
+
+    <!-- 이력 등록 -->
+    <insert id="insert" parameterType="kr.wisead.domain.profanity.entity.ProhibitedWordHistory"
+            useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO prohibited_word_history (WORD_ID, ACTION, PREV_VALUE, NEW_VALUE, ACTOR_ID, REASON)
+        VALUES (#{wordId}, #{action}, #{prevValue}, #{newValue}, #{actorId}, #{reason})
+    </insert>
+
+    <!-- 조건 검색 (페이징) -->
+    <select id="selectByFilter" resultMap="ProhibitedWordHistoryResultMap">
+        SELECT SEQ, WORD_ID, ACTION, PREV_VALUE, NEW_VALUE, ACTOR_ID, REASON, CREATED_AT
+        FROM prohibited_word_history
+        <where>
+            <if test="wordId != null">
+                AND WORD_ID = #{wordId}
+            </if>
+            <if test="fromDate != null">
+                AND CREATED_AT &gt;= #{fromDate}
+            </if>
+            <if test="toDate != null">
+                AND CREATED_AT &lt;= #{toDate}
+            </if>
+        </where>
+        ORDER BY CREATED_AT DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 조건 검색 총 건수 -->
+    <select id="countByFilter" resultType="long">
+        SELECT COUNT(*)
+        FROM prohibited_word_history
+        <where>
+            <if test="wordId != null">
+                AND WORD_ID = #{wordId}
+            </if>
+            <if test="fromDate != null">
+                AND CREATED_AT &gt;= #{fromDate}
+            </if>
+            <if test="toDate != null">
+                AND CREATED_AT &lt;= #{toDate}
+            </if>
+        </where>
+    </select>
+
+</mapper>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.ProfanityBlockLogMapper">
+
+    <resultMap id="ProfanityBlockLogResultMap" type="kr.wisead.domain.profanity.entity.ProfanityBlockLog">
+        <id     property="seq"            column="SEQ"/>
+        <result property="userId"         column="USER_ID"/>
+        <result property="matchedWord"    column="MATCHED_WORD"/>
+        <result property="contentSnippet" column="CONTENT_SNIPPET"/>
+        <result property="fullContent"    column="FULL_CONTENT"/>
+        <result property="source"         column="SOURCE"/>
+        <result property="messageId"      column="MESSAGE_ID"/>
+        <result property="recipientCount" column="RECIPIENT_COUNT"/>
+        <result property="ip"             column="IP"/>
+        <result property="userAgent"      column="USER_AGENT"/>
+        <result property="createdAt"      column="CREATED_AT"/>
+    </resultMap>
+
+    <!-- 차단 로그 등록 -->
+    <insert id="insert" parameterType="kr.wisead.domain.profanity.entity.ProfanityBlockLog"
+            useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO profanity_block_log (
+            USER_ID, MATCHED_WORD, CONTENT_SNIPPET, FULL_CONTENT,
+            SOURCE, MESSAGE_ID, RECIPIENT_COUNT, IP, USER_AGENT
+        ) VALUES (
+            #{userId}, #{matchedWord}, #{contentSnippet}, #{fullContent},
+            #{source}, #{messageId}, #{recipientCount}, #{ip}, #{userAgent}
+        )
+    </insert>
+
+    <!-- 조건 검색 (페이징) -->
+    <select id="selectByFilter" resultMap="ProfanityBlockLogResultMap">
+        SELECT SEQ, USER_ID, MATCHED_WORD, CONTENT_SNIPPET, FULL_CONTENT,
+               SOURCE, MESSAGE_ID, RECIPIENT_COUNT, IP, USER_AGENT, CREATED_AT
+        FROM profanity_block_log
+        <where>
+            <if test="userId != null">
+                AND USER_ID = #{userId}
+            </if>
+            <if test="source != null and source != ''">
+                AND SOURCE = #{source}
+            </if>
+            <if test="from != null">
+                AND CREATED_AT &gt;= #{from}
+            </if>
+            <if test="to != null">
+                AND CREATED_AT &lt;= #{to}
+            </if>
+        </where>
+        ORDER BY CREATED_AT DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 조건 검색 총 건수 -->
+    <select id="countByFilter" resultType="long">
+        SELECT COUNT(*)
+        FROM profanity_block_log
+        <where>
+            <if test="userId != null">
+                AND USER_ID = #{userId}
+            </if>
+            <if test="source != null and source != ''">
+                AND SOURCE = #{source}
+            </if>
+            <if test="from != null">
+                AND CREATED_AT &gt;= #{from}
+            </if>
+            <if test="to != null">
+                AND CREATED_AT &lt;= #{to}
+            </if>
+        </where>
+    </select>
+
+</mapper>

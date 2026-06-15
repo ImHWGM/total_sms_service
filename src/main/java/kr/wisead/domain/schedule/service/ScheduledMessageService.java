@@ -10,6 +10,7 @@ import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.payment.dto.BalanceResponse;
 import kr.wisead.domain.payment.service.BalanceService;
 import kr.wisead.domain.payment.service.WalletService;
+import kr.wisead.domain.profanity.service.ProfanityFilterService;
 import kr.wisead.domain.schedule.dto.ScheduledMessageResponse;
 import kr.wisead.domain.schedule.dto.ScheduledMessageSearchRequest;
 import kr.wisead.domain.schedule.entity.ScheduledMessage;
@@ -34,6 +35,7 @@ public class ScheduledMessageService {
   private final UserIdResolver userIdResolver;
   private final SurveyUserMapper surveyUserMapper;
   private final SmsSendMapper smsSendMapper;
+  private final ProfanityFilterService profanityFilterService;
 
   @Value("${api.base.url:}")
   private String apiBaseUrl;
@@ -121,6 +123,23 @@ public class ScheduledMessageService {
     LocalDateTime minTime = LocalDateTime.now().plusMinutes(10);
     if (newScheduleTime.isBefore(minTime)) {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "예약일시는 현재 시각으로부터 최소 10분 이후여야 합니다.");
+    }
+
+    // 금칙어 재검사 (SCHEDULE): 예약 변경 시점에 새로 추가된 금칙어 차단
+    // 동일 배치의 메시지는 내용이 동일하므로 대표 1건만 조회하여 검사
+    Integer userSeq = userIdResolver.toUserSeq(userId);
+    List<ScheduledMessage> sample =
+        scheduledMessageMapper.selectScheduledMessages(
+            userId, msgType, null, null, null, null, 0, 1);
+    if (!sample.isEmpty() && sample.get(0).getText() != null) {
+      ScheduledMessage rep = sample.get(0);
+      profanityFilterService.validateForSchedule(
+          rep.getText(),
+          userSeq,
+          null,
+          null,
+          rep.getMSeq() != null ? rep.getMSeq().longValue() : null,
+          null);
     }
 
     int updated =

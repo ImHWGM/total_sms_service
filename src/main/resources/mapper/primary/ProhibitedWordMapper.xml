@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.ProhibitedWordMapper">
+
+    <resultMap id="ProhibitedWordResultMap" type="kr.wisead.domain.profanity.entity.ProhibitedWord">
+        <id     property="seq"       column="SEQ"/>
+        <result property="word"      column="WORD"/>
+        <result property="category"  column="CATEGORY"/>
+        <result property="active"    column="ACTIVE"/>
+        <result property="reason"    column="REASON"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="updatedAt" column="UPDATED_AT"/>
+        <result property="version"   column="VERSION"/>
+    </resultMap>
+
+    <!-- 금칙어 등록 -->
+    <insert id="insert" parameterType="kr.wisead.domain.profanity.entity.ProhibitedWord"
+            useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO prohibited_word (WORD, CATEGORY, ACTIVE, REASON, VERSION)
+        VALUES (#{word}, #{category}, #{active}, #{reason}, 0)
+    </insert>
+
+    <!-- 금칙어 수정 -->
+    <update id="update" parameterType="kr.wisead.domain.profanity.entity.ProhibitedWord">
+        UPDATE prohibited_word
+        SET WORD     = #{word},
+            CATEGORY = #{category},
+            ACTIVE   = #{active},
+            REASON   = #{reason}
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- 금칙어 삭제 -->
+    <delete id="delete">
+        DELETE FROM prohibited_word WHERE SEQ = #{seq}
+    </delete>
+
+    <!-- 전체 목록 (관리 화면용) -->
+    <select id="selectAll" resultMap="ProhibitedWordResultMap">
+        SELECT SEQ, WORD, CATEGORY, ACTIVE, REASON, CREATED_AT, UPDATED_AT, VERSION
+        FROM prohibited_word
+        ORDER BY CREATED_AT DESC
+    </select>
+
+    <!-- 단건 조회 -->
+    <select id="selectBySeq" resultMap="ProhibitedWordResultMap">
+        SELECT SEQ, WORD, CATEGORY, ACTIVE, REASON, CREATED_AT, UPDATED_AT, VERSION
+        FROM prohibited_word
+        WHERE SEQ = #{seq}
+    </select>
+
+    <!-- 최대 VERSION (캐시 폴링용) -->
+    <select id="selectMaxVersion" resultType="java.lang.Long">
+        SELECT COALESCE(MAX(VERSION), 0) FROM prohibited_word
+    </select>
+
+    <!-- VERSION 증가 (CUD 완료 직후 호출) -->
+    <update id="bumpVersion">
+        UPDATE prohibited_word SET VERSION = VERSION + 1 WHERE SEQ = #{seq}
+    </update>
+
+    <!-- 활성 금칙어 전체 로드 (캐시 초기/갱신용) -->
+    <select id="selectAllActive" resultMap="ProhibitedWordResultMap">
+        SELECT SEQ, WORD, CATEGORY, ACTIVE, REASON, CREATED_AT, UPDATED_AT, VERSION
+        FROM prohibited_word
+        WHERE ACTIVE = TRUE
+        ORDER BY SEQ
+    </select>
+
+</mapper>

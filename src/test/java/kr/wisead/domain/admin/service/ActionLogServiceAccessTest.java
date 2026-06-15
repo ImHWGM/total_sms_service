@@ -30,7 +30,17 @@ class ActionLogServiceAccessTest {
     actionLogService.logAccess(
         "admin01", "홍길동", "개인정보취합 발송조회", "R", "eventType=P&keyword=홍길동", "200", req);
 
-    verify(actionLogMapper).insertAccessLog(any(ActionLog.class));
+    ArgumentCaptor<ActionLog> captor = ArgumentCaptor.forClass(ActionLog.class);
+    verify(actionLogMapper).insertAccessLog(captor.capture());
+    ActionLog saved = captor.getValue();
+    assertEquals("admin01", saved.getUserId());
+    assertEquals("홍길동", saved.getUserName());
+    assertEquals("개인정보취합 발송조회", saved.getMenuName());
+    assertEquals("R", saved.getActionType());
+    assertEquals("eventType=P&keyword=홍길동", saved.getSearchCondition());
+    assertEquals("/api/survey/users", saved.getMenuUrl());
+    assertEquals("https://wisead.kr/admin/survey/sent", saved.getReferer());
+    assertEquals("200", saved.getCode());
   }
 
   @Test

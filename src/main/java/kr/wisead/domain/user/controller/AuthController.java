@@ -2,7 +2,9 @@ package kr.wisead.domain.user.controller;
 
 import jakarta.validation.Valid;
 import java.util.Map;
+import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ApiResponse;
+import kr.wisead.common.response.ErrorCode;
 import kr.wisead.domain.user.dto.LoginRequest;
 import kr.wisead.domain.user.dto.LoginResponse;
 import kr.wisead.domain.user.dto.SignUpRequest;
@@ -94,5 +96,69 @@ public class AuthController {
     String bizNum = request.get("bizNum");
     Map<String, Object> result = businessNoValidationService.validateBizNo(bizNum);
     return ApiResponse.success(result);
+  }
+
+  // ==================== 잠금 해제 (PR1) ====================
+
+  /**
+   * 잠금 해제 OTP 발송 요청.
+   *
+   * <p>POST /api/auth/unlock/request — body: {"email": "..."}
+   */
+  @PostMapping("/unlock/request")
+  public ApiResponse<Void> requestUnlockOtp(@RequestBody Map<String, String> body) {
+    authService.requestUnlockOtp(requireEmail(body));
+    return ApiResponse.success("잠금 해제 인증 코드가 이메일로 발송되었습니다.");
+  }
+
+  /**
+   * 잠금 해제 OTP 검증 후 즉시 해제.
+   *
+   * <p>POST /api/auth/unlock/verify — body: {"email": "...", "otp": "..."}
+   */
+  @PostMapping("/unlock/verify")
+  public ApiResponse<Void> verifyUnlockOtp(@RequestBody Map<String, String> body) {
+    authService.unlockByEmail(requireEmail(body), requireOtp(body));
+    return ApiResponse.success("계정 잠금이 해제되었습니다.");
+  }
+
+  // ==================== 휴면 복관 (PR3) ====================
+
+  /**
+   * 휴면 복관 OTP 발송 요청.
+   *
+   * <p>POST /api/auth/dormant/request — body: {"email": "..."}
+   */
+  @PostMapping("/dormant/request")
+  public ApiResponse<Void> requestDormantRecovery(@RequestBody Map<String, String> body) {
+    authService.requestDormantRecovery(requireEmail(body));
+    return ApiResponse.success("휴면 복관 인증 코드가 이메일로 발송되었습니다.");
+  }
+
+  /**
+   * 휴면 복관 OTP 검증 후 계정 복구.
+   *
+   * <p>POST /api/auth/dormant/verify — body: {"email": "...", "otp": "..."}
+   */
+  @PostMapping("/dormant/verify")
+  public ApiResponse<Void> verifyDormantRecovery(@RequestBody Map<String, String> body) {
+    authService.recoverDormant(requireEmail(body), requireOtp(body));
+    return ApiResponse.success("휴면 복관이 완료되었습니다. 다시 로그인해주세요.");
+  }
+
+  private String requireEmail(Map<String, String> body) {
+    String email = body.get("email");
+    if (email == null || email.isBlank()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "이메일을 입력해주세요.");
+    }
+    return email;
+  }
+
+  private String requireOtp(Map<String, String> body) {
+    String otp = body.get("otp");
+    if (otp == null || otp.isBlank()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드를 입력해주세요.");
+    }
+    return otp;
   }
 }

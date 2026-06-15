@@ -12,6 +12,7 @@ import kr.wisead.common.response.PageResponse;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.PasswordValidator;
 import kr.wisead.domain.admin.service.AdminService;
+import kr.wisead.domain.audit.service.AuditEventService;
 import kr.wisead.domain.email.service.EmailService;
 import kr.wisead.domain.email.service.PreSignupEmailAuthService;
 import kr.wisead.domain.payment.service.WalletService;
@@ -20,6 +21,7 @@ import kr.wisead.domain.user.dto.FindIdResponse;
 import kr.wisead.domain.user.dto.FindPasswordRequest;
 import kr.wisead.domain.user.dto.FindPasswordResponse;
 import kr.wisead.domain.user.dto.UserResponse;
+import kr.wisead.domain.user.entity.LifecycleStatus;
 import kr.wisead.domain.user.entity.PasswordResetToken;
 import kr.wisead.domain.user.entity.User;
 import kr.wisead.mapper.primary.PasswordHintMapper;
@@ -46,6 +48,7 @@ public class UserService {
   private final EmailService emailService;
   private final AdminService adminService;
   private final WalletService walletService;
+  private final AuditEventService auditEventService;
 
   @Value("${wisead.base-url:http://localhost:3000}")
   private String baseUrl;
@@ -253,15 +256,22 @@ public class UserService {
     return "미승인".equals(status) || "승인".equals(status);
   }
 
-  /** 계정 잠금 해제 (관리자) */
+  /**
+   * 계정 잠금 해제 (관리자).
+   *
+   * <p>PR1 보강: legacy {@code SET STATUS='승인'} 경로(N17 CI grep guard 위반)를 제거하고 seq 기반 atomic reset +
+   * AuditEvent UNLOCK_ADMIN 으로 전환.
+   */
   @Transactional
   public int unlockAccount(String userId) {
-    if (!userMapper.existsByUserId(userId)) {
-      throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
-    }
+    User user =
+        userMapper
+            .findByUserId(userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
-    int result = userMapper.unlockAccount(userId);
-    log.info("계정 잠금 해제: userId={}", userId);
+    int result = userMapper.resetLoginAndUnlock(user.getSeq());
+    auditEventService.recordUnlock(user, AuditEventService.UnlockType.ADMIN, null);
+    log.info("계정 잠금 해제: userId={}, seq={}", userId, user.getSeq());
     return result;
   }
 
@@ -589,5 +599,51 @@ public class UserService {
       log.error("{} 암호화 실패: {}", fieldName, e.getMessage());
       return value;
     }
+  }
+
+  // ==================== 탈퇴/익명화 (PR1 PIPA Art.21) ====================
+
+  /**
+   * 회원 탈퇴 처리 — PIPA Art.21 개인정보 익명화 포함.
+   *
+   * <p>idempotent: user.isAnonymized() 이면 early return (AC34).
+   *
+   * @param userSeq 탈퇴할 사용자 seq
+   * @param reason 탈퇴 사유
+   * @param ip 요청 IP (감사 로그용)
+   * @param userAgent 요청 User-Agent (감사 로그용)
+   */
+  @Transactional
+  public void withdraw(int userSeq, String reason, String ip, String userAgent) {
+    User user =
+        userMapper
+            .findBySeq(userSeq)
+            .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+    // AC34: 이미 익명화된 경우 idempotent guard
+    if (user.isAnonymized()) {
+      log.info("[탈퇴] 이미 익명화된 계정, skip: userSeq={}", userSeq);
+      return;
+    }
+
+    anonymize(user);
+
+    userMapper.withdrawUser(user);
+    auditEventService.recordWithdraw(user, reason, ip, userAgent);
+    log.info("[탈퇴] 완료: userSeq={}", userSeq);
+  }
+
+  /**
+   * 개인정보 익명화 (PIPA Art.21).
+   *
+   * <p>email/person 을 복원 불가한 anon 값으로 대체. LIFECYCLE_STATUS = WITHDRAWN, 타임스탬프 기록.
+   */
+  private void anonymize(User user) {
+    LocalDateTime now = LocalDateTime.now();
+    user.setEmail("anon_" + user.getSeq() + "@deleted");
+    user.setPerson("anon_" + user.getSeq());
+    user.setLifecycleStatus(LifecycleStatus.WITHDRAWN);
+    user.setWithdrawnAt(now);
+    user.setAnonymizedAt(now);
   }
 }

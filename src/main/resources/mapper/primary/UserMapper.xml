@@ -33,16 +33,25 @@
         <result property="blockedSeq" column="BLOCKED_SEQ"/>
         <result property="loginPhone" column="LOGIN_PHONE"/>
         <result property="defaultTwoFactorMethod" column="DEFAULT_TWO_FACTOR_METHOD"/>
+        <!-- PR1: 신규 컬럼 (PR0 additive schema) -->
+        <result property="lockedUntil" column="LOCKED_UNTIL"/>
+        <result property="lifecycleStatus" column="LIFECYCLE_STATUS"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="dormantAt" column="DORMANT_AT"/>
+        <result property="dormantNotifiedAt" column="DORMANT_NOTIFIED_AT"/>
+        <result property="withdrawnAt" column="WITHDRAWN_AT"/>
+        <result property="anonymizedAt" column="ANONYMIZED_AT"/>
     </resultMap>
 
-    <!-- 기본 컬럼 -->
+    <!-- 기본 컬럼 (PR1: 신규 컬럼 포함) -->
     <sql id="userColumns">
         SEQ, USER_ID, USER_PASS, CORP_NAME, CORP_ADDR, BIZ_NUM, BIZ_TEL,
         PERSON, PHONE, EMAIL, USER_LEVEL, USE_YN, ALLOW_IP_YN, ALLOW_IP,
         LAST_LOGIN, LOGIN_FAILURE_CNT, REG_DATE, REG_ID, UPT_DATE, UPT_ID,
         STATUS, EMAIL_CODE, CODE_VALIDATE, CALLBACK,
         BIZ_PDF_LOC, STORE_CODE, BLOCKED_SEQ,
-        LOGIN_PHONE, DEFAULT_TWO_FACTOR_METHOD
+        LOGIN_PHONE, DEFAULT_TWO_FACTOR_METHOD,
+        LOCKED_UNTIL, LIFECYCLE_STATUS, DORMANT_AT, DORMANT_NOTIFIED_AT, WITHDRAWN_AT, ANONYMIZED_AT
     </sql>
 
     <!-- 회원 조회 (by SEQ) -->
@@ -130,18 +139,39 @@
         WHERE USER_ID = #{userId}
     </update>
 
-    <!-- 로그인 실패 횟수 증가 -->
+    <!-- 로그인 실패 횟수 원자적 증가 + 5회차 정확히 한 번만 잠금 설정 (PR1 AC27).
+         WHEN LOGIN_FAILURE_CNT + 1 = 5 → exactly-once (sliding window 회피).
+         6회차+: LOCKED_UNTIL 미변경. -->
     <update id="increaseLoginFailureCnt">
         UPDATE user
-        SET LOGIN_FAILURE_CNT = IFNULL(LOGIN_FAILURE_CNT, 0) + 1
-        WHERE USER_ID = #{userId}
+        SET LOGIN_FAILURE_CNT = LOGIN_FAILURE_CNT + 1,
+            LOCKED_UNTIL = CASE
+                WHEN LOGIN_FAILURE_CNT + 1 = 5 THEN UTC_TIMESTAMP() + INTERVAL 10 MINUTE
+                ELSE LOCKED_UNTIL
+            END
+        WHERE SEQ = #{seq}
     </update>
 
-    <!-- 로그인 실패 횟수 초기화 -->
+    <!-- 로그인 성공/잠금 해제 시 실패 횟수 초기화 + 잠금 해제 (원자적) -->
+    <update id="resetLoginAndUnlock">
+        UPDATE user
+        SET LOGIN_FAILURE_CNT = 0,
+            LOCKED_UNTIL = NULL
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- 로그인 실패 횟수 초기화 (레거시 — userId 기반; 기존 코드 호환) -->
     <update id="resetLoginFailureCnt">
         UPDATE user
         SET LOGIN_FAILURE_CNT = 0
         WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 관리자가 특정 잠금 시각 직접 설정 (관리자 임시 연장 등 운영 용도) -->
+    <update id="setLockedUntil">
+        UPDATE user
+        SET LOCKED_UNTIL = #{lockedUntil}
+        WHERE SEQ = #{seq}
     </update>
 
     <!-- 비밀번호 변경 -->
@@ -329,6 +359,18 @@
         AND USE_YN = 'Y'
     </select>
 
+    <!-- PR1: 탈퇴 처리 — LIFECYCLE_STATUS, WITHDRAWN_AT, ANONYMIZED_AT, EMAIL, PERSON 일괄 갱신 -->
+    <update id="withdrawUser">
+        UPDATE user
+        SET LIFECYCLE_STATUS = #{lifecycleStatus},
+            WITHDRAWN_AT     = #{withdrawnAt},
+            ANONYMIZED_AT    = #{anonymizedAt},
+            EMAIL            = #{email},
+            PERSON           = #{person},
+            UPT_DATE         = NOW()
+        WHERE SEQ = #{seq}
+    </update>
+
     <!-- 로그인 휴대폰번호 갱신 (마이페이지 SMS 2FA 등록/해제 — plan v5 §4 Phase E) -->
     <update id="updateLoginPhone">
         UPDATE user
@@ -342,6 +384,73 @@
         UPDATE user
         SET DEFAULT_TWO_FACTOR_METHOD = #{method},
             UPT_DATE = NOW()
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- PR3: 휴면 사전 알림 대상 조회 (5개월 미접속 + ACTIVE + 알림 미발송, AC37 UTC) -->
+    <select id="selectDormancyNotifyCandidates" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM user
+        WHERE LAST_LOGIN &lt; UTC_TIMESTAMP() - INTERVAL 5 MONTH
+          AND LIFECYCLE_STATUS = 'ACTIVE'
+          AND DORMANT_NOTIFIED_AT IS NULL
+        LIMIT #{limit}
+    </select>
+
+    <!-- PR3: 휴면 전환 대상 조회 (6개월 미접속 + ACTIVE, AC37 UTC) -->
+    <select id="selectDormancyTransitionCandidates" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM user
+        WHERE LAST_LOGIN &lt; UTC_TIMESTAMP() - INTERVAL 6 MONTH
+          AND LIFECYCLE_STATUS = 'ACTIVE'
+        LIMIT #{limit}
+    </select>
+
+    <!-- PR3: 배치 탈퇴 전환 대상 조회 (휴면 6개월 경과 + DORMANT, AC37 UTC) -->
+    <select id="selectWithdrawalCandidates" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM user
+        WHERE DORMANT_AT &lt; UTC_TIMESTAMP() - INTERVAL 6 MONTH
+          AND LIFECYCLE_STATUS = 'DORMANT'
+        LIMIT #{limit}
+    </select>
+
+    <!-- PR3: 휴면 사전 알림 발송 시각 갱신 (idempotent — AC37 UTC) -->
+    <update id="markDormantNotified">
+        UPDATE user
+        SET DORMANT_NOTIFIED_AT = UTC_TIMESTAMP(),
+            UPT_DATE = NOW()
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- PR3: 휴면 전환 (LIFECYCLE_STATUS = DORMANT, DORMANT_AT = UTC_TIMESTAMP()) -->
+    <update id="transitionToDormant">
+        UPDATE user
+        SET LIFECYCLE_STATUS = 'DORMANT',
+            DORMANT_AT       = UTC_TIMESTAMP(),
+            UPT_DATE         = NOW()
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- PR3: 배치 탈퇴 전환 + 익명화 (PIPA Art.21 — LIFECYCLE_STATUS = WITHDRAWN + 개인정보 마스킹) -->
+    <update id="transitionToWithdrawnAndAnonymize">
+        UPDATE user
+        SET LIFECYCLE_STATUS = 'WITHDRAWN',
+            WITHDRAWN_AT     = UTC_TIMESTAMP(),
+            EMAIL            = CONCAT('anon_', SEQ, '@deleted'),
+            PERSON           = CONCAT('anon_', SEQ),
+            ANONYMIZED_AT    = UTC_TIMESTAMP(),
+            UPT_DATE         = NOW()
+        WHERE SEQ = #{seq}
+    </update>
+
+    <!-- PR3: 휴면 복구 (LIFECYCLE_STATUS = ACTIVE, DORMANT_AT = NULL, DORMANT_NOTIFIED_AT = NULL) -->
+    <update id="recoverDormant">
+        UPDATE user
+        SET LIFECYCLE_STATUS      = 'ACTIVE',
+            DORMANT_AT            = NULL,
+            DORMANT_NOTIFIED_AT   = NULL,
+            UPT_DATE              = NOW()
         WHERE SEQ = #{seq}
     </update>
 

@@ -178,35 +178,53 @@ public class ActionLogService {
         log.info("에러 로그 기록: userId={}, menuName={}, error={}", userId, menuName, errorMessage);
     }
 
+    /**
+     * 개인정보 접근 로그 기록 (fire-and-forget).
+     *
+     * <p>AccessLogInterceptor가 호출. 기록 실패가 요청 흐름을 막지 않도록 예외를 삼킨다.
+     */
+    public void logAccess(
+            String userId,
+            String userName,
+            String menuName,
+            String actionType,
+            String searchCondition,
+            String code,
+            HttpServletRequest httpRequest) {
+        try {
+            ActionLog actionLog =
+                    ActionLog.builder()
+                            .menuName(menuName)
+                            .actionType(actionType)
+                            .searchCondition(searchCondition)
+                            .menuUrl(httpRequest.getRequestURI())
+                            .code(code)
+                            .referer(httpRequest.getHeader("Referer"))
+                            .userId(userId)
+                            .userName(userName)
+                            .ip(getClientIp(httpRequest))
+                            .build();
+            actionLogMapper.insertAccessLog(actionLog);
+            log.info("[접근로그] userId={}, menuName={}, uri={}", userId, menuName, httpRequest.getRequestURI());
+        } catch (Exception e) {
+            log.warn("[접근로그] 기록 실패: userId={}, menuName={}, 사유={}", userId, menuName, e.getMessage());
+        }
+    }
+
     // ==================== Private Methods ====================
 
-    /**
-     * 클라이언트 IP 추출
-     */
+    /** 클라이언트 IP 추출. 프록시 헤더를 순서대로 확인하고 없으면 remoteAddr 사용. */
     private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("Proxy-Client-IP");
+        String[] headers = {
+            "X-Forwarded-For", "Proxy-Client-IP", "WL-Proxy-Client-IP",
+            "HTTP_CLIENT_IP", "HTTP_X_FORWARDED_FOR"
+        };
+        for (String header : headers) {
+            String ip = request.getHeader(header);
+            if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
+                return ip.contains(",") ? ip.split(",")[0].trim() : ip;
+            }
         }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("WL-Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_CLIENT_IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-
-        // 쉼표로 구분된 경우 첫 번째 IP 사용
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-
-        return ip;
+        return request.getRemoteAddr();
     }
 }

@@ -1,6 +1,7 @@
 package kr.wisead.domain.statistics.controller;
 
 import java.util.List;
+import kr.wisead.common.annotation.AccessLog;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.domain.statistics.dto.*;
 import kr.wisead.domain.statistics.service.PeriodStatisticsService;
@@ -44,6 +45,7 @@ public class StatisticsController {
   }
 
   /** 사용자별 통계 조회 (관리자용) GET /api/statistics/user?startDate=2025-01-01&endDate=2025-01-31 */
+  @AccessLog(menuName = "사용자별 통계 조회")
   @GetMapping("/user")
   public ApiResponse<List<UserStatsResponse>> getUserStats(
       @RequestParam(required = false) String startDate,
@@ -244,6 +246,7 @@ public class StatisticsController {
    * /api/statistics/user-stats?startDate=2025-01-01&endDate=2025-01-31&serviceType=M serviceType:
    * M(일반메시지), S(설문), Q(QR)
    */
+  @AccessLog(menuName = "사용자별 서비스 통계 조회")
   @GetMapping("/user-stats")
   public ApiResponse<List<?>> getUserStatsByServiceType(
       @RequestParam(required = false) String startDate,
@@ -267,6 +270,7 @@ public class StatisticsController {
    * 사용자별 메시지 통계 조회 (SMS/LMS/MMS) GET
    * /api/statistics/user-stats/msg?startDate=2025-01-01&endDate=2025-01-31
    */
+  @AccessLog(menuName = "사용자별 메시지 통계 조회")
   @GetMapping("/user-stats/msg")
   public ApiResponse<List<UserMsgStatsResponse>> getUserMsgStats(
       @RequestParam(required = false) String startDate,
@@ -287,6 +291,7 @@ public class StatisticsController {
   }
 
   /** 사용자별 설문 통계 조회 GET /api/statistics/user-stats/survey?startDate=2025-01-01&endDate=2025-01-31 */
+  @AccessLog(menuName = "사용자별 설문 통계 조회")
   @GetMapping("/user-stats/survey")
   public ApiResponse<List<UserSurveyStatsResponse>> getUserSurveyStats(
       @RequestParam(required = false) String startDate,
@@ -307,6 +312,7 @@ public class StatisticsController {
   }
 
   /** 사용자별 QR 통계 조회 GET /api/statistics/user-stats/qr?startDate=2025-01-01&endDate=2025-01-31 */
+  @AccessLog(menuName = "사용자별 QR 통계 조회")
   @GetMapping("/user-stats/qr")
   public ApiResponse<List<UserQrStatsResponse>> getUserQrStats(
       @RequestParam(required = false) String startDate,

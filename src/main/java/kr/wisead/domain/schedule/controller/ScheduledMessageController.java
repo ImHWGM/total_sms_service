@@ -11,6 +11,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import kr.wisead.common.annotation.AccessLog;
 import kr.wisead.common.dto.DownloadVerifyRequest;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ApiResponse;
@@ -49,6 +50,7 @@ public class ScheduledMessageController {
   private final DownloadVerifyService downloadVerifyService;
 
   /** 예약 메시지 목록 조회 GET /api/scheduled-messages */
+  @AccessLog(menuName = "예약 메시지 조회")
   @GetMapping
   public ApiResponse<PageResponse<ScheduledMessageResponse>> getScheduledMessages(
       @RequestParam(required = false) String msgType,
@@ -170,6 +172,7 @@ public class ScheduledMessageController {
   }
 
   /** 예약 메시지 상세 조회 GET /api/scheduled-messages/{mSeq} */
+  @AccessLog(menuName = "예약 메시지 상세조회")
   @GetMapping("/{mSeq}")
   public ApiResponse<ScheduledMessageResponse> getScheduledMessageById(
       @PathVariable int mSeq, @RequestHeader("Authorization") String token) {

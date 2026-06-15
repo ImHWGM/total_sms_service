@@ -42,4 +42,9 @@ public interface ActionLogMapper {
      * 다운로드 로그 등록 (사유 포함)
      */
     int insertDownloadLog(ActionLog actionLog);
+
+    /**
+     * 접근 로그 등록 (검색조건 포함)
+     */
+    void insertAccessLog(ActionLog actionLog);
 }

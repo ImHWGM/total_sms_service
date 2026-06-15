@@ -7,24 +7,23 @@
         <result property="menuName" column="MENU_NAME"/>
         <result property="actionType" column="ACTION_TYPE"/>
         <result property="actionReason" column="ACTION_REASON"/>
+        <result property="searchCondition" column="SEARCH_CONDITION"/>
         <result property="menuUrl" column="MENU_URL"/>
         <result property="code" column="CODE"/>
         <result property="referer" column="REFERER"/>
         <result property="userId" column="USER_ID"/>
         <result property="userName" column="USER_NAME"/>
         <result property="ip" column="IP"/>
-        <result property="corpName" column="CORP_NAME"/> <!-- + 추가 -->
+        <result property="corpName" column="CORP_NAME"/>
         <result property="regDate" column="REG_DATE"/>
     </resultMap>
 
     <sql id="selectLogColumns">
-        L
-        .
-        SEQ
-        ,
+        L.SEQ,
         L.MENU_NAME,
         L.ACTION_TYPE,
         L.ACTION_REASON,
+        L.SEARCH_CONDITION,
         L.MENU_URL,
         L.CODE,
         L.REFERER,
@@ -32,49 +31,36 @@
         L.USER_NAME,
         L.IP,
         U.CORP_NAME,
-        L.REG_DATE <!-- L. 접두사 추가 및 U.CORP_NAME 추가 -->
+        L.REG_DATE
     </sql>
 
     <sql id="whereCondition">
         <where>
-            1=1
             <if test="startDate != null and startDate != ''">
-                <!-- [변경 전] AND DATE_FORMAT(REG_DATE, '%Y-%m-%d') &gt;= #{startDate} -->
-                <!-- [변경 후] -->
                 AND DATE_FORMAT(L.REG_DATE, '%Y-%m-%d') &gt;= #{startDate}
             </if>
             <if test="endDate != null and endDate != ''">
-                <!-- [변경 전] AND DATE_FORMAT(REG_DATE, '%Y-%m-%d') &lt;= #{endDate} -->
-                <!-- [변경 후] -->
                 AND DATE_FORMAT(L.REG_DATE, '%Y-%m-%d') &lt;= #{endDate}
             </if>
             <if test="actionType != null and actionType != ''">
-                <!-- [변경 전] AND ACTION_TYPE = #{actionType} -->
-                <!-- [변경 후] -->
                 AND L.ACTION_TYPE = #{actionType}
             </if>
             <if test="searchKeyword != null and searchKeyword != ''">
                 <choose>
                     <when test="searchField == 'logId'">
-                        <!-- [변경 전] AND USER_ID LIKE CONCAT('%', #{searchKeyword}, '%') -->
-                        <!-- [변경 후] -->
                         AND L.USER_ID LIKE CONCAT('%', #{searchKeyword}, '%')
                     </when>
                     <when test="searchField == 'logName'">
-                        <!-- [변경 전] AND USER_NAME LIKE CONCAT('%', #{searchKeyword}, '%') -->
-                        <!-- [변경 후] -->
                         AND L.USER_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
                     </when>
                     <when test="searchField == 'logMenu'">
-                        <!-- [변경 전] AND MENU_NAME LIKE CONCAT('%', #{searchKeyword}, '%') -->
-                        <!-- [변경 후] -->
                         AND L.MENU_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
                     </when>
                     <otherwise>
                         AND (
-                        L.USER_ID LIKE CONCAT('%', #{searchKeyword}, '%')
-                        OR L.USER_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
-                        OR L.MENU_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
+                            L.USER_ID LIKE CONCAT('%', #{searchKeyword}, '%')
+                            OR L.USER_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
+                            OR L.MENU_NAME LIKE CONCAT('%', #{searchKeyword}, '%')
                         )
                     </otherwise>
                 </choose>
@@ -86,12 +72,10 @@
     <select id="selectList" parameterType="kr.wisead.domain.admin.dto.ActionLogSearchRequest" resultMap="actionLogResultMap">
         SELECT
             <include refid="selectLogColumns"/>
-        <!-- [변경 전] FROM ACTION_LOG -->
-        <!-- [변경 후] -->
         FROM ACTION_LOG L
         LEFT JOIN user U ON L.USER_ID = U.USER_ID
         <include refid="whereCondition"/>
-        ORDER BY REG_DATE DESC
+        ORDER BY L.REG_DATE DESC
         LIMIT #{offset}, #{size}
     </select>
 
@@ -137,6 +121,33 @@
         ) VALUES (
             #{menuName},
             #{actionType},
+            #{menuUrl},
+            #{code},
+            #{referer},
+            #{userId},
+            #{userName},
+            #{ip},
+            NOW()
+        )
+    </insert>
+
+    <!-- 접근 로그 등록 (검색조건 포함) -->
+    <insert id="insertAccessLog" parameterType="kr.wisead.domain.admin.entity.ActionLog" useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO ACTION_LOG (
+            MENU_NAME,
+            ACTION_TYPE,
+            SEARCH_CONDITION,
+            MENU_URL,
+            CODE,
+            REFERER,
+            USER_ID,
+            USER_NAME,
+            IP,
+            REG_DATE
+        ) VALUES (
+            #{menuName},
+            #{actionType},
+            #{searchCondition},
             #{menuUrl},
             #{code},
             #{referer},

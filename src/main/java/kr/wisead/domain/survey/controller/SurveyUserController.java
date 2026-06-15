@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import kr.wisead.common.annotation.AccessLog;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
 import kr.wisead.domain.admin.service.AdminService;
@@ -46,6 +47,7 @@ public class SurveyUserController {
    *     <p>설문조사(S) searchType: - number: 번호(SEQ) - customerName: 고객사명 - eventName: 이벤트명 -
    *     phoneNumber: 전화번호 (암호화) - userKey: 난수 - lastAccessDate: 최종접속일 - completionDate: 최종완료일
    */
+  @AccessLog(menuName = "발송조회 목록")
   @GetMapping
   public ApiResponse<PageResponse<SurveyUserResponse>> searchUsers(
       @RequestParam(required = false) Integer eventSeq,
@@ -99,6 +101,7 @@ public class SurveyUserController {
   }
 
   /** 설문 완료자 목록 조회 */
+  @AccessLog(menuName = "설문 완료자 조회")
   @GetMapping("/completed")
   public ApiResponse<List<SurveyUserResponse>> getCompletedUsers(@RequestParam Integer eventSeq) {
     List<SurveyUserResponse> response = surveyUserService.getCompletedUsers(eventSeq);
@@ -106,6 +109,7 @@ public class SurveyUserController {
   }
 
   /** 미참여/접속자 목록 조회 */
+  @AccessLog(menuName = "설문 미참여/접속자 조회")
   @GetMapping("/absentees")
   public ApiResponse<List<SurveyUserResponse>> getAbsenteesAndLurkers(
       @RequestParam Integer eventSeq) {
@@ -114,6 +118,7 @@ public class SurveyUserController {
   }
 
   /** 참여자 상세 조회 (시퀀스) */
+  @AccessLog(menuName = "참여자 상세조회")
   @GetMapping("/{userSeq}")
   public ApiResponse<SurveyUserResponse> getUserBySeq(@PathVariable Integer userSeq) {
     SurveyUserResponse response = surveyUserService.getUserBySeq(userSeq);
@@ -121,6 +126,7 @@ public class SurveyUserController {
   }
 
   /** 참여자 상세 조회 (사용자 키) */
+  @AccessLog(menuName = "참여자 상세조회(키)")
   @GetMapping("/key/{userKey}")
   public ApiResponse<SurveyUserResponse> getUserByUserKey(@PathVariable String userKey) {
     SurveyUserResponse response = surveyUserService.getUserByUserKey(userKey);

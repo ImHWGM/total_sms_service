@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import kr.wisead.common.annotation.AccessLog;
 import kr.wisead.common.dto.DownloadVerifyRequest;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.common.response.PageResponse;
@@ -45,6 +46,7 @@ public class SendHistoryController {
   private final DownloadVerifyService downloadVerifyService;
 
   /** 발송 이력 목록 조회 GET /api/history/send */
+  @AccessLog(menuName = "발송 이력 조회")
   @GetMapping("/send")
   public ApiResponse<PageResponse<SendHistoryResponse>> getSendHistory(
       @RequestParam(required = false) String startDate,
@@ -189,6 +191,7 @@ public class SendHistoryController {
   }
 
   /** 수신거부 목록 조회 GET /api/history/optout */
+  @AccessLog(menuName = "수신거부 목록 조회")
   @GetMapping("/optout")
   public ApiResponse<PageResponse<BlockedSenderResponse>> getOptOutList(
       @RequestParam(defaultValue = "1") int page,

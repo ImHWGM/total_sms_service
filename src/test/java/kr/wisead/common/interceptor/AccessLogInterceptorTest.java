@@ -1,14 +1,14 @@
 package kr.wisead.common.interceptor;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import org.mockito.ArgumentCaptor;
-
 import java.lang.reflect.Method;
+import java.util.List;
 import kr.wisead.common.annotation.AccessLog;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.ActionLogService;
@@ -16,12 +16,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.method.HandlerMethod;
 
@@ -51,7 +54,7 @@ class AccessLogInterceptorTest {
 
   private void authenticate() {
     SecurityContextHolder.getContext()
-        .setAuthentication(new UsernamePasswordAuthenticationToken("123", null, java.util.List.of()));
+        .setAuthentication(new UsernamePasswordAuthenticationToken("123", null, List.of()));
   }
 
   @Test
@@ -105,9 +108,9 @@ class AccessLogInterceptorTest {
   void anonymous_doesNotLog() throws Exception {
     SecurityContextHolder.getContext()
         .setAuthentication(
-            new org.springframework.security.authentication.AnonymousAuthenticationToken(
+            new AnonymousAuthenticationToken(
                 "key", "anonymousUser",
-                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
+                List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
     interceptor.afterCompletion(
         new MockHttpServletRequest(),
         new MockHttpServletResponse(),
@@ -144,6 +147,6 @@ class AccessLogInterceptorTest {
     ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
     interceptor.afterCompletion(req, res, handler("annotated"), null);
     verify(actionLogService).logAccess(any(), any(), any(), any(), captor.capture(), any(), any());
-    org.junit.jupiter.api.Assertions.assertEquals(1000, captor.getValue().length());
+    assertEquals(1000, captor.getValue().length());
   }
 }

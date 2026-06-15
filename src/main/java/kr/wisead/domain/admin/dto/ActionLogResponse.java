@@ -57,7 +57,7 @@ public class ActionLogResponse {
                 .userName(entity.getUserName())
                 .ip(entity.getIp())
                 .regDate(entity.getRegDate())
-            .corpName(entity.getCorpName())
+                .corpName(entity.getCorpName())
                 .build();
     }
 }

@@ -172,4 +172,43 @@ class PreSignupSmsAuthServiceTest {
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("휴대폰 번호 형식");
   }
+
+  @Test
+  @DisplayName("H1: resend 도 60초 쿨다운을 적용받는다 (우회 불가)")
+  void resend_enforcesCooldown() {
+    doNothing().when(smsOtpSender).sendOtp(anyString(), anyString());
+    sut.sendVerificationCode(PHONE_NORMALIZED, SIGNUP); // 방금 발송 → 쿨다운 중
+
+    // 즉시 재발송 시도 → 쿨다운 안내 예외 (제거-후-재발송 우회가 막혔는지 확인)
+    assertThatThrownBy(() -> sut.resendVerificationCode(PHONE_NORMALIZED, SIGNUP))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("재발송은");
+  }
+
+  @Test
+  @DisplayName("M2: checkVerified 는 도장을 소비하지 않는다 (여러 번 통과 + 이후 1회 소비 가능)")
+  void checkVerified_doesNotConsume() {
+    doNothing().when(smsOtpSender).sendOtp(anyString(), anyString());
+    sut.sendVerificationCode(PHONE_NORMALIZED, SIGNUP);
+    String code = captureLastSentCode();
+    sut.verifyCode(PHONE_NORMALIZED, code, SIGNUP);
+
+    // 게이트 검사는 여러 번 호출해도 통과(소비하지 않음)
+    sut.checkVerified(PHONE_NORMALIZED, SIGNUP);
+    sut.checkVerified(PHONE_NORMALIZED, SIGNUP);
+
+    // 실제 소비는 그 후에도 1회 가능
+    sut.consumeVerification(PHONE_NORMALIZED, SIGNUP);
+    assertThatThrownBy(() -> sut.consumeVerification(PHONE_NORMALIZED, SIGNUP))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("본인인증을 먼저 완료");
+  }
+
+  @Test
+  @DisplayName("M2: 미인증 번호는 checkVerified 에서 거부된다")
+  void checkVerified_rejectsUnverified() {
+    assertThatThrownBy(() -> sut.checkVerified(PHONE_NORMALIZED, SIGNUP))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("본인인증을 먼저 완료");
+  }
 }

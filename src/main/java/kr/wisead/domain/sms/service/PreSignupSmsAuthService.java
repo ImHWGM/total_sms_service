@@ -4,6 +4,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
@@ -175,9 +176,13 @@ public class PreSignupSmsAuthService {
         true, remainingSeconds, remainingResendSeconds, remainingAttempts);
   }
 
-  /** 인증 코드 재발송 (기존 코드 무효화). */
+  /**
+   * 인증 코드 재발송.
+   *
+   * <p>H1: 기존 코드를 먼저 제거하지 않는다. {@link #sendVerificationCode} 가 기존 entry 의 {@code canResend()}
+   * (60초 쿨다운)을 검사한 뒤 통과 시에만 새 코드로 덮어쓰므로, resend 경로도 쿨다운을 동일하게 적용받는다.
+   */
   public boolean resendVerificationCode(String phoneNumber, String purpose) {
-    verificationStore.remove(storeKey(purpose, normalizePhone(phoneNumber)));
     return sendVerificationCode(phoneNumber, purpose);
   }
 
@@ -205,6 +210,28 @@ public class PreSignupSmsAuthService {
         "[PreSignup] SMS 인증 소비 완료: phone={}, purpose={}",
         CommonUtils.maskingPhone(phone),
         purpose);
+  }
+
+  /**
+   * 회원가입 게이트용 — 번호가 인증 완료 상태인지 *소비하지 않고* 검사만 한다(M2).
+   *
+   * <p>{@code signUp(@Transactional)} 초입에서 미인증/유예초과를 조기 거부하기 위한 용도. 실제 소비(도장 제거)는
+   * 가입 처리가 끝난 뒤 {@link #consumeVerification(String, String)} 으로 수행한다. 이렇게 분리하면 가입 도중
+   * 암호화/INSERT 실패로 DB 가 롤백돼도 메모리 도장이 보존되어, 일시적 실패에 재인증을 강요하지 않는다.
+   *
+   * @param phoneNumber 회원가입 요청의 휴대폰번호
+   * @param purpose OTP 용도 — 인증 시점과 동일해야 통과
+   */
+  public void checkVerified(String phoneNumber, String purpose) {
+    String key = storeKey(purpose, normalizePhone(phoneNumber));
+    LocalDateTime verifiedAt = verifiedStore.get(key);
+
+    if (verifiedAt == null) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "휴대폰 본인인증을 먼저 완료해주세요.");
+    }
+    if (LocalDateTime.now().isAfter(verifiedAt.plusMinutes(VERIFIED_TTL_MINUTES))) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "본인인증 후 시간이 초과되었습니다. 다시 인증해주세요.");
+    }
   }
 
   /** 만료된 인증 정보/인증 완료 기록 정리 (5분마다 실행). */
@@ -256,12 +283,13 @@ public class PreSignupSmsAuthService {
   private static class VerificationInfo {
     private final String code;
     private final LocalDateTime createdAt;
-    private int attempts;
+
+    /** M1: 동시 verify 시 increment 유실(brute-force 한도 약화) 방지를 위해 원자적 카운터 사용. */
+    private final AtomicInteger attempts = new AtomicInteger(0);
 
     VerificationInfo(String code, LocalDateTime createdAt) {
       this.code = code;
       this.createdAt = createdAt;
-      this.attempts = 0;
     }
 
     String getCode() {
@@ -269,11 +297,11 @@ public class PreSignupSmsAuthService {
     }
 
     int getAttempts() {
-      return attempts;
+      return attempts.get();
     }
 
     void incrementAttempts() {
-      this.attempts++;
+      attempts.incrementAndGet();
     }
 
     boolean isExpired() {
@@ -286,7 +314,8 @@ public class PreSignupSmsAuthService {
 
     long getRemainingSeconds() {
       LocalDateTime expiresAt = createdAt.plusMinutes(EXPIRATION_MINUTES);
-      return java.time.Duration.between(LocalDateTime.now(), expiresAt).getSeconds();
+      long remaining = java.time.Duration.between(LocalDateTime.now(), expiresAt).getSeconds();
+      return Math.max(0, remaining); // L1: 만료-미정리 상태에서 음수 노출 방지
     }
 
     long getRemainingResendSeconds() {

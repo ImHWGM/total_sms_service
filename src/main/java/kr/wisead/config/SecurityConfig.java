@@ -48,6 +48,7 @@ public class SecurityConfig {
     "/api/users/password/reset-validate", // 비밀번호 재설정 토큰 검증
     "/api/users/password/reset-confirm", // 비밀번호 재설정 확인
     "/api/email/verification/**", // 이메일 인증 (회원가입, 로그인 시 사용)
+    "/api/sms/verification/**", // SMS 휴대폰 인증 (회원가입 등 로그인 전 사용)
     "/api/unsubscribe", // 이메일 수신거부
     "/unsubscribe", // 이메일 수신거부 (레거시 호환)
 

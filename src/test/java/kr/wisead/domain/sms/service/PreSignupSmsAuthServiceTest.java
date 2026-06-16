@@ -7,42 +7,55 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 
-import kr.wisead.common.dto.VerificationStatus;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import kr.wisead.common.exception.BusinessException;
+import kr.wisead.domain.sms.entity.SignupSmsVerification;
 import kr.wisead.domain.sms.sender.SmsOtpSender;
+import kr.wisead.mapper.primary.SignupSmsVerificationMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * PreSignupSmsAuthService 단위 테스트 — 회원가입 도메인(key=purpose:phone) 및 강제 검사 / purpose 분리 검증.
+ * PreSignupSmsAuthService 단위 테스트 — DB 기반(M3) 저장소를 인메모리 fake mapper 로 대체해 서비스 로직을 검증한다.
  *
- * <p>OTP 코드는 서비스가 내부에서 생성하므로, {@link SmsOtpSender#sendOtp} 로 전달된 코드를 ArgumentCaptor 로 가로채어 검증에 사용한다.
+ * <p>fake mapper 는 {@link SignupSmsVerificationMapper} 의 SQL 의미(원자적 increment/markVerified, 만료 정리
+ * 등)를 자바로 동일하게 재현한다. OTP 코드는 {@link SmsOtpSender#sendOtp} 로 전달된 값을 ArgumentCaptor 로 가로채 사용한다.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-@DisplayName("PreSignupSmsAuthService (key=purpose:phone)")
+@DisplayName("PreSignupSmsAuthService (DB 기반, key=purpose:phone)")
 class PreSignupSmsAuthServiceTest {
 
   @Mock private SmsOtpSender smsOtpSender;
 
-  @InjectMocks private PreSignupSmsAuthService sut;
+  private InMemorySignupSmsVerificationMapper mapper;
+  private PreSignupSmsAuthService sut;
 
   private static final String PHONE_DASHED = "010-1234-5678";
   private static final String PHONE_NORMALIZED = "01012345678";
   private static final String SIGNUP = PreSignupSmsAuthService.PURPOSE_SIGNUP;
   private static final String OTHER_PURPOSE = "PASSWORD_RESET"; // 가상의 다른 용도
 
+  @BeforeEach
+  void setUp() {
+    mapper = new InMemorySignupSmsVerificationMapper();
+    sut = new PreSignupSmsAuthService(smsOtpSender, mapper);
+  }
+
   /** 발송 시 SmsOtpSender 로 넘어간 OTP 코드를 가로채 반환한다 (마지막 호출). */
   private String captureLastSentCode() {
     ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
-    verify(smsOtpSender, org.mockito.Mockito.atLeastOnce()).sendOtp(anyString(), codeCaptor.capture());
+    verify(smsOtpSender, org.mockito.Mockito.atLeastOnce())
+        .sendOtp(anyString(), codeCaptor.capture());
     return codeCaptor.getValue();
   }
 
@@ -53,18 +66,15 @@ class PreSignupSmsAuthServiceTest {
 
     sut.sendVerificationCode(PHONE_DASHED, SIGNUP);
 
-    // 발신은 하이픈 제거된 번호로 나간다
     verify(smsOtpSender).sendOtp(eq(PHONE_NORMALIZED), anyString());
-    // 생성 코드는 6자리 숫자
     assertThat(captureLastSentCode()).matches("\\d{6}");
 
-    // 하이픈 유무에 관계없이 같은 키로 조회된다
     assertThat(sut.getVerificationStatus(PHONE_DASHED, SIGNUP).codeSent()).isTrue();
     assertThat(sut.getVerificationStatus(PHONE_NORMALIZED, SIGNUP).codeSent()).isTrue();
   }
 
   @Test
-  @DisplayName("verifyCode: 올바른 코드로 검증 성공 후 저장소에서 제거된다")
+  @DisplayName("verifyCode: 올바른 코드로 검증 성공 후 코드가 소비된다")
   void verifyCode_succeedsWithCorrectCode() {
     doNothing().when(smsOtpSender).sendOtp(anyString(), anyString());
     sut.sendVerificationCode(PHONE_DASHED, SIGNUP);
@@ -73,7 +83,7 @@ class PreSignupSmsAuthServiceTest {
     boolean result = sut.verifyCode(PHONE_DASHED, code, SIGNUP);
 
     assertThat(result).isTrue();
-    // 검증 성공 후 코드 저장소는 비워진다
+    // 검증 성공 후 code 소비 → status codeSent=false
     assertThat(sut.getVerificationStatus(PHONE_NORMALIZED, SIGNUP).codeSent()).isFalse();
   }
 
@@ -85,7 +95,6 @@ class PreSignupSmsAuthServiceTest {
     String code = captureLastSentCode();
     sut.verifyCode(PHONE_NORMALIZED, code, SIGNUP);
 
-    // 회원가입에서 하이픈 포함 번호로 들어와도 통과해야 한다
     sut.consumeVerification(PHONE_DASHED, SIGNUP); // 예외 없이 통과
   }
 
@@ -117,18 +126,15 @@ class PreSignupSmsAuthServiceTest {
   void consumeVerification_cannotStealOtherPurposeStamp() {
     doNothing().when(smsOtpSender).sendOtp(anyString(), anyString());
 
-    // 다른 용도(PASSWORD_RESET)로 발송 + 검증 성공 → OTHER_PURPOSE 칸에만 도장
     sut.sendVerificationCode(PHONE_NORMALIZED, OTHER_PURPOSE);
     String code = captureLastSentCode();
     sut.verifyCode(PHONE_NORMALIZED, code, OTHER_PURPOSE);
 
-    // 같은 번호라도 SIGNUP 용도로는 인증된 적이 없으므로 회원가입은 거부되어야 한다
     assertThatThrownBy(() -> sut.consumeVerification(PHONE_NORMALIZED, SIGNUP))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("본인인증을 먼저 완료");
 
-    // 반대로 원래 용도(OTHER_PURPOSE)로는 정상 소비 가능
-    sut.consumeVerification(PHONE_NORMALIZED, OTHER_PURPOSE);
+    sut.consumeVerification(PHONE_NORMALIZED, OTHER_PURPOSE); // 원래 용도로는 정상
   }
 
   @Test
@@ -138,7 +144,6 @@ class PreSignupSmsAuthServiceTest {
     sut.sendVerificationCode(PHONE_NORMALIZED, OTHER_PURPOSE);
     String code = captureLastSentCode();
 
-    // OTHER_PURPOSE 로 받은 코드를 SIGNUP 용도로 검증 시도 → 발송된 코드가 없다고 거부
     assertThatThrownBy(() -> sut.verifyCode(PHONE_NORMALIZED, code, SIGNUP))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("인증 코드를 먼저 발송");
@@ -150,7 +155,6 @@ class PreSignupSmsAuthServiceTest {
     doNothing().when(smsOtpSender).sendOtp(anyString(), anyString());
     sut.sendVerificationCode(PHONE_NORMALIZED, SIGNUP);
 
-    // 틀린 코드 4번 시도 (남은 시도 메시지)
     for (int i = 0; i < 4; i++) {
       try {
         sut.verifyCode(PHONE_NORMALIZED, "000000", SIGNUP);
@@ -159,7 +163,6 @@ class PreSignupSmsAuthServiceTest {
       }
     }
 
-    // 5번째 시도에서 시도 소진 (SmsAuthService 관례: 초과 안내 + 코드 폐기)
     assertThatThrownBy(() -> sut.verifyCode(PHONE_NORMALIZED, "000000", SIGNUP))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("인증 시도 횟수를 초과");
@@ -179,7 +182,6 @@ class PreSignupSmsAuthServiceTest {
     doNothing().when(smsOtpSender).sendOtp(anyString(), anyString());
     sut.sendVerificationCode(PHONE_NORMALIZED, SIGNUP); // 방금 발송 → 쿨다운 중
 
-    // 즉시 재발송 시도 → 쿨다운 안내 예외 (제거-후-재발송 우회가 막혔는지 확인)
     assertThatThrownBy(() -> sut.resendVerificationCode(PHONE_NORMALIZED, SIGNUP))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("재발송은");
@@ -193,11 +195,9 @@ class PreSignupSmsAuthServiceTest {
     String code = captureLastSentCode();
     sut.verifyCode(PHONE_NORMALIZED, code, SIGNUP);
 
-    // 게이트 검사는 여러 번 호출해도 통과(소비하지 않음)
     sut.checkVerified(PHONE_NORMALIZED, SIGNUP);
     sut.checkVerified(PHONE_NORMALIZED, SIGNUP);
 
-    // 실제 소비는 그 후에도 1회 가능
     sut.consumeVerification(PHONE_NORMALIZED, SIGNUP);
     assertThatThrownBy(() -> sut.consumeVerification(PHONE_NORMALIZED, SIGNUP))
         .isInstanceOf(BusinessException.class)
@@ -210,5 +210,101 @@ class PreSignupSmsAuthServiceTest {
     assertThatThrownBy(() -> sut.checkVerified(PHONE_NORMALIZED, SIGNUP))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("본인인증을 먼저 완료");
+  }
+
+  // ==================== Fake Mapper ====================
+
+  /** SignupSmsVerificationMapper 의 SQL 의미를 자바로 재현한 인메모리 구현(테스트 전용). */
+  private static class InMemorySignupSmsVerificationMapper implements SignupSmsVerificationMapper {
+
+    private final Map<String, SignupSmsVerification> store = new HashMap<>();
+
+    private String key(String purpose, String phone) {
+      return purpose + ":" + phone;
+    }
+
+    @Override
+    public SignupSmsVerification findByKey(String purpose, String phone) {
+      return store.get(key(purpose, phone));
+    }
+
+    @Override
+    public int insert(SignupSmsVerification e) {
+      store.put(key(e.getPurpose(), e.getPhone()), e);
+      return 1;
+    }
+
+    @Override
+    public int updateForSend(SignupSmsVerification e) {
+      String k = key(e.getPurpose(), e.getPhone());
+      if (!store.containsKey(k)) {
+        return 0;
+      }
+      // code/created_at 갱신, attempts=0, verified_at=NULL
+      store.put(
+          k,
+          new SignupSmsVerification(
+              e.getPurpose(), e.getPhone(), e.getCode(), 0, e.getCreatedAt(), null));
+      return 1;
+    }
+
+    @Override
+    public int incrementAttempts(String purpose, String phone) {
+      String k = key(purpose, phone);
+      SignupSmsVerification e = store.get(k);
+      if (e == null) {
+        return 0;
+      }
+      store.put(
+          k,
+          new SignupSmsVerification(
+              e.getPurpose(),
+              e.getPhone(),
+              e.getCode(),
+              e.getAttempts() + 1,
+              e.getCreatedAt(),
+              e.getVerifiedAt()));
+      return 1;
+    }
+
+    @Override
+    public int markVerifiedIfCodeMatches(
+        String purpose, String phone, String code, LocalDateTime verifiedAt) {
+      String k = key(purpose, phone);
+      SignupSmsVerification e = store.get(k);
+      if (e != null && code.equals(e.getCode()) && e.getVerifiedAt() == null) {
+        store.put(
+            k,
+            new SignupSmsVerification(
+                e.getPurpose(), e.getPhone(), null, e.getAttempts(), e.getCreatedAt(), verifiedAt));
+        return 1;
+      }
+      return 0;
+    }
+
+    @Override
+    public int deleteByKey(String purpose, String phone) {
+      return store.remove(key(purpose, phone)) != null ? 1 : 0;
+    }
+
+    @Override
+    public int deleteExpired(LocalDateTime codeCutoff, LocalDateTime verifiedCutoff) {
+      int[] count = {0};
+      store
+          .values()
+          .removeIf(
+              e -> {
+                boolean codeExpired =
+                    e.getVerifiedAt() == null && e.getCreatedAt().isBefore(codeCutoff);
+                boolean stampExpired =
+                    e.getVerifiedAt() != null && e.getVerifiedAt().isBefore(verifiedCutoff);
+                if (codeExpired || stampExpired) {
+                  count[0]++;
+                  return true;
+                }
+                return false;
+              });
+      return count[0];
+    }
   }
 }

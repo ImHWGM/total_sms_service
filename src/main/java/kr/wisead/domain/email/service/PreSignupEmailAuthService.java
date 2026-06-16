@@ -3,10 +3,11 @@ package kr.wisead.domain.email.service;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
-import kr.wisead.domain.email.dto.EmailVerificationStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -108,23 +109,27 @@ public class PreSignupEmailAuthService {
   }
 
   /** 인증 상태 확인. */
-  public EmailVerificationStatus getVerificationStatus(String email) {
+  public VerificationStatus getVerificationStatus(String email) {
     VerificationInfo info = verificationStore.get(email.toLowerCase());
     if (info == null) {
-      return new EmailVerificationStatus(false, 0, 0, 0);
+      return new VerificationStatus(false, 0, 0, 0);
     }
 
     long remainingSeconds = info.getRemainingSeconds();
     long remainingResendSeconds = info.getRemainingResendSeconds();
     int remainingAttempts = MAX_ATTEMPTS - info.getAttempts();
 
-    return new EmailVerificationStatus(
+    return new VerificationStatus(
         true, remainingSeconds, remainingResendSeconds, remainingAttempts);
   }
 
-  /** 인증 코드 재발송 (기존 코드 무효화). */
+  /**
+   * 인증 코드 재발송.
+   *
+   * <p>H1: 기존 코드를 먼저 제거하지 않는다. {@link #sendVerificationCode} 가 {@code canResend()}(60초 쿨다운)을
+   * 검사한 뒤 통과 시에만 새 코드로 덮어쓰므로, resend 경로도 동일하게 쿨다운을 적용받는다.
+   */
   public boolean resendVerificationCode(String email) {
-    verificationStore.remove(email.toLowerCase());
     return sendVerificationCode(email);
   }
 
@@ -154,12 +159,13 @@ public class PreSignupEmailAuthService {
   private static class VerificationInfo {
     private final String code;
     private final LocalDateTime createdAt;
-    private int attempts;
+
+    /** M1: 동시 verify 시 increment 유실 방지를 위해 원자적 카운터 사용. */
+    private final AtomicInteger attempts = new AtomicInteger(0);
 
     VerificationInfo(String code, LocalDateTime createdAt) {
       this.code = code;
       this.createdAt = createdAt;
-      this.attempts = 0;
     }
 
     String getCode() {
@@ -167,11 +173,11 @@ public class PreSignupEmailAuthService {
     }
 
     int getAttempts() {
-      return attempts;
+      return attempts.get();
     }
 
     void incrementAttempts() {
-      this.attempts++;
+      attempts.incrementAndGet();
     }
 
     boolean isExpired() {
@@ -184,7 +190,8 @@ public class PreSignupEmailAuthService {
 
     long getRemainingSeconds() {
       LocalDateTime expiresAt = createdAt.plusMinutes(EXPIRATION_MINUTES);
-      return java.time.Duration.between(LocalDateTime.now(), expiresAt).getSeconds();
+      long remaining = java.time.Duration.between(LocalDateTime.now(), expiresAt).getSeconds();
+      return Math.max(0, remaining); // L1: 만료-미정리 상태에서 음수 노출 방지
     }
 
     long getRemainingResendSeconds() {

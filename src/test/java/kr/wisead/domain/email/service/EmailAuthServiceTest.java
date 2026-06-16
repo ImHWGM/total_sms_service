@@ -8,8 +8,8 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
-import kr.wisead.domain.email.dto.EmailVerificationStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,7 +49,7 @@ class EmailAuthServiceTest {
   void getVerificationStatus_byUserIdReturnsStatus() {
     sut.sendVerificationCode(USER_ID, EMAIL);
 
-    EmailVerificationStatus status = sut.getVerificationStatus(USER_ID);
+    VerificationStatus status = sut.getVerificationStatus(USER_ID);
 
     assertThat(status.codeSent()).isTrue();
     assertThat(status.remainingSeconds()).isPositive();
@@ -91,7 +91,7 @@ class EmailAuthServiceTest {
   @Test
   @DisplayName("getVerificationStatus: null userId → codeSent=false (NPE 없음)")
   void getVerificationStatus_nullUserId_returnsFalse() {
-    EmailVerificationStatus status = sut.getVerificationStatus(null);
+    VerificationStatus status = sut.getVerificationStatus(null);
     assertThat(status.codeSent()).isFalse();
   }
 }

@@ -4,10 +4,10 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
-import kr.wisead.domain.email.dto.EmailVerificationStatus;
 import kr.wisead.domain.sms.sender.SmsOtpSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
  * <p>SMS 발송은 {@link SmsOtpSender} 를 통해 결제/야간/잔액 검증을 우회하여 큐에 직접 적재한다. GMGO API 실패 시 자동 EMAIL 폴백은
  * 금지한다 (스펙 C7).
  *
- * <p>응답 스키마 통일을 위해 {@link EmailVerificationStatus} record 를 재사용한다.
+ * <p>응답 스키마 통일을 위해 {@link VerificationStatus} record 를 재사용한다.
  *
  * <p>plan v5 §4 Phase B-2.
  */
@@ -190,20 +190,20 @@ public class SmsAuthService {
    *
    * @param userId 사용자 seq
    */
-  public EmailVerificationStatus getVerificationStatus(Integer userId) {
+  public VerificationStatus getVerificationStatus(Integer userId) {
     if (userId == null) {
-      return new EmailVerificationStatus(false, 0, 0, 0);
+      return new VerificationStatus(false, 0, 0, 0);
     }
     VerificationInfo info = verificationStore.get(userId);
     if (info == null) {
-      return new EmailVerificationStatus(false, 0, 0, 0);
+      return new VerificationStatus(false, 0, 0, 0);
     }
 
     long remainingSeconds = info.getRemainingSeconds();
     long remainingResendSeconds = info.getRemainingResendSeconds();
     int remainingAttempts = MAX_ATTEMPTS - info.getAttempts();
 
-    return new EmailVerificationStatus(
+    return new VerificationStatus(
         true, remainingSeconds, remainingResendSeconds, remainingAttempts);
   }
 

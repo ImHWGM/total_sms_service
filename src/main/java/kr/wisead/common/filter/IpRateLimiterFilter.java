@@ -38,7 +38,13 @@ public class IpRateLimiterFilter extends OncePerRequestFilter {
       List.of(
           "/api/auth/login", // 1차 인증 + OTP 발송
           "/api/auth/resend-email-code", // 이메일 OTP 재발송
-          "/api/auth/switch-channel" // OTP 채널 전환 (재발송 포함)
+          "/api/auth/switch-channel", // OTP 채널 전환 (재발송 포함)
+          "/api/sms/verification", // 회원가입 SMS 인증 코드 발송
+          "/api/sms/verification/resend", // 회원가입 SMS 인증 코드 재발송
+          "/api/sms/verification/verify", // 회원가입 SMS 인증 코드 검증 (brute-force 방어)
+          "/api/email/verification", // 회원가입 이메일 인증 코드 발송
+          "/api/email/verification/resend", // 회원가입 이메일 인증 코드 재발송
+          "/api/email/verification/verify" // 회원가입 이메일 인증 코드 검증 (brute-force 방어)
           );
 
   /** key=clientIp, value=요청 timestamps (밀리초) */

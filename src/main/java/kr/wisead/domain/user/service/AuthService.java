@@ -20,6 +20,7 @@ import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.payment.entity.UserServiceRate;
 import kr.wisead.domain.payment.service.StandardRateService;
 import kr.wisead.domain.payment.service.WalletService;
+import kr.wisead.domain.sms.service.PreSignupSmsAuthService;
 import kr.wisead.domain.sms.service.SmsAuthService;
 import kr.wisead.domain.user.dto.LoginFailureResponse;
 import kr.wisead.domain.user.dto.LoginRequest;
@@ -54,6 +55,7 @@ public class AuthService {
   private final JwtTokenProvider jwtTokenProvider;
   private final EmailAuthService emailAuthService;
   private final SmsAuthService smsAuthService;
+  private final PreSignupSmsAuthService preSignupSmsAuthService;
   private final SessionKeyService sessionKeyService;
   private final AuditEventService auditEventService;
 
@@ -372,6 +374,12 @@ public class AuthService {
       throw new BusinessException(ErrorCode.DUPLICATE_EMAIL, "이미 등록된 이메일입니다.");
     }
 
+    // 3-1. 담당자 연락처 SMS 본인인증 게이트 (M2: 여기선 소비하지 않고 검사만 — 미인증 조기 거부).
+    //       실제 도장 소비는 가입 처리가 모두 끝난 뒤(아래 단계 8)에 수행하여, 중간 실패로 DB 가
+    //       롤백돼도 인증 상태가 보존되도록 한다.
+    preSignupSmsAuthService.checkVerified(
+        request.getPhone(), PreSignupSmsAuthService.PURPOSE_SIGNUP);
+
     // 4-1. 연락처 암호화 처리
     String encryptedPhone = null;
     try {
@@ -458,6 +466,11 @@ public class AuthService {
     // 8. 감사 로그 기록 (AC1-revised: SIGNUP → audit_event)
     // ip/userAgent 는 SignUpRequest 에 없어 null 전달 (컨트롤러 레이어에서 HttpServletRequest 로 보강 가능)
     auditEventService.recordSignup(user, null, null, "WEB");
+
+    // 9. SMS 본인인증 도장 소비 (M2: 가입 처리가 모두 성공한 최후 단계에서 1회용 제거).
+    //    이전 단계에서 예외로 롤백되면 이 줄에 도달하지 않아 도장이 보존된다.
+    preSignupSmsAuthService.consumeVerification(
+        request.getPhone(), PreSignupSmsAuthService.PURPOSE_SIGNUP);
   }
 
   /** 토큰 갱신 */

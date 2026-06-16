@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.wisead.mapper.primary.SignupSmsVerificationMapper">
+
+    <resultMap id="SignupSmsVerificationResultMap"
+               type="kr.wisead.domain.sms.entity.SignupSmsVerification">
+        <id property="seq" column="SEQ"/>
+        <result property="purpose" column="PURPOSE"/>
+        <result property="phone" column="PHONE"/>
+        <result property="code" column="CODE"/>
+        <result property="attempts" column="ATTEMPTS"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="verifiedAt" column="VERIFIED_AT"/>
+    </resultMap>
+
+    <select id="findByKey" resultMap="SignupSmsVerificationResultMap">
+        SELECT SEQ, PURPOSE, PHONE, CODE, ATTEMPTS, CREATED_AT, VERIFIED_AT
+        FROM signup_sms_verification
+        WHERE PURPOSE = #{purpose} AND PHONE = #{phone}
+    </select>
+
+    <insert id="insert" parameterType="kr.wisead.domain.sms.entity.SignupSmsVerification"
+            useGeneratedKeys="true" keyProperty="seq">
+        INSERT INTO signup_sms_verification (PURPOSE, PHONE, CODE, ATTEMPTS, CREATED_AT, VERIFIED_AT)
+        VALUES (#{purpose}, #{phone}, #{code}, #{attempts}, #{createdAt}, #{verifiedAt})
+    </insert>
+
+    <!-- 재발송: 코드/발송시각 갱신, 시도횟수·인증도장 리셋 -->
+    <update id="updateForSend" parameterType="kr.wisead.domain.sms.entity.SignupSmsVerification">
+        UPDATE signup_sms_verification
+        SET CODE = #{code},
+            ATTEMPTS = 0,
+            CREATED_AT = #{createdAt},
+            VERIFIED_AT = NULL
+        WHERE PURPOSE = #{purpose} AND PHONE = #{phone}
+    </update>
+
+    <!-- 검증 시도 +1 (원자적) -->
+    <update id="incrementAttempts">
+        UPDATE signup_sms_verification
+        SET ATTEMPTS = ATTEMPTS + 1
+        WHERE PURPOSE = #{purpose} AND PHONE = #{phone}
+    </update>
+
+    <!-- 코드 일치 + 미인증일 때만 인증 완료 처리 (원자적). code 는 재사용 방지 위해 NULL 화 -->
+    <update id="markVerifiedIfCodeMatches">
+        UPDATE signup_sms_verification
+        SET VERIFIED_AT = #{verifiedAt},
+            CODE = NULL
+        WHERE PURPOSE = #{purpose}
+          AND PHONE = #{phone}
+          AND CODE = #{code}
+          AND VERIFIED_AT IS NULL
+    </update>
+
+    <delete id="deleteByKey">
+        DELETE FROM signup_sms_verification
+        WHERE PURPOSE = #{purpose} AND PHONE = #{phone}
+    </delete>
+
+    <!-- 만료 정리: (미인증 & 코드만료) 또는 (인증 & 유예초과) -->
+    <delete id="deleteExpired">
+        DELETE FROM signup_sms_verification
+        WHERE (VERIFIED_AT IS NULL AND CREATED_AT &lt; #{codeCutoff})
+           OR (VERIFIED_AT IS NOT NULL AND VERIFIED_AT &lt; #{verifiedCutoff})
+    </delete>
+
+</mapper>

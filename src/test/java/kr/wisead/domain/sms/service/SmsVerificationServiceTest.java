@@ -11,9 +11,9 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import kr.wisead.common.exception.BusinessException;
-import kr.wisead.domain.sms.entity.SignupSmsVerification;
+import kr.wisead.domain.sms.entity.SmsVerification;
 import kr.wisead.domain.sms.sender.SmsOtpSender;
-import kr.wisead.mapper.primary.SignupSmsVerificationMapper;
+import kr.wisead.mapper.primary.SmsVerificationMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,30 +25,30 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * PreSignupSmsAuthService 단위 테스트 — DB 기반(M3) 저장소를 인메모리 fake mapper 로 대체해 서비스 로직을 검증한다.
+ * SmsVerificationService 단위 테스트 — DB 기반(M3) 저장소를 인메모리 fake mapper 로 대체해 서비스 로직을 검증한다.
  *
- * <p>fake mapper 는 {@link SignupSmsVerificationMapper} 의 SQL 의미(원자적 increment/markVerified, 만료 정리
+ * <p>fake mapper 는 {@link SmsVerificationMapper} 의 SQL 의미(원자적 increment/markVerified, 만료 정리
  * 등)를 자바로 동일하게 재현한다. OTP 코드는 {@link SmsOtpSender#sendOtp} 로 전달된 값을 ArgumentCaptor 로 가로채 사용한다.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-@DisplayName("PreSignupSmsAuthService (DB 기반, key=purpose:phone)")
-class PreSignupSmsAuthServiceTest {
+@DisplayName("SmsVerificationService (DB 기반, key=purpose:phone)")
+class SmsVerificationServiceTest {
 
   @Mock private SmsOtpSender smsOtpSender;
 
-  private InMemorySignupSmsVerificationMapper mapper;
-  private PreSignupSmsAuthService sut;
+  private InMemorySmsVerificationMapper mapper;
+  private SmsVerificationService sut;
 
   private static final String PHONE_DASHED = "010-1234-5678";
   private static final String PHONE_NORMALIZED = "01012345678";
-  private static final String SIGNUP = PreSignupSmsAuthService.PURPOSE_SIGNUP;
+  private static final String SIGNUP = SmsVerificationService.PURPOSE_SIGNUP;
   private static final String OTHER_PURPOSE = "PASSWORD_RESET"; // 가상의 다른 용도
 
   @BeforeEach
   void setUp() {
-    mapper = new InMemorySignupSmsVerificationMapper();
-    sut = new PreSignupSmsAuthService(smsOtpSender, mapper);
+    mapper = new InMemorySmsVerificationMapper();
+    sut = new SmsVerificationService(smsOtpSender, mapper);
   }
 
   /** 발송 시 SmsOtpSender 로 넘어간 OTP 코드를 가로채 반환한다 (마지막 호출). */
@@ -214,37 +214,37 @@ class PreSignupSmsAuthServiceTest {
 
   // ==================== Fake Mapper ====================
 
-  /** SignupSmsVerificationMapper 의 SQL 의미를 자바로 재현한 인메모리 구현(테스트 전용). */
-  private static class InMemorySignupSmsVerificationMapper implements SignupSmsVerificationMapper {
+  /** SmsVerificationMapper 의 SQL 의미를 자바로 재현한 인메모리 구현(테스트 전용). */
+  private static class InMemorySmsVerificationMapper implements SmsVerificationMapper {
 
-    private final Map<String, SignupSmsVerification> store = new HashMap<>();
+    private final Map<String, SmsVerification> store = new HashMap<>();
 
     private String key(String purpose, String phone) {
       return purpose + ":" + phone;
     }
 
     @Override
-    public SignupSmsVerification findByKey(String purpose, String phone) {
+    public SmsVerification findByKey(String purpose, String phone) {
       return store.get(key(purpose, phone));
     }
 
     @Override
-    public int insert(SignupSmsVerification e) {
+    public int insert(SmsVerification e) {
       store.put(key(e.getPurpose(), e.getPhone()), e);
       return 1;
     }
 
     @Override
-    public int updateForSend(SignupSmsVerification e) {
+    public int updateForSend(SmsVerification e) {
       String k = key(e.getPurpose(), e.getPhone());
       if (!store.containsKey(k)) {
         return 0;
       }
       // code/created_at 갱신, attempts=0, verified_at=NULL (seq 는 기존 행 유지)
-      SignupSmsVerification cur = store.get(k);
+      SmsVerification cur = store.get(k);
       store.put(
           k,
-          new SignupSmsVerification(
+          new SmsVerification(
               cur.getSeq(), e.getPurpose(), e.getPhone(), e.getCode(), 0, e.getCreatedAt(), null));
       return 1;
     }
@@ -252,13 +252,13 @@ class PreSignupSmsAuthServiceTest {
     @Override
     public int incrementAttempts(String purpose, String phone) {
       String k = key(purpose, phone);
-      SignupSmsVerification e = store.get(k);
+      SmsVerification e = store.get(k);
       if (e == null) {
         return 0;
       }
       store.put(
           k,
-          new SignupSmsVerification(
+          new SmsVerification(
               e.getSeq(),
               e.getPurpose(),
               e.getPhone(),
@@ -273,11 +273,11 @@ class PreSignupSmsAuthServiceTest {
     public int markVerifiedIfCodeMatches(
         String purpose, String phone, String code, LocalDateTime verifiedAt) {
       String k = key(purpose, phone);
-      SignupSmsVerification e = store.get(k);
+      SmsVerification e = store.get(k);
       if (e != null && code.equals(e.getCode()) && e.getVerifiedAt() == null) {
         store.put(
             k,
-            new SignupSmsVerification(
+            new SmsVerification(
                 e.getSeq(),
                 e.getPurpose(),
                 e.getPhone(),

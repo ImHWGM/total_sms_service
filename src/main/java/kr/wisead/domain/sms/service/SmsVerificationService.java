@@ -7,23 +7,23 @@ import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
-import kr.wisead.domain.sms.entity.SignupSmsVerification;
+import kr.wisead.domain.sms.entity.SmsVerification;
 import kr.wisead.domain.sms.sender.SmsOtpSender;
-import kr.wisead.mapper.primary.SignupSmsVerificationMapper;
+import kr.wisead.mapper.primary.SmsVerificationMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
- * 회원가입(사전 인증) 도메인 SMS 인증 서비스.
+ * 사전 인증(로그인 전) SMS 휴대폰 인증 범용 서비스.
  *
- * <p>회원가입 흐름과 같이 아직 로그인된 사용자 식별자(userId/seq)가 존재하지 않는 단계에서 사용한다. 식별 단위는 *용도(purpose) + 정규화된
- * 휴대폰번호(숫자만)* 이며, 기존 {@link kr.wisead.domain.email.service.PreSignupEmailAuthService}(key=email) 와
- * 평행 구조다.
+ * <p>아직 로그인된 사용자 식별자(userId/seq)가 없는 흐름(회원가입·아이디찾기·비밀번호찾기 등)에서 공용으로 쓴다. 용도는 호출자가
+ * {@code purpose} 로 지정한다(예: {@link #PURPOSE_SIGNUP}). 식별 단위는 *용도(purpose) + 정규화된 휴대폰번호(숫자만)*
+ * 이며, 기존 {@link kr.wisead.domain.email.service.PreSignupEmailAuthService}(key=email) 와 평행 구조다.
  *
  * <p><b>M3: 상태 저장을 DB 로 이전.</b> 인증 상태(발송 코드/시도횟수/인증완료 도장)를 인스턴스 메모리가 아닌
- * {@code signup_sms_verification} 테이블에 보관한다. 다중 인스턴스 라우팅·재시작에도 인증 상태가 보존된다. 로그인 2FA({@link
+ * {@code sms_verification} 테이블에 보관한다. 다중 인스턴스 라우팅·재시작에도 인증 상태가 보존된다. 로그인 2FA({@link
  * SmsAuthService})/이메일 사전인증은 별개로 in-memory 를 유지한다.
  *
  * <p>SMS 발송은 {@link SmsOtpSender} 를 통해 결제/야간/잔액 검증을 우회하여 큐에 직접 적재한다.
@@ -38,13 +38,13 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class PreSignupSmsAuthService {
+public class SmsVerificationService {
 
   /** 회원가입 본인인증 용도. */
   public static final String PURPOSE_SIGNUP = "SIGNUP";
 
   private final SmsOtpSender smsOtpSender;
-  private final SignupSmsVerificationMapper verificationMapper;
+  private final SmsVerificationMapper verificationMapper;
 
   /** OTP 생성용 SecureRandom (스레드 안전). */
   private final SecureRandom secureRandom = new SecureRandom();
@@ -75,7 +75,7 @@ public class PreSignupSmsAuthService {
     String p = resolvePurpose(purpose);
     LocalDateTime now = LocalDateTime.now();
 
-    SignupSmsVerification existing = verificationMapper.findByKey(p, phone);
+    SmsVerification existing = verificationMapper.findByKey(p, phone);
     if (existing != null && !canResend(existing.getCreatedAt(), now)) {
       long remainingSeconds = remainingResendSeconds(existing.getCreatedAt(), now);
       throw new BusinessException(
@@ -85,7 +85,7 @@ public class PreSignupSmsAuthService {
     String code = generateOtpCode();
     if (existing == null) {
       verificationMapper.insert(
-          SignupSmsVerification.builder()
+          SmsVerification.builder()
               .purpose(p)
               .phone(phone)
               .code(code)
@@ -96,7 +96,7 @@ public class PreSignupSmsAuthService {
     } else {
       // 재발송: 코드/발송시각 갱신 + 시도횟수·도장 리셋
       verificationMapper.updateForSend(
-          SignupSmsVerification.builder().purpose(p).phone(phone).code(code).createdAt(now).build());
+          SmsVerification.builder().purpose(p).phone(phone).code(code).createdAt(now).build());
     }
 
     try {
@@ -135,7 +135,7 @@ public class PreSignupSmsAuthService {
     String p = resolvePurpose(purpose);
     LocalDateTime now = LocalDateTime.now();
 
-    SignupSmsVerification info = verificationMapper.findByKey(p, phone);
+    SmsVerification info = verificationMapper.findByKey(p, phone);
     if (info == null || info.getCode() == null) {
       // code == null: 미발송이거나 이미 검증되어 소비된 상태
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드를 먼저 발송해주세요.");
@@ -160,7 +160,7 @@ public class PreSignupSmsAuthService {
 
     // 불일치 → 시도 횟수 원자적 증가 후 안내
     verificationMapper.incrementAttempts(p, phone);
-    SignupSmsVerification reloaded = verificationMapper.findByKey(p, phone);
+    SmsVerification reloaded = verificationMapper.findByKey(p, phone);
     int attempts = reloaded != null ? reloaded.getAttempts() : MAX_ATTEMPTS;
     log.warn(
         "[PreSignup] SMS 인증 코드 불일치: phone={}, purpose={}, attempts={}",
@@ -179,7 +179,7 @@ public class PreSignupSmsAuthService {
 
   /** 인증 상태 확인. (검증 완료되어 code 가 소비된 행은 codeSent=false 로 본다.) */
   public VerificationStatus getVerificationStatus(String phoneNumber, String purpose) {
-    SignupSmsVerification info =
+    SmsVerification info =
         verificationMapper.findByKey(resolvePurpose(purpose), normalizePhone(phoneNumber));
     if (info == null || info.getCode() == null) {
       return new VerificationStatus(false, 0, 0, 0);
@@ -209,7 +209,7 @@ public class PreSignupSmsAuthService {
    * #consumeVerification(String, String)} 으로 수행한다.
    */
   public void checkVerified(String phoneNumber, String purpose) {
-    SignupSmsVerification info =
+    SmsVerification info =
         verificationMapper.findByKey(resolvePurpose(purpose), normalizePhone(phoneNumber));
     requireValidStamp(info);
   }
@@ -223,7 +223,7 @@ public class PreSignupSmsAuthService {
   public void consumeVerification(String phoneNumber, String purpose) {
     String phone = normalizePhone(phoneNumber);
     String p = resolvePurpose(purpose);
-    SignupSmsVerification info = verificationMapper.findByKey(p, phone);
+    SmsVerification info = verificationMapper.findByKey(p, phone);
     requireValidStamp(info);
     verificationMapper.deleteByKey(p, phone);
     log.info("[PreSignup] SMS 인증 소비 완료: phone={}, purpose={}", CommonUtils.maskingPhone(phone), p);
@@ -244,7 +244,7 @@ public class PreSignupSmsAuthService {
   // ==================== Private Methods ====================
 
   /** 인증 완료 도장 유효성 검사 (미인증/유예초과 시 예외). */
-  private void requireValidStamp(SignupSmsVerification info) {
+  private void requireValidStamp(SmsVerification info) {
     if (info == null || info.getVerifiedAt() == null) {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "휴대폰 본인인증을 먼저 완료해주세요.");
     }
@@ -254,7 +254,11 @@ public class PreSignupSmsAuthService {
   }
 
   private String resolvePurpose(String purpose) {
-    return (purpose != null && !purpose.isBlank()) ? purpose : PURPOSE_SIGNUP;
+    // 범용 저장소이므로 용도를 반드시 명시받는다. 빠뜨린 호출을 조용히 SIGNUP 으로 처리하지 않는다.
+    if (purpose == null || purpose.isBlank()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 용도(purpose)가 필요합니다.");
+    }
+    return purpose;
   }
 
   /** 휴대폰번호 정규화 (숫자만 남김). 예: "010-1234-5678" -> "01012345678". */

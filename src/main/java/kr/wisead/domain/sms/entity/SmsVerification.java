@@ -8,7 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 회원가입 SMS 본인인증 상태 Entity. signup_sms_verification 테이블 매핑.
+ * 회원가입 SMS 본인인증 상태 Entity. sms_verification 테이블 매핑.
  *
  * <p>(purpose, phone) 복합 PK 로 한 번호의 한 용도당 1행을 유지한다. {@code verifiedAt} 이 null 이면 "코드 발송/검증 대기" 상태,
  * not-null 이면 "인증 완료(도장)" 상태이다.
@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class SignupSmsVerification {
+public class SmsVerification {
 
   private Integer seq; // PK (대리키, auto-increment)
   private String purpose; // OTP 용도 (예: SIGNUP)

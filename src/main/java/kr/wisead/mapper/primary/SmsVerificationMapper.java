@@ -1,23 +1,23 @@
 package kr.wisead.mapper.primary;
 
 import java.time.LocalDateTime;
-import kr.wisead.domain.sms.entity.SignupSmsVerification;
+import kr.wisead.domain.sms.entity.SmsVerification;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 /** 회원가입 SMS 본인인증 상태 Mapper (M3: DB 기반 저장). */
 @Mapper
-public interface SignupSmsVerificationMapper {
+public interface SmsVerificationMapper {
 
   /** (purpose, phone) 으로 1행 조회. 없으면 null. */
-  SignupSmsVerification findByKey(
+  SmsVerification findByKey(
       @Param("purpose") String purpose, @Param("phone") String phone);
 
   /** 신규 행 삽입 (최초 발송). */
-  int insert(SignupSmsVerification entity);
+  int insert(SmsVerification entity);
 
   /** 기존 행 갱신 (재발송): code/created_at 갱신, attempts=0, verified_at=NULL 로 리셋. */
-  int updateForSend(SignupSmsVerification entity);
+  int updateForSend(SmsVerification entity);
 
   /** 검증 시도 횟수 +1 (원자적). M1: lost-update 방지. */
   int incrementAttempts(@Param("purpose") String purpose, @Param("phone") String phone);

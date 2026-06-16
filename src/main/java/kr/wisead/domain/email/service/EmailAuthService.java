@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
  * <p>이미 사용자 ID(seq)가 식별된 흐름(로그인 이메일 2FA 등)에서만 사용한다. 저장소 키는 {@code user.seq(Integer)}이며, 같은 이메일을
  * 사용하는 다른 사용자/회원가입과는 도메인이 격리된다. email 인자는 *발송용*으로만 받고 인증 키에는 사용하지 않는다.
  *
- * <p>회원가입처럼 사용자 식별자가 없는 흐름은 {@link PreSignupEmailAuthService}(key=email)를 사용한다.
+ * <p>회원가입처럼 사용자 식별자가 없는 흐름은 {@link EmailVerificationService}(key=email)를 사용한다.
  *
  * <p>plan §4 Phase B-0-3 (#v3-1 CRITICAL 해소).
  */

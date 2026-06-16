@@ -323,7 +323,7 @@ class EventParticipantWorkflowIntegrationTest {
 
     PageResponse<EventParticipantResponse> mockResponse = PageResponse.of(participants, 1, 20, 1);
 
-    when(participantService.getParticipants(any(ParticipantSearchRequest.class)))
+    when(participantService.getParticipants(any(ParticipantSearchRequest.class), anyString()))
         .thenReturn(mockResponse);
 
     // When & Then
@@ -389,7 +389,7 @@ class EventParticipantWorkflowIntegrationTest {
             .build();
 
     when(participantService.getParticipantStatusByCheckCode(
-            eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE)))
+            eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), eq(false), anyString()))
         .thenReturn(mockResponse);
 
     // When & Then: 인증 없이 접근 가능
@@ -507,7 +507,8 @@ class EventParticipantWorkflowIntegrationTest {
                         .build()))
             .build();
 
-    when(participantService.getParticipantStatus(TEST_PARTICIPANT_SEQ)).thenReturn(mockResponse);
+    when(participantService.getParticipantStatus(eq(TEST_EVENT_SEQ), eq(TEST_PARTICIPANT_SEQ), anyString()))
+        .thenReturn(mockResponse);
 
     // When & Then
     mockMvc
@@ -539,7 +540,8 @@ class EventParticipantWorkflowIntegrationTest {
     nametagData.put("participantType", "일반");
     nametagData.put("checkCode", TEST_CHECK_CODE);
 
-    when(nametagService.getNametagData(TEST_PARTICIPANT_SEQ)).thenReturn(nametagData);
+    when(nametagService.getNametagData(eq(TEST_EVENT_SEQ), eq(TEST_PARTICIPANT_SEQ), anyString()))
+        .thenReturn(nametagData);
 
     // When & Then
     mockMvc
@@ -563,7 +565,7 @@ class EventParticipantWorkflowIntegrationTest {
     // Given: 명찰 출력 요청
     NametagPrintRequest request = NametagPrintRequest.builder().templateType("DEFAULT").build();
 
-    doNothing().when(nametagService).recordPrint(any(NametagPrintRequest.class), anyString());
+    doNothing().when(nametagService).recordPrint(eq(TEST_EVENT_SEQ), any(NametagPrintRequest.class), anyString());
 
     // When & Then
     mockMvc
@@ -579,7 +581,7 @@ class EventParticipantWorkflowIntegrationTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.message").value("명찰 출력이 기록되었습니다."));
 
-    verify(nametagService, times(1)).recordPrint(any(NametagPrintRequest.class), anyString());
+    verify(nametagService, times(1)).recordPrint(eq(TEST_EVENT_SEQ), any(NametagPrintRequest.class), anyString());
   }
 
   @Test
@@ -767,7 +769,8 @@ class EventParticipantWorkflowIntegrationTest {
                         .build()))
             .build();
 
-    when(participantService.getParticipantStatus(TEST_PARTICIPANT_SEQ)).thenReturn(mockResponse);
+    when(participantService.getParticipantStatus(eq(TEST_EVENT_SEQ), eq(TEST_PARTICIPANT_SEQ), anyString()))
+        .thenReturn(mockResponse);
 
     // When & Then
     mockMvc

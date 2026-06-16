@@ -1,5 +1,6 @@
 package kr.wisead.domain.event.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import kr.wisead.common.response.ApiResponse;
@@ -44,9 +45,12 @@ public class EventCheckController {
   /** QR 스캔으로 참가자 정보 조회 (체크인 전 확인용) */
   @GetMapping("/{eventSeq}/check/{checkCode}")
   public ApiResponse<ParticipantStatusResponse> getParticipantByCheckCode(
-      @PathVariable Integer eventSeq, @PathVariable String checkCode) {
+      @PathVariable Integer eventSeq,
+      @PathVariable String checkCode,
+      HttpServletRequest request) {
     return ApiResponse.success(
-        participantService.getParticipantStatusByCheckCode(eventSeq, checkCode));
+        participantService.getParticipantStatusByCheckCode(
+            eventSeq, checkCode, false, request.getRemoteAddr()));
   }
 
   /** QR 스캔으로 명찰 데이터 조회 (checkCode 기반) */
@@ -107,6 +111,6 @@ public class EventCheckController {
       @CookieValue(name = "staff_auth", required = false) String staffAuth) {
     checkService.validateStaffCookie(eventSeq, staffAuth);
     return ApiResponse.success(
-        participantService.getParticipantStatusByCheckCode(eventSeq, checkCode));
+        participantService.getParticipantStatusByCheckCode(eventSeq, checkCode, true, null));
   }
 }

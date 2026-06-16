@@ -8,6 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.ratelimit.FailureRateLimiter;
 import kr.wisead.common.ratelimit.RateLimitExceededException;
 import kr.wisead.common.ratelimit.SimpleRateLimiter;
 import kr.wisead.common.response.ErrorCode;
@@ -50,6 +51,7 @@ public class EventParticipantService {
   private final ExcelService excelService;
   private final RsvpNonceStore rsvpNonceStore;
   private final SimpleRateLimiter simpleRateLimiter;
+  private final FailureRateLimiter failureRateLimiter;
 
   @Value("${wisead.url:http://localhost:8080}")
   private String wiseadUrl;
@@ -476,7 +478,10 @@ public class EventParticipantService {
 
   /** 문자 발송용 참가자 전체 목록 조회 (페이징 없음, 발송 이력 포함) */
   @Transactional(readOnly = true)
-  public List<ParticipantForMessageResponse> getParticipantsForMessage(Integer eventSeq) {
+  public List<ParticipantForMessageResponse> getParticipantsForMessage(
+      Integer eventSeq, String userId) {
+    validateEventReadAccess(eventSeq, userId);
+
     List<EventParticipant> participants = participantMapper.selectByEventSeq(eventSeq);
 
     // sms_send에서 발송 이력이 있는 userSeq 조회
@@ -566,7 +571,10 @@ public class EventParticipantService {
 
   /** 참가자 목록 조회 */
   @Transactional(readOnly = true)
-  public PageResponse<EventParticipantResponse> getParticipants(ParticipantSearchRequest request) {
+  public PageResponse<EventParticipantResponse> getParticipants(
+      ParticipantSearchRequest request, String userId) {
+    validateEventReadAccess(request.getEventSeq(), userId);
+
     Map<String, Object> params = new HashMap<>();
     params.put("eventSeq", request.getEventSeq());
     params.put("keyword", request.getKeyword());
@@ -598,24 +606,16 @@ public class EventParticipantService {
 
   /** 참가자 상세 조회 */
   @Transactional(readOnly = true)
-  public EventParticipantResponse getParticipant(Long seq) {
+  public EventParticipantResponse getParticipant(Integer eventSeq, Long seq, String userId) {
+    validateEventReadAccess(eventSeq, userId);
+
     EventParticipant participant =
         participantMapper
             .selectDetailBySeq(seq)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    return buildParticipantResponse(participant);
-  }
-
-  /** 체크코드로 참가자 조회 */
-  @Transactional(readOnly = true)
-  public EventParticipantResponse getParticipantByCheckCode(String checkCode) {
-    EventParticipant participant =
-        participantMapper
-            .selectDetailByCheckCode(checkCode)
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+    validateParticipantEvent(eventSeq, participant);
 
     return buildParticipantResponse(participant);
   }
@@ -657,7 +657,11 @@ public class EventParticipantService {
 
     participantMapper.update(participant);
 
-    return getParticipant(seq);
+    return buildParticipantResponse(
+        participantMapper
+            .selectDetailBySeq(seq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.")));
   }
 
   /** 참가자 삭제 */
@@ -691,13 +695,23 @@ public class EventParticipantService {
 
   /** 참가자 상태 조회 (액션 현황 포함) */
   @Transactional(readOnly = true)
-  public ParticipantStatusResponse getParticipantStatus(Long seq) {
+  public ParticipantStatusResponse getParticipantStatus(Integer eventSeq, Long seq, String userId) {
+    validateEventReadAccess(eventSeq, userId);
+
     EventParticipant participant =
         participantMapper
             .selectDetailBySeq(seq)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
+    validateParticipantEvent(eventSeq, participant);
+
+    return buildParticipantStatus(participant, true);
+  }
+
+  private ParticipantStatusResponse buildParticipantStatus(
+      EventParticipant participant, boolean includeContact) {
+    Long seq = participant.getSeq();
     List<Map<String, Object>> actionStatusList =
         actionLogMapper.selectActionStatusByParticipantSeq(seq, participant.getEventSeq());
 
@@ -730,8 +744,8 @@ public class EventParticipantService {
                 .department(participant.getDepartment())
                 .position(participant.getPosition())
                 .participantType(participant.getParticipantType())
-                .phone(decryptPhone(participant.getUserPhone()))
-                .email(participant.getUserEmail())
+                .phone(includeContact ? decryptPhone(participant.getUserPhone()) : null)
+                .email(includeContact ? participant.getUserEmail() : null)
                 .nametagPrinted(participant.getNametagPrinted())
                 .build())
         .actions(actions)
@@ -742,13 +756,29 @@ public class EventParticipantService {
   @Transactional(readOnly = true)
   public ParticipantStatusResponse getParticipantStatusByCheckCode(
       Integer eventSeq, String checkCode) {
+    return getParticipantStatusByCheckCode(eventSeq, checkCode, true, null);
+  }
+
+  /** 체크코드로 참가자 상태 조회 */
+  @Transactional(readOnly = true)
+  public ParticipantStatusResponse getParticipantStatusByCheckCode(
+      Integer eventSeq, String checkCode, boolean includeContact, String clientIp) {
     EventParticipant participant =
         participantMapper
             .selectByEventSeqAndCheckCode(eventSeq, checkCode)
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+            .orElse(null);
 
-    return getParticipantStatus(participant.getSeq());
+    if (participant == null) {
+      if (clientIp != null && !clientIp.isBlank()) {
+        String failureKey = clientIp + ":" + eventSeq + ":check";
+        if (!failureRateLimiter.recordFailureAndCheckAllowed(failureKey)) {
+          throw new RateLimitExceededException("요청이 너무 빈번합니다. 잠시 후 다시 시도해 주세요.");
+        }
+      }
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.");
+    }
+
+    return buildParticipantStatus(participant, includeContact);
   }
 
   // ==================== 행사 통합 링크 ====================
@@ -931,7 +961,9 @@ public class EventParticipantService {
 
   /** 행사 통계 조회 */
   @Transactional(readOnly = true)
-  public EventStatisticsResponse getStatistics(Integer eventSeq) {
+  public EventStatisticsResponse getStatistics(Integer eventSeq, String userId) {
+    validateEventReadAccess(eventSeq, userId);
+
     // 이벤트 정보 조회
     SurveyMaster event =
         surveyMasterMapper
@@ -1103,6 +1135,23 @@ public class EventParticipantService {
 
   private double calcRate(int numerator, int denominator) {
     return denominator > 0 ? Math.round((double) numerator / denominator * 1000) / 10.0 : 0;
+  }
+
+  @Transactional(readOnly = true)
+  public void validateEventReadAccess(Integer eventSeq, String userId) {
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트 정보를 찾을 수 없습니다."));
+    Integer userLevel = adminService.getUserLevel(userId);
+    adminService.validateModifyPermission(userId, userLevel, event.getRegId());
+  }
+
+  private void validateParticipantEvent(Integer eventSeq, EventParticipant participant) {
+    if (!Objects.equals(participant.getEventSeq(), eventSeq)) {
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.");
+    }
   }
 
   /** 문자 발송 통계 조회 (msg_result_YYYYMM + msg_queue) */

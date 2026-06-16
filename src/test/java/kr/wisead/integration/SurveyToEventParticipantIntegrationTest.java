@@ -395,7 +395,7 @@ class SurveyToEventParticipantIntegrationTest {
             .build();
 
     when(participantService.getParticipantStatusByCheckCode(
-            eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE_NON_RESPONDENT)))
+            eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE_NON_RESPONDENT), eq(false), anyString()))
         .thenReturn(mockResponse);
 
     mockMvc
@@ -560,7 +560,7 @@ class SurveyToEventParticipantIntegrationTest {
             .build();
 
     when(participantService.getParticipantStatusByCheckCode(
-            eq(TEST_EVENT_SEQ), eq("any_check_code")))
+            eq(TEST_EVENT_SEQ), eq("any_check_code"), eq(false), anyString()))
         .thenReturn(mockResponse);
 
     // When & Then: GET 요청도 인증 불필요

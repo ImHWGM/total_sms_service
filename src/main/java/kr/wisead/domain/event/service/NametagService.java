@@ -1,5 +1,7 @@
 package kr.wisead.domain.event.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -7,8 +9,10 @@ import java.util.Map;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.event.dto.NametagPrintRequest;
 import kr.wisead.domain.event.entity.*;
+import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.mapper.primary.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,15 +30,21 @@ public class NametagService {
   private final EventParticipantMapper participantMapper;
   private final EventNametagLogMapper nametagLogMapper;
   private final SurveyMasterMapper surveyMasterMapper;
+  private final AdminService adminService;
+  private final ObjectMapper objectMapper;
 
   /** 명찰 데이터 조회 (출력/미리보기용) */
   @Transactional(readOnly = true)
-  public Map<String, Object> getNametagData(Long participantSeq) {
+  public Map<String, Object> getNametagData(Integer eventSeq, Long participantSeq, String userId) {
+    validateEventReadAccess(eventSeq, userId);
+
     EventParticipant participant =
         participantMapper
             .selectDetailBySeq(participantSeq)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+
+    validateParticipantEvent(eventSeq, participant);
 
     Map<String, Object> nametagData = new HashMap<>();
     nametagData.put("participantSeq", participant.getSeq());
@@ -51,12 +61,16 @@ public class NametagService {
 
   /** 명찰 출력 로그 기록 */
   @Transactional
-  public void recordPrint(NametagPrintRequest request, String printBy) {
+  public void recordPrint(Integer eventSeq, NametagPrintRequest request, String printBy) {
+    validateEventReadAccess(eventSeq, printBy);
+
     EventParticipant participant =
         participantMapper
             .selectBySeq(request.getParticipantSeq())
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+
+    validateParticipantEvent(eventSeq, participant);
 
     // 명찰 출력 로그 등록
     EventNametagLog nametagLog =
@@ -105,7 +119,10 @@ public class NametagService {
     // DB에서 가져온 값은 AES256 + Base64로 암호화되어 있음
     // 명찰에는 사람이 읽을 수 있는 값이 필요하므로 복호화
     String decryptedName = decryptField(participant.getUserName());
-    String decryptedPhone = decryptField(participant.getUserPhone());
+    String decryptedPhone =
+        shouldExposeContact(participant.getNametagConfig())
+            ? decryptField(participant.getUserPhone())
+            : null;
 
     return kr.wisead.domain.event.dto.NametagResponse.from(
         participant, decryptedName, decryptedPhone);
@@ -149,6 +166,43 @@ public class NametagService {
     } catch (Exception e) {
       log.warn("필드 복호화 실패: {}", e.getMessage());
       return encryptedValue; // 복호화 실패 시 원본 반환 (서비스 중단 방지)
+    }
+  }
+
+  private void validateEventReadAccess(Integer eventSeq, String userId) {
+    SurveyMaster event =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트 정보를 찾을 수 없습니다."));
+    Integer userLevel = adminService.getUserLevel(userId);
+    adminService.validateModifyPermission(userId, userLevel, event.getRegId());
+  }
+
+  private void validateParticipantEvent(Integer eventSeq, EventParticipant participant) {
+    if (!java.util.Objects.equals(participant.getEventSeq(), eventSeq)) {
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.");
+    }
+  }
+
+  private boolean shouldExposeContact(String nametagConfig) {
+    if (nametagConfig == null || nametagConfig.isBlank()) {
+      return false;
+    }
+    try {
+      JsonNode fields = objectMapper.readTree(nametagConfig).path("fields");
+      if (!fields.isArray()) {
+        return false;
+      }
+      for (JsonNode field : fields) {
+        if ("contact".equals(field.path("key").asText(null))) {
+          return field.path("enabled").isBoolean() && field.path("enabled").asBoolean();
+        }
+      }
+      return false;
+    } catch (Exception e) {
+      log.warn("명찰 설정 파싱 실패: {}", e.getMessage());
+      return false;
     }
   }
 }

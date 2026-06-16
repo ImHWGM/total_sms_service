@@ -30,7 +30,9 @@ public class EventExcelService {
 
   /** 참가자 목록 엑셀 생성 */
   @Transactional(readOnly = true)
-  public byte[] createParticipantExcel(Integer eventSeq) {
+  public byte[] createParticipantExcel(Integer eventSeq, String userId) {
+    participantService.validateEventReadAccess(eventSeq, userId);
+
     // 이벤트 정보 조회
     SurveyMaster event =
         surveyMasterMapper
@@ -92,7 +94,9 @@ public class EventExcelService {
 
   /** 통계 엑셀 생성 */
   @Transactional(readOnly = true)
-  public byte[] createStatisticsExcel(Integer eventSeq) {
+  public byte[] createStatisticsExcel(Integer eventSeq, String userId) {
+    participantService.validateEventReadAccess(eventSeq, userId);
+
     // 이벤트 정보 조회
     SurveyMaster event =
         surveyMasterMapper
@@ -101,7 +105,7 @@ public class EventExcelService {
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사 정보를 찾을 수 없습니다."));
 
     // 통계 데이터 조회
-    var statistics = participantService.getStatistics(eventSeq);
+    var statistics = participantService.getStatistics(eventSeq, userId);
 
     try (SXSSFWorkbook workbook = excelService.createWorkbook()) {
       // 요약 시트

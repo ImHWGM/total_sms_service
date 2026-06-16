@@ -1,5 +1,6 @@
 package kr.wisead.domain.event.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ public class ParticipantStatusResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ParticipantInfo {
         private Long seq;
         private String checkCode;

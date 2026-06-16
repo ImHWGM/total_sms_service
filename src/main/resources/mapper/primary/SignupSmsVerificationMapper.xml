@@ -4,8 +4,9 @@
 
     <resultMap id="SignupSmsVerificationResultMap"
                type="kr.wisead.domain.sms.entity.SignupSmsVerification">
-        <id property="purpose" column="PURPOSE"/>
-        <id property="phone" column="PHONE"/>
+        <id property="seq" column="SEQ"/>
+        <result property="purpose" column="PURPOSE"/>
+        <result property="phone" column="PHONE"/>
         <result property="code" column="CODE"/>
         <result property="attempts" column="ATTEMPTS"/>
         <result property="createdAt" column="CREATED_AT"/>
@@ -13,12 +14,13 @@
     </resultMap>
 
     <select id="findByKey" resultMap="SignupSmsVerificationResultMap">
-        SELECT PURPOSE, PHONE, CODE, ATTEMPTS, CREATED_AT, VERIFIED_AT
+        SELECT SEQ, PURPOSE, PHONE, CODE, ATTEMPTS, CREATED_AT, VERIFIED_AT
         FROM signup_sms_verification
         WHERE PURPOSE = #{purpose} AND PHONE = #{phone}
     </select>
 
-    <insert id="insert" parameterType="kr.wisead.domain.sms.entity.SignupSmsVerification">
+    <insert id="insert" parameterType="kr.wisead.domain.sms.entity.SignupSmsVerification"
+            useGeneratedKeys="true" keyProperty="seq">
         INSERT INTO signup_sms_verification (PURPOSE, PHONE, CODE, ATTEMPTS, CREATED_AT, VERIFIED_AT)
         VALUES (#{purpose}, #{phone}, #{code}, #{attempts}, #{createdAt}, #{verifiedAt})
     </insert>

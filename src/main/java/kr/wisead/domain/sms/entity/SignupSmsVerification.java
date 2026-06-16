@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class SignupSmsVerification {
 
+  private Integer seq; // PK (대리키, auto-increment)
   private String purpose; // OTP 용도 (예: SIGNUP)
   private String phone; // 정규화 휴대폰번호 (숫자만)
   private String code; // 6자리 인증코드 (검증 성공/만료 시 null)

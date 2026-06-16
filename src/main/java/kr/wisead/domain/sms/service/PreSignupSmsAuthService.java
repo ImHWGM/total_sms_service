@@ -120,6 +120,12 @@ public class PreSignupSmsAuthService {
   /**
    * 인증 코드 검증. 성공 시 verified_at 도장을 찍고 code 를 무효화한다.
    *
+   * <p><b>의도적으로 @Transactional 을 달지 않는다.</b> 코드 불일치 시 incrementAttempts(시도횟수 +1)를 DB 에
+   * 반영한 뒤 BusinessException 을 던지는데, 만약 이 메서드가 @Transactional 이면 예외로 트랜잭션이 롤백되어 시도횟수
+   * 증가가 취소된다 → brute-force 한도(MAX_ATTEMPTS)가 무력화된다. 트랜잭션 없이 각 mapper 호출이 개별 커밋되어야
+   * "실패 시도는 누적되고 예외는 던진다"가 성립한다. (TwoFactorService 등 다른 서비스는 @Transactional 을 쓰지만,
+   * 그쪽은 '쓰기-또는-전체롤백' 패턴이라 사정이 다르다.)
+   *
    * @param phoneNumber 휴대폰번호
    * @param code 입력 코드
    * @param purpose OTP 용도 — 발송 시점과 동일해야 검증 가능

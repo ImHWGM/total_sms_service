@@ -240,11 +240,12 @@ class PreSignupSmsAuthServiceTest {
       if (!store.containsKey(k)) {
         return 0;
       }
-      // code/created_at 갱신, attempts=0, verified_at=NULL
+      // code/created_at 갱신, attempts=0, verified_at=NULL (seq 는 기존 행 유지)
+      SignupSmsVerification cur = store.get(k);
       store.put(
           k,
           new SignupSmsVerification(
-              e.getPurpose(), e.getPhone(), e.getCode(), 0, e.getCreatedAt(), null));
+              cur.getSeq(), e.getPurpose(), e.getPhone(), e.getCode(), 0, e.getCreatedAt(), null));
       return 1;
     }
 
@@ -258,6 +259,7 @@ class PreSignupSmsAuthServiceTest {
       store.put(
           k,
           new SignupSmsVerification(
+              e.getSeq(),
               e.getPurpose(),
               e.getPhone(),
               e.getCode(),
@@ -276,7 +278,13 @@ class PreSignupSmsAuthServiceTest {
         store.put(
             k,
             new SignupSmsVerification(
-                e.getPurpose(), e.getPhone(), null, e.getAttempts(), e.getCreatedAt(), verifiedAt));
+                e.getSeq(),
+                e.getPurpose(),
+                e.getPhone(),
+                null,
+                e.getAttempts(),
+                e.getCreatedAt(),
+                verifiedAt));
         return 1;
       }
       return 0;

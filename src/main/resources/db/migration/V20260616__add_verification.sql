@@ -3,8 +3,15 @@
 -- 발송 코드/시도횟수/인증완료 도장을 인스턴스 메모리 대신 DB 에 보관해
 -- 다중 인스턴스·재시작에도 인증 상태가 보존되도록 한다.
 -- 참고: 자동 실행 도구(Flyway/Liquibase) 미사용. 파일은 보관용이며 DBA 가 수동 실행한다.
+--
+-- ⚠ 멱등(idempotent): 어느 서버에서 몇 번을 돌려도 동일 결과가 되도록 작성.
+--   - 상용: 아무 테이블도 없음 → verification 만 생성.
+--   - 개발: 과거 단계에서 만든 signup_sms_verification / sms_verification 가 남아 있을 수 있음 → 제거.
+--     (인증 상태는 전이성 데이터(최대 30분)라 데이터 이관 불필요 — 그냥 버린다.)
+DROP TABLE IF EXISTS signup_sms_verification;
+DROP TABLE IF EXISTS sms_verification;
 
-CREATE TABLE verification (
+CREATE TABLE IF NOT EXISTS verification (
     seq          INT          NOT NULL AUTO_INCREMENT COMMENT 'PK (대리키)',
     purpose      VARCHAR(20)  NOT NULL COMMENT '용도 (예: SIGNUP)',
     channel      VARCHAR(10)  NOT NULL COMMENT '채널 (SMS | EMAIL)',

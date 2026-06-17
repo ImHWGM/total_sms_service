@@ -755,13 +755,6 @@ public class EventParticipantService {
   /** 체크코드로 참가자 상태 조회 */
   @Transactional(readOnly = true)
   public ParticipantStatusResponse getParticipantStatusByCheckCode(
-      Integer eventSeq, String checkCode) {
-    return getParticipantStatusByCheckCode(eventSeq, checkCode, true, null);
-  }
-
-  /** 체크코드로 참가자 상태 조회 */
-  @Transactional(readOnly = true)
-  public ParticipantStatusResponse getParticipantStatusByCheckCode(
       Integer eventSeq, String checkCode, boolean includeContact, String clientIp) {
     EventParticipant participant =
         participantMapper

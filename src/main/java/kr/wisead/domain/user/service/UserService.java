@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
@@ -52,9 +51,6 @@ public class UserService {
 
   @Value("${wisead.base-url:http://localhost:3000}")
   private String baseUrl;
-
-  // 아이디 찾기용 임시 저장소 (이메일 -> User 정보)
-  private final Map<String, User> findIdTempStore = new ConcurrentHashMap<>();
 
   // 토큰 유효 시간 (10분)
   private static final int TOKEN_EXPIRATION_MINUTES = 10;
@@ -182,10 +178,8 @@ public class UserService {
       String email = user.getEmail();
       emailAuthService.sendVerificationCode(email);
 
-      // 4. 임시 저장소에 사용자 정보 저장 (인증 완료 후 아이디 조회용)
-      findIdTempStore.put(email.toLowerCase(), user);
-
-      // 5. 마스킹된 이메일 반환
+      // 4. 마스킹된 이메일 반환
+      //    (인증 완료 후 아이디 조회는 2단계에서 findByEmail 로 재조회 — 인스턴스 로컬 임시저장소 제거)
       String maskedEmail = maskEmail(email);
       log.info("아이디 찾기 인증코드 발송: email={}", maskedEmail);
 
@@ -215,15 +209,14 @@ public class UserService {
         return FindIdResponse.verificationFailed();
       }
 
-      // 2. 임시 저장소에서 사용자 정보 조회
-      User user = findIdTempStore.remove(email.toLowerCase());
-      if (user == null) {
-        // 임시 저장소에 없으면 DB에서 직접 조회
-        user =
-            userMapper
-                .findByEmail(email)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-      }
+      // 2. 이메일로 사용자 조회 (이메일은 unique). verifyCode 가 발송 시점과 동일한 *전체* 이메일 키로
+      //    통과했으므로 이 email 은 전체 이메일이며 findByEmail 이 동일 사용자를 반환한다.
+      //    (기존 인스턴스 로컬 임시저장소는 DB 쿼리 1회를 아끼는 캐시였을 뿐 — 다중 인스턴스/재시작 비대칭과
+      //     미검증 시 메모리 누수가 있어 제거하고 폴백 경로로 단일화)
+      User user =
+          userMapper
+              .findByEmail(email)
+              .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
       // 3. 마스킹된 아이디 반환
       String maskedUserId = maskUserId(user.getUserId());

@@ -24,10 +24,10 @@ import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.mapper.primary.EventNametagLogMapper;
 import kr.wisead.mapper.primary.EventParticipantMapper;
 import kr.wisead.mapper.primary.SurveyMasterMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -50,7 +50,20 @@ class NametagServiceSecurityTest {
   @Mock private FailureRateLimiter failureRateLimiter;
   @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
-  @InjectMocks private NametagService service;
+  private NametagService service;
+
+  @BeforeEach
+  void setUp() {
+    EventAccessValidator eventAccessValidator =
+        new EventAccessValidator(surveyMasterMapper, adminService);
+    service =
+        new NametagService(
+            participantMapper,
+            nametagLogMapper,
+            objectMapper,
+            failureRateLimiter,
+            eventAccessValidator);
+  }
 
   @Test
   @DisplayName("인증 명찰 read는 비소유자 접근을 차단한다")

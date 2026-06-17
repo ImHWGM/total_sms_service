@@ -52,6 +52,7 @@ public class EventParticipantService {
   private final RsvpNonceStore rsvpNonceStore;
   private final SimpleRateLimiter simpleRateLimiter;
   private final FailureRateLimiter failureRateLimiter;
+  private final EventAccessValidator eventAccessValidator;
 
   @Value("${wisead.url:http://localhost:8080}")
   private String wiseadUrl;
@@ -480,7 +481,7 @@ public class EventParticipantService {
   @Transactional(readOnly = true)
   public List<ParticipantForMessageResponse> getParticipantsForMessage(
       Integer eventSeq, String userId) {
-    validateEventReadAccess(eventSeq, userId);
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
 
     List<EventParticipant> participants = participantMapper.selectByEventSeq(eventSeq);
 
@@ -573,7 +574,7 @@ public class EventParticipantService {
   @Transactional(readOnly = true)
   public PageResponse<EventParticipantResponse> getParticipants(
       ParticipantSearchRequest request, String userId) {
-    validateEventReadAccess(request.getEventSeq(), userId);
+    eventAccessValidator.validateEventReadAccess(request.getEventSeq(), userId);
 
     Map<String, Object> params = new HashMap<>();
     params.put("eventSeq", request.getEventSeq());
@@ -607,7 +608,7 @@ public class EventParticipantService {
   /** 참가자 상세 조회 */
   @Transactional(readOnly = true)
   public EventParticipantResponse getParticipant(Integer eventSeq, Long seq, String userId) {
-    validateEventReadAccess(eventSeq, userId);
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
 
     EventParticipant participant =
         participantMapper
@@ -615,7 +616,7 @@ public class EventParticipantService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    validateParticipantEvent(eventSeq, participant);
+    eventAccessValidator.validateParticipantEvent(eventSeq, participant);
 
     return buildParticipantResponse(participant);
   }
@@ -696,7 +697,7 @@ public class EventParticipantService {
   /** 참가자 상태 조회 (액션 현황 포함) */
   @Transactional(readOnly = true)
   public ParticipantStatusResponse getParticipantStatus(Integer eventSeq, Long seq, String userId) {
-    validateEventReadAccess(eventSeq, userId);
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
 
     EventParticipant participant =
         participantMapper
@@ -704,7 +705,7 @@ public class EventParticipantService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    validateParticipantEvent(eventSeq, participant);
+    eventAccessValidator.validateParticipantEvent(eventSeq, participant);
 
     return buildParticipantStatus(participant, true);
   }
@@ -955,7 +956,7 @@ public class EventParticipantService {
   /** 행사 통계 조회 */
   @Transactional(readOnly = true)
   public EventStatisticsResponse getStatistics(Integer eventSeq, String userId) {
-    validateEventReadAccess(eventSeq, userId);
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
 
     // 이벤트 정보 조회
     SurveyMaster event =
@@ -1128,23 +1129,6 @@ public class EventParticipantService {
 
   private double calcRate(int numerator, int denominator) {
     return denominator > 0 ? Math.round((double) numerator / denominator * 1000) / 10.0 : 0;
-  }
-
-  @Transactional(readOnly = true)
-  public void validateEventReadAccess(Integer eventSeq, String userId) {
-    SurveyMaster event =
-        surveyMasterMapper
-            .selectByEventSeq(eventSeq)
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트 정보를 찾을 수 없습니다."));
-    Integer userLevel = adminService.getUserLevel(userId);
-    adminService.validateModifyPermission(userId, userLevel, event.getRegId());
-  }
-
-  private void validateParticipantEvent(Integer eventSeq, EventParticipant participant) {
-    if (!Objects.equals(participant.getEventSeq(), eventSeq)) {
-      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.");
-    }
   }
 
   /** 문자 발송 통계 조회 (msg_result_YYYYMM + msg_queue) */

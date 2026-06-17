@@ -25,6 +25,7 @@ class EventExcelServiceSecurityTest {
   @Mock private EventParticipantService participantService;
   @Mock private SurveyMasterMapper surveyMasterMapper;
   @Mock private ExcelService excelService;
+  @Mock private EventAccessValidator eventAccessValidator;
 
   @InjectMocks private EventExcelService service;
 
@@ -32,7 +33,7 @@ class EventExcelServiceSecurityTest {
   @DisplayName("참가자 엑셀 생성은 소유권 검증 실패 시 중단된다")
   void createParticipantExcel_deniesNonOwner() {
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
-        .when(participantService)
+        .when(eventAccessValidator)
         .validateEventReadAccess(EVENT_SEQ, OTHER_USER_ID);
 
     assertThatThrownBy(() -> service.createParticipantExcel(EVENT_SEQ, OTHER_USER_ID))
@@ -46,7 +47,7 @@ class EventExcelServiceSecurityTest {
   @DisplayName("통계 엑셀 생성은 소유권 검증 실패 시 중단된다")
   void createStatisticsExcel_deniesNonOwner() {
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
-        .when(participantService)
+        .when(eventAccessValidator)
         .validateEventReadAccess(EVENT_SEQ, OTHER_USER_ID);
 
     assertThatThrownBy(() -> service.createStatisticsExcel(EVENT_SEQ, OTHER_USER_ID))

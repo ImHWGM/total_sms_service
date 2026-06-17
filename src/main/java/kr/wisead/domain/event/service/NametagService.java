@@ -11,10 +11,8 @@ import kr.wisead.common.ratelimit.FailureRateLimiter;
 import kr.wisead.common.ratelimit.RateLimitExceededException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
-import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.event.dto.NametagPrintRequest;
 import kr.wisead.domain.event.entity.*;
-import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.mapper.primary.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,15 +29,14 @@ public class NametagService {
 
   private final EventParticipantMapper participantMapper;
   private final EventNametagLogMapper nametagLogMapper;
-  private final SurveyMasterMapper surveyMasterMapper;
-  private final AdminService adminService;
   private final ObjectMapper objectMapper;
   private final FailureRateLimiter failureRateLimiter;
+  private final EventAccessValidator eventAccessValidator;
 
   /** 명찰 데이터 조회 (출력/미리보기용) */
   @Transactional(readOnly = true)
   public Map<String, Object> getNametagData(Integer eventSeq, Long participantSeq, String userId) {
-    validateEventReadAccess(eventSeq, userId);
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
 
     EventParticipant participant =
         participantMapper
@@ -47,7 +44,7 @@ public class NametagService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    validateParticipantEvent(eventSeq, participant);
+    eventAccessValidator.validateParticipantEvent(eventSeq, participant);
 
     Map<String, Object> nametagData = new HashMap<>();
     nametagData.put("participantSeq", participant.getSeq());
@@ -65,7 +62,7 @@ public class NametagService {
   /** 명찰 출력 로그 기록 */
   @Transactional
   public void recordPrint(Integer eventSeq, NametagPrintRequest request, String printBy) {
-    validateEventReadAccess(eventSeq, printBy);
+    eventAccessValidator.validateEventReadAccess(eventSeq, printBy);
 
     EventParticipant participant =
         participantMapper
@@ -73,7 +70,7 @@ public class NametagService {
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    validateParticipantEvent(eventSeq, participant);
+    eventAccessValidator.validateParticipantEvent(eventSeq, participant);
 
     // 명찰 출력 로그 등록
     EventNametagLog nametagLog =
@@ -177,22 +174,6 @@ public class NametagService {
     } catch (Exception e) {
       log.warn("필드 복호화 실패: {}", e.getMessage());
       return encryptedValue; // 복호화 실패 시 원본 반환 (서비스 중단 방지)
-    }
-  }
-
-  private void validateEventReadAccess(Integer eventSeq, String userId) {
-    SurveyMaster event =
-        surveyMasterMapper
-            .selectByEventSeq(eventSeq)
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트 정보를 찾을 수 없습니다."));
-    Integer userLevel = adminService.getUserLevel(userId);
-    adminService.validateModifyPermission(userId, userLevel, event.getRegId());
-  }
-
-  private void validateParticipantEvent(Integer eventSeq, EventParticipant participant) {
-    if (!java.util.Objects.equals(participant.getEventSeq(), eventSeq)) {
-      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.");
     }
   }
 

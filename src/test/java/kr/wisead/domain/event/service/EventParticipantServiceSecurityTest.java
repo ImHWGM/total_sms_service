@@ -33,10 +33,10 @@ import kr.wisead.mapper.primary.SurveyMasterMapper;
 import kr.wisead.mapper.primary.SurveyUserMapper;
 import kr.wisead.mapper.sms.MsgQueueMapper;
 import kr.wisead.mapper.sms.SendHistoryMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -67,7 +67,30 @@ class EventParticipantServiceSecurityTest {
   @Mock private SimpleRateLimiter simpleRateLimiter;
   @Spy private FailureRateLimiter failureRateLimiter = new FailureRateLimiter();
 
-  @InjectMocks private EventParticipantService service;
+  private EventParticipantService service;
+
+  @BeforeEach
+  void setUp() {
+    EventAccessValidator eventAccessValidator =
+        new EventAccessValidator(surveyMasterMapper, adminService);
+    service =
+        new EventParticipantService(
+            participantMapper,
+            actionTypeMapper,
+            actionLogMapper,
+            nametagLogMapper,
+            surveyUserMapper,
+            surveyMasterMapper,
+            smsSendMapper,
+            msgQueueMapper,
+            sendHistoryMapper,
+            adminService,
+            excelService,
+            rsvpNonceStore,
+            simpleRateLimiter,
+            failureRateLimiter,
+            eventAccessValidator);
+  }
 
   @Test
   @DisplayName("비소유자 참가자 목록 read는 ACCESS_DENIED를 전파한다")

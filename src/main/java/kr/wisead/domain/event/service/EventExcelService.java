@@ -24,6 +24,7 @@ public class EventExcelService {
   private final EventParticipantService participantService;
   private final SurveyMasterMapper surveyMasterMapper;
   private final ExcelService excelService;
+  private final EventAccessValidator eventAccessValidator;
 
   private static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -31,7 +32,7 @@ public class EventExcelService {
   /** 참가자 목록 엑셀 생성 */
   @Transactional(readOnly = true)
   public byte[] createParticipantExcel(Integer eventSeq, String userId) {
-    participantService.validateEventReadAccess(eventSeq, userId);
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
 
     // 이벤트 정보 조회
     SurveyMaster event =
@@ -95,7 +96,7 @@ public class EventExcelService {
   /** 통계 엑셀 생성 */
   @Transactional(readOnly = true)
   public byte[] createStatisticsExcel(Integer eventSeq, String userId) {
-    participantService.validateEventReadAccess(eventSeq, userId);
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
 
     // 이벤트 정보 조회
     SurveyMaster event =

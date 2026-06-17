@@ -7,6 +7,7 @@
         <result property="purpose" column="PURPOSE"/>
         <result property="channel" column="CHANNEL"/>
         <result property="identifier" column="IDENTIFIER"/>
+        <result property="target" column="TARGET"/>
         <result property="code" column="CODE"/>
         <result property="attempts" column="ATTEMPTS"/>
         <result property="createdAt" column="CREATED_AT"/>
@@ -14,21 +15,22 @@
     </resultMap>
 
     <select id="findByKey" resultMap="VerificationResultMap">
-        SELECT SEQ, PURPOSE, CHANNEL, IDENTIFIER, CODE, ATTEMPTS, CREATED_AT, VERIFIED_AT
+        SELECT SEQ, PURPOSE, CHANNEL, IDENTIFIER, TARGET, CODE, ATTEMPTS, CREATED_AT, VERIFIED_AT
         FROM verification
         WHERE PURPOSE = #{purpose} AND CHANNEL = #{channel} AND IDENTIFIER = #{identifier}
     </select>
 
     <insert id="insert" parameterType="kr.wisead.domain.verification.entity.Verification"
             useGeneratedKeys="true" keyProperty="seq">
-        INSERT INTO verification (PURPOSE, CHANNEL, IDENTIFIER, CODE, ATTEMPTS, CREATED_AT, VERIFIED_AT)
-        VALUES (#{purpose}, #{channel}, #{identifier}, #{code}, #{attempts}, #{createdAt}, #{verifiedAt})
+        INSERT INTO verification (PURPOSE, CHANNEL, IDENTIFIER, TARGET, CODE, ATTEMPTS, CREATED_AT, VERIFIED_AT)
+        VALUES (#{purpose}, #{channel}, #{identifier}, #{target}, #{code}, #{attempts}, #{createdAt}, #{verifiedAt})
     </insert>
 
-    <!-- 재발송: 코드/발송시각 갱신, 시도횟수·인증도장 리셋 -->
+    <!-- 재발송: 코드/발송시각/target 갱신, 시도횟수·인증도장 리셋 -->
     <update id="updateForSend" parameterType="kr.wisead.domain.verification.entity.Verification">
         UPDATE verification
         SET CODE = #{code},
+            TARGET = #{target},
             ATTEMPTS = 0,
             CREATED_AT = #{createdAt},
             VERIFIED_AT = NULL
@@ -57,6 +59,21 @@
     <delete id="deleteByKey">
         DELETE FROM verification
         WHERE PURPOSE = #{purpose} AND CHANNEL = #{channel} AND IDENTIFIER = #{identifier}
+    </delete>
+
+    <!-- 채널 전환 시 같은 사용자의 특정 채널 OTP 전체 무효화 -->
+    <delete id="deleteByChannelAndIdentifier">
+        DELETE FROM verification
+        WHERE CHANNEL = #{channel} AND IDENTIFIER = #{identifier}
+    </delete>
+
+    <!-- 코드 일치 시에만 원자적으로 행 삭제 — 로그인 2FA 단발 검증용 -->
+    <delete id="deleteIfCodeMatches">
+        DELETE FROM verification
+        WHERE PURPOSE = #{purpose}
+          AND CHANNEL = #{channel}
+          AND IDENTIFIER = #{identifier}
+          AND CODE = #{code}
     </delete>
 
     <!-- 만료 정리: (미인증 & 코드만료) 또는 (인증 & 유예초과) -->

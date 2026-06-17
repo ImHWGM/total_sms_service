@@ -10,53 +10,47 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.time.LocalDateTime;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
-import kr.wisead.domain.sms.sender.SmsOtpSender;
+import kr.wisead.domain.verification.InMemoryVerificationMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * SmsAuthService 단위 테스트 — EmailAuthServiceTest 와 평행 구조.
+ * SmsAuthService 단위 테스트 — DB 기반(M3) fake mapper 사용.
  *
  * <p>plan v5 §4 Phase B-2.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-@DisplayName("SmsAuthService (로그인 SMS 2FA OTP)")
+@DisplayName("SmsAuthService (로그인 SMS 2FA OTP, DB 기반)")
 class SmsAuthServiceTest {
 
   private static final Integer USER_ID = 42;
   private static final String PHONE = "01012345678";
+  private static final String PURPOSE = "SMS_2FA";
+  private static final String CHANNEL = "SMS";
 
   @Mock private SmsOtpSender smsOtpSender;
 
-  @InjectMocks private SmsAuthService sut;
+  private InMemoryVerificationMapper mapper;
+  private SmsAuthService sut;
 
   @BeforeEach
-  void cleanStore() {
-    // @InjectMocks 가 ConcurrentHashMap 도 새로 만들지만, 안전을 위해 명시 클리어.
-    @SuppressWarnings("unchecked")
-    Map<Integer, Object> store =
-        (Map<Integer, Object>) ReflectionTestUtils.getField(sut, "verificationStore");
-    if (store != null) {
-      store.clear();
-    }
+  void setUp() {
+    mapper = new InMemoryVerificationMapper();
+    sut = new SmsAuthService(smsOtpSender, mapper);
   }
 
   @Test
-  @DisplayName("sendVerificationCode_storesByUserId_andCallsSmsOtpSender")
+  @DisplayName("sendVerificationCode: userId 기반으로 DB에 저장하고 OTP 발송")
   void sendVerificationCode_storesByUserId_andCallsSmsOtpSender() {
     sut.sendVerificationCode(USER_ID, PHONE);
 
@@ -67,62 +61,51 @@ class SmsAuthServiceTest {
   }
 
   @Test
-  @DisplayName("sendVerificationCode_generates6DigitNumericCode")
+  @DisplayName("sendVerificationCode: 6자리 숫자 OTP 생성")
   void sendVerificationCode_generates6DigitNumericCode() {
     sut.sendVerificationCode(USER_ID, PHONE);
 
     ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
     verify(smsOtpSender).sendOtp(eq(PHONE), codeCaptor.capture());
 
-    String code = codeCaptor.getValue();
-    assertThat(code).hasSize(6);
-    assertThat(code).matches("\\d{6}");
+    assertThat(codeCaptor.getValue()).hasSize(6).matches("\\d{6}");
   }
 
   @Test
-  @DisplayName("verifyCode_succeedsWithCorrectCode")
+  @DisplayName("verifyCode: 올바른 코드 검증 성공 → DB 행 삭제")
   void verifyCode_succeedsWithCorrectCode() {
     sut.sendVerificationCode(USER_ID, PHONE);
-    String code = captureSentCode();
+    String code = captureCode();
 
-    // 예외 없이 통과해야 함
     sut.verifyCode(USER_ID, code);
 
-    // 검증 성공 후 store 에서 제거됨
-    VerificationStatus status = sut.getVerificationStatus(USER_ID);
-    assertThat(status.codeSent()).isFalse();
+    assertThat(sut.getVerificationStatus(USER_ID).codeSent()).isFalse();
   }
 
   @Test
-  @DisplayName("verifyCode_failsAfterMaxAttempts: 5회 실패 후 코드 폐기")
+  @DisplayName("verifyCode: 5회 실패 후 행 삭제 → 이후 '먼저 발송' 예외")
   void verifyCode_failsAfterMaxAttempts() {
     sut.sendVerificationCode(USER_ID, PHONE);
 
-    // 5번 틀린 코드 입력
     for (int i = 0; i < 5; i++) {
       try {
         sut.verifyCode(USER_ID, "000000");
       } catch (BusinessException ignored) {
-        // 의도된 실패
       }
     }
 
-    // 6번째 시도 — 이미 폐기되어 "먼저 발송" 메시지
     assertThatThrownBy(() -> sut.verifyCode(USER_ID, "000000"))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("발송");
-
-    VerificationStatus status = sut.getVerificationStatus(USER_ID);
-    assertThat(status.codeSent()).isFalse();
+    assertThat(sut.getVerificationStatus(USER_ID).codeSent()).isFalse();
   }
 
   @Test
-  @DisplayName("verifyCode_throwsAfterExpiry: 5분 경과 시 만료")
+  @DisplayName("verifyCode: 5분 경과 후 만료 예외")
   void verifyCode_throwsAfterExpiry() {
     sut.sendVerificationCode(USER_ID, PHONE);
-
-    // store 의 createdAt 을 6분 전으로 조작
-    expireEntryFor(USER_ID, 6);
+    mapper.backdateCreatedAt(PURPOSE, CHANNEL, String.valueOf(USER_ID),
+        LocalDateTime.now().minusMinutes(6));
 
     assertThatThrownBy(() -> sut.verifyCode(USER_ID, "000000"))
         .isInstanceOf(BusinessException.class)
@@ -130,23 +113,21 @@ class SmsAuthServiceTest {
   }
 
   @Test
-  @DisplayName("resendVerificationCode_respects60SecondLimit")
+  @DisplayName("sendVerificationCode 연속: 60초 쿨다운 적용")
   void resendVerificationCode_respects60SecondLimit() {
     sut.sendVerificationCode(USER_ID, PHONE);
 
-    // 즉시 재발송 시도 — 60초 제한에 걸려야 함
     assertThatThrownBy(() -> sut.sendVerificationCode(USER_ID, PHONE))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("재발송");
   }
 
   @Test
-  @DisplayName("resendVerificationCode_allowsAfter60Seconds: 60초 경과 후 새 코드 발급")
+  @DisplayName("resendVerificationCode: 70초 경과 후 새 코드 발급 (쿨다운 우회)")
   void resendVerificationCode_allowsAfter60Seconds() {
     sut.sendVerificationCode(USER_ID, PHONE);
-
-    // createdAt 을 70초 전으로 조작 → 재발송 가능
-    setCreatedAtSecondsAgo(USER_ID, 70);
+    mapper.backdateCreatedAt(PURPOSE, CHANNEL, String.valueOf(USER_ID),
+        LocalDateTime.now().minusSeconds(70));
 
     sut.resendVerificationCode(USER_ID, PHONE);
 
@@ -154,7 +135,7 @@ class SmsAuthServiceTest {
   }
 
   @Test
-  @DisplayName("invalidate_clearsEntry: OtpStoreCoordinator 용 강제 무효화")
+  @DisplayName("invalidate: 채널 전환 시 SMS 행 전체 삭제")
   void invalidate_clearsEntry() {
     sut.sendVerificationCode(USER_ID, PHONE);
     assertThat(sut.getVerificationStatus(USER_ID).codeSent()).isTrue();
@@ -165,14 +146,13 @@ class SmsAuthServiceTest {
   }
 
   @Test
-  @DisplayName("invalidate_nullUserId_isNoop")
+  @DisplayName("invalidate: null userId 는 noop")
   void invalidate_nullUserId_isNoop() {
-    // 예외 없이 통과해야 함
     sut.invalidate(null);
   }
 
   @Test
-  @DisplayName("getVerificationStatus_returnsCurrentState")
+  @DisplayName("getVerificationStatus: 정상 상태 반환")
   void getVerificationStatus_returnsCurrentState() {
     sut.sendVerificationCode(USER_ID, PHONE);
 
@@ -185,7 +165,7 @@ class SmsAuthServiceTest {
   }
 
   @Test
-  @DisplayName("getVerificationStatus_nullUserId_returnsFalse: null 안전")
+  @DisplayName("getVerificationStatus: null userId → codeSent=false (NPE 없음)")
   void getVerificationStatus_nullUserId_returnsFalse() {
     VerificationStatus status = sut.getVerificationStatus(null);
 
@@ -196,7 +176,7 @@ class SmsAuthServiceTest {
   }
 
   @Test
-  @DisplayName("verifyCode_withoutSend_throwsException")
+  @DisplayName("verifyCode: 발송 없이 검증 시 예외")
   void verifyCode_withoutSend_throwsException() {
     assertThatThrownBy(() -> sut.verifyCode(USER_ID, "000000"))
         .isInstanceOf(BusinessException.class)
@@ -204,7 +184,7 @@ class SmsAuthServiceTest {
   }
 
   @Test
-  @DisplayName("sendVerificationCode_nullUserId_throws")
+  @DisplayName("sendVerificationCode: null userId → 예외")
   void sendVerificationCode_nullUserId_throws() {
     assertThatThrownBy(() -> sut.sendVerificationCode(null, PHONE))
         .isInstanceOf(BusinessException.class)
@@ -212,7 +192,7 @@ class SmsAuthServiceTest {
   }
 
   @Test
-  @DisplayName("sendVerificationCode_blankPhone_throws")
+  @DisplayName("sendVerificationCode: 빈 폰번호 → 예외")
   void sendVerificationCode_blankPhone_throws() {
     assertThatThrownBy(() -> sut.sendVerificationCode(USER_ID, ""))
         .isInstanceOf(BusinessException.class)
@@ -222,44 +202,46 @@ class SmsAuthServiceTest {
   }
 
   @Test
-  @DisplayName("sendVerificationCode_smsOtpSenderFails_doesNotFallbackToEmail")
-  void sendVerificationCode_smsOtpSenderFails_doesNotFallbackToEmail() {
+  @DisplayName("C7: 발송 실패 시 행 삭제 — 즉시 재시도 가능")
+  void sendVerificationCode_smsOtpSenderFails_deletesEntryForRetry() {
     doThrow(new RuntimeException("GMGO 실패")).when(smsOtpSender).sendOtp(anyString(), anyString());
 
-    // 스펙 C7: GMGO 실패 시 자동 EMAIL 폴백 금지 → BusinessException 만 throw
     assertThatThrownBy(() -> sut.sendVerificationCode(USER_ID, PHONE))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("발송");
 
-    // 발송 실패 시 entry 유지 → 사용자가 재발송 명시 선택 가능
-    verify(smsOtpSender, times(1)).sendOtp(eq(PHONE), anyString());
+    // 발송 실패 시 행 삭제 → 즉시 재시도 가능 (쿨다운 없음)
+    assertThat(sut.getVerificationStatus(USER_ID).codeSent()).isFalse();
+  }
+
+  @Test
+  @DisplayName("verifyCodeAndGetPhone: 검증 성공 시 발송 당시 전화번호 반환")
+  void verifyCodeAndGetPhone_returnsStoredPhone() {
+    sut.sendVerificationCode(USER_ID, PHONE);
+    String code = captureCode();
+
+    String phone = sut.verifyCodeAndGetPhone(USER_ID, code);
+
+    assertThat(phone).isEqualTo(PHONE);
+    assertThat(sut.getVerificationStatus(USER_ID).codeSent()).isFalse();
+  }
+
+  @Test
+  @DisplayName("verifyCodeAndGetPhone: 하이픈 포함 번호는 정규화되어 저장/반환")
+  void verifyCodeAndGetPhone_normalizesPhone() {
+    sut.sendVerificationCode(USER_ID, "010-1234-5678");
+    String code = captureCode();
+
+    String phone = sut.verifyCodeAndGetPhone(USER_ID, code);
+
+    assertThat(phone).isEqualTo("01012345678");
   }
 
   // ==================== Helpers ====================
 
-  private String captureSentCode() {
-    ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
-    verify(smsOtpSender).sendOtp(eq(PHONE), codeCaptor.capture());
-    return codeCaptor.getValue();
-  }
-
-  /** 지정한 userId 의 createdAt 을 minutesAgo 분 전으로 조작 (만료 시뮬레이션). */
-  private void expireEntryFor(Integer userId, int minutesAgo) {
-    setCreatedAt(userId, LocalDateTime.now().minusMinutes(minutesAgo));
-  }
-
-  /** 지정한 userId 의 createdAt 을 secondsAgo 초 전으로 조작 (재발송 윈도우 시뮬레이션). */
-  private void setCreatedAtSecondsAgo(Integer userId, int secondsAgo) {
-    setCreatedAt(userId, LocalDateTime.now().minusSeconds(secondsAgo));
-  }
-
-  private void setCreatedAt(Integer userId, LocalDateTime createdAt) {
-    @SuppressWarnings("unchecked")
-    ConcurrentHashMap<Integer, Object> store =
-        (ConcurrentHashMap<Integer, Object>) ReflectionTestUtils.getField(sut, "verificationStore");
-    assertThat(store).isNotNull();
-    Object info = store.get(userId);
-    assertThat(info).isNotNull();
-    ReflectionTestUtils.setField(info, "createdAt", createdAt);
+  private String captureCode() {
+    ArgumentCaptor<String> cap = ArgumentCaptor.forClass(String.class);
+    verify(smsOtpSender, org.mockito.Mockito.atLeastOnce()).sendOtp(anyString(), cap.capture());
+    return cap.getValue();
   }
 }

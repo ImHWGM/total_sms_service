@@ -20,9 +20,10 @@ import lombok.NoArgsConstructor;
 public class Verification {
 
   private Integer seq; // PK (대리키, auto-increment)
-  private String purpose; // 용도 (예: SIGNUP)
+  private String purpose; // 용도 (예: SIGNUP, SMS_2FA)
   private String channel; // 채널 (SMS | EMAIL)
-  private String identifier; // 대상 식별자 (정규화 휴대폰번호 또는 이메일)
+  private String identifier; // 대상 식별자 (정규화 휴대폰번호, 이메일, 또는 userId)
+  private String target; // SMS 발송 대상 (마이페이지 SMS 등록 시 전화번호; nullable)
   private String code; // 인증코드 (검증 성공/만료 시 null)
   private int attempts; // 검증 시도 횟수
   private LocalDateTime createdAt; // 코드 발송 시각

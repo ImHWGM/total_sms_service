@@ -46,9 +46,10 @@ class EventExcelServiceSecurityTest {
   @Test
   @DisplayName("통계 엑셀 생성은 소유권 검증 실패 시 중단된다")
   void createStatisticsExcel_deniesNonOwner() {
+    // getStatistics가 내부에서 소유권을 검증하므로 통계 엑셀은 별도 검증을 중복 호출하지 않는다
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
-        .when(eventAccessValidator)
-        .validateEventReadAccess(EVENT_SEQ, OTHER_USER_ID);
+        .when(participantService)
+        .getStatistics(EVENT_SEQ, OTHER_USER_ID);
 
     assertThatThrownBy(() -> service.createStatisticsExcel(EVENT_SEQ, OTHER_USER_ID))
         .isInstanceOf(BusinessException.class)

@@ -96,7 +96,8 @@ public class EventExcelService {
   /** 통계 엑셀 생성 */
   @Transactional(readOnly = true)
   public byte[] createStatisticsExcel(Integer eventSeq, String userId) {
-    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
+    // 통계 데이터 조회 (getStatistics가 내부에서 read 접근/소유권을 검증한다)
+    var statistics = participantService.getStatistics(eventSeq, userId);
 
     // 이벤트 정보 조회
     SurveyMaster event =
@@ -104,9 +105,6 @@ public class EventExcelService {
             .selectByEventSeq(eventSeq)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사 정보를 찾을 수 없습니다."));
-
-    // 통계 데이터 조회
-    var statistics = participantService.getStatistics(eventSeq, userId);
 
     try (SXSSFWorkbook workbook = excelService.createWorkbook()) {
       // 요약 시트

@@ -253,10 +253,10 @@ public class SmsVerificationService {
   /** 인증 완료 도장 유효성 검사 (미인증/유예초과 시 예외). */
   private void requireValidStamp(Verification info) {
     if (info == null || info.getVerifiedAt() == null) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "휴대폰 본인인증을 먼저 완료해주세요.");
+      throw new BusinessException(ErrorCode.SMS_NOT_VERIFIED, "휴대폰 본인인증을 먼저 완료해주세요.");
     }
     if (LocalDateTime.now().isAfter(info.getVerifiedAt().plusMinutes(VERIFIED_TTL_MINUTES))) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "본인인증 후 시간이 초과되었습니다. 다시 인증해주세요.");
+      throw new BusinessException(ErrorCode.SMS_VERIFY_EXPIRED, "본인인증 후 시간이 초과되었습니다. 다시 인증해주세요.");
     }
   }
 

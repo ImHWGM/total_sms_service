@@ -37,6 +37,11 @@ public enum ErrorCode {
   INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "M004", "비밀번호가 일치하지 않습니다."),
   PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "M005", "비밀번호 확인이 일치하지 않습니다."),
 
+  // Signup SMS 본인인증 (SMS)
+  SMS_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "SMS_NOT_VERIFIED", "휴대폰 본인인증을 먼저 완료해주세요."),
+  SMS_VERIFY_EXPIRED(
+      HttpStatus.BAD_REQUEST, "SMS_VERIFY_EXPIRED", "본인인증 후 시간이 초과되었습니다. 다시 인증해주세요."),
+
   // Message (MSG)
   MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "MSG001", "메시지를 찾을 수 없습니다."),
   MESSAGE_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MSG002", "메시지 전송에 실패했습니다."),

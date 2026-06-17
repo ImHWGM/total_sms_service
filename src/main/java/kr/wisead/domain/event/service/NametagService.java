@@ -7,6 +7,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.ratelimit.FailureRateLimiter;
+import kr.wisead.common.ratelimit.RateLimitExceededException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.admin.service.AdminService;
@@ -32,6 +34,7 @@ public class NametagService {
   private final SurveyMasterMapper surveyMasterMapper;
   private final AdminService adminService;
   private final ObjectMapper objectMapper;
+  private final FailureRateLimiter failureRateLimiter;
 
   /** 명찰 데이터 조회 (출력/미리보기용) */
   @Transactional(readOnly = true)
@@ -109,12 +112,14 @@ public class NametagService {
   /** 명찰 데이터 조회 - checkCode 기반 (QR 스캔용) */
   @Transactional(readOnly = true)
   public kr.wisead.domain.event.dto.NametagResponse getNametagDataByCheckCode(
-      Integer eventSeq, String checkCode) {
+      Integer eventSeq, String checkCode, String clientIp) {
     EventParticipant participant =
-        participantMapper
-            .selectDetailByEventSeqAndCheckCode(eventSeq, checkCode)
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+        participantMapper.selectDetailByEventSeqAndCheckCode(eventSeq, checkCode).orElse(null);
+
+    if (participant == null) {
+      recordCheckCodeFailure(eventSeq, clientIp);
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.");
+    }
 
     // DB에서 가져온 값은 AES256 + Base64로 암호화되어 있음
     // 명찰에는 사람이 읽을 수 있는 값이 필요하므로 복호화
@@ -131,12 +136,18 @@ public class NametagService {
   /** 명찰 출력 로그 기록 - checkCode 기반 (QR 스캔용) */
   @Transactional
   public void recordPrintByCheckCode(
-      Integer eventSeq, String checkCode, NametagPrintRequest request, String deviceInfo) {
+      Integer eventSeq,
+      String checkCode,
+      NametagPrintRequest request,
+      String deviceInfo,
+      String clientIp) {
     EventParticipant participant =
-        participantMapper
-            .selectByEventSeqAndCheckCode(eventSeq, checkCode)
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+        participantMapper.selectByEventSeqAndCheckCode(eventSeq, checkCode).orElse(null);
+
+    if (participant == null) {
+      recordCheckCodeFailure(eventSeq, clientIp);
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.");
+    }
 
     // 출력자 정보 (deviceInfo 또는 SYSTEM)
     String printBy = (deviceInfo != null && !deviceInfo.isBlank()) ? deviceInfo : "QR_SCAN";
@@ -182,6 +193,20 @@ public class NametagService {
   private void validateParticipantEvent(Integer eventSeq, EventParticipant participant) {
     if (!java.util.Objects.equals(participant.getEventSeq(), eventSeq)) {
       throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.");
+    }
+  }
+
+  /**
+   * 무인증 checkCode 조회 실패 시 IP+eventSeq 기준 실패 카운터 누적. status 경로와 동일 키(:check)를 공유해 status/nametag
+   * 교차 brute-force 도 합산 차단한다. 한도 초과 시 RateLimitExceededException.
+   */
+  private void recordCheckCodeFailure(Integer eventSeq, String clientIp) {
+    if (clientIp == null || clientIp.isBlank()) {
+      return;
+    }
+    String failureKey = clientIp + ":" + eventSeq + ":check";
+    if (!failureRateLimiter.recordFailureAndCheckAllowed(failureKey)) {
+      throw new RateLimitExceededException("요청이 너무 빈번합니다. 잠시 후 다시 시도해 주세요.");
     }
   }
 

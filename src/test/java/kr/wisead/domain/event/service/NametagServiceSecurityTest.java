@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Optional;
 import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.ratelimit.FailureRateLimiter;
+import kr.wisead.common.ratelimit.RateLimitExceededException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.admin.service.AdminService;
@@ -39,11 +41,13 @@ class NametagServiceSecurityTest {
   private static final String OWNER_ID = "owner";
   private static final String OTHER_USER_ID = "other";
   private static final String CHECK_CODE = "ABCDE";
+  private static final String CLIENT_IP = "1.2.3.4";
 
   @Mock private EventParticipantMapper participantMapper;
   @Mock private EventNametagLogMapper nametagLogMapper;
   @Mock private SurveyMasterMapper surveyMasterMapper;
   @Mock private AdminService adminService;
+  @Mock private FailureRateLimiter failureRateLimiter;
   @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
   @InjectMocks private NametagService service;
@@ -142,7 +146,7 @@ class NametagServiceSecurityTest {
     when(participantMapper.selectDetailByEventSeqAndCheckCode(EVENT_SEQ, CHECK_CODE))
         .thenReturn(Optional.of(participant(EVENT_SEQ, config(true))));
 
-    NametagResponse response = service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE);
+    NametagResponse response = service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE, CLIENT_IP);
 
     assertThat(response.getContact()).isEqualTo("01012345678");
   }
@@ -153,7 +157,7 @@ class NametagServiceSecurityTest {
     when(participantMapper.selectDetailByEventSeqAndCheckCode(EVENT_SEQ, CHECK_CODE))
         .thenReturn(Optional.of(participant(EVENT_SEQ, config(false))));
 
-    NametagResponse response = service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE);
+    NametagResponse response = service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE, CLIENT_IP);
 
     assertThat(response.getContact()).isNull();
   }
@@ -164,7 +168,7 @@ class NametagServiceSecurityTest {
     when(participantMapper.selectDetailByEventSeqAndCheckCode(EVENT_SEQ, CHECK_CODE))
         .thenReturn(Optional.of(participant(EVENT_SEQ, "{\"fields\":[{\"key\":\"name\",\"enabled\":true}]}")));
 
-    NametagResponse response = service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE);
+    NametagResponse response = service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE, CLIENT_IP);
 
     assertThat(response.getContact()).isNull();
   }
@@ -175,7 +179,7 @@ class NametagServiceSecurityTest {
     when(participantMapper.selectDetailByEventSeqAndCheckCode(EVENT_SEQ, CHECK_CODE))
         .thenReturn(Optional.of(participant(EVENT_SEQ, "{malformed")));
 
-    NametagResponse response = service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE);
+    NametagResponse response = service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE, CLIENT_IP);
 
     assertThat(response.getContact()).isNull();
   }
@@ -186,9 +190,65 @@ class NametagServiceSecurityTest {
     when(participantMapper.selectDetailByEventSeqAndCheckCode(EVENT_SEQ, CHECK_CODE))
         .thenReturn(Optional.of(participant(EVENT_SEQ, null)));
 
-    NametagResponse response = service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE);
+    NametagResponse response = service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE, CLIENT_IP);
 
     assertThat(response.getContact()).isNull();
+  }
+
+  @Test
+  @DisplayName("공개 명찰 GET 미발견 + IP는 실패 카운터를 누적하고 한도 초과 시 RateLimitExceeded")
+  void publicNametag_rateLimitsBruteForceOnNotFound() {
+    when(participantMapper.selectDetailByEventSeqAndCheckCode(EVENT_SEQ, CHECK_CODE))
+        .thenReturn(Optional.empty());
+    when(failureRateLimiter.recordFailureAndCheckAllowed(CLIENT_IP + ":" + EVENT_SEQ + ":check"))
+        .thenReturn(false);
+
+    assertThatThrownBy(() -> service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE, CLIENT_IP))
+        .isInstanceOf(RateLimitExceededException.class);
+  }
+
+  @Test
+  @DisplayName("공개 명찰 GET 미발견이고 한도 내면 실패를 기록하고 RESOURCE_NOT_FOUND")
+  void publicNametag_recordsFailureAndReturnsNotFoundWithinLimit() {
+    when(participantMapper.selectDetailByEventSeqAndCheckCode(EVENT_SEQ, CHECK_CODE))
+        .thenReturn(Optional.empty());
+    when(failureRateLimiter.recordFailureAndCheckAllowed(CLIENT_IP + ":" + EVENT_SEQ + ":check"))
+        .thenReturn(true);
+
+    assertThatThrownBy(() -> service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE, CLIENT_IP))
+        .isInstanceOf(BusinessException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+    verify(failureRateLimiter).recordFailureAndCheckAllowed(CLIENT_IP + ":" + EVENT_SEQ + ":check");
+  }
+
+  @Test
+  @DisplayName("공개 명찰 GET 미발견이고 clientIp가 없으면 rate limiter를 건드리지 않는다")
+  void publicNametag_skipsRateLimiterWhenNoClientIp() {
+    when(participantMapper.selectDetailByEventSeqAndCheckCode(EVENT_SEQ, CHECK_CODE))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.getNametagDataByCheckCode(EVENT_SEQ, CHECK_CODE, null))
+        .isInstanceOf(BusinessException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+    verify(failureRateLimiter, never()).recordFailureAndCheckAllowed(any());
+  }
+
+  @Test
+  @DisplayName("공개 명찰 print 미발견 + IP 한도 초과 시 출력 부작용 없이 RateLimitExceeded")
+  void publicNametagPrint_rateLimitsBruteForceOnNotFound() {
+    when(participantMapper.selectByEventSeqAndCheckCode(EVENT_SEQ, CHECK_CODE))
+        .thenReturn(Optional.empty());
+    when(failureRateLimiter.recordFailureAndCheckAllowed(CLIENT_IP + ":" + EVENT_SEQ + ":check"))
+        .thenReturn(false);
+
+    assertThatThrownBy(
+            () ->
+                service.recordPrintByCheckCode(
+                    EVENT_SEQ, CHECK_CODE, printRequest(), null, CLIENT_IP))
+        .isInstanceOf(RateLimitExceededException.class);
+    verify(nametagLogMapper, never()).insert(any(EventNametagLog.class));
   }
 
   private void givenEventOwner() {

@@ -56,8 +56,11 @@ public class EventCheckController {
   /** QR 스캔으로 명찰 데이터 조회 (checkCode 기반) */
   @GetMapping("/{eventSeq}/check/{checkCode}/nametag")
   public ApiResponse<NametagResponse> getNametagByCheckCode(
-      @PathVariable Integer eventSeq, @PathVariable String checkCode) {
-    return ApiResponse.success(nametagService.getNametagDataByCheckCode(eventSeq, checkCode));
+      @PathVariable Integer eventSeq,
+      @PathVariable String checkCode,
+      HttpServletRequest request) {
+    return ApiResponse.success(
+        nametagService.getNametagDataByCheckCode(eventSeq, checkCode, request.getRemoteAddr()));
   }
 
   /** QR 스캔으로 명찰 출력 로그 기록 (checkCode 기반) */
@@ -66,8 +69,10 @@ public class EventCheckController {
       @PathVariable Integer eventSeq,
       @PathVariable String checkCode,
       @RequestBody NametagPrintRequest request,
-      @RequestHeader(value = "X-Device-Info", required = false) String deviceInfo) {
-    nametagService.recordPrintByCheckCode(eventSeq, checkCode, request, deviceInfo);
+      @RequestHeader(value = "X-Device-Info", required = false) String deviceInfo,
+      HttpServletRequest httpRequest) {
+    nametagService.recordPrintByCheckCode(
+        eventSeq, checkCode, request, deviceInfo, httpRequest.getRemoteAddr());
     return ApiResponse.success("명찰 출력이 기록되었습니다.");
   }
 

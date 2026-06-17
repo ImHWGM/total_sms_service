@@ -6,16 +6,15 @@
 --
 -- ⚠ 멱등(idempotent): 어느 서버에서 몇 번을 돌려도 동일 결과가 되도록 작성.
 --   - 상용: 아무 테이블도 없음 → verification 만 생성.
---   - 개발: 과거 단계에서 만든 signup_sms_verification / sms_verification 가 남아 있을 수 있음 → 제거.
+--   - 개발: 과거 단계에서 만든 sms_verification 가 남아 있을 수 있음 → 제거.
 --     (인증 상태는 전이성 데이터(최대 30분)라 데이터 이관 불필요 — 그냥 버린다.)
-DROP TABLE IF EXISTS signup_sms_verification;
 DROP TABLE IF EXISTS sms_verification;
 
 CREATE TABLE IF NOT EXISTS verification (
     seq          INT          NOT NULL AUTO_INCREMENT COMMENT 'PK (대리키)',
     purpose      VARCHAR(20)  NOT NULL COMMENT '용도 (예: SIGNUP)',
     channel      VARCHAR(10)  NOT NULL COMMENT '채널 (SMS | EMAIL)',
-    identifier   VARCHAR(100) NOT NULL COMMENT '대상 식별자 (정규화 휴대폰번호 또는 이메일)',
+    identifier   VARCHAR(255) NOT NULL COMMENT '대상 식별자 (정규화 휴대폰번호 또는 이메일; RFC 이메일 최대 254자 수용)',
     code         VARCHAR(10)  NULL     COMMENT '인증코드(SMS 6자리/이메일 8자, 검증 성공·만료 시 NULL)',
     attempts     INT          NOT NULL DEFAULT 0 COMMENT '검증 시도 횟수',
     created_at   DATETIME     NOT NULL COMMENT '코드 발송 시각(만료 5분/재발송 60초 기준)',

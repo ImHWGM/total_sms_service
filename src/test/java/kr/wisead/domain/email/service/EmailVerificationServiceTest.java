@@ -102,4 +102,20 @@ class EmailVerificationServiceTest {
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("이메일 형식");
   }
+
+  @Test
+  @DisplayName("동시 최초발송: UNIQUE 충돌 → 500 아닌 안내 예외로 변환")
+  void concurrentFirstSend_translatesUniqueViolation() {
+    kr.wisead.mapper.primary.VerificationMapper mockMapper =
+        org.mockito.Mockito.mock(kr.wisead.mapper.primary.VerificationMapper.class);
+    org.mockito.Mockito.when(mockMapper.findByKey(anyString(), anyString(), anyString()))
+        .thenReturn(null);
+    org.mockito.Mockito.when(mockMapper.insert(org.mockito.ArgumentMatchers.any()))
+        .thenThrow(new org.springframework.dao.DuplicateKeyException("uk violation"));
+    EmailVerificationService racy = new EmailVerificationService(emailService, mockMapper);
+
+    assertThatThrownBy(() -> racy.sendVerificationCode(EMAIL))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("잠시 후 다시 시도");
+  }
 }

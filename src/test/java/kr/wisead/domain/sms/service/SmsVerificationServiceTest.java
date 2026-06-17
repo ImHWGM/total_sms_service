@@ -213,4 +213,22 @@ class SmsVerificationServiceTest {
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("용도(purpose)");
   }
+
+  @Test
+  @DisplayName("동시 최초발송: UNIQUE 충돌(DataIntegrityViolation) → 500 아닌 안내 예외로 변환")
+  void concurrentFirstSend_translatesUniqueViolation() {
+    // insert 가 sendOtp 이전에 예외를 던지므로 smsOtpSender 는 호출되지 않음(스텁 불필요).
+    kr.wisead.mapper.primary.VerificationMapper mockMapper =
+        org.mockito.Mockito.mock(kr.wisead.mapper.primary.VerificationMapper.class);
+    org.mockito.Mockito.when(mockMapper.findByKey(anyString(), anyString(), anyString()))
+        .thenReturn(null); // 둘 다 최초로 봄
+    org.mockito.Mockito.when(
+            mockMapper.insert(org.mockito.ArgumentMatchers.any()))
+        .thenThrow(new org.springframework.dao.DuplicateKeyException("uk violation"));
+    SmsVerificationService racy = new SmsVerificationService(smsOtpSender, mockMapper);
+
+    assertThatThrownBy(() -> racy.sendVerificationCode(PHONE_NORMALIZED, SIGNUP))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("잠시 후 다시 시도");
+  }
 }

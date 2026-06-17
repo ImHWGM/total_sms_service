@@ -12,6 +12,7 @@ import kr.wisead.domain.verification.entity.Verification;
 import kr.wisead.mapper.primary.VerificationMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -85,16 +86,23 @@ public class SmsVerificationService {
 
     String code = generateOtpCode();
     if (existing == null) {
-      verificationMapper.insert(
-          Verification.builder()
-              .purpose(p)
-              .channel(CHANNEL)
-              .identifier(phone)
-              .code(code)
-              .attempts(0)
-              .createdAt(now)
-              .verifiedAt(null)
-              .build());
+      try {
+        verificationMapper.insert(
+            Verification.builder()
+                .purpose(p)
+                .channel(CHANNEL)
+                .identifier(phone)
+                .code(code)
+                .attempts(0)
+                .createdAt(now)
+                .verifiedAt(null)
+                .build());
+      } catch (DataIntegrityViolationException dup) {
+        // 동시 최초발송(더블클릭): 다른 요청이 방금 같은 (purpose,channel,identifier) 행을 만들어
+        // UNIQUE 충돌. 500 대신 쿨다운 안내로 변환한다.
+        throw new BusinessException(
+            ErrorCode.INVALID_INPUT_VALUE, "이미 인증 코드를 발송했습니다. 잠시 후 다시 시도해주세요.");
+      }
     } else {
       // 재발송: 코드/발송시각 갱신 + 시도횟수·도장 리셋
       verificationMapper.updateForSend(

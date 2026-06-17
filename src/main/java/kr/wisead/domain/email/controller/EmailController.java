@@ -6,7 +6,7 @@ import kr.wisead.common.response.ApiResponse;
 import kr.wisead.domain.email.dto.EmailRequest;
 import kr.wisead.domain.email.dto.EmailVerificationRequest;
 import kr.wisead.domain.email.service.EmailService;
-import kr.wisead.domain.email.service.PreSignupEmailAuthService;
+import kr.wisead.domain.email.service.EmailVerificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -14,10 +14,9 @@ import org.springframework.web.bind.annotation.*;
 /**
  * 이메일 Controller.
  *
- * <p>회원가입(사전 인증) 흐름 전용. 4개 인증 메서드 모두 {@link PreSignupEmailAuthService}(key=email)에 라우팅된다. 로그인/2FA
- * 흐름은 {@code AuthService}/{@code EmailAuthService}(key=userId)를 통해 동작한다.
- *
- * <p>plan §4 Phase B-0-4.
+ * <p>사전 인증(로그인 전) 흐름 전용. 4개 인증 메서드 모두 {@link EmailVerificationService}(공용 verification
+ * 테이블, channel=EMAIL)에 라우팅된다. 로그인/2FA 흐름은 {@code AuthService}/{@code EmailAuthService}(key=userId)를
+ * 통해 동작한다.
  */
 @Slf4j
 @RestController
@@ -26,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
 public class EmailController {
 
   private final EmailService emailService;
-  private final PreSignupEmailAuthService emailAuthService;
+  private final EmailVerificationService emailAuthService;
 
   /** 인증 코드 발송 POST /api/email/verification Body: { "email": "test@example.com" } */
   @PostMapping("/verification")

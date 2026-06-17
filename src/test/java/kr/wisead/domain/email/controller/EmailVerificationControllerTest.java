@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.domain.email.service.EmailService;
-import kr.wisead.domain.email.service.PreSignupEmailAuthService;
+import kr.wisead.domain.email.service.EmailVerificationService;
 import kr.wisead.security.jwt.JwtAuthenticationFilter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * EmailController 단위 테스트 — 회원가입 흐름이 PreSignupEmailAuthService(key=email)로 라우팅됨 검증.
+ * EmailController 단위 테스트 — 회원가입 흐름이 EmailVerificationService(key=email)로 라우팅됨 검증.
  *
  * <p>plan §4 Phase B-0-8: signupFlowEmailKeySpace.
  */
@@ -45,14 +45,14 @@ class EmailVerificationControllerTest {
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
 
-  @MockitoBean private PreSignupEmailAuthService emailAuthService;
+  @MockitoBean private EmailVerificationService emailAuthService;
   @MockitoBean private EmailService emailService;
 
   private static final String EMAIL = "signup@example.com";
 
   @Test
   @DisplayName(
-      "signupFlowEmailKeySpace: POST /verification → PreSignupEmailAuthService.sendVerificationCode"
+      "signupFlowEmailKeySpace: POST /verification → EmailVerificationService.sendVerificationCode"
           + " 호출")
   void signupFlow_sendVerificationCode_routesToPreSignup() throws Exception {
     when(emailAuthService.sendVerificationCode(EMAIL)).thenReturn(true);
@@ -69,7 +69,7 @@ class EmailVerificationControllerTest {
   }
 
   @Test
-  @DisplayName("signupFlow: POST /verification/verify → PreSignupEmailAuthService.verifyCode 호출")
+  @DisplayName("signupFlow: POST /verification/verify → EmailVerificationService.verifyCode 호출")
   void signupFlow_verifyCode_routesToPreSignup() throws Exception {
     when(emailAuthService.verifyCode(EMAIL, "A1B2C3")).thenReturn(true);
 
@@ -86,7 +86,7 @@ class EmailVerificationControllerTest {
 
   @Test
   @DisplayName(
-      "signupFlow: GET /verification/status → PreSignupEmailAuthService.getVerificationStatus 호출")
+      "signupFlow: GET /verification/status → EmailVerificationService.getVerificationStatus 호출")
   void signupFlow_getStatus_routesToPreSignup() throws Exception {
     when(emailAuthService.getVerificationStatus(EMAIL))
         .thenReturn(new VerificationStatus(true, 240, 0, 5));
@@ -102,7 +102,7 @@ class EmailVerificationControllerTest {
 
   @Test
   @DisplayName(
-      "signupFlow: POST /verification/resend → PreSignupEmailAuthService.resendVerificationCode 호출")
+      "signupFlow: POST /verification/resend → EmailVerificationService.resendVerificationCode 호출")
   void signupFlow_resend_routesToPreSignup() throws Exception {
     when(emailAuthService.resendVerificationCode(EMAIL)).thenReturn(true);
 

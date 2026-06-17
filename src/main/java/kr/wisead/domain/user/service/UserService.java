@@ -14,7 +14,7 @@ import kr.wisead.common.util.PasswordValidator;
 import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.audit.service.AuditEventService;
 import kr.wisead.domain.email.service.EmailService;
-import kr.wisead.domain.email.service.PreSignupEmailAuthService;
+import kr.wisead.domain.email.service.EmailVerificationService;
 import kr.wisead.domain.payment.service.WalletService;
 import kr.wisead.domain.user.dto.FindIdRequest;
 import kr.wisead.domain.user.dto.FindIdResponse;
@@ -44,7 +44,7 @@ public class UserService {
   private final PasswordHintMapper passwordHintMapper;
   private final PasswordResetTokenMapper passwordResetTokenMapper;
   private final PasswordEncoder passwordEncoder;
-  private final PreSignupEmailAuthService emailAuthService;
+  private final EmailVerificationService emailAuthService;
   private final EmailService emailService;
   private final AdminService adminService;
   private final WalletService walletService;

@@ -88,11 +88,11 @@ public class AuthService {
     }
 
     // 3. 계정 상태 확인 (lifecycleStatus 우선, 한글 status legacy fallback)
-    //    DORMANT는 별도 분기: ACCOUNT_LOCKED(423 의미) + 복관 안내 힌트 (PR3)
+    //    DORMANT는 별도 분기: ACCOUNT_LOCKED(423 의미) + 복구 안내 힌트 (PR3)
     if (user.isDormant()) {
       throw new BusinessException(
           ErrorCode.ACCOUNT_LOCKED,
-          "휴면 계정입니다. 이메일 인증을 통해 복관하세요.",
+          "휴면 계정입니다. 이메일 인증을 통해 복구하세요.",
           Map.of("status", "DORMANT", "recoveryRequired", true));
     }
     if (!user.isActive()) {
@@ -213,7 +213,7 @@ public class AuthService {
       if (!StringUtils.hasText(email)) {
         throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "등록된 이메일이 없습니다.");
       }
-      emailAuthService.sendVerificationCode(userId, email);
+      emailAuthService.sendVerificationCode(userId, email, EmailAuthService.PURPOSE_LOGIN_2FA);
       sessionKeyService.setActiveChannel(sessionKey, "EMAIL");
       log.info("[채널 전환 → EMAIL] userId={}, email={}", userId, CommonUtils.maskingEmailShort(email));
       return LoginResponse.builder()
@@ -260,7 +260,7 @@ public class AuthService {
       String masked = CommonUtils.maskingEmailShort(email);
       if (!emailAuthService.getVerificationStatus(user.getSeq()).codeSent()) {
         log.info("[EMAIL OTP 발송] userId={}, email={}", user.getUserId(), masked);
-        emailAuthService.sendVerificationCode(user.getSeq(), email);
+        emailAuthService.sendVerificationCode(user.getSeq(), email, EmailAuthService.PURPOSE_LOGIN_2FA);
       } else {
         log.info("[EMAIL OTP 재사용] userId={}, email={}", user.getUserId(), masked);
       }
@@ -282,7 +282,7 @@ public class AuthService {
     if ("SMS".equals(channel)) {
       smsAuthService.verifyCode(userId, code);
     } else {
-      if (!emailAuthService.verifyCode(userId, code)) {
+      if (!emailAuthService.verifyCode(userId, code, EmailAuthService.PURPOSE_LOGIN_2FA)) {
         throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드가 일치하지 않습니다.");
       }
     }
@@ -665,10 +665,10 @@ public class AuthService {
     log.info("[잠금해제 완료 (관리자)] userSeq={}, adminSeq={}", userSeq, adminSeq);
   }
 
-  // ==================== 휴면 복관 (PR3) ====================
+  // ==================== 휴면 복구 (PR3) ====================
 
   /**
-   * 휴면 계정 복관 OTP 발송 요청.
+   * 휴면 계정 복구 OTP 발송 요청.
    *
    * <p>이메일로 사용자를 조회하고, 휴면 상태인 경우에만 OTP를 발송한다.
    *
@@ -687,15 +687,15 @@ public class AuthService {
               emailAuthService.sendVerificationCode(
                   user.getSeq(), decryptedEmail, EmailAuthService.PURPOSE_DORMANT_RECOVERY);
               log.info(
-                  "[휴면 복관 OTP 발송] userSeq={}, email={}",
+                  "[휴면 복구 OTP 발송] userSeq={}, email={}",
                   user.getSeq(),
                   CommonUtils.maskingEmailShort(decryptedEmail));
             },
-            () -> log.info("[휴면 복관 OTP 요청 무시] 미존재 또는 비휴면 계정 - 응답 일반화"));
+            () -> log.info("[휴면 복구 OTP 요청 무시] 미존재 또는 비휴면 계정 - 응답 일반화"));
   }
 
   /**
-   * 이메일 OTP 검증 후 휴면 복관 처리.
+   * 이메일 OTP 검증 후 휴면 복구 처리.
    *
    * <p>OTP purpose=DORMANT_RECOVERY 검증 → LIFECYCLE_STATUS=ACTIVE, DORMANT_AT=NULL,
    * DORMANT_NOTIFIED_AT=NULL → AuditEvent RECOVERY 기록.
@@ -718,6 +718,6 @@ public class AuthService {
 
     userMapper.recoverDormant(user.getSeq());
     auditEventService.recordRecovery(user, null, null);
-    log.info("[휴면 복관 완료] userSeq={}", user.getSeq());
+    log.info("[휴면 복구 완료] userSeq={}", user.getSeq());
   }
 }

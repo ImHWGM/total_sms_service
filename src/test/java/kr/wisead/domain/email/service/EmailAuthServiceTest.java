@@ -54,7 +54,7 @@ class EmailAuthServiceTest {
   @Test
   @DisplayName("getVerificationStatus: 발송 후 codeSent=true, 상태 정상")
   void getVerificationStatus_byUserIdReturnsStatus() {
-    sut.sendVerificationCode(USER_ID, EMAIL);
+    sut.sendVerificationCode(USER_ID, EMAIL, LOGIN_2FA);
 
     VerificationStatus status = sut.getVerificationStatus(USER_ID);
 
@@ -67,9 +67,9 @@ class EmailAuthServiceTest {
   @Test
   @DisplayName("verifyCode: 올바른 코드 검증 성공 → DB 행 삭제")
   void verifyCode_succeedsWithCorrectCode() {
-    sut.sendVerificationCode(USER_ID, EMAIL);
+    sut.sendVerificationCode(USER_ID, EMAIL, LOGIN_2FA);
 
-    boolean result = sut.verifyCode(USER_ID, CODE);
+    boolean result = sut.verifyCode(USER_ID, CODE, LOGIN_2FA);
 
     assertThat(result).isTrue();
     assertThat(sut.getVerificationStatus(USER_ID).codeSent()).isFalse();
@@ -78,7 +78,7 @@ class EmailAuthServiceTest {
   @Test
   @DisplayName("verifyCode: 발송 없이 검증 시 BusinessException")
   void verifyCode_withoutSend_throwsException() {
-    assertThatThrownBy(() -> sut.verifyCode(USER_ID, CODE))
+    assertThatThrownBy(() -> sut.verifyCode(USER_ID, CODE, LOGIN_2FA))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("먼저 발송");
   }
@@ -86,7 +86,7 @@ class EmailAuthServiceTest {
   @Test
   @DisplayName("invalidate: SMS 포함 해당 채널 행 전부 삭제 → codeSent=false")
   void invalidate_removesEntry() {
-    sut.sendVerificationCode(USER_ID, EMAIL);
+    sut.sendVerificationCode(USER_ID, EMAIL, LOGIN_2FA);
     assertThat(sut.getVerificationStatus(USER_ID).codeSent()).isTrue();
 
     sut.invalidate(USER_ID);
@@ -126,11 +126,11 @@ class EmailAuthServiceTest {
   @Test
   @DisplayName("5분 경과 후 만료 예외")
   void verifyCode_throwsAfterExpiry() {
-    sut.sendVerificationCode(USER_ID, EMAIL);
+    sut.sendVerificationCode(USER_ID, EMAIL, LOGIN_2FA);
     mapper.backdateCreatedAt(LOGIN_2FA, CHANNEL, String.valueOf(USER_ID),
         LocalDateTime.now().minusMinutes(6));
 
-    assertThatThrownBy(() -> sut.verifyCode(USER_ID, CODE))
+    assertThatThrownBy(() -> sut.verifyCode(USER_ID, CODE, LOGIN_2FA))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("만료");
   }
@@ -138,7 +138,7 @@ class EmailAuthServiceTest {
   @Test
   @DisplayName("resendVerificationCode: 기존 행 삭제 후 재발송 (쿨다운 우회)")
   void resendVerificationCode_bypassesCooldown() {
-    sut.sendVerificationCode(USER_ID, EMAIL);
+    sut.sendVerificationCode(USER_ID, EMAIL, LOGIN_2FA);
 
     // resend 는 쿨다운 없이 즉시 가능
     sut.resendVerificationCode(USER_ID, EMAIL);

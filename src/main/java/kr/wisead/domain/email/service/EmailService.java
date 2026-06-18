@@ -1,6 +1,7 @@
 package kr.wisead.domain.email.service;
 
 import java.security.SecureRandom;
+import kr.wisead.common.util.CommonUtils;
 import kr.wisead.domain.email.dto.EmailRequest;
 import kr.wisead.domain.inquiry.entity.Inquiry;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +46,7 @@ public class EmailService {
         EmailRequest.builder().to(to).subject(subject).content(content).saveSentMail(false).build();
 
     hiworksMailService.send(request);
-    log.info("인증 코드 이메일 발송 완료: to={}", to);
+    log.info("인증 코드 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(to));
   }
 
   /** 문의 접수 확인 이메일 발송 (문의자에게) */
@@ -57,7 +58,7 @@ public class EmailService {
         EmailRequest.builder().to(to).subject(subject).content(content).saveSentMail(false).build();
 
     hiworksMailService.send(request);
-    log.info("문의 접수 확인 이메일 발송 완료: to={}", to);
+    log.info("문의 접수 확인 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(to));
   }
 
   /** 문의 접수 알림 이메일 발송 (관리자에게) */
@@ -74,7 +75,7 @@ public class EmailService {
             .build();
 
     hiworksMailService.send(request);
-    log.info("문의 알림 이메일 발송 완료: to={}", notifyEmail);
+    log.info("문의 알림 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(notifyEmail));
   }
 
   /** 문의 답변 알림 이메일 발송 (문의자에게) */
@@ -86,7 +87,7 @@ public class EmailService {
         EmailRequest.builder().to(to).subject(subject).content(content).saveSentMail(false).build();
 
     hiworksMailService.send(request);
-    log.info("문의 답변 알림 이메일 발송 완료: to={}", to);
+    log.info("문의 답변 알림 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(to));
   }
 
   /**
@@ -96,7 +97,7 @@ public class EmailService {
    * @param userName 사용자명 (표시용)
    * @param lastLoginDate 마지막 로그인 날짜 문자열
    * @param dormantDate 휴면 전환 예정일 문자열
-   * @param recoverUrl 복관 URL
+   * @param recoverUrl 복구 URL
    */
   public void sendDormantWarningEmail(
       String to, String userName, String lastLoginDate, String dormantDate, String recoverUrl) {
@@ -107,13 +108,13 @@ public class EmailService {
         EmailRequest.builder().to(to).subject(subject).content(content).saveSentMail(false).build();
 
     hiworksMailService.send(request);
-    log.info("휴면 전환 예정 안내 이메일 발송 완료: to={}", to);
+    log.info("휴면 전환 예정 안내 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(to));
   }
 
   /** 일반 이메일 발송 */
   public void sendEmail(EmailRequest request) {
     hiworksMailService.send(request);
-    log.info("이메일 발송 완료: to={}", request.getTo());
+    log.info("이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(request.getTo()));
   }
 
   /**
@@ -130,7 +131,7 @@ public class EmailService {
         EmailRequest.builder().to(to).subject(subject).content(content).saveSentMail(false).build();
 
     hiworksMailService.send(request);
-    log.info("비밀번호 재설정 이메일 발송 완료: to={}", to);
+    log.info("비밀번호 재설정 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(to));
   }
 
   // ==================== Private Methods ====================
@@ -291,7 +292,7 @@ public class EmailService {
                 </p>
                 <div style="text-align: center; margin: 30px 0;">
                     <a href="%s" style="display: inline-block; background-color: #007bff; color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold;">
-                        계정 유지 / 복관하기
+                        계정 유지 / 복구하기
                     </a>
                 </div>
                 <div style="margin-top: 30px; padding: 15px; background-color: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">

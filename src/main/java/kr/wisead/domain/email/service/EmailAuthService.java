@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 /**
  * 로그인/2FA 도메인 이메일 인증 서비스 (key=userId).
  *
- * <p>이미 사용자 ID(seq)가 식별된 흐름(로그인 이메일 2FA, 잠금해제, 휴면복관)에서 사용한다.
+ * <p>이미 사용자 ID(seq)가 식별된 흐름(로그인 이메일 2FA, 잠금해제, 휴면복구)에서 사용한다.
  *
  * <p><b>M3: 상태 저장을 DB 로 이전.</b> {@code verification} 테이블(channel=EMAIL, identifier=userId)에
  * purpose 별로 보관한다. 이메일 주소는 발송 후 User 레코드에서 다시 조회 가능하므로 target 컬럼을 사용하지 않는다.
@@ -38,7 +38,7 @@ public class EmailAuthService {
   /** 계정 잠금 해제용 OTP */
   public static final String PURPOSE_UNLOCK = "UNLOCK";
 
-  /** 휴면 계정 복관용 OTP */
+  /** 휴면 계정 복구용 OTP */
   public static final String PURPOSE_DORMANT_RECOVERY = "DORMANT_RECOVERY";
 
   private final EmailService emailService;
@@ -118,16 +118,6 @@ public class EmailAuthService {
   }
 
   /**
-   * 인증 코드 발송 (로그인 2FA — 기본 purpose = LOGIN_2FA).
-   *
-   * @deprecated purpose 를 명시하는 3-arg 오버로드 사용 권장.
-   */
-  @Deprecated(since = "PR1", forRemoval = false)
-  public boolean sendVerificationCode(Integer userId, String email) {
-    return sendVerificationCode(userId, email, PURPOSE_LOGIN_2FA);
-  }
-
-  /**
    * 인증 코드 검증 (purpose 검증 포함).
    *
    * <p><b>의도적으로 @Transactional 을 달지 않는다.</b> 불일치 시 incrementAttempts 가 즉시 커밋되어야
@@ -173,16 +163,6 @@ public class EmailAuthService {
     throw new BusinessException(
         ErrorCode.INVALID_INPUT_VALUE,
         String.format("인증 코드가 일치하지 않습니다. (남은 시도: %d회)", remaining));
-  }
-
-  /**
-   * 인증 코드 검증 (로그인 2FA — 기본 purpose = LOGIN_2FA).
-   *
-   * @deprecated purpose 를 명시하는 3-arg 오버로드 사용 권장.
-   */
-  @Deprecated(since = "PR1", forRemoval = false)
-  public boolean verifyCode(Integer userId, String code) {
-    return verifyCode(userId, code, PURPOSE_LOGIN_2FA);
   }
 
   /**
@@ -233,7 +213,10 @@ public class EmailAuthService {
   // ==================== Private Methods ====================
 
   private String resolvePurpose(String purpose) {
-    return (purpose != null && !purpose.isBlank()) ? purpose : PURPOSE_LOGIN_2FA;
+    if (purpose == null || purpose.isBlank()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 용도(purpose)가 필요합니다.");
+    }
+    return purpose;
   }
 
   private boolean isValidEmail(String email) {

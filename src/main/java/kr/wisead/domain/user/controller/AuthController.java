@@ -94,7 +94,10 @@ public class AuthController {
   @PostMapping("/validate-bizno")
   public ApiResponse<Map<String, Object>> validateBizNo(@RequestBody Map<String, String> request) {
     String bizNum = request.get("bizNum");
-    Map<String, Object> result = businessNoValidationService.validateBizNo(bizNum);
+    if (bizNum == null || bizNum.isBlank()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사업자등록번호를 입력해주세요.");
+    }
+    Map<String, Object> result = businessNoValidationService.validateBizNo(bizNum.replace("-", ""));
     return ApiResponse.success(result);
   }
 

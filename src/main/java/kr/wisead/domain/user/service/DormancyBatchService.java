@@ -43,7 +43,7 @@ public class DormancyBatchService {
   @Value("${dormancy.batch.dailyLimit:1000}")
   private int dailyLimit;
 
-  /** 복관 URL (이메일 본문에 삽입). */
+  /** 복구 URL (이메일 본문에 삽입). */
   @Value("${dormancy.batch.recoverUrl:https://wisead.kr/dormant-recovery}")
   private String recoverUrl;
 

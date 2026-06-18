@@ -122,10 +122,10 @@ public class AuthController {
     return ApiResponse.success("계정 잠금이 해제되었습니다.");
   }
 
-  // ==================== 휴면 복관 (PR3) ====================
+  // ==================== 휴면 복구 (PR3) ====================
 
   /**
-   * 휴면 복관 OTP 발송 요청.
+   * 휴면 복구 OTP 발송 요청.
    *
    * <p>POST /api/auth/dormant/request — body: {"email": "..."}
    */
@@ -136,14 +136,14 @@ public class AuthController {
   }
 
   /**
-   * 휴면 복관 OTP 검증 후 계정 복구.
+   * 휴면 복구 OTP 검증 후 계정 복구.
    *
    * <p>POST /api/auth/dormant/verify — body: {"email": "...", "otp": "..."}
    */
   @PostMapping("/dormant/verify")
   public ApiResponse<Void> verifyDormantRecovery(@RequestBody Map<String, String> body) {
     authService.recoverDormant(requireEmail(body), requireOtp(body));
-    return ApiResponse.success("휴면 복관이 완료되었습니다. 다시 로그인해주세요.");
+    return ApiResponse.success("휴면 복구가 완료되었습니다. 다시 로그인해주세요.");
   }
 
   private String requireEmail(Map<String, String> body) {

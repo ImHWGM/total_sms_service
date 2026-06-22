@@ -166,21 +166,56 @@ class SurveyServiceOtherTextStorageTest {
   }
 
   @Test
-  void nonSoTypes_storeRawAsIs() {
-    for (OtherType type : OtherType.values()) {
-      if (type == OtherType.SO) {
-        continue;
-      }
+  void saType_storesRawPlaintext() {
+    SurveySubmitRequest.AnswerRequest req =
+        SurveySubmitRequest.AnswerRequest.builder()
+            .questionSeq(200)
+            .otherText("자유 의견입니다")
+            .build();
+
+    String stored = invokeResolveStorage(OtherType.SA, req.getOtherText(), req);
+
+    assertThat(stored).as("SA(주관식)는 평문 그대로 저장").isEqualTo("자유 의견입니다");
+  }
+
+  @Test
+  void nePiiTypes_encryptAndRoundTrip() {
+    for (OtherType type : new OtherType[] {OtherType.NE, OtherType.AD, OtherType.CU}) {
+      String plain = "홍길동 " + type.name();
       SurveySubmitRequest.AnswerRequest req =
-          SurveySubmitRequest.AnswerRequest.builder()
-              .questionSeq(200)
-              .otherText("plain text " + type.name())
-              .build();
+          SurveySubmitRequest.AnswerRequest.builder().questionSeq(201).otherText(plain).build();
 
       String stored = invokeResolveStorage(type, req.getOtherText(), req);
 
-      assertThat(stored).as(type.name() + "는 raw 그대로 저장").isEqualTo("plain text " + type.name());
+      assertThat(stored).as(type.name() + "는 PII: 접두사로 암호화 저장").startsWith("PII:").isNotEqualTo(plain);
+      assertThat(OtherTextCrypto.decryptForDisplay(type, stored))
+          .as(type.name() + " 복호화 시 평문 복원")
+          .isEqualTo(plain);
     }
+  }
+
+  @Test
+  void emType_encryptsLocalPartOnly_domainStaysPlaintext() {
+    String email = "alice@gmail.com";
+    SurveySubmitRequest.AnswerRequest req =
+        SurveySubmitRequest.AnswerRequest.builder().questionSeq(202).otherText(email).build();
+
+    String stored = invokeResolveStorage(OtherType.EM, req.getOtherText(), req);
+
+    assertThat(stored).as("도메인은 평문 유지").startsWith("PII:").endsWith("@gmail.com");
+    assertThat(stored).as("로컬파트(alice)는 평문으로 노출되지 않음").doesNotContain("alice@");
+    assertThat(OtherTextCrypto.decryptForDisplay(OtherType.EM, stored))
+        .as("복호화 시 원본 이메일 복원")
+        .isEqualTo(email);
+  }
+
+  @Test
+  void legacyPlaintext_readBackUnchanged() {
+    // 기존(평문) 데이터: 'PII:' 접두사가 없으므로 복호화 대상에서 제외되어 raw 유지.
+    assertThat(OtherTextCrypto.decryptForDisplay(OtherType.NE, "John")).isEqualTo("John");
+    assertThat(OtherTextCrypto.decryptForDisplay(OtherType.AD, "서울시 강남구")).isEqualTo("서울시 강남구");
+    assertThat(OtherTextCrypto.decryptForDisplay(OtherType.EM, "bob@naver.com"))
+        .isEqualTo("bob@naver.com");
   }
 
   @Test

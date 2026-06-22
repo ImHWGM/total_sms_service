@@ -369,21 +369,21 @@ public class SurveyService {
   }
 
   /**
-   * 기타답변 OTHER_TEXT 저장값 결정 — SO 유형은 일반 SO 문항과 동일한 흐름(RSA 복호화 → AES256+Base64 재암호화)을 적용하고, 그 외 5종은
-   * raw 그대로 저장한다 (plan §3 Phase D-3-b, AC-9, spec R7 "기존 SO 흐름 100% 동일").
+   * 기타답변 OTHER_TEXT 저장값 결정 — SO 유형은 일반 SO 문항과 동일한 흐름(RSA 복호화 → AES256+Base64 재암호화)을 적용하고,
+   * 나머지 PII 유형(NE/AD/CU/EM)은 {@link OtherTextCrypto#encryptForStorage}로 암호화한다. SA(주관식)만 평문 저장.
    *
    * <ul>
    *   <li>SO + RSA 복호화 성공: 평문 jumin → validatePlain → AES256+Base64 저장
    *   <li>SO + FOREIGN: AES256+Base64 저장 (일반 SO 문항 흐름과 동일하게 외국인 등록번호도 암호화)
    *   <li>SO + 평문 jumin 직접 입력: validatePlain → AES256+Base64 저장
    *   <li>SO + RSA 복호화 실패 / keypadId 만료 / 형식 오류: 원본 raw 저장 + warn 로그 — fallback 정책 미러
-   *   <li>비-SO (SA/NE/EM/AD/CU): raw 그대로 저장
+   *   <li>NE/AD/CU: AES256+Base64 (PII: 접두사), EM: 로컬파트만 암호화, SA: 평문 저장 — {@link OtherTextCrypto}
    * </ul>
    */
   private String resolveOtherTextForStorage(
       OtherType otherType, String otherText, SurveySubmitRequest.AnswerRequest answerReq) {
     if (otherType != OtherType.SO) {
-      return otherText;
+      return OtherTextCrypto.encryptForStorage(otherType, otherText);
     }
     // F+H 흐름: ENC envelope면 즉시 복호화 후 일반 SO 흐름과 동일하게 재암호화.
     String decrypted = decryptEnvelopeIfPresent(otherText);

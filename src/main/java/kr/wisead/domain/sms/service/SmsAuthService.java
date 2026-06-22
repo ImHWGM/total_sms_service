@@ -7,6 +7,7 @@ import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
+import kr.wisead.domain.sms.sender.SmsOtpSender;
 import kr.wisead.domain.verification.entity.Verification;
 import kr.wisead.mapper.primary.VerificationMapper;
 import lombok.RequiredArgsConstructor;

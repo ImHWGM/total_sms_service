@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import java.time.LocalDateTime;
 import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
+import kr.wisead.domain.sms.sender.SmsOtpSender;
 import kr.wisead.domain.verification.InMemoryVerificationMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

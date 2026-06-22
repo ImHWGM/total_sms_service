@@ -1894,17 +1894,14 @@ public class EventService {
           } else if ("MC".equals(question.getQuestionType())) {
             // 객관식 답변은 평문 숫자이므로 복호화 불필요
             displayAnswer = answer.replace("##", ", ");
-            // 기타 텍스트가 있으면 추가 표시 (SO 유형은 AES256+Base64로 저장되어 복호화 필요)
+            // 기타 텍스트가 있으면 추가 표시 (PII 유형은 암호화 저장되어 복호화 필요)
             String otherText = userOtherTexts.get(question.getQuestionSeq());
             if (otherText != null && !otherText.isEmpty()) {
               OtherType otherType = otherTypeByQuestion.get(question.getQuestionSeq());
-              String displayOtherText = otherText;
-              if (otherType == OtherType.SO) {
-                String decrypted = decryptDataSafe(otherText);
-                if (decrypted != null) {
-                  displayOtherText = decrypted;
-                }
-              }
+              String displayOtherText =
+                  otherType != null
+                      ? OtherTextCrypto.decryptForDisplay(otherType, otherText)
+                      : otherText;
               displayAnswer += " (기타: " + displayOtherText + ")";
             }
           } else if ("SAA".equals(question.getQuestionType())

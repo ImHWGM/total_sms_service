@@ -67,6 +67,41 @@ public final class OtherTextCrypto {
     }
   }
 
+  /**
+   * 주관식 ANSWER 컬럼 PII detail(NE/AD/CU/EM)별 암호화. SO는 caller가 RSA 흐름에서 이미 암호화하므로 무변경.
+   */
+  public static String encryptAnswerByDetail(String detail, String plain) {
+    OtherType type = detailToType(detail);
+    return type == null ? plain : encryptForStorage(type, plain);
+  }
+
+  /** 주관식 ANSWER 컬럼 PII detail(NE/AD/CU/EM/SO)별 복호화. */
+  public static String decryptAnswerByDetail(String detail, String stored) {
+    OtherType type = detailToType(detail);
+    return type == null ? stored : decryptForDisplay(type, stored);
+  }
+
+  /** questionTypeDetail 문자열 → PII OtherType. PII가 아니면 null. */
+  private static OtherType detailToType(String detail) {
+    if (detail == null) {
+      return null;
+    }
+    switch (detail) {
+      case "NE":
+        return OtherType.NE;
+      case "SO":
+        return OtherType.SO;
+      case "EM":
+        return OtherType.EM;
+      case "AD":
+        return OtherType.AD;
+      case "CU":
+        return OtherType.CU;
+      default:
+        return null;
+    }
+  }
+
   private static String strip(String s) {
     return s.substring(ENC_PREFIX.length());
   }

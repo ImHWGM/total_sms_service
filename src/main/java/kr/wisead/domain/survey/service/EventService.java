@@ -1912,8 +1912,10 @@ public class EventService {
             String decrypted = decryptDataSafe(firstAnswer);
             displayAnswer = decrypted != null ? decrypted : firstAnswer;
           } else {
-            // 평문 답변 → 복호화 불필요 (중복 제출 시 첫 번째만)
-            displayAnswer = getFirstPart(answer);
+            // PII 유형(NE/AD/CU/EM)은 복호화, 그 외 평문 (중복 제출 시 첫 번째만)
+            displayAnswer =
+                OtherTextCrypto.decryptAnswerByDetail(
+                    question.getQuestionTypeDetail(), getFirstPart(answer));
           }
         }
         createCell(dataRow, 4 + i, displayAnswer, normalStyle);

@@ -45,7 +45,7 @@ public class SurveyAnswerService {
     @Transactional(readOnly = true)
     public List<AnswerResponse> getAnswersByEvent(Integer eventSeq) {
         List<SurveyAnswer> answers = surveyAnswerMapper.selectByEventSeq(eventSeq);
-        decryptOtherTextPii(eventSeq, answers);
+        decryptAnswers(eventSeq, answers);
         return answers.stream()
                 .map(AnswerResponse::from)
                 .collect(Collectors.toList());
@@ -57,7 +57,7 @@ public class SurveyAnswerService {
     @Transactional(readOnly = true)
     public List<AnswerResponse> getAnswersByUser(Integer eventSeq, Integer userSeq) {
         List<SurveyAnswer> answers = surveyAnswerMapper.selectByUserSeq(eventSeq, userSeq);
-        decryptOtherTextPii(eventSeq, answers);
+        decryptAnswers(eventSeq, answers);
         return answers.stream()
                 .map(AnswerResponse::from)
                 .collect(Collectors.toList());
@@ -69,10 +69,32 @@ public class SurveyAnswerService {
     @Transactional(readOnly = true)
     public List<AnswerResponse> getAnswersByQuestion(Integer eventSeq, Integer questionSeq) {
         List<SurveyAnswer> answers = surveyAnswerMapper.selectByQuestionSeq(eventSeq, questionSeq);
-        decryptOtherTextPii(eventSeq, answers);
+        decryptAnswers(eventSeq, answers);
         return answers.stream()
                 .map(AnswerResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 답변 복호화 후처리 — ANSWER(주관식 PII) + OTHER_TEXT(기타 PII) 모두 복원.
+     */
+    private void decryptAnswers(Integer eventSeq, List<SurveyAnswer> answers) {
+        decryptAnswerPii(answers);
+        decryptOtherTextPii(eventSeq, answers);
+    }
+
+    /** 주관식 ANSWER 컬럼의 PII 유형(NE/AD/CU/EM/SO) 복호화. detail은 답변 row 자체에 존재. */
+    private void decryptAnswerPii(List<SurveyAnswer> answers) {
+        if (answers == null || answers.isEmpty()) {
+            return;
+        }
+        for (SurveyAnswer a : answers) {
+            String raw = a.getAnswer();
+            if (raw == null || raw.isEmpty()) {
+                continue;
+            }
+            a.setAnswer(OtherTextCrypto.decryptAnswerByDetail(a.getQuestionTypeDetail(), raw));
+        }
     }
 
     /**
@@ -195,7 +217,8 @@ public class SurveyAnswerService {
             // 주관식인 경우 답변 목록 조회
             List<SurveyAnswer> answers = surveyAnswerMapper.selectByQuestionSeq(eventSeq, questionSeq);
             List<String> textAnswers = answers.stream()
-                    .map(SurveyAnswer::getAnswer)
+                    .map(a -> OtherTextCrypto.decryptAnswerByDetail(
+                            a.getQuestionTypeDetail(), a.getAnswer()))
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
             builder.textAnswers(textAnswers);

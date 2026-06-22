@@ -316,7 +316,7 @@ public class SurveyService {
             answer.setOtherText(resolveOtherTextForStorage(otherType, otherText, answerReq));
           }
         } else {
-          // 주관식
+          // 주관식 — PII 유형(NE/AD/CU/EM) ANSWER는 암호화 저장. SO는 상단에서 이미 암호화됨.
           answer =
               SurveyAnswer.createShortAnswer(
                   eventSeq,
@@ -324,7 +324,8 @@ public class SurveyService {
                   user.getSeq(),
                   itemSeq,
                   answerReq.getQuestionTypeDetail(),
-                  answerValue);
+                  OtherTextCrypto.encryptAnswerByDetail(
+                      answerReq.getQuestionTypeDetail(), answerValue));
         }
 
         surveyAnswerMapper.insert(answer);

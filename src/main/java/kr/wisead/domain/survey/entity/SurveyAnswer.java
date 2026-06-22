@@ -75,6 +75,11 @@ public class SurveyAnswer {
         .build();
   }
 
+  /** 답변 내용 설정 (복호화 후처리용) */
+  public void setAnswer(String answer) {
+    this.answer = answer;
+  }
+
   /** 기타 텍스트 설정 */
   public void setOtherText(String otherText) {
     this.otherText = otherText;

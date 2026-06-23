@@ -75,7 +75,9 @@ public class EmailVerificationService {
   /**
    * 인증 코드 검증 (회원가입). 성공 시 행을 제거한다.
    *
-   * <p>코드 불일치 시 시도횟수 증가가 커밋돼야 하므로 {@code @Transactional} 을 달지 않는다.
+   * <p><b>@Transactional 금지.</b> 코드 불일치 시 incrementAttempts 가 즉시 커밋되어야 brute-force 한도가
+   * 유지된다. 호출자({@link kr.wisead.domain.user.service.UserService} 등)도 이 메서드를 @Transactional
+   * 경계 안에서 호출해선 안 된다.
    */
   public boolean verifyCode(String email, String code) {
     doVerify(email, code, PURPOSE_SIGNUP);
@@ -85,7 +87,8 @@ public class EmailVerificationService {
   /**
    * 인증 코드 검증 (아이디 찾기). 성공 시 보관된 {@code target}(user.seq 문자열)을 반환한다.
    *
-   * <p>실패 시 {@link BusinessException} 을 던진다.
+   * <p><b>@Transactional 금지.</b> {@link #verifyCode} 와 동일한 이유. 실패 시 {@link BusinessException}
+   * 을 던진다.
    */
   public String verifyAndGetTarget(String email, String code) {
     return doVerify(email, code, PURPOSE_FIND_ID);
@@ -168,12 +171,7 @@ public class EmailVerificationService {
     }
   }
 
-  /**
-   * 인증 코드 검증 공용 구현. 성공 시 행을 제거하고 {@code target} 을 반환한다(SIGNUP 은 null).
-   *
-   * <p>코드 불일치 시 incrementAttempts 가 즉시 커밋되어야 brute-force 한도가 유지되므로 호출자에 {@code @Transactional}
-   * 을 달아선 안 된다.
-   */
+  /** 인증 코드 검증 공용 구현. 성공 시 행을 제거하고 {@code target} 을 반환한다(SIGNUP 은 null). */
   private String doVerify(String email, String code, String purpose) {
     String id = email.toLowerCase();
     LocalDateTime now = LocalDateTime.now();

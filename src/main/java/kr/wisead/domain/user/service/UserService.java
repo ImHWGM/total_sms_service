@@ -203,6 +203,9 @@ public class UserService {
     try {
       // 1. 인증코드 검증 + 발송 시점에 저장된 target(user.seq) 반환
       String seqStr = emailAuthService.verifyAndGetTarget(email, code);
+      if (seqStr == null || seqStr.isBlank()) {
+        throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+      }
 
       // 2. seq 로 정확한 사용자 조회 (이메일 중복 무관)
       User user =

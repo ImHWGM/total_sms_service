@@ -811,7 +811,9 @@ class EventParticipantWorkflowIntegrationTest {
   @DisplayName("20. 참가자 삭제 (인증 필요)")
   void deleteParticipant_Success() throws Exception {
     // Given: 참가자 삭제
-    doNothing().when(participantService).deleteParticipant(eq(TEST_PARTICIPANT_SEQ), anyString());
+    doNothing()
+        .when(participantService)
+        .deleteParticipant(eq(TEST_EVENT_SEQ), eq(TEST_PARTICIPANT_SEQ), anyString());
 
     // When & Then
     mockMvc
@@ -825,6 +827,7 @@ class EventParticipantWorkflowIntegrationTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.message").value("참가자가 삭제되었습니다."));
 
-    verify(participantService, times(1)).deleteParticipant(eq(TEST_PARTICIPANT_SEQ), anyString());
+    verify(participantService, times(1))
+        .deleteParticipant(eq(TEST_EVENT_SEQ), eq(TEST_PARTICIPANT_SEQ), anyString());
   }
 }

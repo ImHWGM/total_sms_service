@@ -633,21 +633,18 @@ public class EventParticipantService {
   /** 참가자 수정 */
   @Transactional
   public EventParticipantResponse updateParticipant(
-      Long seq, EventParticipantRequest request, String userId) {
+      Integer eventSeq, Long seq, EventParticipantRequest request, String userId) {
+    // 권한 체크: path 행사의 소유자이거나 A레벨이어야 수정 가능
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
+
     EventParticipant participant =
         participantMapper
             .selectBySeq(seq)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    // 권한 체크: 해당 이벤트의 소유자이거나 A레벨이어야 수정 가능
-    SurveyMaster event =
-        surveyMasterMapper
-            .selectByEventSeq(participant.getEventSeq())
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트 정보를 찾을 수 없습니다."));
-    Integer userLevel = adminService.getUserLevel(userId);
-    adminService.validateModifyPermission(userId, userLevel, event.getRegId());
+    // path eventSeq ↔ 참가자 eventSeq 정합 검증 (IDOR 차단)
+    eventAccessValidator.validateParticipantEvent(eventSeq, participant);
 
     participant.update(
         request.getDepartment(),
@@ -667,21 +664,18 @@ public class EventParticipantService {
 
   /** 참가자 삭제 */
   @Transactional
-  public void deleteParticipant(Long seq, String uptId) {
+  public void deleteParticipant(Integer eventSeq, Long seq, String uptId) {
+    // 권한 체크: path 행사의 소유자이거나 A레벨이어야 삭제 가능
+    eventAccessValidator.validateEventReadAccess(eventSeq, uptId);
+
     EventParticipant participant =
         participantMapper
             .selectBySeq(seq)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
-    // 권한 체크: 해당 이벤트의 소유자이거나 A레벨이어야 삭제 가능
-    SurveyMaster event =
-        surveyMasterMapper
-            .selectByEventSeq(participant.getEventSeq())
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "이벤트 정보를 찾을 수 없습니다."));
-    Integer userLevel = adminService.getUserLevel(uptId);
-    adminService.validateModifyPermission(uptId, userLevel, event.getRegId());
+    // path eventSeq ↔ 참가자 eventSeq 정합 검증 (IDOR 차단)
+    eventAccessValidator.validateParticipantEvent(eventSeq, participant);
 
     // 관련 로그 삭제
     actionLogMapper.deleteByParticipantSeq(seq);

@@ -18,6 +18,7 @@ import kr.wisead.common.ratelimit.SimpleRateLimiter;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.admin.service.AdminService;
+import kr.wisead.domain.event.dto.EventParticipantRequest;
 import kr.wisead.domain.event.dto.ParticipantSearchRequest;
 import kr.wisead.domain.event.dto.ParticipantStatusResponse;
 import kr.wisead.domain.event.entity.EventParticipant;
@@ -187,6 +188,100 @@ class EventParticipantServiceSecurityTest {
 
     assertThat(service.getParticipant(EVENT_SEQ, PARTICIPANT_SEQ, OWNER_ID).getSeq())
         .isEqualTo(PARTICIPANT_SEQ);
+  }
+
+  @Test
+  @DisplayName("참가자 수정에서 path eventSeq와 참가자 eventSeq가 다르면 RESOURCE_NOT_FOUND")
+  void updateParticipant_rejectsEventSeqMismatch() {
+    givenEventOwner();
+    when(participantMapper.selectBySeq(PARTICIPANT_SEQ))
+        .thenReturn(Optional.of(participant(OTHER_EVENT_SEQ)));
+
+    assertThatThrownBy(
+            () ->
+                service.updateParticipant(
+                    EVENT_SEQ, PARTICIPANT_SEQ, new EventParticipantRequest(), OWNER_ID))
+        .isInstanceOf(BusinessException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+    verify(participantMapper, never()).update(any());
+  }
+
+  @Test
+  @DisplayName("참가자 수정 비소유자는 참가자 조회 전에 ACCESS_DENIED로 차단된다")
+  void updateParticipant_deniesNonOwnerBeforeParticipantLookup() {
+    givenEventOwner();
+    doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
+        .when(adminService)
+        .validateModifyPermission(OTHER_USER_ID, 1, OWNER_ID);
+
+    assertThatThrownBy(
+            () ->
+                service.updateParticipant(
+                    EVENT_SEQ, PARTICIPANT_SEQ, new EventParticipantRequest(), OTHER_USER_ID))
+        .isInstanceOf(BusinessException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.ACCESS_DENIED);
+    verify(participantMapper, never()).selectBySeq(any());
+    verify(participantMapper, never()).update(any());
+  }
+
+  @Test
+  @DisplayName("참가자 수정 소유자는 참가자 eventSeq가 일치하면 정상 수정한다")
+  void updateParticipant_ownerCanUpdateMatching() {
+    givenEventOwner();
+    when(participantMapper.selectBySeq(PARTICIPANT_SEQ))
+        .thenReturn(Optional.of(participant(EVENT_SEQ)));
+    when(participantMapper.selectDetailBySeq(PARTICIPANT_SEQ))
+        .thenReturn(Optional.of(participant(EVENT_SEQ)));
+
+    service.updateParticipant(
+        EVENT_SEQ, PARTICIPANT_SEQ, new EventParticipantRequest(), OWNER_ID);
+
+    verify(participantMapper).update(any());
+  }
+
+  @Test
+  @DisplayName("참가자 삭제에서 path eventSeq와 참가자 eventSeq가 다르면 RESOURCE_NOT_FOUND")
+  void deleteParticipant_rejectsEventSeqMismatch() {
+    givenEventOwner();
+    when(participantMapper.selectBySeq(PARTICIPANT_SEQ))
+        .thenReturn(Optional.of(participant(OTHER_EVENT_SEQ)));
+
+    assertThatThrownBy(() -> service.deleteParticipant(EVENT_SEQ, PARTICIPANT_SEQ, OWNER_ID))
+        .isInstanceOf(BusinessException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+    verify(participantMapper, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("참가자 삭제 비소유자는 참가자 조회 전에 ACCESS_DENIED로 차단된다")
+  void deleteParticipant_deniesNonOwnerBeforeParticipantLookup() {
+    givenEventOwner();
+    doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
+        .when(adminService)
+        .validateModifyPermission(OTHER_USER_ID, 1, OWNER_ID);
+
+    assertThatThrownBy(() -> service.deleteParticipant(EVENT_SEQ, PARTICIPANT_SEQ, OTHER_USER_ID))
+        .isInstanceOf(BusinessException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.ACCESS_DENIED);
+    verify(participantMapper, never()).selectBySeq(any());
+    verify(participantMapper, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("참가자 삭제 소유자는 참가자 eventSeq가 일치하면 정상 삭제한다")
+  void deleteParticipant_ownerCanDeleteMatching() {
+    givenEventOwner();
+    when(participantMapper.selectBySeq(PARTICIPANT_SEQ))
+        .thenReturn(Optional.of(participant(EVENT_SEQ)));
+
+    service.deleteParticipant(EVENT_SEQ, PARTICIPANT_SEQ, OWNER_ID);
+
+    verify(participantMapper).delete(PARTICIPANT_SEQ);
+    verify(surveyUserMapper).softDelete(1, OWNER_ID);
   }
 
   @Test

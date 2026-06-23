@@ -115,7 +115,7 @@ public class EventParticipantController {
       @Valid @RequestBody EventParticipantRequest request,
       @CurrentUser JwtPrincipal user) {
     return ApiResponse.success(
-        participantService.updateParticipant(seq, request, user.userId()),
+        participantService.updateParticipant(eventSeq, seq, request, user.userId()),
         "참가자 정보가 수정되었습니다.");
   }
 
@@ -125,7 +125,7 @@ public class EventParticipantController {
       @PathVariable Integer eventSeq,
       @PathVariable Long seq,
       @CurrentUser JwtPrincipal user) {
-    participantService.deleteParticipant(seq, user.userId());
+    participantService.deleteParticipant(eventSeq, seq, user.userId());
     return ApiResponse.success("참가자가 삭제되었습니다.");
   }
 

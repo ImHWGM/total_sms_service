@@ -26,8 +26,10 @@ public class EventCheckController {
   public ApiResponse<EventCheckResponse> checkIn(
       @PathVariable Integer eventSeq,
       @PathVariable String checkCode,
-      @RequestHeader(value = "X-Device-Info", required = false) String deviceInfo) {
-    EventCheckResponse response = checkService.checkIn(eventSeq, checkCode, deviceInfo);
+      @RequestHeader(value = "X-Device-Info", required = false) String deviceInfo,
+      HttpServletRequest request) {
+    EventCheckResponse response =
+        checkService.checkIn(eventSeq, checkCode, deviceInfo, request.getRemoteAddr());
     return ApiResponse.success(response, response.getMessage());
   }
 

@@ -424,7 +424,7 @@ class EventParticipantWorkflowIntegrationTest {
             .message("입장 처리되었습니다. 명찰을 출력해주세요.")
             .build();
 
-    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any()))
+    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any(), anyString()))
         .thenReturn(mockResponse);
 
     // When & Then: 인증 없이 체크인 가능
@@ -439,7 +439,8 @@ class EventParticipantWorkflowIntegrationTest {
         .andExpect(jsonPath("$.data.nametagUrl").exists())
         .andExpect(jsonPath("$.message").value("입장 처리되었습니다. 명찰을 출력해주세요."));
 
-    verify(checkService, times(1)).checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any());
+    verify(checkService, times(1))
+        .checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any(), anyString());
   }
 
   @Test
@@ -461,7 +462,7 @@ class EventParticipantWorkflowIntegrationTest {
             .message("이미 입장 처리된 참가자입니다.")
             .build();
 
-    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any()))
+    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any(), anyString()))
         .thenReturn(mockResponse);
 
     // When & Then
@@ -795,7 +796,7 @@ class EventParticipantWorkflowIntegrationTest {
     // Given: 존재하지 않는 체크코드
     String invalidCheckCode = "invalid_check_code_123";
 
-    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(invalidCheckCode), any()))
+    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(invalidCheckCode), any(), anyString()))
         .thenThrow(new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
     // When & Then

@@ -300,7 +300,9 @@ class SurveyToEventParticipantIntegrationTest {
             .message("입장 처리되었습니다. 명찰을 출력해주세요.")
             .build();
 
-    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE_RESPONDENT), any()))
+    when(
+            checkService.checkIn(
+                eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE_RESPONDENT), any(), anyString()))
         .thenReturn(mockResponse);
 
     mockMvc
@@ -430,7 +432,9 @@ class SurveyToEventParticipantIntegrationTest {
             .message("입장 처리되었습니다. 명찰을 출력해주세요.")
             .build();
 
-    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE_NON_RESPONDENT), any()))
+    when(
+            checkService.checkIn(
+                eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE_NON_RESPONDENT), any(), anyString()))
         .thenReturn(mockResponse);
 
     // When & Then: 설문 미응답자도 체크인 가능
@@ -538,7 +542,7 @@ class SurveyToEventParticipantIntegrationTest {
             .message("입장 처리되었습니다.")
             .build();
 
-    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq("any_check_code"), any()))
+    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq("any_check_code"), any(), anyString()))
         .thenReturn(mockResponse);
 
     // When & Then: 인증 없이 접근 가능

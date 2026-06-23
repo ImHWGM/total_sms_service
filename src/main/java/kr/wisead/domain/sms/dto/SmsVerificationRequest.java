@@ -8,9 +8,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 회원가입(사전 인증) SMS 인증 요청 DTO.
+ * 사전 인증(로그인 전) SMS 인증 요청 DTO.
  *
- * <p>{@code PreSignupSmsAuthService} 라우팅용. 이메일판 {@code EmailVerificationRequest} 와 평행 구조이며,
+ * <p>{@code SmsVerificationService} 라우팅용. 이메일판 {@code EmailVerificationRequest} 와 평행 구조이며,
  * email 대신 phoneNumber 를 받는다.
  */
 @Data

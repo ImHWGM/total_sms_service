@@ -1,26 +1,31 @@
 package kr.wisead.mapper.primary;
 
 import java.time.LocalDateTime;
-import kr.wisead.domain.sms.entity.SignupSmsVerification;
+import kr.wisead.domain.verification.entity.Verification;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-/** 회원가입 SMS 본인인증 상태 Mapper (M3: DB 기반 저장). */
+/** 사전 인증(SMS/EMAIL 공용) 상태 Mapper (M3: DB 기반 저장). */
 @Mapper
-public interface SignupSmsVerificationMapper {
+public interface VerificationMapper {
 
-  /** (purpose, phone) 으로 1행 조회. 없으면 null. */
-  SignupSmsVerification findByKey(
-      @Param("purpose") String purpose, @Param("phone") String phone);
+  /** (purpose, channel, identifier) 으로 1행 조회. 없으면 null. */
+  Verification findByKey(
+      @Param("purpose") String purpose,
+      @Param("channel") String channel,
+      @Param("identifier") String identifier);
 
   /** 신규 행 삽입 (최초 발송). */
-  int insert(SignupSmsVerification entity);
+  int insert(Verification entity);
 
   /** 기존 행 갱신 (재발송): code/created_at 갱신, attempts=0, verified_at=NULL 로 리셋. */
-  int updateForSend(SignupSmsVerification entity);
+  int updateForSend(Verification entity);
 
   /** 검증 시도 횟수 +1 (원자적). M1: lost-update 방지. */
-  int incrementAttempts(@Param("purpose") String purpose, @Param("phone") String phone);
+  int incrementAttempts(
+      @Param("purpose") String purpose,
+      @Param("channel") String channel,
+      @Param("identifier") String identifier);
 
   /**
    * 코드 일치 + 미인증 상태일 때만 인증 완료 처리 (원자적). verified_at 설정 + code NULL 화.
@@ -29,12 +34,16 @@ public interface SignupSmsVerificationMapper {
    */
   int markVerifiedIfCodeMatches(
       @Param("purpose") String purpose,
-      @Param("phone") String phone,
+      @Param("channel") String channel,
+      @Param("identifier") String identifier,
       @Param("code") String code,
       @Param("verifiedAt") LocalDateTime verifiedAt);
 
-  /** (purpose, phone) 행 삭제. */
-  int deleteByKey(@Param("purpose") String purpose, @Param("phone") String phone);
+  /** (purpose, channel, identifier) 행 삭제. */
+  int deleteByKey(
+      @Param("purpose") String purpose,
+      @Param("channel") String channel,
+      @Param("identifier") String identifier);
 
   /**
    * 만료 행 정리.

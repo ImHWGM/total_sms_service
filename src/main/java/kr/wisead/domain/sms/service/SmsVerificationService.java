@@ -7,44 +7,46 @@ import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
-import kr.wisead.domain.sms.entity.SignupSmsVerification;
 import kr.wisead.domain.sms.sender.SmsOtpSender;
-import kr.wisead.mapper.primary.SignupSmsVerificationMapper;
+import kr.wisead.domain.verification.entity.Verification;
+import kr.wisead.mapper.primary.VerificationMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
- * 회원가입(사전 인증) 도메인 SMS 인증 서비스.
+ * 사전 인증(로그인 전) SMS 휴대폰 인증 서비스.
  *
- * <p>회원가입 흐름과 같이 아직 로그인된 사용자 식별자(userId/seq)가 존재하지 않는 단계에서 사용한다. 식별 단위는 *용도(purpose) + 정규화된
- * 휴대폰번호(숫자만)* 이며, 기존 {@link kr.wisead.domain.email.service.PreSignupEmailAuthService}(key=email) 와
- * 평행 구조다.
+ * <p>아직 로그인된 사용자 식별자(userId/seq)가 없는 흐름(회원가입·아이디찾기·비밀번호찾기 등)에서 공용으로 쓴다. 용도는 호출자가
+ * {@code purpose} 로 지정한다(예: {@link #PURPOSE_SIGNUP}).
  *
- * <p><b>M3: 상태 저장을 DB 로 이전.</b> 인증 상태(발송 코드/시도횟수/인증완료 도장)를 인스턴스 메모리가 아닌
- * {@code signup_sms_verification} 테이블에 보관한다. 다중 인스턴스 라우팅·재시작에도 인증 상태가 보존된다. 로그인 2FA({@link
- * SmsAuthService})/이메일 사전인증은 별개로 in-memory 를 유지한다.
+ * <p><b>M3: 상태 저장을 DB 로 이전 + 채널 통합.</b> 인증 상태(발송 코드/시도횟수/인증완료 도장)를 인스턴스 메모리가 아닌 공용
+ * {@code verification} 테이블(channel=SMS)에 보관한다. 이메일 사전인증({@link
+ * kr.wisead.domain.email.service.EmailVerificationService}, channel=EMAIL)과 동일 테이블/매퍼를 공유하며, 식별
+ * 단위는 (purpose, channel, identifier=정규화 휴대폰번호) 이다. 로그인 2FA({@link SmsAuthService})는 별개(userId 기반
+ * in-memory).
  *
  * <p>SMS 발송은 {@link SmsOtpSender} 를 통해 결제/야간/잔액 검증을 우회하여 큐에 직접 적재한다.
  *
  * <p>검증 성공 시 {@code verified_at} 도장을 찍어 30분간 유지하고, 회원가입({@code signUp})에서 {@link
  * #checkVerified(String, String)} 게이트로 검사한 뒤 가입 성공 시 {@link #consumeVerification(String, String)} 로
  * 소비한다. consume 는 signUp 트랜잭션에 합류하므로, 가입이 롤백되면 도장 삭제도 함께 롤백되어 인증 상태가 보존된다(리뷰 M2).
- *
- * <p><b>purpose 분리(cross-purpose replay 방지)</b>: (purpose, phone) 복합키로 행을 분리해, 예컨대 "비밀번호 찾기"용
- * 인증을 "회원가입"이 가져다 쓰지 못하게 한다.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class PreSignupSmsAuthService {
+public class SmsVerificationService {
 
   /** 회원가입 본인인증 용도. */
   public static final String PURPOSE_SIGNUP = "SIGNUP";
 
+  /** 채널 식별자 (verification.channel). */
+  private static final String CHANNEL = "SMS";
+
   private final SmsOtpSender smsOtpSender;
-  private final SignupSmsVerificationMapper verificationMapper;
+  private final VerificationMapper verificationMapper;
 
   /** OTP 생성용 SecureRandom (스레드 안전). */
   private final SecureRandom secureRandom = new SecureRandom();
@@ -75,7 +77,7 @@ public class PreSignupSmsAuthService {
     String p = resolvePurpose(purpose);
     LocalDateTime now = LocalDateTime.now();
 
-    SignupSmsVerification existing = verificationMapper.findByKey(p, phone);
+    Verification existing = verificationMapper.findByKey(p, CHANNEL, phone);
     if (existing != null && !canResend(existing.getCreatedAt(), now)) {
       long remainingSeconds = remainingResendSeconds(existing.getCreatedAt(), now);
       throw new BusinessException(
@@ -84,35 +86,42 @@ public class PreSignupSmsAuthService {
 
     String code = generateOtpCode();
     if (existing == null) {
-      verificationMapper.insert(
-          SignupSmsVerification.builder()
-              .purpose(p)
-              .phone(phone)
-              .code(code)
-              .attempts(0)
-              .createdAt(now)
-              .verifiedAt(null)
-              .build());
+      try {
+        verificationMapper.insert(
+            Verification.builder()
+                .purpose(p)
+                .channel(CHANNEL)
+                .identifier(phone)
+                .code(code)
+                .attempts(0)
+                .createdAt(now)
+                .verifiedAt(null)
+                .build());
+      } catch (DataIntegrityViolationException dup) {
+        // 동시 최초발송(더블클릭): 다른 요청이 방금 같은 (purpose,channel,identifier) 행을 만들어
+        // UNIQUE 충돌. 500 대신 쿨다운 안내로 변환한다.
+        throw new BusinessException(
+            ErrorCode.INVALID_INPUT_VALUE, "이미 인증 코드를 발송했습니다. 잠시 후 다시 시도해주세요.");
+      }
     } else {
       // 재발송: 코드/발송시각 갱신 + 시도횟수·도장 리셋
       verificationMapper.updateForSend(
-          SignupSmsVerification.builder().purpose(p).phone(phone).code(code).createdAt(now).build());
+          Verification.builder()
+              .purpose(p)
+              .channel(CHANNEL)
+              .identifier(phone)
+              .code(code)
+              .createdAt(now)
+              .build());
     }
 
     try {
       smsOtpSender.sendOtp(phone, code);
-      log.info(
-          "[PreSignup] SMS 인증 코드 발송 완료: phone={}, purpose={}",
-          CommonUtils.maskingPhone(phone),
-          p);
+      log.info("[SMS인증] 코드 발송 완료: phone={}, purpose={}", CommonUtils.maskingPhone(phone), p);
       return true;
     } catch (Exception e) {
-      log.error(
-          "[PreSignup] SMS 인증 코드 발송 실패: phone={}, purpose={}",
-          CommonUtils.maskingPhone(phone),
-          p,
-          e);
-      verificationMapper.deleteByKey(p, phone);
+      log.error("[SMS인증] 코드 발송 실패: phone={}, purpose={}", CommonUtils.maskingPhone(phone), p, e);
+      verificationMapper.deleteByKey(p, CHANNEL, phone);
       throw new BusinessException(ErrorCode.INTERNAL_ERROR, "SMS 인증 코드 발송에 실패했습니다.");
     }
   }
@@ -123,8 +132,7 @@ public class PreSignupSmsAuthService {
    * <p><b>의도적으로 @Transactional 을 달지 않는다.</b> 코드 불일치 시 incrementAttempts(시도횟수 +1)를 DB 에
    * 반영한 뒤 BusinessException 을 던지는데, 만약 이 메서드가 @Transactional 이면 예외로 트랜잭션이 롤백되어 시도횟수
    * 증가가 취소된다 → brute-force 한도(MAX_ATTEMPTS)가 무력화된다. 트랜잭션 없이 각 mapper 호출이 개별 커밋되어야
-   * "실패 시도는 누적되고 예외는 던진다"가 성립한다. (TwoFactorService 등 다른 서비스는 @Transactional 을 쓰지만,
-   * 그쪽은 '쓰기-또는-전체롤백' 패턴이라 사정이 다르다.)
+   * "실패 시도는 누적되고 예외는 던진다"가 성립한다.
    *
    * @param phoneNumber 휴대폰번호
    * @param code 입력 코드
@@ -135,41 +143,41 @@ public class PreSignupSmsAuthService {
     String p = resolvePurpose(purpose);
     LocalDateTime now = LocalDateTime.now();
 
-    SignupSmsVerification info = verificationMapper.findByKey(p, phone);
+    Verification info = verificationMapper.findByKey(p, CHANNEL, phone);
     if (info == null || info.getCode() == null) {
       // code == null: 미발송이거나 이미 검증되어 소비된 상태
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드를 먼저 발송해주세요.");
     }
 
     if (isExpired(info.getCreatedAt(), now)) {
-      verificationMapper.deleteByKey(p, phone);
+      verificationMapper.deleteByKey(p, CHANNEL, phone);
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드가 만료되었습니다. 다시 발송해주세요.");
     }
 
     if (info.getAttempts() >= MAX_ATTEMPTS) {
-      verificationMapper.deleteByKey(p, phone);
+      verificationMapper.deleteByKey(p, CHANNEL, phone);
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 시도 횟수를 초과했습니다. 다시 발송해주세요.");
     }
 
     // 코드 일치 + 미인증일 때만 원자적으로 도장 처리
-    int matched = verificationMapper.markVerifiedIfCodeMatches(p, phone, code, now);
+    int matched = verificationMapper.markVerifiedIfCodeMatches(p, CHANNEL, phone, code, now);
     if (matched == 1) {
-      log.info("[PreSignup] SMS 인증 성공: phone={}, purpose={}", CommonUtils.maskingPhone(phone), p);
+      log.info("[SMS인증] 성공: phone={}, purpose={}", CommonUtils.maskingPhone(phone), p);
       return true;
     }
 
     // 불일치 → 시도 횟수 원자적 증가 후 안내
-    verificationMapper.incrementAttempts(p, phone);
-    SignupSmsVerification reloaded = verificationMapper.findByKey(p, phone);
+    verificationMapper.incrementAttempts(p, CHANNEL, phone);
+    Verification reloaded = verificationMapper.findByKey(p, CHANNEL, phone);
     int attempts = reloaded != null ? reloaded.getAttempts() : MAX_ATTEMPTS;
     log.warn(
-        "[PreSignup] SMS 인증 코드 불일치: phone={}, purpose={}, attempts={}",
+        "[SMS인증] 코드 불일치: phone={}, purpose={}, attempts={}",
         CommonUtils.maskingPhone(phone),
         p,
         attempts);
     int remaining = MAX_ATTEMPTS - attempts;
     if (remaining <= 0) {
-      verificationMapper.deleteByKey(p, phone);
+      verificationMapper.deleteByKey(p, CHANNEL, phone);
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 시도 횟수를 초과했습니다. 다시 발송해주세요.");
     }
     throw new BusinessException(
@@ -179,8 +187,8 @@ public class PreSignupSmsAuthService {
 
   /** 인증 상태 확인. (검증 완료되어 code 가 소비된 행은 codeSent=false 로 본다.) */
   public VerificationStatus getVerificationStatus(String phoneNumber, String purpose) {
-    SignupSmsVerification info =
-        verificationMapper.findByKey(resolvePurpose(purpose), normalizePhone(phoneNumber));
+    Verification info =
+        verificationMapper.findByKey(resolvePurpose(purpose), CHANNEL, normalizePhone(phoneNumber));
     if (info == null || info.getCode() == null) {
       return new VerificationStatus(false, 0, 0, 0);
     }
@@ -209,27 +217,26 @@ public class PreSignupSmsAuthService {
    * #consumeVerification(String, String)} 으로 수행한다.
    */
   public void checkVerified(String phoneNumber, String purpose) {
-    SignupSmsVerification info =
-        verificationMapper.findByKey(resolvePurpose(purpose), normalizePhone(phoneNumber));
+    Verification info =
+        verificationMapper.findByKey(resolvePurpose(purpose), CHANNEL, normalizePhone(phoneNumber));
     requireValidStamp(info);
   }
 
   /**
    * 회원가입 강제 검사용 — 번호가 인증 완료 상태인지 확인하고, 맞으면 행을 삭제(1회용 소비)한다.
    *
-   * <p>signUp 의 트랜잭션에 합류하므로(별도 propagation 미지정), 가입이 롤백되면 이 삭제도 함께 롤백되어 인증 상태가 보존된다(M2). 용도가 다른
-   * 인증 행은 키 자체가 달라 조회되지 않으므로 cross-purpose 탈취가 불가능하다.
+   * <p>signUp 의 트랜잭션에 합류하므로(별도 propagation 미지정), 가입이 롤백되면 이 삭제도 함께 롤백되어 인증 상태가 보존된다(M2).
    */
   public void consumeVerification(String phoneNumber, String purpose) {
     String phone = normalizePhone(phoneNumber);
     String p = resolvePurpose(purpose);
-    SignupSmsVerification info = verificationMapper.findByKey(p, phone);
+    Verification info = verificationMapper.findByKey(p, CHANNEL, phone);
     requireValidStamp(info);
-    verificationMapper.deleteByKey(p, phone);
-    log.info("[PreSignup] SMS 인증 소비 완료: phone={}, purpose={}", CommonUtils.maskingPhone(phone), p);
+    verificationMapper.deleteByKey(p, CHANNEL, phone);
+    log.info("[SMS인증] 소비 완료: phone={}, purpose={}", CommonUtils.maskingPhone(phone), p);
   }
 
-  /** 만료된 인증 행 정리 (5분마다 실행). */
+  /** 만료된 인증 행 정리 (5분마다 실행). 채널 무관 전체 정리이므로 SMS·EMAIL 공통으로 동작한다. */
   @Scheduled(fixedRate = 300000)
   public void cleanupExpiredCodes() {
     LocalDateTime now = LocalDateTime.now();
@@ -237,24 +244,28 @@ public class PreSignupSmsAuthService {
         verificationMapper.deleteExpired(
             now.minusMinutes(EXPIRATION_MINUTES), now.minusMinutes(VERIFIED_TTL_MINUTES));
     if (deleted > 0) {
-      log.debug("[PreSignup] 만료된 SMS 인증 행 정리: {} 건", deleted);
+      log.debug("[인증] 만료된 인증 행 정리: {} 건", deleted);
     }
   }
 
   // ==================== Private Methods ====================
 
   /** 인증 완료 도장 유효성 검사 (미인증/유예초과 시 예외). */
-  private void requireValidStamp(SignupSmsVerification info) {
+  private void requireValidStamp(Verification info) {
     if (info == null || info.getVerifiedAt() == null) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "휴대폰 본인인증을 먼저 완료해주세요.");
+      throw new BusinessException(ErrorCode.SMS_NOT_VERIFIED, "휴대폰 본인인증을 먼저 완료해주세요.");
     }
     if (LocalDateTime.now().isAfter(info.getVerifiedAt().plusMinutes(VERIFIED_TTL_MINUTES))) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "본인인증 후 시간이 초과되었습니다. 다시 인증해주세요.");
+      throw new BusinessException(ErrorCode.SMS_VERIFY_EXPIRED, "본인인증 후 시간이 초과되었습니다. 다시 인증해주세요.");
     }
   }
 
   private String resolvePurpose(String purpose) {
-    return (purpose != null && !purpose.isBlank()) ? purpose : PURPOSE_SIGNUP;
+    // 범용 저장소이므로 용도를 반드시 명시받는다. 빠뜨린 호출을 조용히 SIGNUP 으로 처리하지 않는다.
+    if (purpose == null || purpose.isBlank()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 용도(purpose)가 필요합니다.");
+    }
+    return purpose;
   }
 
   /** 휴대폰번호 정규화 (숫자만 남김). 예: "010-1234-5678" -> "01012345678". */

@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import kr.wisead.common.dto.VerificationStatus;
-import kr.wisead.domain.email.service.PreSignupEmailAuthService;
+import kr.wisead.domain.email.service.EmailVerificationService;
 import kr.wisead.domain.user.dto.LoginRequest;
 import kr.wisead.domain.user.dto.LoginResponse;
 import kr.wisead.domain.user.service.AuthService;
@@ -42,8 +42,8 @@ class LoginWithEmailVerificationTest {
 
   @MockitoBean private AuthService authService;
 
-  // Phase B-0-4: /api/email/* 경로는 PreSignupEmailAuthService(key=email)로 라우팅됨
-  @MockitoBean private PreSignupEmailAuthService emailAuthService;
+  // Phase B-0-4: /api/email/* 경로는 EmailVerificationService(key=email)로 라우팅됨
+  @MockitoBean private EmailVerificationService emailAuthService;
 
   private static final String TEST_USER_ID = "testuser01";
   private static final String TEST_PASSWORD = "Test1234!@";

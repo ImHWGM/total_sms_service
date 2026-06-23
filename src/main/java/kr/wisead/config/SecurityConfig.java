@@ -47,7 +47,11 @@ public class SecurityConfig {
     "/api/users/find-pw", // 비밀번호 찾기
     "/api/users/password/reset-validate", // 비밀번호 재설정 토큰 검증
     "/api/users/password/reset-confirm", // 비밀번호 재설정 확인
+    // 사전 인증(로그인 전) 엔드포인트라 permitAll 필수. /status 는 비인증으로 번호/이메일별 잔여시도·쿨다운을
+    // 노출(약한 enumeration)하나, 코드·PII 는 없고 양 채널 동일 패턴이라 의도적으로 유지.
+    // 노출 축소가 필요하면 SMS·이메일 /status 를 함께 제거하는 별도 과제로 다룬다.
     "/api/email/verification/**", // 이메일 인증 (회원가입, 로그인 시 사용)
+    "/api/sms/verification/**", // SMS 휴대폰 인증 (회원가입 등 로그인 전 사용)
     "/api/unsubscribe", // 이메일 수신거부
     "/unsubscribe", // 이메일 수신거부 (레거시 호환)
 

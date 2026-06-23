@@ -153,7 +153,6 @@ public class UserService {
    * @param request 아이디 찾기 요청 (기업명, 담당자명, 연락처)
    * @return 마스킹된 이메일 정보
    */
-  @Transactional(readOnly = true)
   public FindIdResponse requestFindId(FindIdRequest request) {
     try {
       // 1. 평문 담당자명, 연락처를 암호화 (DB 저장 형식에 맞게)
@@ -200,7 +199,6 @@ public class UserService {
    * @param code 인증코드
    * @return 마스킹된 아이디
    */
-  @Transactional(readOnly = true)
   public FindIdResponse verifyAndGetUserId(String email, String code) {
     try {
       // 1. 인증코드 검증 + 발송 시점에 저장된 target(user.seq) 반환

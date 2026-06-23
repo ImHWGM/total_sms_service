@@ -36,18 +36,19 @@ public class InMemoryVerificationMapper implements VerificationMapper {
     if (cur == null) {
       return 0;
     }
-    // code/created_at 갱신, attempts=0, verified_at=NULL (seq 유지)
     store.put(
         k,
-        new Verification(
-            cur.getSeq(),
-            e.getPurpose(),
-            e.getChannel(),
-            e.getIdentifier(),
-            e.getCode(),
-            0,
-            e.getCreatedAt(),
-            null));
+        Verification.builder()
+            .seq(cur.getSeq())
+            .purpose(e.getPurpose())
+            .channel(e.getChannel())
+            .identifier(e.getIdentifier())
+            .target(e.getTarget())
+            .code(e.getCode())
+            .attempts(0)
+            .createdAt(e.getCreatedAt())
+            .verifiedAt(null)
+            .build());
     return 1;
   }
 
@@ -60,15 +61,17 @@ public class InMemoryVerificationMapper implements VerificationMapper {
     }
     store.put(
         k,
-        new Verification(
-            e.getSeq(),
-            e.getPurpose(),
-            e.getChannel(),
-            e.getIdentifier(),
-            e.getCode(),
-            e.getAttempts() + 1,
-            e.getCreatedAt(),
-            e.getVerifiedAt()));
+        Verification.builder()
+            .seq(e.getSeq())
+            .purpose(e.getPurpose())
+            .channel(e.getChannel())
+            .identifier(e.getIdentifier())
+            .target(e.getTarget())
+            .code(e.getCode())
+            .attempts(e.getAttempts() + 1)
+            .createdAt(e.getCreatedAt())
+            .verifiedAt(e.getVerifiedAt())
+            .build());
     return 1;
   }
 
@@ -80,15 +83,17 @@ public class InMemoryVerificationMapper implements VerificationMapper {
     if (e != null && code.equals(e.getCode()) && e.getVerifiedAt() == null) {
       store.put(
           k,
-          new Verification(
-              e.getSeq(),
-              e.getPurpose(),
-              e.getChannel(),
-              e.getIdentifier(),
-              null,
-              e.getAttempts(),
-              e.getCreatedAt(),
-              verifiedAt));
+          Verification.builder()
+              .seq(e.getSeq())
+              .purpose(e.getPurpose())
+              .channel(e.getChannel())
+              .identifier(e.getIdentifier())
+              .target(e.getTarget())
+              .code(null)
+              .attempts(e.getAttempts())
+              .createdAt(e.getCreatedAt())
+              .verifiedAt(verifiedAt)
+              .build());
       return 1;
     }
     return 0;

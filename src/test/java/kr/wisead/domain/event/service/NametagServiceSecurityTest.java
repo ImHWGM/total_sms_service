@@ -264,6 +264,41 @@ class NametagServiceSecurityTest {
     verify(nametagLogMapper, never()).insert(any(EventNametagLog.class));
   }
 
+  @Test
+  @DisplayName("공개 명찰 print 미발견이고 한도 내면 실패를 기록하고 출력 부작용 없이 RESOURCE_NOT_FOUND")
+  void publicNametagPrint_recordsFailureAndReturnsNotFoundWithinLimit() {
+    when(participantMapper.selectByEventSeqAndCheckCode(EVENT_SEQ, CHECK_CODE))
+        .thenReturn(Optional.empty());
+    when(failureRateLimiter.recordFailureAndCheckAllowed(CLIENT_IP + ":" + EVENT_SEQ + ":check"))
+        .thenReturn(true);
+
+    assertThatThrownBy(
+            () ->
+                service.recordPrintByCheckCode(
+                    EVENT_SEQ, CHECK_CODE, printRequest(), null, CLIENT_IP))
+        .isInstanceOf(BusinessException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+    verify(failureRateLimiter).recordFailureAndCheckAllowed(CLIENT_IP + ":" + EVENT_SEQ + ":check");
+    verify(nametagLogMapper, never()).insert(any(EventNametagLog.class));
+  }
+
+  @Test
+  @DisplayName("공개 명찰 print 미발견이고 clientIp가 없으면 rate limiter를 건드리지 않는다")
+  void publicNametagPrint_skipsRateLimiterWhenNoClientIp() {
+    when(participantMapper.selectByEventSeqAndCheckCode(EVENT_SEQ, CHECK_CODE))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                service.recordPrintByCheckCode(EVENT_SEQ, CHECK_CODE, printRequest(), null, null))
+        .isInstanceOf(BusinessException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+    verify(failureRateLimiter, never()).recordFailureAndCheckAllowed(any());
+    verify(nametagLogMapper, never()).insert(any(EventNametagLog.class));
+  }
+
   private void givenEventOwner() {
     when(surveyMasterMapper.selectByEventSeq(EVENT_SEQ))
         .thenReturn(Optional.of(SurveyMaster.builder().eventSeq(EVENT_SEQ).regId(OWNER_ID).build()));

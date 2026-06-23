@@ -353,6 +353,8 @@
 
 **파일**: `SendHistoryController.java`
 
+> TODO(legacy): `/api/history/send`·`/send/download`는 구버전 FE 호환용 `sendFailure`(Y=실패)·`type=H`(성공) 파라미터를 병행 처리 중. FE 배포 후 제거.
+
 | Method | URL | 메서드명 | 설명 | 인증 | Request Body / Params |
 |--------|-----|---------|------|------|-----------------------|
 | GET | `/api/history/send` | getSendHistory | 발송 이력 목록 조회 | O | Query: `startDate`, `endDate`, `type`, `keyword`, `sendResult` (success/failure), `page`, `size` |

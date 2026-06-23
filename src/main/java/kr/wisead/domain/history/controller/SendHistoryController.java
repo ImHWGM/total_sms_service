@@ -54,6 +54,7 @@ public class SendHistoryController {
       @RequestParam(required = false) String type,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String sendResult,
+      @RequestParam(required = false) String sendFailure,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size,
       @RequestHeader("Authorization") String token) {
@@ -72,6 +73,7 @@ public class SendHistoryController {
             .type(type)
             .keyword(keyword)
             .sendResult(sendResult)
+            .sendFailure(sendFailure)
             .userId(queryUserId)
             .page(page)
             .size(size)
@@ -89,6 +91,7 @@ public class SendHistoryController {
       @RequestParam(required = false) String type,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String sendResult,
+      @RequestParam(required = false) String sendFailure,
       @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       @RequestHeader("Authorization") String token,
       HttpServletRequest request,
@@ -117,6 +120,7 @@ public class SendHistoryController {
             .type(type)
             .keyword(keyword)
             .sendResult(sendResult)
+            .sendFailure(sendFailure)
             .userId(queryUserId)
             .build();
 

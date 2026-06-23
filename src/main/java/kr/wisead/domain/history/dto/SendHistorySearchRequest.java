@@ -21,6 +21,7 @@ public class SendHistorySearchRequest {
     private String type;            // 검색 타입 (dstAddr, callBack, subject, text)
     private String keyword;         // 검색 키워드
     private String sendResult;      // 발신결과 (success/failure)
+    private String sendFailure;     // [legacy] 구버전 FE 호환 (Y=실패), FE 배포 후 제거
     private String userId;          // 사용자 ID (권한에 따라 설정)
 
     // 페이징

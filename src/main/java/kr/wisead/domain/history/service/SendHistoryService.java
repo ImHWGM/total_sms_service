@@ -223,6 +223,7 @@ public class SendHistoryService {
     params.put("type", request.getType());
     params.put("keyword", request.getKeyword());
     params.put("sendResult", request.getSendResult());
+    params.put("sendFailure", request.getSendFailure()); // [legacy] FE 배포 후 제거
     params.put("userId", request.getUserId());
     params.put("offset", request.getOffset());
     params.put("size", request.getSize());

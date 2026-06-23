@@ -50,10 +50,14 @@
                 AND REQUEST_TIME &lt; CONCAT(#{params.endDate}, ' 00:00:00')
             </if>
             <if test="params.sendResult == 'failure'.toString()">
-                AND STAT = 3 AND RESULT != 0
+                AND STAT = 3 AND RESULT NOT IN ('0', '1000')
             </if>
             <if test="params.sendResult == 'success'.toString()">
-                AND STAT = 3 AND RESULT = 0
+                AND STAT = 3 AND RESULT IN ('0', '1000')
+            </if>
+            <!-- [legacy] 구버전 FE 실패 필터(sendResult 없고 sendFailure=Y일 때만). FE 배포 후 제거 -->
+            <if test="(params.sendResult == null or params.sendResult == '') and params.sendFailure == 'Y'.toString()">
+                AND STAT = 3 AND RESULT NOT IN ('0', '1000')
             </if>
             <if test="params.userId != null and params.userId != '' and params.userId != 'ALL'.toString()">
                 <choose>
@@ -97,6 +101,10 @@
                     <!-- G: 등록자 -->
                     <when test="params.type == 'G'.toString()">
                         AND EXT_COL3 LIKE CONCAT('%', #{params.keyword}, '%')
+                    </when>
+                    <!-- [legacy] H: 결과(구버전 성공필터, sendResult 없고 keyword=0일 때만). FE 배포 후 제거 -->
+                    <when test="(params.sendResult == null or params.sendResult == '') and params.type == 'H'.toString() and params.keyword == '0'.toString()">
+                        AND STAT = 3 AND RESULT IN ('0', '1000')
                     </when>
                     <otherwise>
                         AND (
@@ -148,8 +156,8 @@
     <select id="selectMessageStatsByEventSeq" resultType="map">
         SELECT
             COUNT(*) as totalSent,
-            SUM(CASE WHEN RESULT = '0' THEN 1 ELSE 0 END) as successCount,
-            SUM(CASE WHEN RESULT IS NOT NULL AND RESULT != '0' THEN 1 ELSE 0 END) as failCount
+            SUM(CASE WHEN RESULT IN ('0', '1000') THEN 1 ELSE 0 END) as successCount,
+            SUM(CASE WHEN RESULT IS NOT NULL AND RESULT NOT IN ('0', '1000') THEN 1 ELSE 0 END) as failCount
         FROM ${tableName}
         WHERE EXT_COL0 = #{eventSeq}
     </select>

@@ -355,8 +355,8 @@
 
 | Method | URL | 메서드명 | 설명 | 인증 | Request Body / Params |
 |--------|-----|---------|------|------|-----------------------|
-| GET | `/api/history/send` | getSendHistory | 발송 이력 목록 조회 | O | Query: `startDate`, `endDate`, `type`, `keyword`, `sendFailure`, `page`, `size` |
-| POST | `/api/history/send/download` | downloadSendHistory | 발송 이력 엑셀 다운로드 | O | Query: `startDate`, `endDate`, `type`, `keyword`, `sendFailure`, `reason` |
+| GET | `/api/history/send` | getSendHistory | 발송 이력 목록 조회 | O | Query: `startDate`, `endDate`, `type`, `keyword`, `sendResult` (success/failure), `page`, `size` |
+| POST | `/api/history/send/download` | downloadSendHistory | 발송 이력 엑셀 다운로드 | O | Query: `startDate`, `endDate`, `type`, `keyword`, `sendResult` (success/failure), `reason` |
 | GET | `/api/history/optout` | getOptOutList | 수신거부 목록 조회 | O | Query: `page`, `size` |
 | DELETE | `/api/history/optout` | deleteOptOut | 수신거부 삭제 | O | JSON: `[{ "key": "value" }, ...]` |
 | GET | `/api/history/optout/download` | downloadOptOut | 수신거부 엑셀 다운로드 | O | None |

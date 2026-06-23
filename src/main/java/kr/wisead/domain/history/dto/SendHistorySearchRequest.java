@@ -20,7 +20,7 @@ public class SendHistorySearchRequest {
     private String endDate;         // 검색 종료일 (yyyy-MM-dd)
     private String type;            // 검색 타입 (dstAddr, callBack, subject, text)
     private String keyword;         // 검색 키워드
-    private String sendFailure;     // 실패만 조회 (Y/N)
+    private String sendResult;      // 발신결과 (success/failure)
     private String userId;          // 사용자 ID (권한에 따라 설정)
 
     // 페이징

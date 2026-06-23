@@ -35,13 +35,13 @@ public class SendHistoryService {
     List<String> tables = getTableNames(request.getStartDate(), request.getEndDate());
 
     log.info(
-        "[발송이력조회] 검색조건 - startDate={}, endDate={}, type={}, keyword={}, sendFailure={}, userId={},"
+        "[발송이력조회] 검색조건 - startDate={}, endDate={}, type={}, keyword={}, sendResult={}, userId={},"
             + " page={}, size={}",
         request.getStartDate(),
         request.getEndDate(),
         request.getType(),
         request.getKeyword(),
-        request.getSendFailure(),
+        request.getSendResult(),
         request.getUserId(),
         request.getPage(),
         request.getSize());
@@ -222,7 +222,7 @@ public class SendHistoryService {
     params.put("endDate", request.getEndDate());
     params.put("type", request.getType());
     params.put("keyword", request.getKeyword());
-    params.put("sendFailure", request.getSendFailure());
+    params.put("sendResult", request.getSendResult());
     params.put("userId", request.getUserId());
     params.put("offset", request.getOffset());
     params.put("size", request.getSize());

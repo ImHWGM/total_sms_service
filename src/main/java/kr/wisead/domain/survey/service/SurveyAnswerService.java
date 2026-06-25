@@ -93,7 +93,7 @@ public class SurveyAnswerService {
             if (raw == null || raw.isEmpty()) {
                 continue;
             }
-            a.setAnswer(OtherTextCrypto.decryptAnswerByDetail(a.getQuestionTypeDetail(), raw));
+            a.setAnswer(OtherTextCrypto.decryptForDisplay(a.getQuestionTypeDetail(), raw));
         }
     }
 
@@ -124,7 +124,7 @@ public class SurveyAnswerService {
             if (type == null) {
                 continue;
             }
-            a.setOtherText(OtherTextCrypto.decryptForDisplay(type, raw));
+            a.setOtherText(OtherTextCrypto.decryptForDisplay(type.name(), raw));
         }
     }
 
@@ -217,7 +217,7 @@ public class SurveyAnswerService {
             // 주관식인 경우 답변 목록 조회
             List<SurveyAnswer> answers = surveyAnswerMapper.selectByQuestionSeq(eventSeq, questionSeq);
             List<String> textAnswers = answers.stream()
-                    .map(a -> OtherTextCrypto.decryptAnswerByDetail(
+                    .map(a -> OtherTextCrypto.decryptForDisplay(
                             a.getQuestionTypeDetail(), a.getAnswer()))
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());

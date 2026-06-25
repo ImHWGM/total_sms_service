@@ -1193,7 +1193,7 @@ public class PrivacyConsentPdfService {
                     user.getEventSeq(), user.getSeq(), "NE");
             if (answerName != null && !answerName.trim().isEmpty()) {
               decryptedValue =
-                  kr.wisead.domain.survey.service.OtherTextCrypto.decryptAnswerByDetail(
+                  kr.wisead.domain.survey.service.OtherTextCrypto.decryptForDisplay(
                           "NE", answerName)
                       .trim();
             }

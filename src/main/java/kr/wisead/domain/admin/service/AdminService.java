@@ -239,6 +239,53 @@ public class AdminService {
   }
 
   /**
+   * 대상 데이터에 대한 조회 권한 확인 (수정권한과 분리)
+   *
+   * <p>B 레벨은 A 레벨과 조회 범위가 동일하나 수정 권한만 없으므로, read 경로에서는 {@link #canModify}가 아닌 이 메서드를 사용해야 한다. 조회 범위는
+   * {@link #resolveQueryUserIds}와 동일하게 정렬한다.
+   *
+   * @param currentUserId 현재 로그인한 사용자 ID
+   * @param currentLevel 현재 사용자 권한 레벨
+   * @param targetOwnerId 대상 데이터 소유자 ID
+   * @return 조회 가능 여부
+   */
+  public boolean canRead(String currentUserId, Integer currentLevel, String targetOwnerId) {
+    if (currentUserId == null || currentLevel == null || targetOwnerId == null) {
+      return false;
+    }
+
+    // JWT subject는 seq(숫자)일 수 있으므로 실제 userId로 변환
+    String resolvedUserId = getUserIdBySeq(currentUserId);
+
+    // 본인 데이터는 항상 조회 가능
+    if (resolvedUserId.equals(targetOwnerId)) {
+      return true;
+    }
+
+    // 최고관리자(A=99, B=90): 전체 조회 가능
+    if (currentLevel >= 90) {
+      return true;
+    }
+
+    // 운영관리자(A=60, B=50): 관리 계정 데이터만 조회 가능
+    if (currentLevel >= 50) {
+      List<String> managedUserIds = customerCompanyMapper.selectManagedUserIds(resolvedUserId);
+      return managedUserIds != null && managedUserIds.contains(targetOwnerId);
+    }
+
+    // 기업관리자(10): 본인만 (위에서 이미 체크됨)
+    return false;
+  }
+
+  /** 조회 권한 검증 (권한 없으면 예외 발생) */
+  public void validateReadPermission(
+      String currentUserId, Integer currentLevel, String targetOwnerId) {
+    if (!canRead(currentUserId, currentLevel, targetOwnerId)) {
+      throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 데이터를 조회할 권한이 없습니다.");
+    }
+  }
+
+  /**
    * 권한별 조회 대상 사용자 ID 결정 - 레벨 90 이상: "ALL" (전체 조회) - 레벨 50-89: 본인 + 관리하는 계정들 (콤마 구분) - 레벨 50 미만: 본인만
    *
    * @param userId 현재 로그인한 사용자 ID

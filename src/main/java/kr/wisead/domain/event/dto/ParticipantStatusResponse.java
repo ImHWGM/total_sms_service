@@ -1,5 +1,6 @@
 package kr.wisead.domain.event.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -30,7 +31,10 @@ public class ParticipantStatusResponse {
         private String department;
         private String position;
         private String participantType;
+        // 무인증 공개 경로에서는 null로 마스킹 → 응답에서 완전히 제외 (다른 필드는 기존대로 null 렌더 유지)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         private String phone;
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         private String email;
         private String nametagPrinted;
     }

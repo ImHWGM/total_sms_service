@@ -323,7 +323,7 @@ class EventParticipantWorkflowIntegrationTest {
 
     PageResponse<EventParticipantResponse> mockResponse = PageResponse.of(participants, 1, 20, 1);
 
-    when(participantService.getParticipants(any(ParticipantSearchRequest.class)))
+    when(participantService.getParticipants(any(ParticipantSearchRequest.class), anyString()))
         .thenReturn(mockResponse);
 
     // When & Then
@@ -389,7 +389,7 @@ class EventParticipantWorkflowIntegrationTest {
             .build();
 
     when(participantService.getParticipantStatusByCheckCode(
-            eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE)))
+            eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), eq(false), anyString()))
         .thenReturn(mockResponse);
 
     // When & Then: 인증 없이 접근 가능
@@ -424,7 +424,7 @@ class EventParticipantWorkflowIntegrationTest {
             .message("입장 처리되었습니다. 명찰을 출력해주세요.")
             .build();
 
-    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any()))
+    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any(), anyString()))
         .thenReturn(mockResponse);
 
     // When & Then: 인증 없이 체크인 가능
@@ -439,7 +439,8 @@ class EventParticipantWorkflowIntegrationTest {
         .andExpect(jsonPath("$.data.nametagUrl").exists())
         .andExpect(jsonPath("$.message").value("입장 처리되었습니다. 명찰을 출력해주세요."));
 
-    verify(checkService, times(1)).checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any());
+    verify(checkService, times(1))
+        .checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any(), anyString());
   }
 
   @Test
@@ -461,7 +462,7 @@ class EventParticipantWorkflowIntegrationTest {
             .message("이미 입장 처리된 참가자입니다.")
             .build();
 
-    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any()))
+    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(TEST_CHECK_CODE), any(), anyString()))
         .thenReturn(mockResponse);
 
     // When & Then
@@ -507,7 +508,8 @@ class EventParticipantWorkflowIntegrationTest {
                         .build()))
             .build();
 
-    when(participantService.getParticipantStatus(TEST_PARTICIPANT_SEQ)).thenReturn(mockResponse);
+    when(participantService.getParticipantStatus(eq(TEST_EVENT_SEQ), eq(TEST_PARTICIPANT_SEQ), anyString()))
+        .thenReturn(mockResponse);
 
     // When & Then
     mockMvc
@@ -539,7 +541,8 @@ class EventParticipantWorkflowIntegrationTest {
     nametagData.put("participantType", "일반");
     nametagData.put("checkCode", TEST_CHECK_CODE);
 
-    when(nametagService.getNametagData(TEST_PARTICIPANT_SEQ)).thenReturn(nametagData);
+    when(nametagService.getNametagData(eq(TEST_EVENT_SEQ), eq(TEST_PARTICIPANT_SEQ), anyString()))
+        .thenReturn(nametagData);
 
     // When & Then
     mockMvc
@@ -563,7 +566,7 @@ class EventParticipantWorkflowIntegrationTest {
     // Given: 명찰 출력 요청
     NametagPrintRequest request = NametagPrintRequest.builder().templateType("DEFAULT").build();
 
-    doNothing().when(nametagService).recordPrint(any(NametagPrintRequest.class), anyString());
+    doNothing().when(nametagService).recordPrint(eq(TEST_EVENT_SEQ), any(NametagPrintRequest.class), anyString());
 
     // When & Then
     mockMvc
@@ -579,7 +582,7 @@ class EventParticipantWorkflowIntegrationTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.message").value("명찰 출력이 기록되었습니다."));
 
-    verify(nametagService, times(1)).recordPrint(any(NametagPrintRequest.class), anyString());
+    verify(nametagService, times(1)).recordPrint(eq(TEST_EVENT_SEQ), any(NametagPrintRequest.class), anyString());
   }
 
   @Test
@@ -767,7 +770,8 @@ class EventParticipantWorkflowIntegrationTest {
                         .build()))
             .build();
 
-    when(participantService.getParticipantStatus(TEST_PARTICIPANT_SEQ)).thenReturn(mockResponse);
+    when(participantService.getParticipantStatus(eq(TEST_EVENT_SEQ), eq(TEST_PARTICIPANT_SEQ), anyString()))
+        .thenReturn(mockResponse);
 
     // When & Then
     mockMvc
@@ -792,7 +796,7 @@ class EventParticipantWorkflowIntegrationTest {
     // Given: 존재하지 않는 체크코드
     String invalidCheckCode = "invalid_check_code_123";
 
-    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(invalidCheckCode), any()))
+    when(checkService.checkIn(eq(TEST_EVENT_SEQ), eq(invalidCheckCode), any(), anyString()))
         .thenThrow(new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
 
     // When & Then
@@ -808,7 +812,9 @@ class EventParticipantWorkflowIntegrationTest {
   @DisplayName("20. 참가자 삭제 (인증 필요)")
   void deleteParticipant_Success() throws Exception {
     // Given: 참가자 삭제
-    doNothing().when(participantService).deleteParticipant(eq(TEST_PARTICIPANT_SEQ), anyString());
+    doNothing()
+        .when(participantService)
+        .deleteParticipant(eq(TEST_EVENT_SEQ), eq(TEST_PARTICIPANT_SEQ), anyString());
 
     // When & Then
     mockMvc
@@ -822,6 +828,7 @@ class EventParticipantWorkflowIntegrationTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.message").value("참가자가 삭제되었습니다."));
 
-    verify(participantService, times(1)).deleteParticipant(eq(TEST_PARTICIPANT_SEQ), anyString());
+    verify(participantService, times(1))
+        .deleteParticipant(eq(TEST_EVENT_SEQ), eq(TEST_PARTICIPANT_SEQ), anyString());
   }
 }

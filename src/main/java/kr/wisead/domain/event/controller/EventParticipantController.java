@@ -63,8 +63,8 @@ public class EventParticipantController {
   /** 문자 발송용 참가자 전체 목록 조회 (페이징 없음) */
   @GetMapping("/for-message")
   public ApiResponse<List<ParticipantForMessageResponse>> getParticipantsForMessage(
-      @PathVariable Integer eventSeq) {
-    return ApiResponse.success(participantService.getParticipantsForMessage(eventSeq));
+      @PathVariable Integer eventSeq, @CurrentUser JwtPrincipal user) {
+    return ApiResponse.success(participantService.getParticipantsForMessage(eventSeq, user.userId()));
   }
 
   /** 참가자 목록 조회 */
@@ -77,7 +77,8 @@ public class EventParticipantController {
       @RequestParam(required = false) String registType,
       @RequestParam(required = false) String attendStatus,
       @RequestParam(defaultValue = "1") Integer page,
-      @RequestParam(defaultValue = "20") Integer size) {
+      @RequestParam(defaultValue = "20") Integer size,
+      @CurrentUser JwtPrincipal user) {
     ParticipantSearchRequest request =
         ParticipantSearchRequest.builder()
             .eventSeq(eventSeq)
@@ -89,21 +90,21 @@ public class EventParticipantController {
             .page(page)
             .size(size)
             .build();
-    return ApiResponse.success(participantService.getParticipants(request));
+    return ApiResponse.success(participantService.getParticipants(request, user.userId()));
   }
 
   /** 참가자 상세 조회 */
   @GetMapping("/{seq}")
   public ApiResponse<EventParticipantResponse> getParticipant(
-      @PathVariable Integer eventSeq, @PathVariable Long seq) {
-    return ApiResponse.success(participantService.getParticipant(seq));
+      @PathVariable Integer eventSeq, @PathVariable Long seq, @CurrentUser JwtPrincipal user) {
+    return ApiResponse.success(participantService.getParticipant(eventSeq, seq, user.userId()));
   }
 
   /** 참가자 상태 조회 (액션 현황 포함) */
   @GetMapping("/{seq}/status")
   public ApiResponse<ParticipantStatusResponse> getParticipantStatus(
-      @PathVariable Integer eventSeq, @PathVariable Long seq) {
-    return ApiResponse.success(participantService.getParticipantStatus(seq));
+      @PathVariable Integer eventSeq, @PathVariable Long seq, @CurrentUser JwtPrincipal user) {
+    return ApiResponse.success(participantService.getParticipantStatus(eventSeq, seq, user.userId()));
   }
 
   /** 참가자 수정 */
@@ -114,7 +115,7 @@ public class EventParticipantController {
       @Valid @RequestBody EventParticipantRequest request,
       @CurrentUser JwtPrincipal user) {
     return ApiResponse.success(
-        participantService.updateParticipant(seq, request, user.userId()),
+        participantService.updateParticipant(eventSeq, seq, request, user.userId()),
         "참가자 정보가 수정되었습니다.");
   }
 
@@ -124,7 +125,7 @@ public class EventParticipantController {
       @PathVariable Integer eventSeq,
       @PathVariable Long seq,
       @CurrentUser JwtPrincipal user) {
-    participantService.deleteParticipant(seq, user.userId());
+    participantService.deleteParticipant(eventSeq, seq, user.userId());
     return ApiResponse.success("참가자가 삭제되었습니다.");
   }
 
@@ -141,8 +142,8 @@ public class EventParticipantController {
   /** 명찰 데이터 조회 (미리보기/출력용) */
   @GetMapping("/{seq}/nametag")
   public ApiResponse<Map<String, Object>> getNametagData(
-      @PathVariable Integer eventSeq, @PathVariable Long seq) {
-    return ApiResponse.success(nametagService.getNametagData(seq));
+      @PathVariable Integer eventSeq, @PathVariable Long seq, @CurrentUser JwtPrincipal user) {
+    return ApiResponse.success(nametagService.getNametagData(eventSeq, seq, user.userId()));
   }
 
   /** 명찰 출력 로그 기록 */
@@ -153,7 +154,7 @@ public class EventParticipantController {
       @RequestBody NametagPrintRequest request,
       @CurrentUser JwtPrincipal user) {
     request.setParticipantSeq(seq);
-    nametagService.recordPrint(request, user.userId());
+    nametagService.recordPrint(eventSeq, request, user.userId());
     return ApiResponse.success("명찰 출력이 기록되었습니다.");
   }
 
@@ -161,8 +162,9 @@ public class EventParticipantController {
 
   /** 행사 통계 조회 */
   @GetMapping("/statistics")
-  public ApiResponse<EventStatisticsResponse> getStatistics(@PathVariable Integer eventSeq) {
-    return ApiResponse.success(participantService.getStatistics(eventSeq));
+  public ApiResponse<EventStatisticsResponse> getStatistics(
+      @PathVariable Integer eventSeq, @CurrentUser JwtPrincipal user) {
+    return ApiResponse.success(participantService.getStatistics(eventSeq, user.userId()));
   }
 
   /** 참가자 목록 엑셀 다운로드 */
@@ -175,7 +177,7 @@ public class EventParticipantController {
     // 비밀번호 검증
     downloadVerifyService.verify(user, verifyRequest.getPassword());
 
-    byte[] excelData = excelService.createParticipantExcel(eventSeq);
+    byte[] excelData = excelService.createParticipantExcel(eventSeq, user.userId());
     String fileName =
         "참가자목록_"
             + eventSeq
@@ -202,7 +204,7 @@ public class EventParticipantController {
     // 비밀번호 검증
     downloadVerifyService.verify(user, verifyRequest.getPassword());
 
-    byte[] excelData = excelService.createStatisticsExcel(eventSeq);
+    byte[] excelData = excelService.createStatisticsExcel(eventSeq, user.userId());
     String fileName =
         "행사통계_"
             + eventSeq

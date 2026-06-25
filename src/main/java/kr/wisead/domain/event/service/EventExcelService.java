@@ -24,13 +24,16 @@ public class EventExcelService {
   private final EventParticipantService participantService;
   private final SurveyMasterMapper surveyMasterMapper;
   private final ExcelService excelService;
+  private final EventAccessValidator eventAccessValidator;
 
   private static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
   /** 참가자 목록 엑셀 생성 */
   @Transactional(readOnly = true)
-  public byte[] createParticipantExcel(Integer eventSeq) {
+  public byte[] createParticipantExcel(Integer eventSeq, String userId) {
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
+
     // 이벤트 정보 조회
     SurveyMaster event =
         surveyMasterMapper
@@ -92,16 +95,16 @@ public class EventExcelService {
 
   /** 통계 엑셀 생성 */
   @Transactional(readOnly = true)
-  public byte[] createStatisticsExcel(Integer eventSeq) {
+  public byte[] createStatisticsExcel(Integer eventSeq, String userId) {
+    // 통계 데이터 조회 (getStatistics가 내부에서 read 접근/소유권을 검증한다)
+    var statistics = participantService.getStatistics(eventSeq, userId);
+
     // 이벤트 정보 조회
     SurveyMaster event =
         surveyMasterMapper
             .selectByEventSeq(eventSeq)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "행사 정보를 찾을 수 없습니다."));
-
-    // 통계 데이터 조회
-    var statistics = participantService.getStatistics(eventSeq);
 
     try (SXSSFWorkbook workbook = excelService.createWorkbook()) {
       // 요약 시트

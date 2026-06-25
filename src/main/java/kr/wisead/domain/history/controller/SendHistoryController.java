@@ -38,6 +38,14 @@ public class SendHistoryController {
 
   private static final int MAX_DOWNLOAD_SIZE = 100_000;
 
+  /** 발신결과 필터 정규화: 정의된 값(success/failure)만 통과시키고 그 외는 무시(null) */
+  private static String normalizeSendResult(String sendResult) {
+    if ("success".equals(sendResult) || "failure".equals(sendResult)) {
+      return sendResult;
+    }
+    return null;
+  }
+
   private final SendHistoryService sendHistoryService;
   private final ActionLogService actionLogService;
   private final AdminService adminService;
@@ -53,6 +61,7 @@ public class SendHistoryController {
       @RequestParam(required = false) String endDate,
       @RequestParam(required = false) String type,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String sendResult,
       @RequestParam(required = false) String sendFailure,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size,
@@ -71,6 +80,7 @@ public class SendHistoryController {
             .endDate(endDate)
             .type(type)
             .keyword(keyword)
+            .sendResult(normalizeSendResult(sendResult))
             .sendFailure(sendFailure)
             .userId(queryUserId)
             .page(page)
@@ -88,6 +98,7 @@ public class SendHistoryController {
       @RequestParam(required = false) String endDate,
       @RequestParam(required = false) String type,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String sendResult,
       @RequestParam(required = false) String sendFailure,
       @RequestBody @Valid DownloadVerifyRequest verifyRequest,
       @RequestHeader("Authorization") String token,
@@ -116,6 +127,7 @@ public class SendHistoryController {
             .endDate(endDate)
             .type(type)
             .keyword(keyword)
+            .sendResult(normalizeSendResult(sendResult))
             .sendFailure(sendFailure)
             .userId(queryUserId)
             .build();

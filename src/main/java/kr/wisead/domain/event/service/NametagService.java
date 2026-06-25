@@ -62,7 +62,7 @@ public class NametagService {
   /** 명찰 출력 로그 기록 */
   @Transactional
   public void recordPrint(Integer eventSeq, NametagPrintRequest request, String printBy) {
-    eventAccessValidator.validateEventReadAccess(eventSeq, printBy);
+    eventAccessValidator.validateEventModifyAccess(eventSeq, printBy);
 
     EventParticipant participant =
         participantMapper

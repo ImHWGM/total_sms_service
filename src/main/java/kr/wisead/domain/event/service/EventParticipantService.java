@@ -635,7 +635,7 @@ public class EventParticipantService {
   public EventParticipantResponse updateParticipant(
       Integer eventSeq, Long seq, EventParticipantRequest request, String userId) {
     // 권한 체크: path 행사의 소유자이거나 A레벨이어야 수정 가능
-    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
+    eventAccessValidator.validateEventModifyAccess(eventSeq, userId);
 
     EventParticipant participant =
         participantMapper
@@ -666,7 +666,7 @@ public class EventParticipantService {
   @Transactional
   public void deleteParticipant(Integer eventSeq, Long seq, String uptId) {
     // 권한 체크: path 행사의 소유자이거나 A레벨이어야 삭제 가능
-    eventAccessValidator.validateEventReadAccess(eventSeq, uptId);
+    eventAccessValidator.validateEventModifyAccess(eventSeq, uptId);
 
     EventParticipant participant =
         participantMapper

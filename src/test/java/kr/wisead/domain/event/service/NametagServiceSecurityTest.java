@@ -71,7 +71,7 @@ class NametagServiceSecurityTest {
     givenEventOwner();
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
         .when(adminService)
-        .validateModifyPermission(OTHER_USER_ID, 1, OWNER_ID);
+        .validateReadPermission(OTHER_USER_ID, 1, OWNER_ID);
 
     assertThatThrownBy(() -> service.getNametagData(EVENT_SEQ, PARTICIPANT_SEQ, OTHER_USER_ID))
         .isInstanceOf(BusinessException.class)
@@ -99,7 +99,7 @@ class NametagServiceSecurityTest {
     givenEventOwner();
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
         .when(adminService)
-        .validateModifyPermission(OTHER_USER_ID, 1, OWNER_ID);
+        .validateReadPermission(OTHER_USER_ID, 1, OWNER_ID);
 
     assertThatThrownBy(() -> service.getNametagData(EVENT_SEQ, PARTICIPANT_SEQ, OTHER_USER_ID))
         .isInstanceOf(BusinessException.class)

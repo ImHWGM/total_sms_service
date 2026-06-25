@@ -99,7 +99,7 @@ class EventParticipantServiceSecurityTest {
     givenEventOwner();
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
         .when(adminService)
-        .validateModifyPermission(OTHER_USER_ID, 1, OWNER_ID);
+        .validateReadPermission(OTHER_USER_ID, 1, OWNER_ID);
 
     ParticipantSearchRequest request =
         ParticipantSearchRequest.builder().eventSeq(EVENT_SEQ).page(1).size(20).build();
@@ -111,7 +111,7 @@ class EventParticipantServiceSecurityTest {
   }
 
   @Test
-  @DisplayName("문자 발송용 read도 행사 소유권을 검증한다")
+  @DisplayName("문자 발송용 read도 행사 조회권한을 검증한다")
   void getParticipantsForMessage_validatesReadAccess() {
     givenEventOwner();
     when(participantMapper.selectByEventSeq(EVENT_SEQ)).thenReturn(List.of());
@@ -119,7 +119,7 @@ class EventParticipantServiceSecurityTest {
 
     service.getParticipantsForMessage(EVENT_SEQ, OWNER_ID);
 
-    verify(adminService).validateModifyPermission(OWNER_ID, 1, OWNER_ID);
+    verify(adminService).validateReadPermission(OWNER_ID, 1, OWNER_ID);
   }
 
   @Test
@@ -128,7 +128,7 @@ class EventParticipantServiceSecurityTest {
     givenEventOwner();
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
         .when(adminService)
-        .validateModifyPermission(OTHER_USER_ID, 1, OWNER_ID);
+        .validateReadPermission(OTHER_USER_ID, 1, OWNER_ID);
 
     assertThatThrownBy(() -> service.getStatistics(EVENT_SEQ, OTHER_USER_ID))
         .isInstanceOf(BusinessException.class)
@@ -155,7 +155,7 @@ class EventParticipantServiceSecurityTest {
     givenEventOwner();
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
         .when(adminService)
-        .validateModifyPermission(OTHER_USER_ID, 1, OWNER_ID);
+        .validateReadPermission(OTHER_USER_ID, 1, OWNER_ID);
 
     assertThatThrownBy(() -> service.getParticipant(EVENT_SEQ, PARTICIPANT_SEQ, OTHER_USER_ID))
         .isInstanceOf(BusinessException.class)
@@ -170,7 +170,7 @@ class EventParticipantServiceSecurityTest {
     givenEventOwner();
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
         .when(adminService)
-        .validateModifyPermission(OTHER_USER_ID, 1, OWNER_ID);
+        .validateReadPermission(OTHER_USER_ID, 1, OWNER_ID);
 
     assertThatThrownBy(() -> service.getParticipant(EVENT_SEQ, PARTICIPANT_SEQ, OTHER_USER_ID))
         .isInstanceOf(BusinessException.class)
@@ -208,7 +208,7 @@ class EventParticipantServiceSecurityTest {
   }
 
   @Test
-  @DisplayName("참가자 수정 비소유자는 참가자 조회 전에 ACCESS_DENIED로 차단된다")
+  @DisplayName("참가자 수정 비소유자는 수정 권한이 없어 참가자 조회 전에 ACCESS_DENIED로 차단된다")
   void updateParticipant_deniesNonOwnerBeforeParticipantLookup() {
     givenEventOwner();
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
@@ -256,7 +256,7 @@ class EventParticipantServiceSecurityTest {
   }
 
   @Test
-  @DisplayName("참가자 삭제 비소유자는 참가자 조회 전에 ACCESS_DENIED로 차단된다")
+  @DisplayName("참가자 삭제 비소유자는 수정 권한이 없어 참가자 조회 전에 ACCESS_DENIED로 차단된다")
   void deleteParticipant_deniesNonOwnerBeforeParticipantLookup() {
     givenEventOwner();
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
@@ -285,7 +285,7 @@ class EventParticipantServiceSecurityTest {
   }
 
   @Test
-  @DisplayName("seq 기반 status read도 행사 소유권을 검증한다")
+  @DisplayName("seq 기반 status read도 행사 조회권한을 검증한다")
   void getParticipantStatus_validatesReadAccess() {
     givenEventOwner();
     when(participantMapper.selectDetailBySeq(PARTICIPANT_SEQ))
@@ -295,7 +295,7 @@ class EventParticipantServiceSecurityTest {
 
     service.getParticipantStatus(EVENT_SEQ, PARTICIPANT_SEQ, OWNER_ID);
 
-    verify(adminService).validateModifyPermission(OWNER_ID, 1, OWNER_ID);
+    verify(adminService).validateReadPermission(OWNER_ID, 1, OWNER_ID);
   }
 
   @Test
@@ -317,7 +317,7 @@ class EventParticipantServiceSecurityTest {
     givenEventOwner();
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
         .when(adminService)
-        .validateModifyPermission(OTHER_USER_ID, 1, OWNER_ID);
+        .validateReadPermission(OTHER_USER_ID, 1, OWNER_ID);
 
     assertThatThrownBy(() -> service.getParticipantStatus(EVENT_SEQ, PARTICIPANT_SEQ, OTHER_USER_ID))
         .isInstanceOf(BusinessException.class)
@@ -332,7 +332,7 @@ class EventParticipantServiceSecurityTest {
     givenEventOwner();
     doThrow(new BusinessException(ErrorCode.ACCESS_DENIED, "접근 권한이 없습니다."))
         .when(adminService)
-        .validateModifyPermission(OTHER_USER_ID, 1, OWNER_ID);
+        .validateReadPermission(OTHER_USER_ID, 1, OWNER_ID);
 
     assertThatThrownBy(() -> service.getParticipantStatus(EVENT_SEQ, PARTICIPANT_SEQ, OTHER_USER_ID))
         .isInstanceOf(BusinessException.class)

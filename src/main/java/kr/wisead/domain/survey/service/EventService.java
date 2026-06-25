@@ -1900,7 +1900,7 @@ public class EventService {
               OtherType otherType = otherTypeByQuestion.get(question.getQuestionSeq());
               String displayOtherText =
                   otherType != null
-                      ? OtherTextCrypto.decryptForDisplay(otherType, otherText)
+                      ? OtherTextCrypto.decryptForDisplay(otherType.name(), otherText)
                       : otherText;
               displayAnswer += " (기타: " + displayOtherText + ")";
             }
@@ -1914,7 +1914,7 @@ public class EventService {
           } else {
             // PII 유형(NE/AD/CU/EM)은 복호화, 그 외 평문 (중복 제출 시 첫 번째만)
             displayAnswer =
-                OtherTextCrypto.decryptAnswerByDetail(
+                OtherTextCrypto.decryptForDisplay(
                     question.getQuestionTypeDetail(), getFirstPart(answer));
           }
         }

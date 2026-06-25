@@ -324,7 +324,7 @@ public class SurveyService {
                   user.getSeq(),
                   itemSeq,
                   answerReq.getQuestionTypeDetail(),
-                  OtherTextCrypto.encryptAnswerByDetail(
+                  OtherTextCrypto.encryptForStorage(
                       answerReq.getQuestionTypeDetail(), answerValue));
         }
 
@@ -384,7 +384,7 @@ public class SurveyService {
   private String resolveOtherTextForStorage(
       OtherType otherType, String otherText, SurveySubmitRequest.AnswerRequest answerReq) {
     if (otherType != OtherType.SO) {
-      return OtherTextCrypto.encryptForStorage(otherType, otherText);
+      return OtherTextCrypto.encryptForStorage(otherType.name(), otherText);
     }
     // F+H 흐름: ENC envelope면 즉시 복호화 후 일반 SO 흐름과 동일하게 재암호화.
     String decrypted = decryptEnvelopeIfPresent(otherText);

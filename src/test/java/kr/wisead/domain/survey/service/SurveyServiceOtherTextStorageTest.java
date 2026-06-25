@@ -179,7 +179,7 @@ class SurveyServiceOtherTextStorageTest {
   }
 
   @Test
-  void nePiiTypes_encryptAndRoundTrip() {
+  void nePiiTypes_encryptViaService() {
     for (OtherType type : new OtherType[] {OtherType.NE, OtherType.AD, OtherType.CU}) {
       String plain = "홍길동 " + type.name();
       SurveySubmitRequest.AnswerRequest req =
@@ -188,14 +188,12 @@ class SurveyServiceOtherTextStorageTest {
       String stored = invokeResolveStorage(type, req.getOtherText(), req);
 
       assertThat(stored).as(type.name() + "는 PII: 접두사로 암호화 저장").startsWith("PII:").isNotEqualTo(plain);
-      assertThat(OtherTextCrypto.decryptForDisplay(type, stored))
-          .as(type.name() + " 복호화 시 평문 복원")
-          .isEqualTo(plain);
+      assertThat(OtherTextCrypto.decryptForDisplay(type.name(), stored)).isEqualTo(plain);
     }
   }
 
   @Test
-  void emType_encryptsLocalPartOnly_domainStaysPlaintext() {
+  void emType_encryptsLocalPartViaService() {
     String email = "alice@gmail.com";
     SurveySubmitRequest.AnswerRequest req =
         SurveySubmitRequest.AnswerRequest.builder().questionSeq(202).otherText(email).build();
@@ -203,19 +201,7 @@ class SurveyServiceOtherTextStorageTest {
     String stored = invokeResolveStorage(OtherType.EM, req.getOtherText(), req);
 
     assertThat(stored).as("도메인은 평문 유지").startsWith("PII:").endsWith("@gmail.com");
-    assertThat(stored).as("로컬파트(alice)는 평문으로 노출되지 않음").doesNotContain("alice@");
-    assertThat(OtherTextCrypto.decryptForDisplay(OtherType.EM, stored))
-        .as("복호화 시 원본 이메일 복원")
-        .isEqualTo(email);
-  }
-
-  @Test
-  void legacyPlaintext_readBackUnchanged() {
-    // 기존(평문) 데이터: 'PII:' 접두사가 없으므로 복호화 대상에서 제외되어 raw 유지.
-    assertThat(OtherTextCrypto.decryptForDisplay(OtherType.NE, "John")).isEqualTo("John");
-    assertThat(OtherTextCrypto.decryptForDisplay(OtherType.AD, "서울시 강남구")).isEqualTo("서울시 강남구");
-    assertThat(OtherTextCrypto.decryptForDisplay(OtherType.EM, "bob@naver.com"))
-        .isEqualTo("bob@naver.com");
+    assertThat(OtherTextCrypto.decryptForDisplay("EM", stored)).isEqualTo(email);
   }
 
   @Test

@@ -27,8 +27,7 @@ public class JwtTokenProvider {
   private static final String AUTHORITIES_KEY = "auth";
   private static final String USER_NAME_KEY = "userName";
 
-  @Value(
-      "${jwt.secret:default-secret-key-for-development-only-must-be-changed-in-production-at-least-256-bits}")
+  @Value("${jwt.secret}")
   private String secret;
 
   @Value("${jwt.access-token-validity:3600000}") // 1시간 (밀리초)

@@ -21,6 +21,7 @@ jobs:
 
       # Jenkins 'Build' 단계 그대로 (dev 프로파일)
       - name: Build
+        shell: cmd
         run: mvn clean install -Dspring.profiles.active=dev -DskipTests
 
       # Jenkins 'Deploy' 단계 대체.

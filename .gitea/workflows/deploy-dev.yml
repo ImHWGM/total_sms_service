@@ -1,0 +1,33 @@
+name: be-deploy-dev
+
+# develop 브랜치에 push 되면 dev 서버에서 자동으로 빌드 → 배포.
+# (기존 Jenkins dev-pipeline.config 의 1:1 대체)
+#
+# 시크릿(DB 비번/키 등)은 이 workflow / Gitea / 서버 디스크 어디에도 두지 않는다.
+# 앱이 기동할 때 AWS SSM Parameter Store(/wisead/be/dev/*)에서 직접 읽는다.
+#   (application-dev.properties 의 spring.config.import 참고)
+# dev 서버에는 SSM 접근용 AWS 자격(/wisead/be/dev/* 만 허용하는 IAM)만 있으면 된다.
+on:
+  push:
+    branches: [develop]
+
+jobs:
+  build-deploy:
+    runs-on: windows            # dev 서버 host 러너(be_wisead) 가 받음. 서버의 Maven 3.9.5 / JDK 21 사용
+    steps:
+      # Jenkins 'GitHub Clone' 단계 대체
+      - uses: actions/checkout@v4
+
+      # Jenkins 'Build' 단계 그대로 (dev 프로파일)
+      - name: Build
+        run: mvn clean install -Dspring.profiles.active=dev -DskipTests
+
+      # Jenkins 'Deploy' 단계 대체.
+      # java -jar 를 직접 띄우지 않고, dev 서버에 등록된 Windows 서비스(WiseAdBEDev)를 재시작한다.
+      # 시크릿은 그 서비스의 환경변수(AppEnvironmentExtra)에 이미 들어있으므로 여기서 주입하지 않는다.
+      - name: Deploy
+        shell: cmd
+        run: |
+          if not exist C:\app\wisead-dev mkdir C:\app\wisead-dev
+          copy /Y target\wisead-0.0.1-SNAPSHOT.jar C:\app\wisead-dev\wisead.jar
+          nssm restart WiseAdBEDev

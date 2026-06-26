@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import kr.wisead.common.dto.VerificationStatus;
+import kr.wisead.common.util.UserIdResolver;
+import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.email.service.EmailService;
 import kr.wisead.domain.email.service.EmailVerificationService;
 import kr.wisead.security.jwt.JwtAuthenticationFilter;
@@ -45,6 +47,8 @@ class EmailVerificationControllerTest {
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
 
+  @MockitoBean private ActionLogService actionLogService;
+  @MockitoBean private UserIdResolver userIdResolver;
   @MockitoBean private EmailVerificationService emailAuthService;
   @MockitoBean private EmailService emailService;
 

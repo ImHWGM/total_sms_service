@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
@@ -52,9 +51,6 @@ public class UserService {
 
   @Value("${wisead.base-url:http://localhost:3000}")
   private String baseUrl;
-
-  // 아이디 찾기용 임시 저장소 (이메일 -> User 정보)
-  private final Map<String, User> findIdTempStore = new ConcurrentHashMap<>();
 
   // 토큰 유효 시간 (10분)
   private static final int TOKEN_EXPIRATION_MINUTES = 10;
@@ -157,7 +153,6 @@ public class UserService {
    * @param request 아이디 찾기 요청 (기업명, 담당자명, 연락처)
    * @return 마스킹된 이메일 정보
    */
-  @Transactional(readOnly = true)
   public FindIdResponse requestFindId(FindIdRequest request) {
     try {
       // 1. 평문 담당자명, 연락처를 암호화 (DB 저장 형식에 맞게)
@@ -178,14 +173,12 @@ public class UserService {
         return FindIdResponse.accountNotFound();
       }
 
-      // 3. 이메일로 인증코드 발송
+      // 3. 이메일로 인증코드 발송 — target 에 user.seq 를 보관해 2단계에서 정확한 사용자 조회에 사용
+      //    (findByEmail 은 이메일에 UNIQUE 제약이 없어 중복 시 오조회 위험 → seq 로 단일화)
       String email = user.getEmail();
-      emailAuthService.sendVerificationCode(email);
+      emailAuthService.sendVerificationCode(email, String.valueOf(user.getSeq()));
 
-      // 4. 임시 저장소에 사용자 정보 저장 (인증 완료 후 아이디 조회용)
-      findIdTempStore.put(email.toLowerCase(), user);
-
-      // 5. 마스킹된 이메일 반환
+      // 4. 마스킹된 이메일 반환
       String maskedEmail = maskEmail(email);
       log.info("아이디 찾기 인증코드 발송: email={}", maskedEmail);
 
@@ -206,24 +199,19 @@ public class UserService {
    * @param code 인증코드
    * @return 마스킹된 아이디
    */
-  @Transactional(readOnly = true)
   public FindIdResponse verifyAndGetUserId(String email, String code) {
     try {
-      // 1. 인증코드 검증
-      boolean verified = emailAuthService.verifyCode(email, code);
-      if (!verified) {
-        return FindIdResponse.verificationFailed();
+      // 1. 인증코드 검증 + 발송 시점에 저장된 target(user.seq) 반환
+      String seqStr = emailAuthService.verifyAndGetTarget(email, code);
+      if (seqStr == null || seqStr.isBlank()) {
+        throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
       }
 
-      // 2. 임시 저장소에서 사용자 정보 조회
-      User user = findIdTempStore.remove(email.toLowerCase());
-      if (user == null) {
-        // 임시 저장소에 없으면 DB에서 직접 조회
-        user =
-            userMapper
-                .findByEmail(email)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-      }
+      // 2. seq 로 정확한 사용자 조회 (이메일 중복 무관)
+      User user =
+          userMapper
+              .findBySeq(Integer.parseInt(seqStr))
+              .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
       // 3. 마스킹된 아이디 반환
       String maskedUserId = maskUserId(user.getUserId());

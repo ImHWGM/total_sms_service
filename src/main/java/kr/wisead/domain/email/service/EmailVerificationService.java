@@ -32,6 +32,9 @@ public class EmailVerificationService {
   /** 회원가입 이메일 인증 용도. */
   public static final String PURPOSE_SIGNUP = "SIGNUP";
 
+  /** 아이디 찾기 이메일 인증 용도. */
+  public static final String PURPOSE_FIND_ID = "FIND_ID";
+
   /** 채널 식별자 (verification.channel). */
   private static final String CHANNEL = "EMAIL";
 
@@ -42,105 +45,53 @@ public class EmailVerificationService {
   private static final int RESEND_LIMIT_SECONDS = 60;
   private static final int MAX_ATTEMPTS = 5;
 
-  /** 인증 코드 발송. */
+  // ==================== Public API ====================
+
+  /** 인증 코드 발송 (회원가입). */
   public boolean sendVerificationCode(String email) {
     if (!isValidEmail(email)) {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "유효하지 않은 이메일 형식입니다.");
     }
-    String id = email.toLowerCase();
-    LocalDateTime now = LocalDateTime.now();
-
-    Verification existing = verificationMapper.findByKey(PURPOSE_SIGNUP, CHANNEL, id);
-    if (existing != null && !canResend(existing.getCreatedAt(), now)) {
-      long remainingSeconds = remainingResendSeconds(existing.getCreatedAt(), now);
-      throw new BusinessException(
-          ErrorCode.INVALID_INPUT_VALUE, String.format("재발송은 %d초 후에 가능합니다.", remainingSeconds));
-    }
-
-    String code = emailService.createVerificationCode();
-    if (existing == null) {
-      try {
-        verificationMapper.insert(
-            Verification.builder()
-                .purpose(PURPOSE_SIGNUP)
-                .channel(CHANNEL)
-                .identifier(id)
-                .code(code)
-                .attempts(0)
-                .createdAt(now)
-                .verifiedAt(null)
-                .build());
-      } catch (DataIntegrityViolationException dup) {
-        // 동시 최초발송(더블클릭): 다른 요청이 방금 같은 키 행을 만들어 UNIQUE 충돌 → 500 대신 안내로 변환
-        throw new BusinessException(
-            ErrorCode.INVALID_INPUT_VALUE, "이미 인증 코드를 발송했습니다. 잠시 후 다시 시도해주세요.");
-      }
-    } else {
-      verificationMapper.updateForSend(
-          Verification.builder()
-              .purpose(PURPOSE_SIGNUP)
-              .channel(CHANNEL)
-              .identifier(id)
-              .code(code)
-              .createdAt(now)
-              .build());
-    }
-
-    try {
-      emailService.sendVerificationEmail(email, code);
-      log.info("[이메일인증] 코드 발송 완료: email={}", CommonUtils.maskingEmailShort(email));
-      return true;
-    } catch (Exception e) {
-      log.error("[이메일인증] 코드 발송 실패: email={}", CommonUtils.maskingEmailShort(email), e);
-      verificationMapper.deleteByKey(PURPOSE_SIGNUP, CHANNEL, id);
-      throw new BusinessException(ErrorCode.INTERNAL_ERROR, "인증 코드 발송에 실패했습니다.");
-    }
+    return doSend(email, PURPOSE_SIGNUP, null);
   }
 
   /**
-   * 인증 코드 검증. 성공 시 행을 제거한다(이메일은 게이트가 없어 도장을 남기지 않음).
+   * 인증 코드 발송 (아이디 찾기).
    *
-   * <p>{@code SmsVerificationService.verifyCode} 와 동일하게, 코드 불일치 시 시도횟수 증가가 커밋돼야 하므로 @Transactional
-   * 을 달지 않는다.
+   * <p>발송 시점에 특정된 {@code target}(user.seq 문자열)을 verification 행에 함께 보관한다. 검증 성공 후
+   * {@link #verifyAndGetTarget} 으로 seq 를 꺼내 {@code findBySeq} 로 정확한 사용자를 조회하기 위함.
+   * 이메일에 UNIQUE 제약이 없어 {@code findByEmail} 로 재조회하면 오조회 위험이 있다.
+   *
+   * @param email 발송 대상 이메일
+   * @param target 보관할 user.seq 문자열
+   */
+  public boolean sendVerificationCode(String email, String target) {
+    if (!isValidEmail(email)) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "유효하지 않은 이메일 형식입니다.");
+    }
+    return doSend(email, PURPOSE_FIND_ID, target);
+  }
+
+  /**
+   * 인증 코드 검증 (회원가입). 성공 시 행을 제거한다.
+   *
+   * <p><b>@Transactional 금지.</b> 코드 불일치 시 incrementAttempts 가 즉시 커밋되어야 brute-force 한도가
+   * 유지된다. 호출자({@link kr.wisead.domain.user.service.UserService} 등)도 이 메서드를 @Transactional
+   * 경계 안에서 호출해선 안 된다.
    */
   public boolean verifyCode(String email, String code) {
-    String id = email.toLowerCase();
-    LocalDateTime now = LocalDateTime.now();
+    doVerify(email, code, PURPOSE_SIGNUP);
+    return true;
+  }
 
-    Verification info = verificationMapper.findByKey(PURPOSE_SIGNUP, CHANNEL, id);
-    if (info == null || info.getCode() == null) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드를 먼저 발송해주세요.");
-    }
-    if (isExpired(info.getCreatedAt(), now)) {
-      verificationMapper.deleteByKey(PURPOSE_SIGNUP, CHANNEL, id);
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드가 만료되었습니다. 다시 발송해주세요.");
-    }
-    if (info.getAttempts() >= MAX_ATTEMPTS) {
-      verificationMapper.deleteByKey(PURPOSE_SIGNUP, CHANNEL, id);
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 시도 횟수를 초과했습니다. 다시 발송해주세요.");
-    }
-
-    int matched = verificationMapper.markVerifiedIfCodeMatches(PURPOSE_SIGNUP, CHANNEL, id, code, now);
-    if (matched == 1) {
-      // 이메일은 게이트가 없으므로 검증 성공 즉시 제거
-      verificationMapper.deleteByKey(PURPOSE_SIGNUP, CHANNEL, id);
-      log.info("[이메일인증] 성공: email={}", CommonUtils.maskingEmailShort(email));
-      return true;
-    }
-
-    verificationMapper.incrementAttempts(PURPOSE_SIGNUP, CHANNEL, id);
-    Verification reloaded = verificationMapper.findByKey(PURPOSE_SIGNUP, CHANNEL, id);
-    int attempts = reloaded != null ? reloaded.getAttempts() : MAX_ATTEMPTS;
-    log.warn(
-        "[이메일인증] 코드 불일치: email={}, attempts={}", CommonUtils.maskingEmailShort(email), attempts);
-    int remaining = MAX_ATTEMPTS - attempts;
-    if (remaining <= 0) {
-      verificationMapper.deleteByKey(PURPOSE_SIGNUP, CHANNEL, id);
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 시도 횟수를 초과했습니다. 다시 발송해주세요.");
-    }
-    throw new BusinessException(
-        ErrorCode.INVALID_INPUT_VALUE,
-        String.format("인증 코드가 일치하지 않습니다. (남은 시도: %d회)", remaining));
+  /**
+   * 인증 코드 검증 (아이디 찾기). 성공 시 보관된 {@code target}(user.seq 문자열)을 반환한다.
+   *
+   * <p><b>@Transactional 금지.</b> {@link #verifyCode} 와 동일한 이유. 실패 시 {@link BusinessException}
+   * 을 던진다.
+   */
+  public String verifyAndGetTarget(String email, String code) {
+    return doVerify(email, code, PURPOSE_FIND_ID);
   }
 
   /** 인증 상태 확인. */
@@ -162,7 +113,105 @@ public class EmailVerificationService {
     return sendVerificationCode(email);
   }
 
-  // ==================== Private Methods ====================
+  // ==================== Private Core Logic ====================
+
+  /**
+   * 인증 코드 발송 공용 구현. purpose·target 만 다르고 나머지 흐름(쿨다운/insert-race/발송실패 롤백)이 동일하여 통합.
+   */
+  private boolean doSend(String email, String purpose, String target) {
+    String id = email.toLowerCase();
+    LocalDateTime now = LocalDateTime.now();
+
+    Verification existing = verificationMapper.findByKey(purpose, CHANNEL, id);
+    if (existing != null && !canResend(existing.getCreatedAt(), now)) {
+      long remainingSeconds = remainingResendSeconds(existing.getCreatedAt(), now);
+      throw new BusinessException(
+          ErrorCode.INVALID_INPUT_VALUE, String.format("재발송은 %d초 후에 가능합니다.", remainingSeconds));
+    }
+
+    String code = emailService.createVerificationCode();
+    if (existing == null) {
+      try {
+        verificationMapper.insert(
+            Verification.builder()
+                .purpose(purpose)
+                .channel(CHANNEL)
+                .identifier(id)
+                .target(target)
+                .code(code)
+                .attempts(0)
+                .createdAt(now)
+                .verifiedAt(null)
+                .build());
+      } catch (DataIntegrityViolationException dup) {
+        // 동시 최초발송(더블클릭): 다른 요청이 방금 같은 키 행을 만들어 UNIQUE 충돌 → 500 대신 안내로 변환
+        throw new BusinessException(
+            ErrorCode.INVALID_INPUT_VALUE, "이미 인증 코드를 발송했습니다. 잠시 후 다시 시도해주세요.");
+      }
+    } else {
+      verificationMapper.updateForSend(
+          Verification.builder()
+              .purpose(purpose)
+              .channel(CHANNEL)
+              .identifier(id)
+              .target(target)
+              .code(code)
+              .createdAt(now)
+              .build());
+    }
+
+    try {
+      emailService.sendVerificationEmail(email, code);
+      log.info("[{}] 코드 발송 완료: email={}", purpose, CommonUtils.maskingEmailShort(email));
+      return true;
+    } catch (Exception e) {
+      log.error("[{}] 코드 발송 실패: email={}", purpose, CommonUtils.maskingEmailShort(email), e);
+      verificationMapper.deleteByKey(purpose, CHANNEL, id);
+      throw new BusinessException(ErrorCode.INTERNAL_ERROR, "인증 코드 발송에 실패했습니다.");
+    }
+  }
+
+  /** 인증 코드 검증 공용 구현. 성공 시 행을 제거하고 {@code target} 을 반환한다(SIGNUP 은 null). */
+  private String doVerify(String email, String code, String purpose) {
+    String id = email.toLowerCase();
+    LocalDateTime now = LocalDateTime.now();
+
+    Verification info = verificationMapper.findByKey(purpose, CHANNEL, id);
+    if (info == null || info.getCode() == null) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드를 먼저 발송해주세요.");
+    }
+    if (isExpired(info.getCreatedAt(), now)) {
+      verificationMapper.deleteByKey(purpose, CHANNEL, id);
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 코드가 만료되었습니다. 다시 발송해주세요.");
+    }
+    if (info.getAttempts() >= MAX_ATTEMPTS) {
+      verificationMapper.deleteByKey(purpose, CHANNEL, id);
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 시도 횟수를 초과했습니다. 다시 발송해주세요.");
+    }
+
+    String target = info.getTarget();
+    int matched = verificationMapper.markVerifiedIfCodeMatches(purpose, CHANNEL, id, code, now);
+    if (matched == 1) {
+      verificationMapper.deleteByKey(purpose, CHANNEL, id);
+      log.info("[{}] 이메일 인증 성공: email={}", purpose, CommonUtils.maskingEmailShort(email));
+      return target;
+    }
+
+    verificationMapper.incrementAttempts(purpose, CHANNEL, id);
+    Verification reloaded = verificationMapper.findByKey(purpose, CHANNEL, id);
+    int attempts = reloaded != null ? reloaded.getAttempts() : MAX_ATTEMPTS;
+    log.warn("[{}] 코드 불일치: email={}, attempts={}", purpose, CommonUtils.maskingEmailShort(email), attempts);
+    int remaining = MAX_ATTEMPTS - attempts;
+    if (remaining <= 0) {
+      verificationMapper.deleteByKey(purpose, CHANNEL, id);
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인증 시도 횟수를 초과했습니다. 다시 발송해주세요.");
+    }
+    throw new BusinessException(
+        ErrorCode.INVALID_INPUT_VALUE,
+        String.format("인증 코드가 일치하지 않습니다. (남은 시도: %d회)", remaining));
+  }
+
+  // ==================== Private Helpers ====================
 
   private boolean isValidEmail(String email) {
     if (email == null || email.isBlank()) {

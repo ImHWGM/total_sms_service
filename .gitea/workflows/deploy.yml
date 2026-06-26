@@ -28,7 +28,7 @@ jobs:
         run: mvn -U clean install -Dspring.profiles.active=prod -DskipTests
 
       # Jenkins 'Deploy' 단계 대체.
-      # java -jar 를 직접 띄우지 않고, 상용서버에 등록된 Windows 서비스(WiseAdBE)를 재시작한다.
+      # java -jar 를 직접 띄우지 않고, 상용서버에 등록된 Windows 서비스(1_WiseAdBE)를 재시작한다.
       # 시크릿은 앱이 기동 시 SSM 에서 직접 읽으므로 여기서 주입하지 않는다.
       # 서비스 env 에는 SSM 접근용 AWS 자격(AWS_REGION/ACCESS_KEY/SECRET)만 있으면 된다.
       - name: Deploy
@@ -36,4 +36,4 @@ jobs:
         run: |
           if not exist C:\app\wisead mkdir C:\app\wisead
           copy /Y target\wisead-0.0.1-SNAPSHOT.jar C:\app\wisead\wisead.jar
-          nssm restart WiseAdBE
+          nssm restart 1_WiseAdBE

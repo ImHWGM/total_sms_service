@@ -14,7 +14,7 @@ on:
 
 jobs:
   build-deploy:
-    runs-on: windows            # dev 서버 host 러너(be_wisead) 가 받음. 서버의 Maven 3.9.5 / JDK 21 사용
+    runs-on: dev                # dev 서버 instance 러너(라벨 dev). 서버의 Maven 3.9.5 / JDK 21 사용
     steps:
       # Jenkins 'GitHub Clone' 단계 대체
       - uses: actions/checkout@v4

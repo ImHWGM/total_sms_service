@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadWiseAdBeProdParams",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParametersByPath",
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+      ],
+      "Resource": "arn:aws:ssm:ap-northeast-2:<ACCOUNT_ID>:parameter/wisead/be/prod/*"
+    },
+    {
+      "Sid": "DecryptWiseAdBeProdParamsViaSsm",
+      "Effect": "Allow",
+      "Action": "kms:Decrypt",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "kms:ViaService": "ssm.ap-northeast-2.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

@@ -20,8 +20,8 @@ import kr.wisead.domain.email.service.EmailAuthService;
 import kr.wisead.domain.payment.entity.UserServiceRate;
 import kr.wisead.domain.payment.service.StandardRateService;
 import kr.wisead.domain.payment.service.WalletService;
-import kr.wisead.domain.sms.service.SmsVerificationService;
 import kr.wisead.domain.sms.service.SmsAuthService;
+import kr.wisead.domain.sms.service.SmsVerificationService;
 import kr.wisead.domain.user.dto.LoginFailureResponse;
 import kr.wisead.domain.user.dto.LoginRequest;
 import kr.wisead.domain.user.dto.LoginResponse;
@@ -377,28 +377,13 @@ public class AuthService {
     // 3-1. 담당자 연락처 SMS 본인인증 게이트 (M2: 여기선 소비하지 않고 검사만 — 미인증 조기 거부).
     //       실제 도장 소비는 가입 처리가 모두 끝난 뒤(아래 단계 8)에 수행하여, 중간 실패로 DB 가
     //       롤백돼도 인증 상태가 보존되도록 한다.
-    smsVerificationService.checkVerified(
-        request.getPhone(), SmsVerificationService.PURPOSE_SIGNUP);
+    smsVerificationService.checkVerified(request.getPhone(), SmsVerificationService.PURPOSE_SIGNUP);
 
     // 4-1. 연락처 암호화 처리
-    String encryptedPhone = null;
-    try {
-      String phone = request.getPhone().replace("-", "");
-      encryptedPhone = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(phone));
-    } catch (Exception e) {
-      log.error("연락처 암호화 실패: {}", e.getMessage());
-      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "연락처 암호화에 실패했습니다.");
-    }
-    // 4-2. 담당자 암호화 처리 -> 비밀번호 찾기에서 담당자 암호화 처리가 들어가기에 회원가입시에도 있어야 함.
-    String encryptedPerson = null;
-    try {
-      String person = request.getPerson();
-      encryptedPerson = CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(person));
-    } catch (Exception e) {
-      log.error("담당자 암호화 실패: {}", e.getMessage());
-      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "담당자 암호화에 실패했습니다.");
-    }
-    // 4-2. 고유한 상점코드 생성
+    String encryptedPhone = encryptSignupField(request.getPhone().replace("-", ""), "연락처");
+    // 4-2. 담당자 암호화 처리 (비밀번호 찾기에서도 담당자 암호화가 필요하므로 가입 시에도 동일 처리)
+    String encryptedPerson = encryptSignupField(request.getPerson(), "담당자");
+    // 4-3. 고유한 상점코드 생성
     String storeCode = null;
     int attempts = 0;
     while (attempts < 5) {
@@ -420,11 +405,10 @@ public class AuthService {
             .corpAddr(request.getCorpAddr())
             .bizNum(request.getBizNum())
             .bizTel(request.getBizTel())
-            //            .person(request.getPerson())
             .person(encryptedPerson)
             .phone(encryptedPhone)
             .email(request.getEmail())
-            .userLevel(1) // 일반 회원
+            .userLevel(10) // 기업관리자 (B2B 자가 가입 기본 권한)
             .useYn("Y")
             .status("미승인") // 가입 후 관리자 승인 필요
             .regId(request.getUserId())
@@ -548,11 +532,21 @@ public class AuthService {
     }
   }
 
+  /** 회원가입 시 필드 암호화 (AES256 + Base64). 실패 시 BusinessException 발생 */
+  private String encryptSignupField(String value, String fieldName) {
+    try {
+      return CryptoUtils.encodeBase64(CryptoUtils.encryptAES256(value));
+    } catch (Exception e) {
+      log.error("{} 암호화 실패: {}", fieldName, e.getMessage());
+      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, fieldName + " 암호화에 실패했습니다.");
+    }
+  }
+
   /**
    * 비활성 계정 오류 메시지 결정.
    *
-   * <p>lifecycleStatus 가 non-null 이면 enum 기반 메시지 우선. null 이면 legacy 한글 STATUS 값으로 fallback
-   * (PR4 cleanup 전까지 보존).
+   * <p>lifecycleStatus 가 non-null 이면 enum 기반 메시지 우선. null 이면 legacy 한글 STATUS 값으로 fallback (PR4
+   * cleanup 전까지 보존).
    */
   private String resolveInactiveMessage(User user) {
     if (user.getLifecycleStatus() != null) {

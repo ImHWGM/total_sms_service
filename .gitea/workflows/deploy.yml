@@ -1,0 +1,39 @@
+name: be-deploy-prod
+
+# 수동 실행 전용(workflow_dispatch). main 에 머지/push 만으로는 빌드/배포되지 않는다.
+# Gitea → 이 레포 → Actions 탭에서 이 워크플로우를 main 브랜치로 'Run workflow' 해야
+# 빌드 → 배포가 진행된다. (기존 Jenkins prod pipeline.config 의 1:1 대체)
+#
+# ⚠ 상용은 개발서버와 '다른 서버'다. 그 서버에 라벨 'prod' 로 act_runner 를 별도 등록해야 한다
+#   (register --labels prod:host). 그래야 develop=dev서버 / main=prod서버 로 빌드가 갈린다.
+#
+# 시크릿(DB 비번/키 등)은 이 workflow / Gitea / 서버 디스크 어디에도 두지 않는다.
+# 앱이 기동할 때 AWS SSM Parameter Store(/wisead/be/prod/*)에서 직접 읽는다.
+#   (application-prod.properties 의 spring.config.import 참고)
+# 상용서버에는 SSM 접근용 AWS 자격(/wisead/be/prod/* 만 허용하는 IAM)만 있으면 된다.
+#   ⚠ 상용 키/자격은 개발서버·Gitea 에 절대 두지 않는다(환경 격리).
+on:
+  workflow_dispatch:        # 수동 트리거만. 자동 push 트리거 없음.
+
+jobs:
+  build-deploy:
+    runs-on: prod           # 상용서버 host 러너(라벨 prod) 가 받음. 서버의 Maven 3.9.5 / JDK 21 사용
+    steps:
+      # Jenkins 'GitHub Clone' 단계 대체
+      - uses: actions/checkout@v4
+
+      # Jenkins 'Build' 단계 그대로 (prod 프로파일)
+      - name: Build
+        shell: cmd
+        run: mvn -U clean install -Dspring.profiles.active=prod -DskipTests
+
+      # Jenkins 'Deploy' 단계 대체.
+      # java -jar 를 직접 띄우지 않고, 상용서버에 등록된 Windows 서비스(1_WiseAdBE)를 재시작한다.
+      # 시크릿은 앱이 기동 시 SSM 에서 직접 읽으므로 여기서 주입하지 않는다.
+      # 서비스 env 에는 SSM 접근용 AWS 자격(AWS_REGION/ACCESS_KEY/SECRET)만 있으면 된다.
+      - name: Deploy
+        shell: cmd
+        run: |
+          if not exist C:\app\wisead mkdir C:\app\wisead
+          copy /Y target\wisead-0.0.1-SNAPSHOT.jar C:\app\wisead\wisead.jar
+          nssm restart 1_WiseAdBE

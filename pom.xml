@@ -20,7 +20,21 @@
 
     <properties>
         <java.version>21</java.version>
+        <spring-cloud-aws.version>3.3.0</spring-cloud-aws.version>
     </properties>
+
+    <!-- Spring Cloud AWS BOM (SSM Parameter Store 등 버전 일괄 관리) -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.awspring.cloud</groupId>
+                <artifactId>spring-cloud-aws-dependencies</artifactId>
+                <version>${spring-cloud-aws.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Spring Boot Starters -->
@@ -31,6 +45,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- AWS SSM Parameter Store: 환경별 비밀값 주입 (spring.config.import) -->
+        <dependency>
+            <groupId>io.awspring.cloud</groupId>
+            <artifactId>spring-cloud-aws-starter-parameter-store</artifactId>
         </dependency>
 
         <!-- MyBatis -->

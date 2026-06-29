@@ -1,0 +1,36 @@
+name: be-deploy-dev
+
+# 수동 실행 전용(workflow_dispatch). push 만으로는 절대 빌드/배포되지 않는다.
+# 기존 Jenkins 처럼 develop 에 push 한 뒤, Gitea → 이 레포 → Actions 탭에서
+# 이 워크플로우를 직접 'Run workflow' 로 눌러야 빌드 → 배포가 진행된다.
+# (기존 Jenkins dev-pipeline.config 의 1:1 대체)
+#
+# 시크릿(DB 비번/키 등)은 이 workflow / Gitea / 서버 디스크 어디에도 두지 않는다.
+# 앱이 기동할 때 AWS SSM Parameter Store(/wisead/be/dev/*)에서 직접 읽는다.
+#   (application-dev.properties 의 spring.config.import 참고)
+# dev 서버에는 SSM 접근용 AWS 자격(/wisead/be/dev/* 만 허용하는 IAM)만 있으면 된다.
+on:
+  workflow_dispatch:        # 수동 트리거만. 자동 push 트리거 없음.
+
+jobs:
+  build-deploy:
+    runs-on: dev                # dev 서버 instance 러너(라벨 dev). 서버의 Maven 3.9.5 / JDK 21 사용
+    steps:
+      # Jenkins 'GitHub Clone' 단계 대체
+      - uses: actions/checkout@v4
+
+      # Jenkins 'Build' 단계 그대로 (dev 프로파일)
+      - name: Build
+        shell: cmd
+        run: mvn clean install -Dspring.profiles.active=dev -DskipTests
+
+      # Jenkins 'Deploy' 단계 대체.
+      # java -jar 를 직접 띄우지 않고, dev 서버에 등록된 Windows 서비스(1_WiseAdBEDev)를 재시작한다.
+      # 시크릿은 앱이 기동 시 SSM 에서 직접 읽으므로 여기서 주입하지 않는다.
+      # 서비스 env 에는 SSM 접근용 AWS 자격(AWS_REGION/ACCESS_KEY/SECRET)만 있으면 된다.
+      - name: Deploy
+        shell: cmd
+        run: |
+          if not exist C:\app\wisead-dev mkdir C:\app\wisead-dev
+          copy /Y target\wisead-0.0.1-SNAPSHOT.jar C:\app\wisead-dev\wisead.jar
+          nssm restart 1_WiseAdBEDev

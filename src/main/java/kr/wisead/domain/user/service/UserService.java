@@ -153,7 +153,6 @@ public class UserService {
    * @param request 아이디 찾기 요청 (기업명, 담당자명, 연락처)
    * @return 마스킹된 이메일 정보
    */
-  @Transactional(readOnly = true)
   public FindIdResponse requestFindId(FindIdRequest request) {
     try {
       // 1. 평문 담당자명, 연락처를 암호화 (DB 저장 형식에 맞게)
@@ -174,12 +173,12 @@ public class UserService {
         return FindIdResponse.accountNotFound();
       }
 
-      // 3. 이메일로 인증코드 발송
+      // 3. 이메일로 인증코드 발송 — target 에 user.seq 를 보관해 2단계에서 정확한 사용자 조회에 사용
+      //    (findByEmail 은 이메일에 UNIQUE 제약이 없어 중복 시 오조회 위험 → seq 로 단일화)
       String email = user.getEmail();
-      emailAuthService.sendVerificationCode(email);
+      emailAuthService.sendVerificationCode(email, String.valueOf(user.getSeq()));
 
       // 4. 마스킹된 이메일 반환
-      //    (인증 완료 후 아이디 조회는 2단계에서 findByEmail 로 재조회 — 인스턴스 로컬 임시저장소 제거)
       String maskedEmail = maskEmail(email);
       log.info("아이디 찾기 인증코드 발송: email={}", maskedEmail);
 
@@ -200,22 +199,18 @@ public class UserService {
    * @param code 인증코드
    * @return 마스킹된 아이디
    */
-  @Transactional(readOnly = true)
   public FindIdResponse verifyAndGetUserId(String email, String code) {
     try {
-      // 1. 인증코드 검증
-      boolean verified = emailAuthService.verifyCode(email, code);
-      if (!verified) {
-        return FindIdResponse.verificationFailed();
+      // 1. 인증코드 검증 + 발송 시점에 저장된 target(user.seq) 반환
+      String seqStr = emailAuthService.verifyAndGetTarget(email, code);
+      if (seqStr == null || seqStr.isBlank()) {
+        throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
       }
 
-      // 2. 이메일로 사용자 조회 (이메일은 unique). verifyCode 가 발송 시점과 동일한 *전체* 이메일 키로
-      //    통과했으므로 이 email 은 전체 이메일이며 findByEmail 이 동일 사용자를 반환한다.
-      //    (기존 인스턴스 로컬 임시저장소는 DB 쿼리 1회를 아끼는 캐시였을 뿐 — 다중 인스턴스/재시작 비대칭과
-      //     미검증 시 메모리 누수가 있어 제거하고 폴백 경로로 단일화)
+      // 2. seq 로 정확한 사용자 조회 (이메일 중복 무관)
       User user =
           userMapper
-              .findByEmail(email)
+              .findBySeq(Integer.parseInt(seqStr))
               .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
       // 3. 마스킹된 아이디 반환

@@ -3,6 +3,8 @@ package kr.wisead.domain.event.service;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.ratelimit.FailureRateLimiter;
+import kr.wisead.common.ratelimit.RateLimitExceededException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.event.dto.*;
@@ -29,6 +31,7 @@ public class EventCheckService {
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final SurveyMasterMapper surveyMasterMapper;
+  private final FailureRateLimiter failureRateLimiter;
 
   private static final long STAFF_COOKIE_MAX_AGE_MS = 86400_000L; // 24시간
 
@@ -37,12 +40,15 @@ public class EventCheckService {
 
   /** QR 스캔으로 체크인 처리 (참가자용) */
   @Transactional
-  public EventCheckResponse checkIn(Integer eventSeq, String checkCode, String deviceInfo) {
+  public EventCheckResponse checkIn(
+      Integer eventSeq, String checkCode, String deviceInfo, String clientIp) {
     EventParticipant participant =
-        participantMapper
-            .selectDetailByEventSeqAndCheckCode(eventSeq, checkCode)
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+        participantMapper.selectDetailByEventSeqAndCheckCode(eventSeq, checkCode).orElse(null);
+
+    if (participant == null) {
+      recordCheckCodeFailure(eventSeq, clientIp);
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.");
+    }
 
     return processCheckIn(participant, deviceInfo);
   }
@@ -303,5 +309,16 @@ public class EventCheckService {
 
     return actionLogMapper.existsByParticipantSeqAndActionTypeSeq(
         participantSeq, checkInType.getSeq());
+  }
+
+  private void recordCheckCodeFailure(Integer eventSeq, String clientIp) {
+    if (clientIp == null || clientIp.isBlank()) {
+      return;
+    }
+
+    String failureKey = clientIp + ":" + eventSeq + ":check";
+    if (!failureRateLimiter.recordFailureAndCheckAllowed(failureKey)) {
+      throw new RateLimitExceededException("요청이 너무 빈번합니다. 잠시 후 다시 시도해 주세요.");
+    }
   }
 }

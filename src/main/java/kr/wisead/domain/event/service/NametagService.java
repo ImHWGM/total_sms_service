@@ -1,10 +1,14 @@
 package kr.wisead.domain.event.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.ratelimit.FailureRateLimiter;
+import kr.wisead.common.ratelimit.RateLimitExceededException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.event.dto.NametagPrintRequest;
@@ -25,16 +29,22 @@ public class NametagService {
 
   private final EventParticipantMapper participantMapper;
   private final EventNametagLogMapper nametagLogMapper;
-  private final SurveyMasterMapper surveyMasterMapper;
+  private final ObjectMapper objectMapper;
+  private final FailureRateLimiter failureRateLimiter;
+  private final EventAccessValidator eventAccessValidator;
 
   /** 명찰 데이터 조회 (출력/미리보기용) */
   @Transactional(readOnly = true)
-  public Map<String, Object> getNametagData(Long participantSeq) {
+  public Map<String, Object> getNametagData(Integer eventSeq, Long participantSeq, String userId) {
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
+
     EventParticipant participant =
         participantMapper
             .selectDetailBySeq(participantSeq)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+
+    eventAccessValidator.validateParticipantEvent(eventSeq, participant);
 
     Map<String, Object> nametagData = new HashMap<>();
     nametagData.put("participantSeq", participant.getSeq());
@@ -51,12 +61,16 @@ public class NametagService {
 
   /** 명찰 출력 로그 기록 */
   @Transactional
-  public void recordPrint(NametagPrintRequest request, String printBy) {
+  public void recordPrint(Integer eventSeq, NametagPrintRequest request, String printBy) {
+    eventAccessValidator.validateEventModifyAccess(eventSeq, printBy);
+
     EventParticipant participant =
         participantMapper
             .selectBySeq(request.getParticipantSeq())
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+
+    eventAccessValidator.validateParticipantEvent(eventSeq, participant);
 
     // 명찰 출력 로그 등록
     EventNametagLog nametagLog =
@@ -95,17 +109,22 @@ public class NametagService {
   /** 명찰 데이터 조회 - checkCode 기반 (QR 스캔용) */
   @Transactional(readOnly = true)
   public kr.wisead.domain.event.dto.NametagResponse getNametagDataByCheckCode(
-      Integer eventSeq, String checkCode) {
+      Integer eventSeq, String checkCode, String clientIp) {
     EventParticipant participant =
-        participantMapper
-            .selectDetailByEventSeqAndCheckCode(eventSeq, checkCode)
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+        participantMapper.selectDetailByEventSeqAndCheckCode(eventSeq, checkCode).orElse(null);
+
+    if (participant == null) {
+      recordCheckCodeFailure(eventSeq, clientIp);
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.");
+    }
 
     // DB에서 가져온 값은 AES256 + Base64로 암호화되어 있음
     // 명찰에는 사람이 읽을 수 있는 값이 필요하므로 복호화
     String decryptedName = decryptField(participant.getUserName());
-    String decryptedPhone = decryptField(participant.getUserPhone());
+    String decryptedPhone =
+        shouldExposeContact(participant.getNametagConfig())
+            ? decryptField(participant.getUserPhone())
+            : null;
 
     return kr.wisead.domain.event.dto.NametagResponse.from(
         participant, decryptedName, decryptedPhone);
@@ -114,12 +133,18 @@ public class NametagService {
   /** 명찰 출력 로그 기록 - checkCode 기반 (QR 스캔용) */
   @Transactional
   public void recordPrintByCheckCode(
-      Integer eventSeq, String checkCode, NametagPrintRequest request, String deviceInfo) {
+      Integer eventSeq,
+      String checkCode,
+      NametagPrintRequest request,
+      String deviceInfo,
+      String clientIp) {
     EventParticipant participant =
-        participantMapper
-            .selectByEventSeqAndCheckCode(eventSeq, checkCode)
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다."));
+        participantMapper.selectByEventSeqAndCheckCode(eventSeq, checkCode).orElse(null);
+
+    if (participant == null) {
+      recordCheckCodeFailure(eventSeq, clientIp);
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "참가자 정보를 찾을 수 없습니다.");
+    }
 
     // 출력자 정보 (deviceInfo 또는 SYSTEM)
     String printBy = (deviceInfo != null && !deviceInfo.isBlank()) ? deviceInfo : "QR_SCAN";
@@ -149,6 +174,41 @@ public class NametagService {
     } catch (Exception e) {
       log.warn("필드 복호화 실패: {}", e.getMessage());
       return encryptedValue; // 복호화 실패 시 원본 반환 (서비스 중단 방지)
+    }
+  }
+
+  /**
+   * 무인증 checkCode 조회 실패 시 IP+eventSeq 기준 실패 카운터 누적. status 경로와 동일 키(:check)를 공유해 status/nametag
+   * 교차 brute-force 도 합산 차단한다. 한도 초과 시 RateLimitExceededException.
+   */
+  private void recordCheckCodeFailure(Integer eventSeq, String clientIp) {
+    if (clientIp == null || clientIp.isBlank()) {
+      return;
+    }
+    String failureKey = clientIp + ":" + eventSeq + ":check";
+    if (!failureRateLimiter.recordFailureAndCheckAllowed(failureKey)) {
+      throw new RateLimitExceededException("요청이 너무 빈번합니다. 잠시 후 다시 시도해 주세요.");
+    }
+  }
+
+  private boolean shouldExposeContact(String nametagConfig) {
+    if (nametagConfig == null || nametagConfig.isBlank()) {
+      return false;
+    }
+    try {
+      JsonNode fields = objectMapper.readTree(nametagConfig).path("fields");
+      if (!fields.isArray()) {
+        return false;
+      }
+      for (JsonNode field : fields) {
+        if ("contact".equals(field.path("key").asText(null))) {
+          return field.path("enabled").isBoolean() && field.path("enabled").asBoolean();
+        }
+      }
+      return false;
+    } catch (Exception e) {
+      log.warn("명찰 설정 파싱 실패: {}", e.getMessage());
+      return false;
     }
   }
 }

@@ -107,7 +107,7 @@
             REG_DATE, REG_ID, STORE_CODE,
             LOGIN_PHONE, DEFAULT_TWO_FACTOR_METHOD
         ) VALUES (
-            #{userId}, #{userPass}, #{corpName}, #{corpAddr}, #{bizNum}, #{bizTel},
+            #{userId}, #{userPass}, #{corpName}, #{corpAddr}, REPLACE(#{bizNum}, '-', ''), #{bizTel},
             #{person}, #{phone}, #{email}, #{userLevel}, #{useYn}, #{status},
             NOW(), #{regId}, #{storeCode},
             #{loginPhone}, #{defaultTwoFactorMethod}
@@ -120,7 +120,7 @@
         SET
             CORP_NAME = #{corpName},
             CORP_ADDR = #{corpAddr},
-            BIZ_NUM = #{bizNum},
+            BIZ_NUM = REPLACE(#{bizNum}, '-', ''),
             BIZ_TEL = #{bizTel},
             PERSON = #{person},
             PHONE = #{phone},
@@ -288,7 +288,7 @@
         SET
             CORP_NAME = #{corpName},
             CORP_ADDR = #{corpAddr},
-            BIZ_NUM = #{bizNum},
+            BIZ_NUM = REPLACE(#{bizNum}, '-', ''),
             BIZ_TEL = #{bizTel},
             PERSON = #{person},
             PHONE = #{phone},

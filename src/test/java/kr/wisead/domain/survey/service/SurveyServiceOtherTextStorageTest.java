@@ -166,21 +166,42 @@ class SurveyServiceOtherTextStorageTest {
   }
 
   @Test
-  void nonSoTypes_storeRawAsIs() {
-    for (OtherType type : OtherType.values()) {
-      if (type == OtherType.SO) {
-        continue;
-      }
+  void saType_storesRawPlaintext() {
+    SurveySubmitRequest.AnswerRequest req =
+        SurveySubmitRequest.AnswerRequest.builder()
+            .questionSeq(200)
+            .otherText("자유 의견입니다")
+            .build();
+
+    String stored = invokeResolveStorage(OtherType.SA, req.getOtherText(), req);
+
+    assertThat(stored).as("SA(주관식)는 평문 그대로 저장").isEqualTo("자유 의견입니다");
+  }
+
+  @Test
+  void nePiiTypes_encryptViaService() {
+    for (OtherType type : new OtherType[] {OtherType.NE, OtherType.AD, OtherType.CU}) {
+      String plain = "홍길동 " + type.name();
       SurveySubmitRequest.AnswerRequest req =
-          SurveySubmitRequest.AnswerRequest.builder()
-              .questionSeq(200)
-              .otherText("plain text " + type.name())
-              .build();
+          SurveySubmitRequest.AnswerRequest.builder().questionSeq(201).otherText(plain).build();
 
       String stored = invokeResolveStorage(type, req.getOtherText(), req);
 
-      assertThat(stored).as(type.name() + "는 raw 그대로 저장").isEqualTo("plain text " + type.name());
+      assertThat(stored).as(type.name() + "는 PII: 접두사로 암호화 저장").startsWith("PII:").isNotEqualTo(plain);
+      assertThat(OtherTextCrypto.decryptForDisplay(type.name(), stored)).isEqualTo(plain);
     }
+  }
+
+  @Test
+  void emType_encryptsLocalPartViaService() {
+    String email = "alice@gmail.com";
+    SurveySubmitRequest.AnswerRequest req =
+        SurveySubmitRequest.AnswerRequest.builder().questionSeq(202).otherText(email).build();
+
+    String stored = invokeResolveStorage(OtherType.EM, req.getOtherText(), req);
+
+    assertThat(stored).as("도메인은 평문 유지").startsWith("PII:").endsWith("@gmail.com");
+    assertThat(OtherTextCrypto.decryptForDisplay("EM", stored)).isEqualTo(email);
   }
 
   @Test

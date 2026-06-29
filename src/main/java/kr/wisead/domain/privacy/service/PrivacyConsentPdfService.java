@@ -1192,7 +1192,10 @@ public class PrivacyConsentPdfService {
                 surveyAnswerMapper.selectAnswerByTypeDetail(
                     user.getEventSeq(), user.getSeq(), "NE");
             if (answerName != null && !answerName.trim().isEmpty()) {
-              decryptedValue = answerName.trim();
+              decryptedValue =
+                  kr.wisead.domain.survey.service.OtherTextCrypto.decryptForDisplay(
+                          "NE", answerName)
+                      .trim();
             }
           }
           if (isValidPrivacyData(decryptedValue)) {

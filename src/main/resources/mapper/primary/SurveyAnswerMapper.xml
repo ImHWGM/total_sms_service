@@ -167,8 +167,14 @@
                ANSWER AS value
         FROM SURVEY_ANSWER
         WHERE QUESTION_TYPE_DETAIL IN ('NE','AD','CU','EM')
-          AND ANSWER IS NOT NULL AND ANSWER &lt;&gt; ''
+          AND ANSWER IS NOT NULL AND TRIM(ANSWER) &lt;&gt; ''
           AND ANSWER NOT LIKE 'PII:%'
+          AND TRIM(ANSWER) &lt;&gt; '-'
+          AND ANSWER NOT LIKE '*%'
+          <if test="markers != null and markers.size() > 0">
+            AND TRIM(ANSWER) NOT IN
+            <foreach item="m" collection="markers" open="(" separator="," close=")">#{m}</foreach>
+          </if>
     </select>
 
     <!-- OTHER_TEXT 컬럼: 기타항목 OTHER_TYPE(NE/AD/CU/EM) 평문 후보 -->
@@ -183,8 +189,14 @@
              AND si.QUESTION_SEQ = sa.QUESTION_SEQ
              AND si.OTHER_YN = 'Y'
              AND si.OTHER_TYPE IN ('NE','AD','CU','EM')
-        WHERE sa.OTHER_TEXT IS NOT NULL AND sa.OTHER_TEXT &lt;&gt; ''
+        WHERE sa.OTHER_TEXT IS NOT NULL AND TRIM(sa.OTHER_TEXT) &lt;&gt; ''
           AND sa.OTHER_TEXT NOT LIKE 'PII:%'
+          AND TRIM(sa.OTHER_TEXT) &lt;&gt; '-'
+          AND sa.OTHER_TEXT NOT LIKE '*%'
+          <if test="markers != null and markers.size() > 0">
+            AND TRIM(sa.OTHER_TEXT) NOT IN
+            <foreach item="m" collection="markers" open="(" separator="," close=")">#{m}</foreach>
+          </if>
     </select>
 
     <!-- ANSWER 단건 갱신 -->

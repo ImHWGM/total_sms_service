@@ -119,3 +119,29 @@ WHERE QUESTION_TYPE_DETAIL IN ('NE','AD','CU','EM')
   AND ANSWER IS NOT NULL AND ANSWER <> '' AND ANSWER NOT LIKE 'PII:%'
 ORDER BY REG_DATE DESC
 LIMIT 10;
+
+-- -----------------------------------------------------------------------------
+-- 6) 파기/플레이스홀더 마커 발견 — 반복되는 값(파기처리 등)은 PII 아님 → 백필 제외 대상
+--    여기 상위에 뜨는 마커들을 백필 설정(backfill.survey-pii.disposed-markers)에 추가.
+-- -----------------------------------------------------------------------------
+SELECT ANSWER AS value, COUNT(*) AS cnt
+FROM survey_answer
+WHERE QUESTION_TYPE_DETAIL IN ('NE','AD','CU','EM')
+  AND ANSWER IS NOT NULL AND ANSWER <> '' AND ANSWER NOT LIKE 'PII:%'
+GROUP BY ANSWER
+HAVING COUNT(*) >= 5
+ORDER BY cnt DESC
+LIMIT 50;
+
+-- -----------------------------------------------------------------------------
+-- 7) 마커 제외 후 실제 백필 대상 총건수 (마커 목록을 실제 발견값으로 교체)
+--    빈값/'-'/마스킹('*...')도 제외해 백필 러너 후보와 일치시킨다.
+-- -----------------------------------------------------------------------------
+SELECT COUNT(*) AS answer_real_pii_total
+FROM survey_answer
+WHERE QUESTION_TYPE_DETAIL IN ('NE','AD','CU','EM')
+  AND ANSWER IS NOT NULL AND TRIM(ANSWER) <> ''
+  AND ANSWER NOT LIKE 'PII:%'
+  AND TRIM(ANSWER) <> '-'
+  AND ANSWER NOT LIKE '*%'
+  AND TRIM(ANSWER) NOT IN ('파기처리');   -- ← 6)에서 찾은 마커 모두 나열

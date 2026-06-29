@@ -61,11 +61,13 @@ public interface SurveyAnswerMapper {
       @Param("questionTypeDetail") String questionTypeDetail);
   // ===== 레거시 PII 평문 백필 (일회성, SurveyPiiBackfillRunner 전용) =====
 
-  /** ANSWER 컬럼의 NE/AD/CU/EM 평문(미암호, 'PII:' 접두 없음) 후보 조회 */
-  java.util.List<kr.wisead.batch.SurveyPiiBackfillRow> selectBackfillAnswerCandidates();
+  /** ANSWER 컬럼의 NE/AD/CU/EM 평문(미암호, 'PII:' 접두 없음) 후보 조회. markers=파기/플레이스홀더 제외 목록 */
+  java.util.List<kr.wisead.batch.SurveyPiiBackfillRow> selectBackfillAnswerCandidates(
+      @Param("markers") java.util.List<String> markers);
 
-  /** OTHER_TEXT 컬럼의 NE/AD/CU/EM 평문 후보 조회 (SURVEY_ITEM.OTHER_TYPE 조인) */
-  java.util.List<kr.wisead.batch.SurveyPiiBackfillRow> selectBackfillOtherTextCandidates();
+  /** OTHER_TEXT 컬럼의 NE/AD/CU/EM 평문 후보 조회 (SURVEY_ITEM.OTHER_TYPE 조인). markers=제외 목록 */
+  java.util.List<kr.wisead.batch.SurveyPiiBackfillRow> selectBackfillOtherTextCandidates(
+      @Param("markers") java.util.List<String> markers);
 
   /** ANSWER 단건 갱신 (백필 전용) */
   int updateAnswerValueById(@Param("answerSeq") Integer answerSeq, @Param("value") String value);

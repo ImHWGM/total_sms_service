@@ -8,6 +8,7 @@ import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
 import kr.wisead.domain.sms.service.SmsVerificationService;
 import kr.wisead.domain.verification.entity.Verification;
+import kr.wisead.domain.verification.service.VerificationAttemptPersister;
 import kr.wisead.mapper.primary.VerificationMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,7 @@ public class EmailAuthService {
 
   private final EmailService emailService;
   private final VerificationMapper verificationMapper;
+  private final VerificationAttemptPersister attemptPersister;
 
   private static final int EXPIRATION_MINUTES = 5;
   private static final int RESEND_LIMIT_SECONDS = 60;
@@ -151,8 +153,8 @@ public class EmailAuthService {
       return true;
     }
 
-    // 불일치: 시도 횟수 누적
-    verificationMapper.incrementAttempts(resolvedPurpose, CHANNEL, identifier);
+    // 불일치: 시도 횟수 누적 (REQUIRES_NEW 트랜잭션 — 호출자 rollback 에 영향 없이 즉시 커밋)
+    attemptPersister.persistIncrement(resolvedPurpose, CHANNEL, identifier);
     Verification reloaded = verificationMapper.findByKey(resolvedPurpose, CHANNEL, identifier);
     int attempts = reloaded != null ? reloaded.getAttempts() : MAX_ATTEMPTS;
     int remaining = MAX_ATTEMPTS - attempts;

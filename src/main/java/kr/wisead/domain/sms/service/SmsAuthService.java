@@ -9,6 +9,7 @@ import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
 import kr.wisead.domain.sms.sender.SmsOtpSender;
 import kr.wisead.domain.verification.entity.Verification;
+import kr.wisead.domain.verification.service.VerificationAttemptPersister;
 import kr.wisead.mapper.primary.VerificationMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,7 @@ public class SmsAuthService {
 
   private final SmsOtpSender smsOtpSender;
   private final VerificationMapper verificationMapper;
+  private final VerificationAttemptPersister attemptPersister;
 
   private final SecureRandom secureRandom = new SecureRandom();
 
@@ -141,8 +143,8 @@ public class SmsAuthService {
       return;
     }
 
-    // 불일치: 시도 횟수 누적
-    verificationMapper.incrementAttempts(PURPOSE_SMS_2FA, CHANNEL, identifier);
+    // 불일치: 시도 횟수 누적 (REQUIRES_NEW 트랜잭션 — 호출자 rollback 에 영향 없이 즉시 커밋)
+    attemptPersister.persistIncrement(PURPOSE_SMS_2FA, CHANNEL, identifier);
     Verification reloaded = verificationMapper.findByKey(PURPOSE_SMS_2FA, CHANNEL, identifier);
     int attempts = reloaded != null ? reloaded.getAttempts() : MAX_ATTEMPTS;
     int remaining = MAX_ATTEMPTS - attempts;
@@ -191,7 +193,8 @@ public class SmsAuthService {
       return phone;
     }
 
-    verificationMapper.incrementAttempts(PURPOSE_SMS_2FA, CHANNEL, identifier);
+    // REQUIRES_NEW 트랜잭션 — 호출자 rollback 에 영향 없이 즉시 커밋
+    attemptPersister.persistIncrement(PURPOSE_SMS_2FA, CHANNEL, identifier);
     Verification reloaded = verificationMapper.findByKey(PURPOSE_SMS_2FA, CHANNEL, identifier);
     int attempts = reloaded != null ? reloaded.getAttempts() : MAX_ATTEMPTS;
     int remaining = MAX_ATTEMPTS - attempts;

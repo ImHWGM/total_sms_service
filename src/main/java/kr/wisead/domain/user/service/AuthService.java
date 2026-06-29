@@ -587,9 +587,12 @@ public class AuthService {
    *
    * <p>계정이 잠긴 사용자가 이메일 인증을 통해 즉시 잠금을 해제할 수 있도록 OTP를 발송한다.
    *
+   * <p><b>의도적으로 @Transactional 을 달지 않는다.</b> {@code emailAuthService.sendVerificationCode}
+   * 가 DB write 를 수행하므로 {@code readOnly=true} 트랜잭션과 충돌한다.
+   * {@code sendVerificationCode} 는 내부에서 발송 실패 시 행을 직접 삭제하므로 트랜잭션 없이도 정합성을 유지한다.
+   *
    * @param email 사용자 이메일
    */
-  @Transactional(readOnly = true)
   public void requestUnlockOtp(String email) {
     // 계정 열거(account enumeration) 방지: 미존재/비잠금 계정은 조용히 무시하고
     // 컨트롤러는 항상 동일한 일반 성공 응답을 반환한다. 실제 결과는 서버 로그로만 남긴다.
@@ -672,9 +675,10 @@ public class AuthService {
    *
    * <p>이메일로 사용자를 조회하고, 휴면 상태인 경우에만 OTP를 발송한다.
    *
+   * <p><b>의도적으로 @Transactional 을 달지 않는다.</b> {@code requestUnlockOtp} 와 동일한 이유.
+   *
    * @param email 사용자 이메일
    */
-  @Transactional(readOnly = true)
   public void requestDormantRecovery(String email) {
     // 계정 열거(account enumeration) 방지: 미존재/비휴면 계정은 조용히 무시하고
     // 컨트롤러는 항상 동일한 일반 성공 응답을 반환한다. 실제 결과는 서버 로그로만 남긴다.

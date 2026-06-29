@@ -14,6 +14,7 @@ import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.domain.sms.sender.SmsOtpSender;
 import kr.wisead.domain.verification.InMemoryVerificationMapper;
+import kr.wisead.domain.verification.service.VerificationAttemptPersister;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,7 @@ class SmsAuthServiceTest {
   @BeforeEach
   void setUp() {
     mapper = new InMemoryVerificationMapper();
-    sut = new SmsAuthService(smsOtpSender, mapper);
+    sut = new SmsAuthService(smsOtpSender, mapper, new VerificationAttemptPersister(mapper));
   }
 
   @Test

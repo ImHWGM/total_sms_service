@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import kr.wisead.common.dto.VerificationStatus;
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.domain.verification.InMemoryVerificationMapper;
+import kr.wisead.domain.verification.service.VerificationAttemptPersister;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,7 @@ class EmailAuthServiceTest {
   @BeforeEach
   void setUp() {
     mapper = new InMemoryVerificationMapper();
-    sut = new EmailAuthService(emailService, mapper);
+    sut = new EmailAuthService(emailService, mapper, new VerificationAttemptPersister(mapper));
     when(emailService.createVerificationCode()).thenReturn(CODE);
     doNothing().when(emailService).sendVerificationEmail(anyString(), anyString());
   }

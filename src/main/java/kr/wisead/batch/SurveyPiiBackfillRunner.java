@@ -77,11 +77,12 @@ public class SurveyPiiBackfillRunner implements ApplicationRunner {
     log.warn("  ANSHER     : {}", answer);
     log.warn("  OTHER_TEXT : {}", other);
     log.warn(
-        "  TOTAL      : 대상 {}건 / {} {}건 / 무변경 {}건 / 검증실패 {}건 / 갱신실패 {}건",
+        "  TOTAL      : 대상 {}건 / {} {}건 / 무변경 {}건 / 이미암호문 {}건 / 검증실패 {}건 / 갱신실패 {}건",
         answer.total + other.total,
         dryRun ? "예상갱신" : "갱신",
         answer.applied() + other.applied(),
         answer.skippedNoChange + other.skippedNoChange,
+        answer.skippedEncrypted + other.skippedEncrypted,
         answer.failedVerify + other.failedVerify,
         answer.failedUpdate + other.failedUpdate);
 
@@ -106,11 +107,50 @@ public class SurveyPiiBackfillRunner implements ApplicationRunner {
     return out;
   }
 
+  /** base64 문자 집합 패턴 (이미 암호화된 값 구조 판별용) */
+  private static final java.util.regex.Pattern B64 =
+      java.util.regex.Pattern.compile("^[A-Za-z0-9+/]+={0,2}$");
+
+  /**
+   * 이미 (레거시) AES 암호문인지 구조적으로 판별한다.
+   *
+   * <p>레거시 암호문 = base64(base64(16바이트 배수 AES 블록)) 형태(접두/매직 없음). 평문(이름/주소/이메일/전화)은 한글·공백·@·-·. 등으로
+   * 이중 base64 + 16바이트 배수 조건을 거의 만족하지 않는다. 신규 포맷은 'PII:' 접두로 SQL 단계에서 이미 제외됨. 이 판별로 레거시 암호문을 백필에서
+   * 건너뛰어 이중 암호화를 방지한다.
+   */
+  static boolean isLikelyAesCiphertext(String value) {
+    if (value == null) {
+      return false;
+    }
+    String t = value.trim();
+    if (t.length() < 16 || t.length() % 4 != 0 || !B64.matcher(t).matches()) {
+      return false;
+    }
+    try {
+      byte[] outer = java.util.Base64.getDecoder().decode(t);
+      String s1 = new String(outer, java.nio.charset.StandardCharsets.US_ASCII);
+      if (s1.isEmpty() || s1.length() % 4 != 0 || !B64.matcher(s1).matches()) {
+        return false;
+      }
+      byte[] inner = java.util.Base64.getDecoder().decode(s1);
+      return inner.length > 0 && inner.length % 16 == 0;
+    } catch (RuntimeException e) {
+      return false;
+    }
+  }
+
   private Stats process(String label, List<SurveyPiiBackfillRow> rows, boolean isAnswer) {
     Stats s = new Stats();
     s.total = rows.size();
     for (SurveyPiiBackfillRow r : rows) {
       String plain = r.getValue();
+      // 이미 (레거시) 암호문이면 절대 재암호화하지 않는다(이중 암호화 방지).
+      if (isLikelyAesCiphertext(plain)) {
+        s.skippedEncrypted++;
+        log.warn("[{}] 이미암호문-skip answerSeq={} type={}", label, r.getAnswerSeq(), r.getType());
+        continue;
+      }
+
       String enc = OtherTextCrypto.encryptForStorage(r.getType(), plain);
 
       // 암호화로 값이 바뀌지 않았다면(유형 미해당 또는 암호화 실패) 절대 쓰지 않는다.
@@ -155,6 +195,7 @@ public class SurveyPiiBackfillRunner implements ApplicationRunner {
     int updated;
     int wouldUpdate;
     int skippedNoChange;
+    int skippedEncrypted;
     int failedVerify;
     int failedUpdate;
 
@@ -172,6 +213,8 @@ public class SurveyPiiBackfillRunner implements ApplicationRunner {
           + wouldUpdate
           + ", 무변경="
           + skippedNoChange
+          + ", 이미암호문="
+          + skippedEncrypted
           + ", 검증실패="
           + failedVerify
           + ", 갱신실패="

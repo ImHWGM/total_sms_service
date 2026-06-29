@@ -229,6 +229,14 @@ class SmsAuthServiceTest {
   }
 
   @Test
+  @DisplayName("sendVerificationCode: 하이픈 포함 번호 → GMGO에 정규화된 번호(하이픈 없음)로 발송")
+  void sendVerificationCode_withHyphenatedPhone_sendsNormalizedToGmgo() {
+    sut.sendVerificationCode(USER_ID, "010-1234-5678");
+
+    verify(smsOtpSender).sendOtp(eq("01012345678"), anyString());
+  }
+
+  @Test
   @DisplayName("verifyCodeAndGetPhone: 하이픈 포함 번호는 정규화되어 저장/반환")
   void verifyCodeAndGetPhone_normalizesPhone() {
     sut.sendVerificationCode(USER_ID, "010-1234-5678");

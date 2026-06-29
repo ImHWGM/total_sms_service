@@ -33,17 +33,21 @@ CREATE TABLE survey_answer_bak_20260629 AS SELECT * FROM survey_answer;
 SELECT COUNT(*) FROM survey_answer_bak_20260629;  -- 원본과 동일한지 확인
 ```
 
-### 1. 규모 재확인 (read-only)
-`docs/sql/diag_survey_pii_plaintext_count.sql` 의 쿼리 ④ 실행 → `answer_plaintext_total` 확인.
+### 1. 규모 재확인 + 파기 마커 발견 (read-only)
+- `docs/sql/diag_survey_pii_plaintext_count.sql` 의 쿼리 ⑥ 실행 → `파기처리` 같은 **파기/플레이스홀더 마커**(반복 다수 값)를 모두 확인.
+- 쿼리 ⑦의 `NOT IN ('파기처리')` 에 발견된 마커를 모두 채운 뒤 실행 → `answer_real_pii_total`(마커 제외 실제 대상) 확인.
+
+> ⚠ `파기처리` 등 파기 tombstone은 PII가 아니므로 암호화하지 않는다. 백필 러너는 `backfill.survey-pii.disposed-markers`(콤마 구분, 기본 `파기처리`)로 제외한다. 발견된 마커가 더 있으면 실행 시 이 옵션에 모두 넘긴다. 빈값/`-`/마스킹(`*...`)은 러너가 자동 제외.
 
 ### 2. dry-run (변경 없음, 건수만 로그)
 상용 서버에서 **별도 1회 실행**(웹서버 미기동, 운영 서비스와 분리):
 ```bat
 java -jar -Dspring.profiles.active=prod -Dspring.main.web-application-type=none ^
      -Dbackfill.survey-pii.enabled=true ^
+     -Dbackfill.survey-pii.disposed-markers=파기처리 ^
      C:\app\wisead\wisead.jar
 ```
-로그의 `예상갱신` 건수가 진단 ④ 총건수와 일치하는지, `검증실패=0` 인지 확인.
+로그의 `예상갱신` 건수가 진단 ⑦(마커 제외 총건수)과 일치하는지, `검증실패=0`, 시작 로그의 `제외마커`가 의도대로인지 확인.
 
 ### 3. 실제 실행
 ```bat

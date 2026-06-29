@@ -56,12 +56,22 @@ public class SurveyPiiBackfillRunner implements ApplicationRunner {
   @Value("${backfill.survey-pii.exit-after:true}")
   private boolean exitAfter;
 
+  /**
+   * 개인정보 파기/플레이스홀더 마커(콤마 구분). 이 값들은 더 이상 PII가 아니므로 암호화 대상에서 제외한다. 빈값/'-'/마스킹('*...')은 SQL에서 별도 제외.
+   * 발견 쿼리로 확인된 마커를 추가하라.
+   */
+  @Value("${backfill.survey-pii.disposed-markers:파기처리}")
+  private String disposedMarkersCsv;
+
   @Override
   public void run(ApplicationArguments args) {
-    log.warn("================ [설문 PII 백필] 시작 (dryRun={}) ================", dryRun);
+    java.util.List<String> markers = parseMarkers(disposedMarkersCsv);
+    log.warn(
+        "================ [설문 PII 백필] 시작 (dryRun={}, 제외마커={}) ================",
+        dryRun, markers);
 
-    Stats answer = process("ANSWER", mapper.selectBackfillAnswerCandidates(), true);
-    Stats other = process("OTHER_TEXT", mapper.selectBackfillOtherTextCandidates(), false);
+    Stats answer = process("ANSWER", mapper.selectBackfillAnswerCandidates(markers), true);
+    Stats other = process("OTHER_TEXT", mapper.selectBackfillOtherTextCandidates(markers), false);
 
     log.warn("================ [설문 PII 백필] 종료 (dryRun={}) ================", dryRun);
     log.warn("  ANSHER     : {}", answer);
@@ -80,6 +90,20 @@ public class SurveyPiiBackfillRunner implements ApplicationRunner {
       log.warn("[설문 PII 백필] exit-after=true → 종료 (exitCode={})", code);
       System.exit(org.springframework.boot.SpringApplication.exit(applicationContext, () -> code));
     }
+  }
+
+  private static java.util.List<String> parseMarkers(String csv) {
+    java.util.List<String> out = new java.util.ArrayList<>();
+    if (csv == null) {
+      return out;
+    }
+    for (String m : csv.split(",")) {
+      String t = m.trim();
+      if (!t.isEmpty()) {
+        out.add(t);
+      }
+    }
+    return out;
   }
 
   private Stats process(String label, List<SurveyPiiBackfillRow> rows, boolean isAnswer) {

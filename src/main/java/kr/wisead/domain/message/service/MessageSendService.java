@@ -23,6 +23,7 @@ import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.ShortUrlUtils;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.ars.service.BlockedNumberService;
+import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.event.dto.ParticipantForMessageResponse;
 import kr.wisead.domain.event.service.EventParticipantService;
 import kr.wisead.domain.message.dto.*;
@@ -67,6 +68,7 @@ public class MessageSendService {
   private final BlockedNumberService blockedNumberService;
   private final UserMapper userMapper;
   private final ProfanityFilterService profanityFilterService;
+  private final AdminService adminService;
 
   @Value("${wisead.url:https://wisead.kr}")
   private String wiseadUrl;
@@ -772,22 +774,48 @@ public class MessageSendService {
       return ResendResponse.fail("이벤트 정보를 찾을 수 없습니다.");
     }
 
-    // 설문 요금 차감
-    String txGroupId = deductForMessage(regId, "survey", receivers.size(), "L");
-
     int successCount = 0;
     int failCount = 0;
     List<String> failedList = new ArrayList<>();
 
+    // 이벤트 발송 권한 검증 (IDOR 방지)
+    validateEventSendPermission(request.getEventSeq(), regId);
+
+    // userSeq ↔ eventSeq 검증 (IDOR 방지) — 결제 전 필터링
+    List<ResendRequest.DuplicateReceiver> validReceivers = new ArrayList<>();
     for (ResendRequest.DuplicateReceiver receiver : receivers) {
+      if (isReceiverInEvent(receiver.getUserSeq(), request.getEventSeq())) {
+        validReceivers.add(receiver);
+      } else {
+        failCount++;
+        failedList.add(receiver.getPhone());
+        log.warn(
+            "재발송 대상 설문 참여자 검증 실패 - userSeq: {}, eventSeq: {}",
+            receiver.getUserSeq(),
+            request.getEventSeq());
+      }
+    }
+    if (validReceivers.isEmpty()) {
+      return ResendResponse.fail("재발송 가능한 대상이 없습니다.");
+    }
+
+    // 설문 요금 차감 (검증 통과 대상 기준)
+    String txGroupId = deductForMessage(regId, "survey", validReceivers.size(), "L");
+
+    for (ResendRequest.DuplicateReceiver receiver : validReceivers) {
       try {
         String phone = normalizePhoneNumber(receiver.getPhone());
         String text = request.getText();
 
-        // 대치문자 및 유저키 처리
+        // 설문 치환문자 영속화 (기존 SURVEY_USER 기준, first-write-wins)
+        persistSurveyRepChars(receiver.getUserSeq(), receiver);
+
+        // 대치문자 / 설문대치문자 / 유저키 처리
+        // AC-3: applyReplaceChars → applySurveyReplaceChars → applyUserKey → ShortUrlUtils 순서 변경 금지
         text =
             applyReplaceChars(
                 text, receiver.getRepChar01(), receiver.getRepChar02(), receiver.getRepChar03());
+        text = applySurveyReplaceChars(text, receiver);
         text = applyUserKey(text, receiver.getUserKey());
 
         // URL 패턴을 찾아서 단축 URL로 변환
@@ -874,6 +902,9 @@ public class MessageSendService {
       return ResendResponse.fail("이벤트 정보를 찾을 수 없습니다.");
     }
 
+    // 이벤트 발송 권한 검증 (IDOR 방지) — 신규 userSeq는 서버 생성이나, request.eventSeq는 클라이언트 전달이므로 검증 필요
+    validateEventSendPermission(request.getEventSeq(), regId);
+
     // 설문 요금 차감
     String txGroupId = deductForMessage(regId, "survey", receivers.size(), "L");
 
@@ -909,10 +940,15 @@ public class MessageSendService {
 
         String text = request.getText();
 
-        // 대치문자 및 새 유저키 처리
+        // 설문 치환문자 영속화 (신규 SURVEY_USER 기준, first-write-wins)
+        persistSurveyRepChars(newUserSeq, receiver);
+
+        // 대치문자 / 설문대치문자 / 새 유저키 처리
+        // AC-3: applyReplaceChars → applySurveyReplaceChars → applyUserKey → ShortUrlUtils 순서 변경 금지
         text =
             applyReplaceChars(
                 text, receiver.getRepChar01(), receiver.getRepChar02(), receiver.getRepChar03());
+        text = applySurveyReplaceChars(text, receiver);
         text = applyUserKey(text, newUserKey);
 
         // URL 패턴을 찾아서 단축 URL로 변환
@@ -1118,14 +1154,35 @@ public class MessageSendService {
       }
     }
 
-    // 잔액 확인 및 차감 (설문 요금 적용 - 필터링 후 수량 기준)
-    String txGroupId = deductForMessage(regId, "survey", receivers.size(), "L");
     int successCount = 0;
     int failCount = 0;
     List<String> failedPhones = new ArrayList<>();
     List<Integer> mseqList = new ArrayList<>();
 
+    // userSeq ↔ eventSeq 검증 (IDOR 방지) — 클라이언트가 보낸 userSeq가 타 이벤트 참여자면 거부.
+    //   userSeq == null 은 신규 자동 등록 대상이므로 통과(서버가 request.eventSeq로 생성).
+    List<SurveyMessageRequest.Receiver> validReceivers = new ArrayList<>();
     for (SurveyMessageRequest.Receiver receiver : receivers) {
+      if (receiver.getUserSeq() == null
+          || isReceiverInEvent(receiver.getUserSeq(), request.getEventSeq())) {
+        validReceivers.add(receiver);
+      } else {
+        failCount++;
+        failedPhones.add(receiver.getPhone());
+        log.warn(
+            "설문 발송 대상 참여자 검증 실패 - userSeq: {}, eventSeq: {}",
+            receiver.getUserSeq(),
+            request.getEventSeq());
+      }
+    }
+    if (validReceivers.isEmpty()) {
+      return SurveyMessageResponse.fail("발송 가능한 대상이 없습니다.");
+    }
+
+    // 잔액 확인 및 차감 (설문 요금 적용 - 필터링 후 수량 기준)
+    String txGroupId = deductForMessage(regId, "survey", validReceivers.size(), "L");
+
+    for (SurveyMessageRequest.Receiver receiver : validReceivers) {
       try {
         String phone = receiver.getNormalizedPhone();
         Integer userSeq = receiver.getUserSeq();
@@ -1525,6 +1582,46 @@ public class MessageSendService {
   }
 
   /**
+   * 호출자가 해당 이벤트에 대해 발송 권한을 가지는지 검증 (IDOR 방지).
+   *
+   * <p>request.eventSeq는 클라이언트가 전달하므로, 호출자(regId)가 해당 이벤트 소유자이거나 관리 권한(AdminService.canModify)을 가질
+   * 때만 통과시킨다. 권한이 없으면 ACCESS_DENIED.
+   */
+  private void validateEventSendPermission(Integer eventSeq, String regId) {
+    SurveyMaster master =
+        surveyMasterMapper
+            .selectByEventSeq(eventSeq)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.INVALID_INPUT, "이벤트 정보를 찾을 수 없습니다."));
+    // 소유자 본인은 권한 레벨과 무관하게 통과 (userLevel null 등으로 canModify가 본인을 오거부하는 것을 방지)
+    if (regId != null && regId.equals(master.getRegId())) {
+      return;
+    }
+    Integer level = userMapper.findByUserId(regId).map(User::getUserLevel).orElse(null);
+    if (!adminService.canModify(regId, level, master.getRegId())) {
+      log.warn(
+          "이벤트 발송 권한 없음 - eventSeq: {}, 요청자: {}, 소유자: {}", eventSeq, regId, master.getRegId());
+      throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 이벤트에 대한 발송 권한이 없습니다.");
+    }
+  }
+
+  /**
+   * userSeq가 해당 이벤트에 속한 유효한(미삭제) 설문 참여자인지 검증 (IDOR 방지).
+   *
+   * <p>클라이언트가 전달한 userSeq가 다른 이벤트 참여자를 가리키는 경우 false. first-write-wins 치환문자 선점 공격을 차단한다.
+   */
+  private boolean isReceiverInEvent(Integer userSeq, Integer eventSeq) {
+    if (userSeq == null || eventSeq == null) {
+      return false;
+    }
+    return surveyUserMapper
+        .selectBySeq(userSeq)
+        .filter(u -> !"Y".equals(u.getDelYn()))
+        .map(u -> eventSeq.equals(u.getEventSeq()))
+        .orElse(false);
+  }
+
+  /**
    * 설문 대치문자 처리 (#설문대치1#~#설문대치5# 치환).
    *
    * <p>기존 {@link #applyReplaceChars}와 시맨틱 차이: 빈 값 / null인 경우 토큰을 빈 문자열로 치환하여 사라지게 한다 (AC-5b).
@@ -1548,17 +1645,58 @@ public class MessageSendService {
     return text;
   }
 
+  /** 설문 대치문자 처리 - DuplicateReceiver 오버로드. */
+  private String applySurveyReplaceChars(String text, ResendRequest.DuplicateReceiver receiver) {
+    return applySurveyReplaceChars(
+        text,
+        receiver.getSurveyRepChar01(),
+        receiver.getSurveyRepChar02(),
+        receiver.getSurveyRepChar03(),
+        receiver.getSurveyRepChar04(),
+        receiver.getSurveyRepChar05());
+  }
+
   /**
    * 설문 치환문자 영속화 (SURVEY_USER_REP_CHAR). INSERT IGNORE — first-write-wins. 실패 시 발송 계속 (graceful
    * degradation).
    */
   private void persistSurveyRepChars(Integer userSeq, SurveyMessageRequest.Receiver receiver) {
+    persistSurveyRepChars(
+        userSeq,
+        receiver.getSurveyRepChar01(),
+        receiver.getSurveyRepChar02(),
+        receiver.getSurveyRepChar03(),
+        receiver.getSurveyRepChar04(),
+        receiver.getSurveyRepChar05());
+  }
+
+  /** 설문 치환문자 영속화 - DuplicateReceiver 오버로드. */
+  private void persistSurveyRepChars(Integer userSeq, ResendRequest.DuplicateReceiver receiver) {
+    persistSurveyRepChars(
+        userSeq,
+        receiver.getSurveyRepChar01(),
+        receiver.getSurveyRepChar02(),
+        receiver.getSurveyRepChar03(),
+        receiver.getSurveyRepChar04(),
+        receiver.getSurveyRepChar05());
+  }
+
+  /**
+   * 설문 치환문자 영속화 (SURVEY_USER_REP_CHAR) - 값 기반 오버로드. INSERT IGNORE — first-write-wins. 실패 시 발송 계속
+   * (graceful degradation).
+   */
+  private void persistSurveyRepChars(
+      Integer userSeq,
+      String surveyRepChar01,
+      String surveyRepChar02,
+      String surveyRepChar03,
+      String surveyRepChar04,
+      String surveyRepChar05) {
+    if (userSeq == null) {
+      return;
+    }
     String[] values = {
-      receiver.getSurveyRepChar01(),
-      receiver.getSurveyRepChar02(),
-      receiver.getSurveyRepChar03(),
-      receiver.getSurveyRepChar04(),
-      receiver.getSurveyRepChar05(),
+      surveyRepChar01, surveyRepChar02, surveyRepChar03, surveyRepChar04, surveyRepChar05,
     };
     List<SurveyUserRepChar> rows = new ArrayList<>();
     for (int idx = 1; idx <= values.length; idx++) {

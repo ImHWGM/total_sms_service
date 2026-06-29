@@ -40,5 +40,10 @@ public class ResendRequest {
     private String repChar01; // 대치문자1
     private String repChar02; // 대치문자2
     private String repChar03; // 대치문자3
+    private String surveyRepChar01; // 설문대치1
+    private String surveyRepChar02; // 설문대치2
+    private String surveyRepChar03; // 설문대치3
+    private String surveyRepChar04; // 설문대치4
+    private String surveyRepChar05; // 설문대치5
   }
 }

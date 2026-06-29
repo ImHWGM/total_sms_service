@@ -7,6 +7,7 @@ import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CommonUtils;
 import kr.wisead.common.util.CryptoUtils;
+import kr.wisead.domain.event.service.EventAccessValidator;
 import kr.wisead.domain.survey.dto.*;
 import kr.wisead.domain.survey.entity.*;
 import kr.wisead.mapper.primary.*;
@@ -29,6 +30,7 @@ public class SurveyService {
   private final SurveyUserRepCharMapper surveyUserRepCharMapper;
   private final SurveyAnswerMapper surveyAnswerMapper;
   private final FrontAuthService frontAuthService;
+  private final EventAccessValidator eventAccessValidator;
 
   /** 설문 치환문자 슬롯 개수 (#설문대치1~N#) — 추후 슬롯 확장 시 이 상수만 변경. */
   private static final int MAX_SURVEY_REP_CHARS = 5;
@@ -514,7 +516,8 @@ public class SurveyService {
 
   /** 참여자 목록 조회 */
   @Transactional(readOnly = true)
-  public List<SurveyUserResponse> getParticipants(Integer eventSeq) {
+  public List<SurveyUserResponse> getParticipants(Integer eventSeq, String userId) {
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
     return surveyUserMapper.selectCompletedByEventSeq(eventSeq).stream()
         .map(SurveyUserResponse::from)
         .collect(Collectors.toList());
@@ -522,7 +525,8 @@ public class SurveyService {
 
   /** 미참여/접속자 목록 조회 */
   @Transactional(readOnly = true)
-  public List<SurveyUserResponse> getAbsenteesAndLurkers(Integer eventSeq) {
+  public List<SurveyUserResponse> getAbsenteesAndLurkers(Integer eventSeq, String userId) {
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
     return surveyUserMapper.selectAbsenteesAndLurkers(eventSeq).stream()
         .map(SurveyUserResponse::from)
         .collect(Collectors.toList());

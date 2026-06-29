@@ -61,9 +61,6 @@ public class SecurityConfig {
     "/api/survey/key/**", // 사용자키로 설문 조회
     "/api/survey/auth/**", // 범용인증
     "/api/survey/*/submit", // 설문 제출
-    "/api/survey/*/participants", // 참여자 목록 조회
-    "/api/survey/*/absentees", // 미참여자 조회
-    "/api/survey/answers/**", // 설문 응답/통계
     // 설문 참여자 프론트 엔드포인트 (비로그인 허용)
     "/api/survey/users/key/**", // 사용자키로 참여자 조회
     "/api/survey/users/validate-key", // 사용자키 유효성 검증

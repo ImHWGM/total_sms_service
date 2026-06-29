@@ -2,6 +2,7 @@ package kr.wisead.domain.survey.service;
 
 import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.response.ErrorCode;
+import kr.wisead.domain.event.service.EventAccessValidator;
 import kr.wisead.domain.survey.dto.AnswerResponse;
 import kr.wisead.domain.survey.dto.AnswerStatisticsResponse;
 import kr.wisead.domain.survey.entity.OtherType;
@@ -30,12 +31,14 @@ public class SurveyAnswerService {
     private final SurveyAnswerMapper surveyAnswerMapper;
     private final SurveyQuestionMapper surveyQuestionMapper;
     private final SurveyItemMapper surveyItemMapper;
+    private final EventAccessValidator eventAccessValidator;
 
     /**
      * 이벤트별 답변 수 조회
      */
     @Transactional(readOnly = true)
-    public int getAnswerCount(Integer eventSeq) {
+    public int getAnswerCount(Integer eventSeq, String userId) {
+        eventAccessValidator.validateEventReadAccess(eventSeq, userId);
         return surveyAnswerMapper.countByEventSeq(eventSeq);
     }
 
@@ -43,7 +46,8 @@ public class SurveyAnswerService {
      * 이벤트별 전체 답변 목록 조회
      */
     @Transactional(readOnly = true)
-    public List<AnswerResponse> getAnswersByEvent(Integer eventSeq) {
+    public List<AnswerResponse> getAnswersByEvent(Integer eventSeq, String userId) {
+        eventAccessValidator.validateEventReadAccess(eventSeq, userId);
         List<SurveyAnswer> answers = surveyAnswerMapper.selectByEventSeq(eventSeq);
         decryptAnswers(eventSeq, answers);
         return answers.stream()
@@ -55,7 +59,8 @@ public class SurveyAnswerService {
      * 사용자별 답변 목록 조회
      */
     @Transactional(readOnly = true)
-    public List<AnswerResponse> getAnswersByUser(Integer eventSeq, Integer userSeq) {
+    public List<AnswerResponse> getAnswersByUser(Integer eventSeq, Integer userSeq, String userId) {
+        eventAccessValidator.validateEventReadAccess(eventSeq, userId);
         List<SurveyAnswer> answers = surveyAnswerMapper.selectByUserSeq(eventSeq, userSeq);
         decryptAnswers(eventSeq, answers);
         return answers.stream()
@@ -67,7 +72,8 @@ public class SurveyAnswerService {
      * 문항별 답변 목록 조회
      */
     @Transactional(readOnly = true)
-    public List<AnswerResponse> getAnswersByQuestion(Integer eventSeq, Integer questionSeq) {
+    public List<AnswerResponse> getAnswersByQuestion(Integer eventSeq, Integer questionSeq, String userId) {
+        eventAccessValidator.validateEventReadAccess(eventSeq, userId);
         List<SurveyAnswer> answers = surveyAnswerMapper.selectByQuestionSeq(eventSeq, questionSeq);
         decryptAnswers(eventSeq, answers);
         return answers.stream()
@@ -167,7 +173,13 @@ public class SurveyAnswerService {
      * 문항별 응답 통계 조회
      */
     @Transactional(readOnly = true)
-    public AnswerStatisticsResponse getQuestionStatistics(Integer eventSeq, Integer questionSeq) {
+    public AnswerStatisticsResponse getQuestionStatistics(
+            Integer eventSeq, Integer questionSeq, String userId) {
+        eventAccessValidator.validateEventReadAccess(eventSeq, userId);
+        return computeQuestionStatistics(eventSeq, questionSeq);
+    }
+
+    private AnswerStatisticsResponse computeQuestionStatistics(Integer eventSeq, Integer questionSeq) {
         // 문항 정보 조회
         SurveyQuestion question = surveyQuestionMapper.selectByQuestionSeq(questionSeq)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "문항을 찾을 수 없습니다."));
@@ -231,13 +243,14 @@ public class SurveyAnswerService {
      * 이벤트 전체 문항 통계 조회
      */
     @Transactional(readOnly = true)
-    public List<AnswerStatisticsResponse> getEventStatistics(Integer eventSeq) {
+    public List<AnswerStatisticsResponse> getEventStatistics(Integer eventSeq, String userId) {
+        eventAccessValidator.validateEventReadAccess(eventSeq, userId);
         List<SurveyQuestion> questions = surveyQuestionMapper.selectByEventSeq(eventSeq);
         List<AnswerStatisticsResponse> statistics = new ArrayList<>();
 
         for (SurveyQuestion question : questions) {
             try {
-                AnswerStatisticsResponse stat = getQuestionStatistics(eventSeq, question.getQuestionSeq());
+                AnswerStatisticsResponse stat = computeQuestionStatistics(eventSeq, question.getQuestionSeq());
                 statistics.add(stat);
             } catch (Exception e) {
                 log.warn("문항 통계 조회 실패: eventSeq={}, questionSeq={}", eventSeq, question.getQuestionSeq(), e);

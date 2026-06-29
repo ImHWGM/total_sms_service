@@ -13,7 +13,7 @@ import kr.wisead.domain.verification.service.VerificationAttemptPersister;
 import kr.wisead.mapper.primary.VerificationMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -85,7 +85,7 @@ public class SmsAuthService {
                 .attempts(0)
                 .createdAt(now)
                 .build());
-      } catch (DataIntegrityViolationException dup) {
+      } catch (DuplicateKeyException dup) {
         throw new BusinessException(
             ErrorCode.INVALID_INPUT_VALUE, "이미 인증 코드를 발송했습니다. 잠시 후 다시 시도해주세요.");
       }

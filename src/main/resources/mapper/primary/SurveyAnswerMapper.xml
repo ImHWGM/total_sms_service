@@ -157,4 +157,44 @@
         LIMIT 1
     </select>
 
+    <!-- ===== 레거시 PII 평문 백필 (일회성, SurveyPiiBackfillRunner 전용) ===== -->
+
+    <!-- ANSWER 컬럼: NE/AD/CU/EM 평문(미암호, 'PII:' 접두 없음) 후보 -->
+    <select id="selectBackfillAnswerCandidates"
+            resultType="kr.wisead.batch.SurveyPiiBackfillRow">
+        SELECT ANSWER_SEQ AS answerSeq,
+               QUESTION_TYPE_DETAIL AS type,
+               ANSWER AS value
+        FROM SURVEY_ANSWER
+        WHERE QUESTION_TYPE_DETAIL IN ('NE','AD','CU','EM')
+          AND ANSWER IS NOT NULL AND ANSWER &lt;&gt; ''
+          AND ANSWER NOT LIKE 'PII:%'
+    </select>
+
+    <!-- OTHER_TEXT 컬럼: 기타항목 OTHER_TYPE(NE/AD/CU/EM) 평문 후보 -->
+    <select id="selectBackfillOtherTextCandidates"
+            resultType="kr.wisead.batch.SurveyPiiBackfillRow">
+        SELECT sa.ANSWER_SEQ AS answerSeq,
+               si.OTHER_TYPE AS type,
+               sa.OTHER_TEXT AS value
+        FROM SURVEY_ANSWER sa
+        JOIN SURVEY_ITEM si
+              ON si.EVENT_SEQ = sa.EVENT_SEQ
+             AND si.QUESTION_SEQ = sa.QUESTION_SEQ
+             AND si.OTHER_YN = 'Y'
+             AND si.OTHER_TYPE IN ('NE','AD','CU','EM')
+        WHERE sa.OTHER_TEXT IS NOT NULL AND sa.OTHER_TEXT &lt;&gt; ''
+          AND sa.OTHER_TEXT NOT LIKE 'PII:%'
+    </select>
+
+    <!-- ANSWER 단건 갱신 -->
+    <update id="updateAnswerValueById">
+        UPDATE SURVEY_ANSWER SET ANSWER = #{value} WHERE ANSWER_SEQ = #{answerSeq}
+    </update>
+
+    <!-- OTHER_TEXT 단건 갱신 -->
+    <update id="updateOtherTextValueById">
+        UPDATE SURVEY_ANSWER SET OTHER_TEXT = #{value} WHERE ANSWER_SEQ = #{answerSeq}
+    </update>
+
 </mapper>

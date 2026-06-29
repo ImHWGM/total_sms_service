@@ -144,6 +144,32 @@ class OtpAttemptPersistenceIntegrationTest {
   // ==================== EmailAuthService ====================
 
   @Test
+  @DisplayName("Email — resendVerificationCode: 기존 행 삭제 후 새 코드 발급 (readOnly=true 제거 회귀 검증)")
+  void email_resendVerificationCode_dbWriteSucceeds() {
+    // given: 이미 발송된 상태 (attempts=3, 기존 코드 존재)
+    verificationMapper.insert(
+        Verification.builder()
+            .purpose(EMAIL_PURPOSE)
+            .channel(EMAIL_CHANNEL)
+            .identifier(IDENTIFIER)
+            .code("111111")
+            .attempts(3)
+            .createdAt(LocalDateTime.now().minusMinutes(2))
+            .build());
+
+    // when: 재발송 — 내부에서 deleteByKey + insert/updateForSend (DB write 2회)
+    //       호출자(resendLoginEmailCode)에 @Transactional(readOnly=true) 가 남아 있으면
+    //       운영 DB 에서 DML 거부로 실패한다. 이 테스트는 write 가 성공함을 검증한다.
+    emailAuthService.resendVerificationCode(USER_ID, "test@test.com");
+
+    // then: 새 코드로 갱신, attempts 리셋
+    Verification v = verificationMapper.findByKey(EMAIL_PURPOSE, EMAIL_CHANNEL, IDENTIFIER);
+    assertThat(v).isNotNull();
+    assertThat(v.getAttempts()).as("재발송 후 attempts 는 0이어야 한다").isZero();
+    assertThat(v.getCode()).as("코드가 새로 발급돼야 한다").isNotEqualTo("111111");
+  }
+
+  @Test
   @DisplayName("Email — 오답 시 호출자 롤백에도 attempts 가 1로 보존된다")
   void email_wrongCode_attemptsPersistDespiteCallerRollback() {
     // given

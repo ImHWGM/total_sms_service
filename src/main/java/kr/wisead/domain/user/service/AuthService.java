@@ -311,8 +311,13 @@ public class AuthService {
     return lastLoginDate.equals(today);
   }
 
-  /** 로그인 이메일 인증 코드 재발송 - ID/PW 검증 후 이메일 인증 코드 재발송 */
-  @Transactional(readOnly = true)
+  /**
+   * 로그인 이메일 인증 코드 재발송 - ID/PW 검증 후 이메일 인증 코드 재발송.
+   *
+   * <p><b>의도적으로 @Transactional 을 달지 않는다.</b> {@code emailAuthService.resendVerificationCode}
+   * 가 deleteByKey + insert/updateForSend(DB write)를 수행하므로 {@code readOnly=true} 와 충돌한다.
+   * {@code sendVerificationCode} 는 내부에서 발송 실패 시 행을 직접 삭제하므로 트랜잭션 없이도 정합성을 유지한다.
+   */
   public LoginResponse resendLoginEmailCode(LoginRequest request) {
     // 1. 사용자 조회
     User user =

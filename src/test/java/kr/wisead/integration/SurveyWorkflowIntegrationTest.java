@@ -10,6 +10,7 @@ import kr.wisead.domain.survey.service.SurveyAnswerService;
 import kr.wisead.domain.survey.service.SurveyService;
 import kr.wisead.domain.survey.service.SurveyUserService;
 import kr.wisead.security.jwt.JwtTokenProvider;
+import kr.wisead.common.util.UserIdResolver;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -71,6 +72,9 @@ class SurveyWorkflowIntegrationTest {
     @MockitoBean
     private MessageSendService messageSendService;
 
+    @MockitoBean
+    private UserIdResolver userIdResolver;
+
     private static final String TEST_USER_ID = "testuser01";
     private static final Integer TEST_USER_SEQ = 1;
     private static final Integer TEST_EVENT_SEQ = 100;
@@ -86,6 +90,8 @@ class SurveyWorkflowIntegrationTest {
                 TEST_USER_ID, null,
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
         userToken = jwtTokenProvider.createAccessToken(userAuth, "테스트사용자");
+        lenient().when(userIdResolver.fromJwtUsername(anyString())).thenReturn(1);
+        lenient().when(userIdResolver.toUserId(any())).thenReturn(TEST_USER_ID);
     }
 
     @Test
@@ -146,8 +152,7 @@ class SurveyWorkflowIntegrationTest {
                 .status("A")
                 .build();
 
-        when(eventService.createEvent(anyString(), any(EventRequest.class),
-                any(), any(), anyList(), anyList()))
+        when(eventService.createEvent(anyString(), any(EventRequest.class), any(), any(), any(), any()))
                 .thenReturn(mockResponse);
 
         // When & Then
@@ -160,8 +165,7 @@ class SurveyWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.eventSeq").value(TEST_EVENT_SEQ))
                 .andExpect(jsonPath("$.data.eventCode").value(TEST_EVENT_CODE));
 
-        verify(eventService, times(1)).createEvent(anyString(), any(EventRequest.class),
-                any(), any(), anyList(), anyList());
+        verify(eventService, times(1)).createEvent(anyString(), any(EventRequest.class), any(), any(), any(), any());
     }
 
     @Test
@@ -333,7 +337,7 @@ class SurveyWorkflowIntegrationTest {
     @DisplayName("7. 설문 응답 기록 확인 - 이벤트별 답변 수")
     void getAnswerCount_AfterSubmission() throws Exception {
         // Given: 응답 기록 확인
-        when(surveyAnswerService.getAnswerCount(TEST_EVENT_SEQ)).thenReturn(2);
+        when(surveyAnswerService.getAnswerCount(eq(TEST_EVENT_SEQ), anyString())).thenReturn(2);
 
         // When & Then
         mockMvc.perform(get("/api/survey/answers/count")
@@ -403,7 +407,7 @@ class SurveyWorkflowIntegrationTest {
                         .build()
         );
 
-        when(surveyService.getParticipants(TEST_EVENT_SEQ)).thenReturn(participants);
+        when(surveyService.getParticipants(eq(TEST_EVENT_SEQ), anyString())).thenReturn(participants);
 
         // When & Then
         mockMvc.perform(get("/api/survey/{eventSeq}/participants", TEST_EVENT_SEQ)
@@ -436,5 +440,25 @@ class SurveyWorkflowIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("이미 설문에 참여하셨습니다."));
+    }
+
+    @Test
+    @Order(11)
+    @DisplayName("11. 비로그인 참여자 목록 조회 - 인증 필요이므로 401")
+    void getParticipants_Unauthenticated_Unauthorized() throws Exception {
+        mockMvc.perform(get("/api/survey/{eventSeq}/participants", TEST_EVENT_SEQ))
+                .andExpect(status().isUnauthorized());
+
+        verify(surveyService, never()).getParticipants(any(), any());
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("12. 비로그인 미참여자 목록 조회 - 인증 필요이므로 401")
+    void getAbsentees_Unauthenticated_Unauthorized() throws Exception {
+        mockMvc.perform(get("/api/survey/{eventSeq}/absentees", TEST_EVENT_SEQ))
+                .andExpect(status().isUnauthorized());
+
+        verify(surveyService, never()).getAbsenteesAndLurkers(any(), any());
     }
 }

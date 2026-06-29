@@ -5,6 +5,8 @@ import java.util.List;
 import kr.wisead.common.response.ApiResponse;
 import kr.wisead.domain.survey.dto.*;
 import kr.wisead.domain.survey.service.SurveyService;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -67,16 +69,17 @@ public class SurveyController {
 
   /** 참여자 목록 조회 */
   @GetMapping("/{eventSeq}/participants")
-  public ApiResponse<List<SurveyUserResponse>> getParticipants(@PathVariable Integer eventSeq) {
-    List<SurveyUserResponse> response = surveyService.getParticipants(eventSeq);
+  public ApiResponse<List<SurveyUserResponse>> getParticipants(
+      @PathVariable Integer eventSeq, @CurrentUser JwtPrincipal user) {
+    List<SurveyUserResponse> response = surveyService.getParticipants(eventSeq, user.userId());
     return ApiResponse.success(response);
   }
 
   /** 미참여/접속자 목록 조회 */
   @GetMapping("/{eventSeq}/absentees")
   public ApiResponse<List<SurveyUserResponse>> getAbsenteesAndLurkers(
-      @PathVariable Integer eventSeq) {
-    List<SurveyUserResponse> response = surveyService.getAbsenteesAndLurkers(eventSeq);
+      @PathVariable Integer eventSeq, @CurrentUser JwtPrincipal user) {
+    List<SurveyUserResponse> response = surveyService.getAbsenteesAndLurkers(eventSeq, user.userId());
     return ApiResponse.success(response);
   }
 }

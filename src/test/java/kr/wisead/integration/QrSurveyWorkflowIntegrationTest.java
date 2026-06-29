@@ -6,6 +6,7 @@ import kr.wisead.domain.survey.service.EventService;
 import kr.wisead.domain.survey.service.FrontAuthService;
 import kr.wisead.domain.survey.service.SurveyAnswerService;
 import kr.wisead.domain.survey.service.SurveyService;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.security.jwt.JwtTokenProvider;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,6 +69,9 @@ class QrSurveyWorkflowIntegrationTest {
     @MockitoBean
     private SurveyAnswerService surveyAnswerService;
 
+    @MockitoBean
+    private UserIdResolver userIdResolver;
+
     private static final String TEST_USER_ID = "testuser01";
     private static final Integer TEST_EVENT_SEQ = 100;
     private static final String TEST_EVENT_CODE = "QREVT123ABC";
@@ -84,6 +88,8 @@ class QrSurveyWorkflowIntegrationTest {
                 TEST_USER_ID, null,
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
         userToken = jwtTokenProvider.createAccessToken(userAuth, "테스트사용자");
+        lenient().when(userIdResolver.fromJwtUsername(anyString())).thenReturn(1);
+        lenient().when(userIdResolver.toUserId(any())).thenReturn(TEST_USER_ID);
     }
 
     @Test
@@ -143,8 +149,7 @@ class QrSurveyWorkflowIntegrationTest {
                 .qrCodeImgPath(TEST_QR_CODE_IMG_PATH)
                 .build();
 
-        when(eventService.createEvent(anyString(), any(EventRequest.class),
-                any(), any(), anyList(), anyList()))
+        when(eventService.createEvent(anyString(), any(EventRequest.class), any(), any(), any(), any()))
                 .thenReturn(mockResponse);
 
         // When & Then
@@ -160,8 +165,7 @@ class QrSurveyWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.qrCodeImgPath").value(TEST_QR_CODE_IMG_PATH))
                 .andReturn();
 
-        verify(eventService, times(1)).createEvent(anyString(), any(EventRequest.class),
-                any(), any(), anyList(), anyList());
+        verify(eventService, times(1)).createEvent(anyString(), any(EventRequest.class), any(), any(), any(), any());
 
         // authCodeUrl이 20자리인지 확인
         assertThat(TEST_AUTH_CODE_URL).hasSize(20);
@@ -303,7 +307,7 @@ class QrSurveyWorkflowIntegrationTest {
     @DisplayName("6. QR 설문 응답 기록 확인")
     void getAnswerCountAfterQrSubmission_Success() throws Exception {
         // Given: QR 설문 응답 후 기록 확인
-        when(surveyAnswerService.getAnswerCount(TEST_EVENT_SEQ)).thenReturn(2);
+        when(surveyAnswerService.getAnswerCount(eq(TEST_EVENT_SEQ), anyString())).thenReturn(2);
 
         // When & Then
         mockMvc.perform(get("/api/survey/answers/count")
@@ -313,7 +317,7 @@ class QrSurveyWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").value(2));
 
-        verify(surveyAnswerService, times(1)).getAnswerCount(TEST_EVENT_SEQ);
+        verify(surveyAnswerService, times(1)).getAnswerCount(eq(TEST_EVENT_SEQ), anyString());
     }
 
     @Test
@@ -412,8 +416,7 @@ class QrSurveyWorkflowIntegrationTest {
                 .qrCodeImgPath(null)
                 .build();
 
-        when(eventService.createEvent(anyString(), any(EventRequest.class),
-                any(), any(), anyList(), anyList()))
+        when(eventService.createEvent(anyString(), any(EventRequest.class), any(), any(), any(), any()))
                 .thenReturn(mockResponse);
 
         // When & Then
@@ -459,8 +462,7 @@ class QrSurveyWorkflowIntegrationTest {
                 .qrCodeImgPath("http://localhost:8080/files/qrcode/new-uuid.png")
                 .build();
 
-        when(eventService.updateEvent(eq(TEST_EVENT_SEQ), any(EventRequest.class), anyString(),
-                any(), any(), anyList(), anyList()))
+        when(eventService.updateEvent(eq(TEST_EVENT_SEQ), any(EventRequest.class), anyString(), any(), any(), any(), any()))
                 .thenReturn(mockResponse);
 
         // When & Then
@@ -474,7 +476,6 @@ class QrSurveyWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.authCodeUrl").exists())
                 .andExpect(jsonPath("$.data.qrCodeImgPath").exists());
 
-        verify(eventService, times(1)).updateEvent(eq(TEST_EVENT_SEQ), any(EventRequest.class), anyString(),
-                any(), any(), anyList(), anyList());
+        verify(eventService, times(1)).updateEvent(eq(TEST_EVENT_SEQ), any(EventRequest.class), anyString(), any(), any(), any(), any());
     }
 }

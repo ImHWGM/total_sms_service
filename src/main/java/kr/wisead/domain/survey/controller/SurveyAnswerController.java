@@ -6,8 +6,8 @@ import kr.wisead.domain.survey.dto.AnswerStatisticsResponse;
 import kr.wisead.domain.survey.service.SurveyAnswerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
+import kr.wisead.security.jwt.CurrentUser;
+import kr.wisead.security.jwt.JwtPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,8 +28,9 @@ public class SurveyAnswerController {
      * GET /api/survey/answers/count?eventSeq=1
      */
     @GetMapping("/count")
-    public ApiResponse<Integer> getAnswerCount(@RequestParam Integer eventSeq) {
-        int count = surveyAnswerService.getAnswerCount(eventSeq);
+    public ApiResponse<Integer> getAnswerCount(
+            @RequestParam Integer eventSeq, @CurrentUser JwtPrincipal user) {
+        int count = surveyAnswerService.getAnswerCount(eventSeq, user.userId());
         return ApiResponse.success(count);
     }
 
@@ -38,8 +39,9 @@ public class SurveyAnswerController {
      * GET /api/survey/answers?eventSeq=1
      */
     @GetMapping
-    public ApiResponse<List<AnswerResponse>> getAnswersByEvent(@RequestParam Integer eventSeq) {
-        List<AnswerResponse> answers = surveyAnswerService.getAnswersByEvent(eventSeq);
+    public ApiResponse<List<AnswerResponse>> getAnswersByEvent(
+            @RequestParam Integer eventSeq, @CurrentUser JwtPrincipal user) {
+        List<AnswerResponse> answers = surveyAnswerService.getAnswersByEvent(eventSeq, user.userId());
         return ApiResponse.success(answers);
     }
 
@@ -50,8 +52,9 @@ public class SurveyAnswerController {
     @GetMapping("/user")
     public ApiResponse<List<AnswerResponse>> getAnswersByUser(
             @RequestParam Integer eventSeq,
-            @RequestParam Integer userSeq) {
-        List<AnswerResponse> answers = surveyAnswerService.getAnswersByUser(eventSeq, userSeq);
+            @RequestParam Integer userSeq,
+            @CurrentUser JwtPrincipal user) {
+        List<AnswerResponse> answers = surveyAnswerService.getAnswersByUser(eventSeq, userSeq, user.userId());
         return ApiResponse.success(answers);
     }
 
@@ -62,8 +65,9 @@ public class SurveyAnswerController {
     @GetMapping("/question")
     public ApiResponse<List<AnswerResponse>> getAnswersByQuestion(
             @RequestParam Integer eventSeq,
-            @RequestParam Integer questionSeq) {
-        List<AnswerResponse> answers = surveyAnswerService.getAnswersByQuestion(eventSeq, questionSeq);
+            @RequestParam Integer questionSeq,
+            @CurrentUser JwtPrincipal user) {
+        List<AnswerResponse> answers = surveyAnswerService.getAnswersByQuestion(eventSeq, questionSeq, user.userId());
         return ApiResponse.success(answers);
     }
 
@@ -74,8 +78,9 @@ public class SurveyAnswerController {
     @GetMapping("/statistics/question")
     public ApiResponse<AnswerStatisticsResponse> getQuestionStatistics(
             @RequestParam Integer eventSeq,
-            @RequestParam Integer questionSeq) {
-        AnswerStatisticsResponse statistics = surveyAnswerService.getQuestionStatistics(eventSeq, questionSeq);
+            @RequestParam Integer questionSeq,
+            @CurrentUser JwtPrincipal user) {
+        AnswerStatisticsResponse statistics = surveyAnswerService.getQuestionStatistics(eventSeq, questionSeq, user.userId());
         return ApiResponse.success(statistics);
     }
 
@@ -84,8 +89,9 @@ public class SurveyAnswerController {
      * GET /api/survey/answers/statistics?eventSeq=1
      */
     @GetMapping("/statistics")
-    public ApiResponse<List<AnswerStatisticsResponse>> getEventStatistics(@RequestParam Integer eventSeq) {
-        List<AnswerStatisticsResponse> statistics = surveyAnswerService.getEventStatistics(eventSeq);
+    public ApiResponse<List<AnswerStatisticsResponse>> getEventStatistics(
+            @RequestParam Integer eventSeq, @CurrentUser JwtPrincipal user) {
+        List<AnswerStatisticsResponse> statistics = surveyAnswerService.getEventStatistics(eventSeq, user.userId());
         return ApiResponse.success(statistics);
     }
 }

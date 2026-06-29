@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.wisead.domain.survey.dto.AnswerResponse;
 import kr.wisead.domain.survey.dto.AnswerStatisticsResponse;
 import kr.wisead.domain.survey.service.SurveyAnswerService;
+import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.security.jwt.JwtTokenProvider;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +55,9 @@ class SurveyAnswerRecordTest {
     @MockitoBean
     private SurveyAnswerService surveyAnswerService;
 
+    @MockitoBean
+    private UserIdResolver userIdResolver;
+
     private static final Integer TEST_EVENT_SEQ = 100;
     private static final Integer TEST_USER_SEQ = 1;
     private static final Integer TEST_QUESTION_SEQ = 10;
@@ -67,6 +71,8 @@ class SurveyAnswerRecordTest {
                 TEST_USER_ID, null,
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
         userToken = jwtTokenProvider.createAccessToken(userAuth, "테스트사용자");
+        lenient().when(userIdResolver.fromJwtUsername(anyString())).thenReturn(1);
+        lenient().when(userIdResolver.toUserId(any())).thenReturn(TEST_USER_ID);
     }
 
     @Test
@@ -74,7 +80,7 @@ class SurveyAnswerRecordTest {
     @DisplayName("1. 이벤트별 답변 수 조회")
     void getAnswerCount_Success() throws Exception {
         // Given
-        when(surveyAnswerService.getAnswerCount(TEST_EVENT_SEQ)).thenReturn(25);
+        when(surveyAnswerService.getAnswerCount(eq(TEST_EVENT_SEQ), anyString())).thenReturn(25);
 
         // When & Then
         mockMvc.perform(get("/api/survey/answers/count")
@@ -84,7 +90,7 @@ class SurveyAnswerRecordTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").value(25));
 
-        verify(surveyAnswerService, times(1)).getAnswerCount(TEST_EVENT_SEQ);
+        verify(surveyAnswerService, times(1)).getAnswerCount(eq(TEST_EVENT_SEQ), anyString());
     }
 
     @Test
@@ -113,7 +119,7 @@ class SurveyAnswerRecordTest {
                         .build()
         );
 
-        when(surveyAnswerService.getAnswersByEvent(TEST_EVENT_SEQ)).thenReturn(answers);
+        when(surveyAnswerService.getAnswersByEvent(eq(TEST_EVENT_SEQ), anyString())).thenReturn(answers);
 
         // When & Then
         mockMvc.perform(get("/api/survey/answers")
@@ -151,7 +157,7 @@ class SurveyAnswerRecordTest {
                         .build()
         );
 
-        when(surveyAnswerService.getAnswersByUser(TEST_EVENT_SEQ, TEST_USER_SEQ))
+        when(surveyAnswerService.getAnswersByUser(eq(TEST_EVENT_SEQ), eq(TEST_USER_SEQ), anyString()))
                 .thenReturn(userAnswers);
 
         // When & Then
@@ -194,7 +200,7 @@ class SurveyAnswerRecordTest {
                         .build()
         );
 
-        when(surveyAnswerService.getAnswersByQuestion(TEST_EVENT_SEQ, TEST_QUESTION_SEQ))
+        when(surveyAnswerService.getAnswersByQuestion(eq(TEST_EVENT_SEQ), eq(TEST_QUESTION_SEQ), anyString()))
                 .thenReturn(questionAnswers);
 
         // When & Then
@@ -244,7 +250,7 @@ class SurveyAnswerRecordTest {
                 ))
                 .build();
 
-        when(surveyAnswerService.getQuestionStatistics(TEST_EVENT_SEQ, TEST_QUESTION_SEQ))
+        when(surveyAnswerService.getQuestionStatistics(eq(TEST_EVENT_SEQ), eq(TEST_QUESTION_SEQ), anyString()))
                 .thenReturn(stats);
 
         // When & Then
@@ -279,7 +285,7 @@ class SurveyAnswerRecordTest {
                 ))
                 .build();
 
-        when(surveyAnswerService.getQuestionStatistics(TEST_EVENT_SEQ, 11))
+        when(surveyAnswerService.getQuestionStatistics(eq(TEST_EVENT_SEQ), eq(11), anyString()))
                 .thenReturn(stats);
 
         // When & Then
@@ -324,7 +330,7 @@ class SurveyAnswerRecordTest {
                         .build()
         );
 
-        when(surveyAnswerService.getEventStatistics(TEST_EVENT_SEQ)).thenReturn(allStats);
+        when(surveyAnswerService.getEventStatistics(eq(TEST_EVENT_SEQ), anyString())).thenReturn(allStats);
 
         // When & Then
         mockMvc.perform(get("/api/survey/answers/statistics")
@@ -344,7 +350,7 @@ class SurveyAnswerRecordTest {
     void getAnswersByEvent_NotFound_EmptyList() throws Exception {
         // Given
         Integer nonExistentEventSeq = 99999;
-        when(surveyAnswerService.getAnswersByEvent(nonExistentEventSeq))
+        when(surveyAnswerService.getAnswersByEvent(eq(nonExistentEventSeq), anyString()))
                 .thenReturn(Collections.emptyList());
 
         // When & Then
@@ -393,7 +399,7 @@ class SurveyAnswerRecordTest {
                 ))
                 .build();
 
-        when(surveyAnswerService.getQuestionStatistics(TEST_EVENT_SEQ, 12))
+        when(surveyAnswerService.getQuestionStatistics(eq(TEST_EVENT_SEQ), eq(12), anyString()))
                 .thenReturn(stats);
 
         // When & Then
@@ -409,16 +415,13 @@ class SurveyAnswerRecordTest {
 
     @Test
     @Order(10)
-    @DisplayName("10. 비로그인 사용자의 답변 조회 - 공개 API이므로 성공")
-    void getAnswers_PublicAccess_Success() throws Exception {
-        // Given: /api/survey/** 는 설문 참여자용 공개 API
-        when(surveyAnswerService.getAnswersByEvent(TEST_EVENT_SEQ))
-                .thenReturn(Collections.emptyList());
-
-        // When & Then: 토큰 없이도 접근 가능
+    @DisplayName("10. 비로그인 사용자의 답변 조회 - 인증 필요(PII 보호)이므로 401")
+    void getAnswers_Unauthenticated_Unauthorized() throws Exception {
+        // When & Then: 토큰 없으면 차단 (미인증 PII 노출 방지)
         mockMvc.perform(get("/api/survey/answers")
                         .param("eventSeq", String.valueOf(TEST_EVENT_SEQ)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(status().isUnauthorized());
+
+        verify(surveyAnswerService, never()).getAnswersByEvent(any(), any());
     }
 }

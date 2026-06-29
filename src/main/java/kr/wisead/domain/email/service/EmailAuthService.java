@@ -202,15 +202,16 @@ public class EmailAuthService {
   }
 
   /**
-   * 사용자에 묶인 인증 정보 강제 무효화 (채널 전환 시 cross-channel 정리용).
+   * 로그인 2FA OTP 강제 무효화 (채널 전환 시 cross-channel 정리용).
    *
-   * <p>purpose 무관하게 해당 채널의 모든 행을 삭제한다.
+   * <p>LOGIN_2FA purpose만 삭제한다. UNLOCK·DORMANT_RECOVERY OTP는 별개 흐름(잠금/휴면 계정
+   * 전용)이므로 로그인 채널 전환 시 건드리지 않는다.
    */
   public void invalidate(Integer userId) {
     if (userId == null) {
       return;
     }
-    verificationMapper.deleteByChannelAndIdentifier(CHANNEL, String.valueOf(userId));
+    verificationMapper.deleteByKey(PURPOSE_LOGIN_2FA, CHANNEL, String.valueOf(userId));
   }
 
   // ==================== Private Methods ====================

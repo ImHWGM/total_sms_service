@@ -61,6 +61,21 @@
         WHERE PURPOSE = #{purpose} AND CHANNEL = #{channel} AND IDENTIFIER = #{identifier}
     </delete>
 
+    <!-- 채널 전환 시 같은 사용자의 특정 채널 OTP 전체 무효화 -->
+    <delete id="deleteByChannelAndIdentifier">
+        DELETE FROM verification
+        WHERE CHANNEL = #{channel} AND IDENTIFIER = #{identifier}
+    </delete>
+
+    <!-- 코드 일치 시에만 원자적으로 행 삭제 — 로그인 2FA 단발 검증용 -->
+    <delete id="deleteIfCodeMatches">
+        DELETE FROM verification
+        WHERE PURPOSE = #{purpose}
+          AND CHANNEL = #{channel}
+          AND IDENTIFIER = #{identifier}
+          AND CODE = #{code}
+    </delete>
+
     <!-- 만료 정리: (미인증 & 코드만료) 또는 (인증 & 유예초과) -->
     <delete id="deleteExpired">
         DELETE FROM verification

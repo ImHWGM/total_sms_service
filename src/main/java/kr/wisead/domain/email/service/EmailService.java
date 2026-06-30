@@ -1,6 +1,7 @@
 package kr.wisead.domain.email.service;
 
 import java.security.SecureRandom;
+import kr.wisead.common.util.CommonUtils;
 import kr.wisead.domain.email.dto.EmailRequest;
 import kr.wisead.domain.inquiry.entity.Inquiry;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +46,7 @@ public class EmailService {
         EmailRequest.builder().to(to).subject(subject).content(content).saveSentMail(false).build();
 
     hiworksMailService.send(request);
-    log.info("인증 코드 이메일 발송 완료: to={}", to);
+    log.info("인증 코드 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(to));
   }
 
   /** 문의 접수 확인 이메일 발송 (문의자에게) */
@@ -57,7 +58,7 @@ public class EmailService {
         EmailRequest.builder().to(to).subject(subject).content(content).saveSentMail(false).build();
 
     hiworksMailService.send(request);
-    log.info("문의 접수 확인 이메일 발송 완료: to={}", to);
+    log.info("문의 접수 확인 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(to));
   }
 
   /** 문의 접수 알림 이메일 발송 (관리자에게) */
@@ -74,7 +75,7 @@ public class EmailService {
             .build();
 
     hiworksMailService.send(request);
-    log.info("문의 알림 이메일 발송 완료: to={}", notifyEmail);
+    log.info("문의 알림 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(notifyEmail));
   }
 
   /** 문의 답변 알림 이메일 발송 (문의자에게) */
@@ -86,7 +87,7 @@ public class EmailService {
         EmailRequest.builder().to(to).subject(subject).content(content).saveSentMail(false).build();
 
     hiworksMailService.send(request);
-    log.info("문의 답변 알림 이메일 발송 완료: to={}", to);
+    log.info("문의 답변 알림 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(to));
   }
 
   /**
@@ -107,13 +108,13 @@ public class EmailService {
         EmailRequest.builder().to(to).subject(subject).content(content).saveSentMail(false).build();
 
     hiworksMailService.send(request);
-    log.info("휴면 전환 예정 안내 이메일 발송 완료: to={}", to);
+    log.info("휴면 전환 예정 안내 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(to));
   }
 
   /** 일반 이메일 발송 */
   public void sendEmail(EmailRequest request) {
     hiworksMailService.send(request);
-    log.info("이메일 발송 완료: to={}", request.getTo());
+    log.info("이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(request.getTo()));
   }
 
   /**
@@ -130,7 +131,7 @@ public class EmailService {
         EmailRequest.builder().to(to).subject(subject).content(content).saveSentMail(false).build();
 
     hiworksMailService.send(request);
-    log.info("비밀번호 재설정 이메일 발송 완료: to={}", to);
+    log.info("비밀번호 재설정 이메일 발송 완료: to={}", CommonUtils.maskingEmailShort(to));
   }
 
   // ==================== Private Methods ====================

@@ -45,6 +45,21 @@ public interface VerificationMapper {
       @Param("channel") String channel,
       @Param("identifier") String identifier);
 
+  /** 같은 (channel, identifier) 의 모든 행 삭제 — 채널 전환 시 전체 무효화용. */
+  int deleteByChannelAndIdentifier(
+      @Param("channel") String channel, @Param("identifier") String identifier);
+
+  /**
+   * code 일치 시에만 행 삭제 (원자적). 로그인 2FA 단발 검증에 사용.
+   *
+   * @return 삭제된 행 수 (1=코드 일치·성공, 0=불일치 또는 행 없음)
+   */
+  int deleteIfCodeMatches(
+      @Param("purpose") String purpose,
+      @Param("channel") String channel,
+      @Param("identifier") String identifier,
+      @Param("code") String code);
+
   /**
    * 만료 행 정리.
    *

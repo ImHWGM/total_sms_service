@@ -1521,6 +1521,8 @@ public class EventService {
     Map<Integer, Map<Integer, String>> userAnswersMap = new HashMap<>();
     // 사용자별 기타 텍스트 맵 구성
     Map<Integer, Map<Integer, String>> userOtherTextMap = new HashMap<>();
+    // 답변 PII 유형(detail) 맵 — 답변 row의 detail이 권위값(문항 정의 detail과 달라도 복호화 정확).
+    Map<Integer, Map<Integer, String>> userAnswerDetailMap = new HashMap<>();
     for (SurveyAnswer answer : allAnswers) {
       if (answer.getAnswer() == null) continue;
       Map<Integer, String> questionMap =
@@ -1529,6 +1531,9 @@ public class EventService {
           answer.getQuestionSeq(),
           answer.getAnswer(),
           (existing, newVal) -> existing + "##" + newVal);
+      userAnswerDetailMap
+          .computeIfAbsent(answer.getUserSeq(), k -> new HashMap<>())
+          .put(answer.getQuestionSeq(), answer.getQuestionTypeDetail());
       // 기타 텍스트 저장
       if (answer.getOtherText() != null && !answer.getOtherText().isEmpty()) {
         Map<Integer, String> otherTextMap =
@@ -1577,7 +1582,8 @@ public class EventService {
           participants,
           userAnswersMap,
           userOtherTextMap,
-          otherTypeByQuestion);
+          otherTypeByQuestion,
+          userAnswerDetailMap);
 
       // 시트4: 개별전체(비응답자)
       addSurveyAbsenteesSheet(workbook, absentees);
@@ -1801,7 +1807,8 @@ public class EventService {
       List<SurveyUser> participants,
       Map<Integer, Map<Integer, String>> userAnswersMap,
       Map<Integer, Map<Integer, String>> userOtherTextMap,
-      Map<Integer, OtherType> otherTypeByQuestion) {
+      Map<Integer, OtherType> otherTypeByQuestion,
+      Map<Integer, Map<Integer, String>> userAnswerDetailMap) {
     Sheet sheet = workbook.createSheet("개별전체(응답자)");
     sheet.setDefaultColumnWidth(15);
 
@@ -1883,12 +1890,22 @@ public class EventService {
           userAnswersMap.getOrDefault(participant.getSeq(), new HashMap<>());
       Map<Integer, String> userOtherTexts =
           userOtherTextMap.getOrDefault(participant.getSeq(), new HashMap<>());
+      Map<Integer, String> userAnswerDetails =
+          userAnswerDetailMap.getOrDefault(participant.getSeq(), new HashMap<>());
       for (int i = 0; i < questions.size(); i++) {
         SurveyQuestion question = questions.get(i);
         String answer = userAnswers.get(question.getQuestionSeq());
         String displayAnswer = "";
         if (answer != null) {
-          if (answer.startsWith("RSA:")) {
+          String firstPart = getFirstPart(answer);
+          if (firstPart != null && firstPart.startsWith("PII:")) {
+            // 'PII:' 접두 = 주관식 PII 암호값. 문항 타입 분기와 무관하게 답변 detail 기준 복호화.
+            String ansDetail = userAnswerDetails.get(question.getQuestionSeq());
+            if (ansDetail == null) {
+              ansDetail = question.getQuestionTypeDetail();
+            }
+            displayAnswer = OtherTextCrypto.decryptForDisplay(ansDetail, firstPart);
+          } else if (answer.startsWith("RSA:")) {
             // RSA 암호화 데이터: 세션 키 소멸로 직접 복호화 불가 → SURVEY_USER 필드에서 복호화
             displayAnswer = decryptUserFieldByType(participant, question.getQuestionTypeDetail());
           } else if ("MC".equals(question.getQuestionType())) {
@@ -1912,10 +1929,14 @@ public class EventService {
             String decrypted = decryptDataSafe(firstAnswer);
             displayAnswer = decrypted != null ? decrypted : firstAnswer;
           } else {
-            // PII 유형(NE/AD/CU/EM)은 복호화, 그 외 평문 (중복 제출 시 첫 번째만)
+            // PII 유형(NE/AD/CU/EM)은 복호화, 그 외 평문 (중복 제출 시 첫 번째만).
+            // detail은 답변 row 기준 — 문항 정의 detail과 달라도 정확히 복호화 (API 경로와 동일).
+            String ansDetail = userAnswerDetails.get(question.getQuestionSeq());
+            if (ansDetail == null) {
+              ansDetail = question.getQuestionTypeDetail();
+            }
             displayAnswer =
-                OtherTextCrypto.decryptForDisplay(
-                    question.getQuestionTypeDetail(), getFirstPart(answer));
+                OtherTextCrypto.decryptForDisplay(ansDetail, getFirstPart(answer));
           }
         }
         createCell(dataRow, 4 + i, displayAnswer, normalStyle);

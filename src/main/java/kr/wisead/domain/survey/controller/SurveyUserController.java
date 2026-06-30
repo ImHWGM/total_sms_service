@@ -103,8 +103,9 @@ public class SurveyUserController {
   /** 설문 완료자 목록 조회 */
   @AccessLog(menuName = "설문 완료자 조회")
   @GetMapping("/completed")
-  public ApiResponse<List<SurveyUserResponse>> getCompletedUsers(@RequestParam Integer eventSeq) {
-    List<SurveyUserResponse> response = surveyUserService.getCompletedUsers(eventSeq);
+  public ApiResponse<List<SurveyUserResponse>> getCompletedUsers(
+      @RequestParam Integer eventSeq, @CurrentUser JwtPrincipal user) {
+    List<SurveyUserResponse> response = surveyUserService.getCompletedUsers(eventSeq, user.userId());
     return ApiResponse.success(response);
   }
 
@@ -112,16 +113,17 @@ public class SurveyUserController {
   @AccessLog(menuName = "설문 미참여/접속자 조회")
   @GetMapping("/absentees")
   public ApiResponse<List<SurveyUserResponse>> getAbsenteesAndLurkers(
-      @RequestParam Integer eventSeq) {
-    List<SurveyUserResponse> response = surveyUserService.getAbsenteesAndLurkers(eventSeq);
+      @RequestParam Integer eventSeq, @CurrentUser JwtPrincipal user) {
+    List<SurveyUserResponse> response = surveyUserService.getAbsenteesAndLurkers(eventSeq, user.userId());
     return ApiResponse.success(response);
   }
 
   /** 참여자 상세 조회 (시퀀스) */
   @AccessLog(menuName = "참여자 상세조회")
   @GetMapping("/{userSeq}")
-  public ApiResponse<SurveyUserResponse> getUserBySeq(@PathVariable Integer userSeq) {
-    SurveyUserResponse response = surveyUserService.getUserBySeq(userSeq);
+  public ApiResponse<SurveyUserResponse> getUserBySeq(
+      @PathVariable Integer userSeq, @CurrentUser JwtPrincipal user) {
+    SurveyUserResponse response = surveyUserService.getUserBySeq(userSeq, user.userId());
     return ApiResponse.success(response);
   }
 
@@ -135,13 +137,9 @@ public class SurveyUserController {
 
   /** 이벤트별 참여자 수 통계 */
   @GetMapping("/count")
-  public ApiResponse<Map<String, Integer>> getParticipantCounts(@RequestParam Integer eventSeq) {
-    Map<String, Integer> counts =
-        Map.of(
-            "total", surveyUserService.countByEventSeq(eventSeq),
-            "completed", surveyUserService.countCompletedByEventSeq(eventSeq),
-            "absentees", surveyUserService.countAbsenteesByEventSeq(eventSeq),
-            "lurkers", surveyUserService.countLurkersByEventSeq(eventSeq));
+  public ApiResponse<Map<String, Integer>> getParticipantCounts(
+      @RequestParam Integer eventSeq, @CurrentUser JwtPrincipal user) {
+    Map<String, Integer> counts = surveyUserService.getParticipantCounts(eventSeq, user.userId());
     return ApiResponse.success(counts);
   }
 

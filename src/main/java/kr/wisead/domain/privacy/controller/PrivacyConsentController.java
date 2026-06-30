@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Date;
+import kr.wisead.common.exception.BusinessException;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.privacy.dto.PrivacyPreviewRequest;
 import kr.wisead.domain.privacy.service.PrivacyConsentPdfService;
@@ -52,7 +53,7 @@ public class PrivacyConsentController {
 
       byte[] pdfContent =
           privacyConsentPdfService.generatePrivacyConsentPdf(
-              userSeq, eventSeq, includeSignature, language);
+              userSeq, eventSeq, includeSignature, language, requestUserId);
 
       log.info(
           "개인정보제공동의서 PDF 다운로드 성공 - 요청자: {}, eventSeq: {}, userSeq: {}, PDF 크기: {} bytes",
@@ -86,6 +87,9 @@ public class PrivacyConsentController {
             .build();
       }
       return ResponseEntity.badRequest().header("X-Error-Message-Encoded", encodedMessage).build();
+    } catch (BusinessException e) {
+      // 권한 없음(403)/리소스 없음(404) 등은 전역 핸들러가 상태코드로 매핑하도록 그대로 전파
+      throw e;
     } catch (Exception e) {
       log.error(
           "개인정보제공동의서 다운로드 오류 - 요청자: {}, eventSeq: {}, userSeq: {}",
@@ -117,7 +121,7 @@ public class PrivacyConsentController {
 
       byte[] zipContent =
           privacyConsentPdfService.generatePrivacyConsentPdfZip(
-              eventSeq, includeSignature, language);
+              eventSeq, includeSignature, language, requestUserId);
 
       log.info(
           "개인정보제공동의서 ZIP 다운로드 성공 - 요청자: {}, eventSeq: {}, ZIP 크기: {} bytes",
@@ -146,6 +150,9 @@ public class PrivacyConsentController {
       return ResponseEntity.badRequest()
           .header("X-Error-Message-Encoded", encodeErrorMessage(e.getMessage()))
           .build();
+    } catch (BusinessException e) {
+      // 권한 없음(403)/리소스 없음(404) 등은 전역 핸들러가 상태코드로 매핑하도록 그대로 전파
+      throw e;
     } catch (Exception e) {
       log.error("개인정보제공동의서 ZIP 다운로드 오류 - 요청자: {}, eventSeq: {}", requestUserId, eventSeq, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();

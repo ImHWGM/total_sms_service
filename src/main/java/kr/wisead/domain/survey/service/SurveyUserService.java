@@ -16,6 +16,7 @@ import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.common.util.UserIdResolver;
 import kr.wisead.domain.admin.service.ActionLogService;
 import kr.wisead.domain.admin.service.AdminService;
+import kr.wisead.domain.event.service.EventAccessValidator;
 import kr.wisead.domain.survey.dto.SurveyUserRequest;
 import kr.wisead.domain.survey.dto.SurveyUserResponse;
 import kr.wisead.domain.survey.entity.SurveyMaster;
@@ -38,6 +39,7 @@ public class SurveyUserService {
   private final AdminService adminService;
   private final ActionLogService actionLogService;
   private final UserIdResolver userIdResolver;
+  private final EventAccessValidator eventAccessValidator;
 
   /** 이벤트별 참여자 목록 조회 */
   @Transactional(readOnly = true)
@@ -244,26 +246,29 @@ public class SurveyUserService {
 
   /** 설문 완료자 목록 조회 */
   @Transactional(readOnly = true)
-  public List<SurveyUserResponse> getCompletedUsers(Integer eventSeq) {
+  public List<SurveyUserResponse> getCompletedUsers(Integer eventSeq, String userId) {
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
     List<SurveyUser> users = surveyUserMapper.selectCompletedByEventSeq(eventSeq);
     return users.stream().map(this::toResponse).collect(Collectors.toList());
   }
 
   /** 미참여/접속자 목록 조회 */
   @Transactional(readOnly = true)
-  public List<SurveyUserResponse> getAbsenteesAndLurkers(Integer eventSeq) {
+  public List<SurveyUserResponse> getAbsenteesAndLurkers(Integer eventSeq, String userId) {
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
     List<SurveyUser> users = surveyUserMapper.selectAbsenteesAndLurkers(eventSeq);
     return users.stream().map(this::toResponse).collect(Collectors.toList());
   }
 
   /** 사용자 상세 조회 (시퀀스) */
   @Transactional(readOnly = true)
-  public SurveyUserResponse getUserBySeq(Integer userSeq) {
+  public SurveyUserResponse getUserBySeq(Integer userSeq, String userId) {
     SurveyUser user =
         surveyUserMapper
             .selectBySeq(userSeq)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자를 찾을 수 없습니다."));
+    eventAccessValidator.validateEventReadAccess(user.getEventSeq(), userId);
     return toResponse(user);
   }
 
@@ -300,6 +305,17 @@ public class SurveyUserService {
   @Transactional(readOnly = true)
   public int countLurkersByEventSeq(Integer eventSeq) {
     return surveyUserMapper.countLurkersByEventSeq(eventSeq);
+  }
+
+  /** 이벤트별 참여자 수 통계 (소유권 검증 포함) */
+  @Transactional(readOnly = true)
+  public Map<String, Integer> getParticipantCounts(Integer eventSeq, String userId) {
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
+    return Map.of(
+        "total", countByEventSeq(eventSeq),
+        "completed", countCompletedByEventSeq(eventSeq),
+        "absentees", countAbsenteesByEventSeq(eventSeq),
+        "lurkers", countLurkersByEventSeq(eventSeq));
   }
 
   /** 참여자 등록 */
@@ -447,7 +463,7 @@ public class SurveyUserService {
     surveyUserMapper.update(updateUser);
     log.info("설문 참여자 수정 완료: userSeq={}", userSeq);
 
-    return getUserBySeq(userSeq);
+    return getUserBySeq(userSeq, uptId);
   }
 
   /** 재발송 전화번호 수정 */

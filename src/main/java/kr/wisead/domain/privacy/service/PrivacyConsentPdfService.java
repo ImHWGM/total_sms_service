@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.imageio.ImageIO;
@@ -19,6 +20,7 @@ import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.CryptoUtils;
 import kr.wisead.domain.privacy.dto.FontSet;
 import kr.wisead.domain.privacy.dto.PageState;
+import kr.wisead.domain.event.service.EventAccessValidator;
 import kr.wisead.domain.survey.entity.SurveyMaster;
 import kr.wisead.domain.survey.entity.SurveyUser;
 import kr.wisead.mapper.primary.SurveyAnswerMapper;
@@ -71,6 +73,7 @@ public class PrivacyConsentPdfService {
   private final SurveyMasterMapper surveyMasterMapper;
   private final SurveyQuestionMapper surveyQuestionMapper;
   private final SurveyUserMapper surveyUserMapper;
+  private final EventAccessValidator eventAccessValidator;
 
   private String getTitle(String language) {
     return "en".equals(language) ? PDF_TITLE_EN : PDF_TITLE;
@@ -107,7 +110,10 @@ public class PrivacyConsentPdfService {
   /** 단건 개인정보제공동의서 PDF 생성 */
   @Transactional(readOnly = true)
   public byte[] generatePrivacyConsentPdf(
-      int userSeq, int eventSeq, boolean includeSignature, String language) throws Exception {
+      int userSeq, int eventSeq, boolean includeSignature, String language, String userId)
+      throws Exception {
+    // 호출자(고객사)가 해당 이벤트 조회 권한을 가지는지 검증 (인증된 IDOR 차단)
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
     SurveyMaster event =
         surveyMasterMapper
             .selectByEventSeq(eventSeq)
@@ -123,6 +129,11 @@ public class PrivacyConsentPdfService {
             .selectBySeq(userSeq)
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자 정보를 찾을 수 없습니다."));
+
+    // userSeq ↔ eventSeq 정합 검증: 타 이벤트 참여자 PII 조회 차단
+    if (!Objects.equals(user.getEventSeq(), eventSeq)) {
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
+    }
 
     if (user.getSubmissionDate() == null) {
       throw new IllegalArgumentException("설문 제출이 완료되지 않아 개인정보제공동의서를 생성할 수 없습니다.");
@@ -149,7 +160,9 @@ public class PrivacyConsentPdfService {
   /** 다건 개인정보제공동의서 PDF.zip 생성 */
   @Transactional(readOnly = true)
   public byte[] generatePrivacyConsentPdfZip(
-      int eventSeq, boolean includeSignature, String language) throws Exception {
+      int eventSeq, boolean includeSignature, String language, String userId) throws Exception {
+    // 호출자(고객사)가 해당 이벤트 조회 권한을 가지는지 검증 (인증된 IDOR 차단 — 전량 덤프 방지)
+    eventAccessValidator.validateEventReadAccess(eventSeq, userId);
     SurveyMaster event =
         surveyMasterMapper
             .selectByEventSeq(eventSeq)

@@ -5,10 +5,15 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Date;
+import java.util.Objects;
 import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.util.UserIdResolver;
+import kr.wisead.domain.event.service.EventAccessValidator;
 import kr.wisead.domain.privacy.dto.PrivacyPreviewRequest;
 import kr.wisead.domain.privacy.service.PrivacyConsentPdfService;
+import kr.wisead.domain.survey.entity.SurveyUser;
+import kr.wisead.mapper.primary.SurveyUserMapper;
 import kr.wisead.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +35,8 @@ public class PrivacyConsentController {
   private final PrivacyConsentPdfService privacyConsentPdfService;
   private final JwtTokenProvider jwtTokenProvider;
   private final UserIdResolver userIdResolver;
+  private final EventAccessValidator eventAccessValidator;
+  private final SurveyUserMapper surveyUserMapper;
 
   /** 단건 개인정보제공동의서 PDF 다운로드 GET /api/privacy-consent/download/user/{userSeq}/event/{eventSeq} */
   @GetMapping("/download/user/{userSeq}/event/{eventSeq}")
@@ -42,6 +49,9 @@ public class PrivacyConsentController {
 
     String requestUserId =
         userIdResolver.resolveUserId(jwtTokenProvider.getUserId(extractToken(token)));
+
+    eventAccessValidator.validateEventReadAccess(eventSeq, requestUserId);
+    validateUserBelongsToEvent(userSeq, eventSeq);
 
     try {
       log.info(
@@ -111,6 +121,8 @@ public class PrivacyConsentController {
 
     String requestUserId =
         userIdResolver.resolveUserId(jwtTokenProvider.getUserId(extractToken(token)));
+
+    eventAccessValidator.validateEventReadAccess(eventSeq, requestUserId);
 
     try {
       log.info(
@@ -226,6 +238,14 @@ public class PrivacyConsentController {
       return String.format("privacy_consent_%s.pdf", userName);
     } catch (Exception e) {
       return String.format("privacy_consent_%d.pdf", userSeq);
+    }
+  }
+
+  /** path eventSeq ↔ 참여자 소속 eventSeq 정합 검증 (userSeq 임의 대입으로 타 이벤트 PII 조회 차단) */
+  private void validateUserBelongsToEvent(int userSeq, int eventSeq) {
+    SurveyUser user = surveyUserMapper.selectBySeq(userSeq).orElse(null);
+    if (user == null || !Objects.equals(user.getEventSeq(), eventSeq)) {
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
     }
   }
 }

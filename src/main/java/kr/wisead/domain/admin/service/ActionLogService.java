@@ -136,6 +136,35 @@ public class ActionLogService {
     }
 
     /**
+     * 발송 이력 수신번호 원본조회 로그 기록.
+     *
+     * <p>셀 더블클릭 원본조회는 비밀번호/사유 입력 UI가 없으므로 reason 검증 없이, 인증된 관리자 기준으로
+     * "누가(userId/userName) / 언제(REG_DATE) / 어느 seq(searchCondition)"를 자동 기록한다.
+     */
+    @Transactional
+    public void logSendHistoryUnmask(String userId, String userName, Long seq, String ym,
+                                     HttpServletRequest httpRequest) {
+        String searchCondition = ym != null && !ym.isBlank()
+                ? "seq=" + seq + ", ym=" + ym
+                : "seq=" + seq;
+
+        ActionLog actionLog = ActionLog.builder()
+                .menuName("발송 이력 수신번호 원본조회")
+                .actionType("R")
+                .searchCondition(searchCondition)
+                .menuUrl(httpRequest.getRequestURI())
+                .code("200")
+                .referer(httpRequest.getHeader("Referer"))
+                .userId(userId)
+                .userName(userName)
+                .ip(getClientIp(httpRequest))
+                .build();
+
+        actionLogMapper.insertAccessLog(actionLog);
+        log.info("[원본조회로그] userId={}, {}", userId, searchCondition);
+    }
+
+    /**
      * 다운로드 로그 기록 (간편 버전 - HttpServletRequest 없이)
      */
     @Transactional

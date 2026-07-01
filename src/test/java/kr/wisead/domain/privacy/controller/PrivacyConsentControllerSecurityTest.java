@@ -66,7 +66,7 @@ class PrivacyConsentControllerSecurityTest {
         .isEqualTo(ErrorCode.ACCESS_DENIED);
 
     verify(privacyConsentPdfService, never())
-        .generatePrivacyConsentPdfZip(anyInt(), anyBoolean(), any());
+        .generatePrivacyConsentPdfZip(anyInt(), anyBoolean(), any(), any());
   }
 
   @Test
@@ -85,7 +85,7 @@ class PrivacyConsentControllerSecurityTest {
         .isEqualTo(ErrorCode.ACCESS_DENIED);
 
     verify(privacyConsentPdfService, never())
-        .generatePrivacyConsentPdf(anyInt(), anyInt(), anyBoolean(), any());
+        .generatePrivacyConsentPdf(anyInt(), anyInt(), anyBoolean(), any(), any());
   }
 
   @Test
@@ -105,6 +105,6 @@ class PrivacyConsentControllerSecurityTest {
 
     verify(eventAccessValidator).validateEventReadAccess(eq(EVENT_SEQ), eq(ATTACKER_ID));
     verify(privacyConsentPdfService, never())
-        .generatePrivacyConsentPdf(anyInt(), anyInt(), anyBoolean(), any());
+        .generatePrivacyConsentPdf(anyInt(), anyInt(), anyBoolean(), any(), any());
   }
 }

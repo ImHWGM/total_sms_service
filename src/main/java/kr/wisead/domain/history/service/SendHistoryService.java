@@ -4,7 +4,10 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import kr.wisead.common.exception.BusinessException;
+import kr.wisead.common.response.ErrorCode;
 import kr.wisead.common.response.PageResponse;
+import kr.wisead.common.util.PhoneUtils;
 import kr.wisead.domain.ars.dto.BlockedSenderResponse;
 import kr.wisead.domain.ars.service.ArsService;
 import kr.wisead.domain.history.dto.SendHistoryResponse;
@@ -22,6 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class SendHistoryService {
+
+  /** ym 미지정 시 seq 를 역순 탐색할 최근 월 테이블 수 */
+  private static final int UNMASK_FALLBACK_MONTHS = 13;
 
   private final SendHistoryMapper sendHistoryMapper;
   private final ArsService arsService;
@@ -136,6 +142,32 @@ public class SendHistoryService {
     return allResults.stream().map(SendHistoryResponse::from).toList();
   }
 
+  /**
+   * seq(MSEQ) 로 원본 수신번호 조회.
+   *
+   * @param seq 발송 이력 seq (SendHistoryResponse.seq / MSEQ)
+   * @param ym 발송월 힌트 "yyyyMM" (선택). 유효하면 해당 월 단일 테이블만 조회, 없으면 최근 월 역순 탐색
+   * @param queryUserId 권한 범위 (콤마 구분 발신 userId 또는 "ALL")
+   * @return 하이픈 포맷된 원본 수신번호 (예: 010-1234-5678)
+   * @throws BusinessException 권한 범위 내에서 seq 를 찾지 못하면 RESOURCE_NOT_FOUND (404)
+   */
+  @Transactional(readOnly = true)
+  public String getUnmaskedReceiver(Long seq, String ym, String queryUserId) {
+    for (String tableName : resolveCandidateTables(ym)) {
+      try {
+        SendHistory found = sendHistoryMapper.selectBySeq(tableName, seq, queryUserId);
+        if (found != null) {
+          log.info("[원본조회] seq={}, table={}", seq, tableName);
+          return PhoneUtils.format(found.getDstAddr());
+        }
+      } catch (Exception e) {
+        // 존재하지 않는 월 테이블 등은 무시하고 다음 후보로 진행
+        log.warn("[원본조회] 테이블 {} 조회 중 오류(무시): {}", tableName, e.getMessage());
+      }
+    }
+    throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "발송 이력을 찾을 수 없습니다.");
+  }
+
   /** 수신거부 목록 조회 (ArsService 위임) */
   @Transactional(readOnly = true)
   public PageResponse<BlockedSenderResponse> getBlockedSenders(
@@ -177,6 +209,22 @@ public class SendHistoryService {
   }
 
   // ==================== Private Methods ====================
+
+  /** 원본조회 대상 후보 테이블 결정: ym 유효 시 단일 테이블, 아니면 최근 월 역순 목록 */
+  private List<String> resolveCandidateTables(String ym) {
+    if (ym != null && ym.matches("\\d{6}")) {
+      return List.of("msg_result_" + ym);
+    }
+    // ym 미지정/형식오류 시 최근 UNMASK_FALLBACK_MONTHS 개월을 당월부터 역순 탐색
+    DateTimeFormatter yearMonth = DateTimeFormatter.ofPattern("yyyyMM");
+    LocalDate month = LocalDate.now().withDayOfMonth(1);
+    List<String> tables = new ArrayList<>();
+    for (int i = 0; i < UNMASK_FALLBACK_MONTHS; i++) {
+      tables.add("msg_result_" + month.format(yearMonth));
+      month = month.minusMonths(1);
+    }
+    return tables;
+  }
 
   /** 검색 기간에 해당하는 테이블 명 목록 생성 */
   private List<String> getTableNames(String startDateStr, String endDateStr) {

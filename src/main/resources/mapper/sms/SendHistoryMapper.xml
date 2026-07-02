@@ -144,6 +144,28 @@
         ORDER BY REQUEST_TIME DESC
     </select>
 
+    <!-- seq(MSEQ) 단건 조회 (원본 수신번호 조회용, 권한 범위 필터 포함) -->
+    <select id="selectBySeq" resultMap="sendHistoryResultMap">
+        SELECT
+            <include refid="selectColumns"/>
+        FROM ${tableName}
+        WHERE MSEQ = #{seq}
+        <if test="userId != null and userId != '' and userId != 'ALL'.toString()">
+            <choose>
+                <when test="userId.indexOf(',') >= 0">
+                    AND EXT_COL3 IN
+                    <foreach item="id" collection="userId.split(',')" open="(" separator="," close=")">
+                        #{id}
+                    </foreach>
+                </when>
+                <otherwise>
+                    AND EXT_COL3 = #{userId}
+                </otherwise>
+            </choose>
+        </if>
+        LIMIT 1
+    </select>
+
     <!-- 전화번호로 최근 발송자 ID 조회 (동적 테이블명) - ARS 자동등록형 -->
     <select id="selectUserIdByAni" resultType="String">
         SELECT EXT_COL3

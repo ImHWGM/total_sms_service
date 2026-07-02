@@ -1,5 +1,6 @@
 package kr.wisead.domain.history.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import kr.wisead.common.util.PhoneUtils;
 import kr.wisead.common.util.UrlUtils;
 import kr.wisead.domain.history.entity.SendHistory;
@@ -22,6 +23,12 @@ public class SendHistoryResponse {
     private Long seq; // 메시지 시퀀스 (mseq)
     private String msgType; // 메시지 타입
     private String receiver; // 수신번호 (마스킹 처리됨)
+
+    /**
+     * 원본 수신번호. 엑셀 다운로드(getter 직접 참조)에서만 사용하며, 리스트 JSON 응답에는
+     * PII 노출 방지를 위해 직렬화하지 않는다. 원본 조회는 감사 로그가 남는 별도 unmask API를 통한다.
+     */
+    @JsonIgnore
     private String rawReceiver; // 원본 번호
     private String callback; // 발신번호
     private String subject; // 제목

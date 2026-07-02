@@ -21,6 +21,7 @@ import kr.wisead.domain.admin.service.AdminService;
 import kr.wisead.domain.ars.dto.BlockedSenderResponse;
 import kr.wisead.domain.history.dto.SendHistoryResponse;
 import kr.wisead.domain.history.dto.SendHistorySearchRequest;
+import kr.wisead.domain.history.dto.UnmaskedReceiverResponse;
 import kr.wisead.domain.history.service.SendHistoryService;
 import kr.wisead.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
@@ -89,6 +90,36 @@ public class SendHistoryController {
 
     PageResponse<SendHistoryResponse> response = sendHistoryService.getHistoryList(request);
     return ApiResponse.success(response);
+  }
+
+  /**
+   * 발송 이력 원본 수신번호 조회 GET /api/history/send/{seq}/unmasked
+   *
+   * <p>리스트에서 마스킹된 수신번호의 원본을 셀 더블클릭으로 조회한다. 비밀번호/사유 없이 즉시 해제하되,
+   * 접근 추적성은 감사 로그(ACTION_LOG)로 보완한다. 권한 범위를 벗어나거나 없는 seq 는 404.
+   *
+   * @param ym 발송월 힌트 "yyyyMM" (선택). 지정 시 해당 월 단일 테이블만 조회하여 효율적
+   */
+  @GetMapping("/send/{seq}/unmasked")
+  public ApiResponse<UnmaskedReceiverResponse> getUnmaskedReceiver(
+      @PathVariable Long seq,
+      @RequestParam(required = false) String ym,
+      @RequestHeader("Authorization") String token,
+      HttpServletRequest request) {
+
+    String accessToken = token.replace("Bearer ", "");
+    String userId = userIdResolver.resolveUserId(jwtTokenProvider.getUserId(accessToken));
+    Integer userLevel = adminService.getUserLevel(userId);
+    String queryUserId = adminService.determineQueryUserIds(userId, userLevel);
+
+    // 권한 범위 내에서 조회. 없거나 범위 밖이면 서비스가 404(RESOURCE_NOT_FOUND)를 던진다.
+    String receiver = sendHistoryService.getUnmaskedReceiver(seq, ym, queryUserId);
+
+    // 원본이 실제로 노출된 경우에만 접근 감사 로그 기록 (누가/언제/어느 seq)
+    String userName = userIdResolver.resolveUserName(userId);
+    actionLogService.logSendHistoryUnmask(userId, userName, seq, ym, request);
+
+    return ApiResponse.success(new UnmaskedReceiverResponse(receiver));
   }
 
   /** 발송 이력 엑셀 다운로드 POST /api/history/send/download */
